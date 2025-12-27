@@ -40,6 +40,7 @@ export type MoreStackParamList = {
   Refund: undefined;
   Printer: undefined;
   PaymentTerminal: { amount?: number; items?: any[] };
+  DailyOrders: undefined;
 };
 
 /**

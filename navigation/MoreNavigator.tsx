@@ -8,6 +8,7 @@ import RefundScreen from '../screens/RefundScreen';
 import PrinterScreen from '../screens/PrinterScreen';
 import PaymentTerminalScreen from '../screens/PaymentTerminalScreen';
 import UsersScreen from '../screens/UsersScreen';
+import DailyOrdersScreen from '../screens/DailyOrdersScreen';
 import type { MoreStackParamList, MoreStackScreenProps } from './types';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../utils/theme';
 
@@ -24,6 +25,12 @@ const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ onLogout }) => {
   const navigation = useNavigation<MoreStackScreenProps<'MoreMenu'>['navigation']>();
 
   const menuItems = [
+    {
+      icon: 'receipt-long' as const,
+      label: 'Daily Orders',
+      onPress: () => navigation.navigate('DailyOrders'),
+      color: lightColors.info,
+    },
     {
       icon: 'settings' as const,
       label: 'Settings',
@@ -86,7 +93,7 @@ interface MoreNavigatorProps {
 
 /**
  * More Stack Navigator
- * Contains Settings, Refund, Printer, and PaymentTerminal screens
+ * Contains Daily Orders, Settings, Refund, Printer, and PaymentTerminal screens
  */
 export const MoreNavigator: React.FC<MoreNavigatorProps> = ({ onLogout }) => {
   return (
@@ -102,6 +109,7 @@ export const MoreNavigator: React.FC<MoreNavigatorProps> = ({ onLogout }) => {
       <Stack.Screen name="MoreMenu" options={{ headerShown: false }}>
         {props => <MoreMenuScreen {...props} onLogout={onLogout} />}
       </Stack.Screen>
+      <Stack.Screen name="DailyOrders" component={DailyOrdersScreen} options={{ title: 'Daily Orders' }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
       <Stack.Screen name="Users" component={UsersScreen} options={{ title: 'User Management' }} />
       <Stack.Screen name="Refund" component={RefundScreen} options={{ title: 'Process Refund' }} />
