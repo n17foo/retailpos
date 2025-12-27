@@ -1,0 +1,49 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "error": "Error",
+    "success": "Success",
+    "back": "Back",
+    "next": "Next",
+    "done": "Done"
+  },
+  "settings": {
+    "title": "Settings",
+    "printer": {
+      "title": "Printer Settings",
+      "enabled": "Enable Printer",
+      "connectionType": "Connection Type",
+      "printerName": "Printer Name",
+      "deviceName": "Device Name",
+      "ipAddress": "IP Address",
+      "port": "Port",
+      "macAddress": "MAC Address",
+      "vendorId": "Vendor ID",
+      "productId": "Product ID",
+      "printReceipts": "Print Receipts",
+      "testConnection": "Test Connection",
+      "testConnectionSuccessTitle": "Success",
+      "testConnectionSuccess": "Printer connection test successful!",
+      "testConnectionErrorTitle": "Connection Error",
+      "testConnectionError": "Failed to connect to the printer. Please check your settings.",
+      "validationErrorTitle": "Validation Error",
+      "validationError": "Please check your input and try again.",
+      "saveSuccess": "Printer settings saved successfully.",
+      "saveError": "Failed to save printer settings: {{error}}",
+      "connectionTypes": {
+        "bluetooth": "Bluetooth",
+        "usb": "USB",
+        "network": "Network"
+      },
+      "validation": {
+        "printerNameRequired": "Printer name is required",
+        "invalidMacAddress": "Invalid MAC address format",
+        "invalidIpAddress": "Invalid IP address format",
+        "invalidPort": "Port must be between 1 and 65535",
+        "usbIdsRequired": "Vendor ID and Product ID are required for USB printers"
+      }
+    }
+  }
+}

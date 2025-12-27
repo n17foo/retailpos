@@ -1,0 +1,8 @@
+node_modules/
+.expo/
+.expo-shared/
+build/
+coverage/
+dist/
+*.lock
+*.log

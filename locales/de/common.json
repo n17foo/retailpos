@@ -1,0 +1,49 @@
+{
+  "common": {
+    "loading": "Wird geladen...",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "error": "Fehler",
+    "success": "Erfolg",
+    "back": "Zurück",
+    "next": "Weiter",
+    "done": "Fertig"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "printer": {
+      "title": "Druckereinstellungen",
+      "enabled": "Drucker aktivieren",
+      "connectionType": "Verbindungstyp",
+      "printerName": "Druckername",
+      "deviceName": "Gerätename",
+      "ipAddress": "IP-Adresse",
+      "port": "Port",
+      "macAddress": "MAC-Adresse",
+      "vendorId": "Hersteller-ID",
+      "productId": "Produkt-ID",
+      "printReceipts": "Belege drucken",
+      "testConnection": "Verbindung testen",
+      "testConnectionSuccessTitle": "Erfolg",
+      "testConnectionSuccess": "Druckerverbindungstest erfolgreich!",
+      "testConnectionErrorTitle": "Verbindungsfehler",
+      "testConnectionError": "Verbindung zum Drucker fehlgeschlagen. Bitte überprüfen Sie Ihre Einstellungen.",
+      "validationErrorTitle": "Validierungsfehler",
+      "validationError": "Bitte überprüfen Sie Ihre Eingabe und versuchen Sie es erneut.",
+      "saveSuccess": "Druckereinstellungen erfolgreich gespeichert.",
+      "saveError": "Fehler beim Speichern der Druckereinstellungen: {{error}}",
+      "connectionTypes": {
+        "bluetooth": "Bluetooth",
+        "usb": "USB",
+        "network": "Netzwerk"
+      },
+      "validation": {
+        "printerNameRequired": "Druckername ist erforderlich",
+        "invalidMacAddress": "Ungültiges MAC-Adressformat",
+        "invalidIpAddress": "Ungültiges IP-Adressformat",
+        "invalidPort": "Port muss zwischen 1 und 65535 liegen",
+        "usbIdsRequired": "Hersteller-ID und Produkt-ID werden für USB-Drucker benötigt"
+      }
+    }
+  }
+}

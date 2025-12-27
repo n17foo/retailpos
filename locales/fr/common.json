@@ -1,0 +1,49 @@
+{
+  "common": {
+    "loading": "Chargement...",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "error": "Erreur",
+    "success": "Succès",
+    "back": "Retour",
+    "next": "Suivant",
+    "done": "Terminé"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "printer": {
+      "title": "Paramètres de l'imprimante",
+      "enabled": "Activer l'imprimante",
+      "connectionType": "Type de connexion",
+      "printerName": "Nom de l'imprimante",
+      "deviceName": "Nom de l'appareil",
+      "ipAddress": "Adresse IP",
+      "port": "Port",
+      "macAddress": "Adresse MAC",
+      "vendorId": "ID du fournisseur",
+      "productId": "ID du produit",
+      "printReceipts": "Imprimer les reçus",
+      "testConnection": "Tester la connexion",
+      "testConnectionSuccessTitle": "Succès",
+      "testConnectionSuccess": "Test de connexion à l'imprimante réussi !",
+      "testConnectionErrorTitle": "Erreur de connexion",
+      "testConnectionError": "Échec de la connexion à l'imprimante. Veuillez vérifier vos paramètres.",
+      "validationErrorTitle": "Erreur de validation",
+      "validationError": "Veuillez vérifier vos informations et réessayer.",
+      "saveSuccess": "Paramètres de l'imprimante enregistrés avec succès.",
+      "saveError": "Échec de l'enregistrement des paramètres de l'imprimante : {{error}}",
+      "connectionTypes": {
+        "bluetooth": "Bluetooth",
+        "usb": "USB",
+        "network": "Réseau"
+      },
+      "validation": {
+        "printerNameRequired": "Le nom de l'imprimante est requis",
+        "invalidMacAddress": "Format d'adresse MAC invalide",
+        "invalidIpAddress": "Format d'adresse IP invalide",
+        "invalidPort": "Le port doit être compris entre 1 et 65535",
+        "usbIdsRequired": "L'ID du fournisseur et l'ID du produit sont requis pour les imprimantes USB"
+      }
+    }
+  }
+}
