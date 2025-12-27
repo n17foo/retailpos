@@ -101,62 +101,62 @@ export type UnifiedProductStatus = 'active' | 'draft' | 'archived';
 export interface UnifiedProduct {
   /** Unique identifier in the app */
   id: string;
-  
+
   /** Original platform ID (before any prefixing) */
   platformId: string;
-  
+
   /** Source platform */
   platform: ECommercePlatform;
-  
+
   /** Product title/name */
   title: string;
-  
+
   /** Short description for listings */
   shortDescription?: string;
-  
+
   /** Full HTML description */
   description?: string;
-  
+
   /** Vendor/brand name */
   vendor?: string;
-  
+
   /** Product type/category name */
   productType?: string;
-  
+
   /** Category IDs this product belongs to */
   categoryIds: string[];
-  
+
   /** Searchable tags */
   tags: string[];
-  
+
   /** Product options (Size, Color, etc.) */
   options: UnifiedProductOption[];
-  
+
   /** Product variants */
   variants: UnifiedProductVariant[];
-  
+
   /** Product images */
   images: UnifiedProductImage[];
-  
+
   /** Product status */
   status: UnifiedProductStatus;
-  
+
   /** Whether product is featured/highlighted */
   isFeatured: boolean;
-  
+
   /** SEO-friendly URL handle/slug */
   handle?: string;
-  
+
   /** When the product was created */
   createdAt: Date;
-  
+
   /** When the product was last updated */
   updatedAt: Date;
-  
+
   /** When the product was last synced from platform */
   syncedAt: Date;
-  
-  /** 
+
+  /**
    * Platform-specific metadata
    * Store any platform-specific data that doesn't fit the unified schema
    */
@@ -282,16 +282,14 @@ export interface UnifiedProductSummaryResult {
 export function toProductSummary(product: UnifiedProduct): UnifiedProductSummary {
   const defaultVariant = product.variants[0];
   const primaryImage = product.images.find(img => img.isPrimary) || product.images[0];
-  
+
   const prices = product.variants.map(v => v.price);
   const lowestPrice = Math.min(...prices);
-  const compareAtPrices = product.variants
-    .filter(v => v.compareAtPrice && v.compareAtPrice > v.price)
-    .map(v => v.compareAtPrice!);
-  
+  const compareAtPrices = product.variants.filter(v => v.compareAtPrice && v.compareAtPrice > v.price).map(v => v.compareAtPrice!);
+
   const totalInventory = product.variants.reduce((sum, v) => sum + v.inventoryQuantity, 0);
   const inStock = product.variants.some(v => v.isAvailable && v.inventoryQuantity > 0);
-  
+
   return {
     id: product.id,
     platformId: product.platformId,

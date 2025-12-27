@@ -12,12 +12,7 @@ interface BasketProps {
   platform?: ECommercePlatform;
 }
 
-export const Basket: React.FC<BasketProps> = ({ 
-  onCheckout, 
-  onPaymentTerminal, 
-  onPrintReceipt,
-  platform,
-}) => {
+export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, onPrintReceipt, platform }) => {
   const {
     isRightPanelOpen,
     setIsRightPanelOpen,
@@ -44,14 +39,10 @@ export const Basket: React.FC<BasketProps> = ({
   const handleDecrement = async (itemId: string, currentQuantity: number) => {
     if (currentQuantity <= 1) {
       // Confirm removal
-      Alert.alert(
-        'Remove Item',
-        'Are you sure you want to remove this item?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Remove', style: 'destructive', onPress: () => removeFromCart(itemId) },
-        ]
-      );
+      Alert.alert('Remove Item', 'Are you sure you want to remove this item?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => removeFromCart(itemId) },
+      ]);
     } else {
       await decrementQuantity(itemId);
     }
@@ -140,22 +131,18 @@ export const Basket: React.FC<BasketProps> = ({
   const renderItem = ({ item }: { item: CartItem }) => (
     <View style={styles.cartItem}>
       <View style={styles.itemInfo}>
-        <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+        <Text style={styles.itemName} numberOfLines={2}>
+          {item.name}
+        </Text>
         <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
         {item.sku && <Text style={styles.itemSku}>SKU: {item.sku}</Text>}
       </View>
       <View style={styles.quantityContainer}>
-        <TouchableOpacity 
-          style={styles.quantityButton} 
-          onPress={() => handleDecrement(item.id, item.quantity)}
-        >
+        <TouchableOpacity style={styles.quantityButton} onPress={() => handleDecrement(item.id, item.quantity)}>
           <Text style={styles.quantityButtonText}>-</Text>
         </TouchableOpacity>
         <Text style={styles.quantity}>{item.quantity}</Text>
-        <TouchableOpacity 
-          style={styles.quantityButton} 
-          onPress={() => incrementQuantity(item.id)}
-        >
+        <TouchableOpacity style={styles.quantityButton} onPress={() => incrementQuantity(item.id)}>
           <Text style={styles.quantityButtonText}>+</Text>
         </TouchableOpacity>
       </View>
@@ -195,16 +182,8 @@ export const Basket: React.FC<BasketProps> = ({
           <View style={styles.summary}>
             {/* Unsynced orders indicator */}
             {unsyncedOrdersCount > 0 && (
-              <TouchableOpacity 
-                style={styles.syncBanner} 
-                onPress={handleSyncOrders}
-                disabled={isSyncing}
-              >
-                <Text style={styles.syncBannerText}>
-                  {isSyncing 
-                    ? 'Syncing...' 
-                    : `${unsyncedOrdersCount} order(s) pending sync`}
-                </Text>
+              <TouchableOpacity style={styles.syncBanner} onPress={handleSyncOrders} disabled={isSyncing}>
+                <Text style={styles.syncBannerText}>{isSyncing ? 'Syncing...' : `${unsyncedOrdersCount} order(s) pending sync`}</Text>
                 {isSyncing && <ActivityIndicator size="small" color={lightColors.textOnPrimary} />}
               </TouchableOpacity>
             )}
@@ -224,10 +203,7 @@ export const Basket: React.FC<BasketProps> = ({
 
             <View style={styles.buttonsContainer}>
               <TouchableOpacity
-                style={[
-                  styles.checkoutButton,
-                  (cartItems.length === 0 || isProcessing) && styles.buttonDisabled,
-                ]}
+                style={[styles.checkoutButton, (cartItems.length === 0 || isProcessing) && styles.buttonDisabled]}
                 onPress={handleCheckout}
                 disabled={cartItems.length === 0 || isProcessing}
                 accessibilityLabel="Complete order"

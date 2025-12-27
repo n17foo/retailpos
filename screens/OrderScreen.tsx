@@ -18,24 +18,14 @@ interface OrderScreenProps {
 
 const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
   const { selectedCategory, selectedCategoryName } = useCategoryContext();
-  const {
-    cartItems,
-    cartItemsMap,
-    addToCart,
-    updateQuantity,
-    itemCount,
-  } = useBasketContext();
+  const { cartItems, cartItemsMap, addToCart, updateQuantity, itemCount } = useBasketContext();
 
   // eCommerce integration
   const { currentPlatform } = useEcommerceSettings();
 
   // Use unified products hook - automatically fetches and maps products
   // Pass both categoryId and categoryName for flexible filtering
-  const { products, isLoading: isProductLoading } = useProductsForDisplay(
-    currentPlatform,
-    selectedCategory,
-    selectedCategoryName
-  );
+  const { products, isLoading: isProductLoading } = useProductsForDisplay(currentPlatform, selectedCategory, selectedCategoryName);
 
   // Products are already filtered by the hook, no need for additional filtering
   const filteredProducts = products;
@@ -49,7 +39,7 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
 
       // Find the cart item by productId (not the basket item id)
       const cartItem = cartItems.find(item => item.productId === id);
-      
+
       if (quantity <= 0 && cartItem) {
         // Remove from cart if quantity is 0 or less
         await updateQuantity(cartItem.id, 0);

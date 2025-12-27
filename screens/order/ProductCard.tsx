@@ -48,15 +48,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ id, name, price, image
   const isInCart = inCart || quantity > 0;
 
   return (
-    <TouchableOpacity 
-      style={[styles.card, isInCart && styles.cardInCart]} 
-      onPress={handleCardPress}
-      activeOpacity={0.7}
-    >
+    <TouchableOpacity style={[styles.card, isInCart && styles.cardInCart]} onPress={handleCardPress} activeOpacity={0.7}>
       {/* Product Image - takes most of the card */}
       <View style={styles.imageContainer}>
         <Image source={image} style={styles.image} resizeMode="cover" />
-        
+
         {/* Quantity badge overlay when in cart */}
         {isInCart && (
           <View style={styles.quantityBadge}>
@@ -76,19 +72,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({ id, name, price, image
       {/* Quantity controls overlay - only show when in cart */}
       {isInCart && (
         <View style={styles.quantityOverlay}>
-          <TouchableOpacity 
-            style={styles.quantityButton} 
-            onPress={handleDecrement}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity style={styles.quantityButton} onPress={handleDecrement} activeOpacity={0.8}>
             <Text style={styles.quantityButtonText}>−</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.quantityButton} 
-            onPress={handleIncrement}
-            activeOpacity={0.8}
-          >
+
+          <TouchableOpacity style={styles.quantityButton} onPress={handleIncrement} activeOpacity={0.8}>
             <Text style={styles.quantityButtonText}>+</Text>
           </TouchableOpacity>
         </View>

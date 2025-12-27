@@ -1,9 +1,5 @@
 import { ECommercePlatform } from '../../utils/platforms';
-import {
-  UnifiedCategory,
-  UnifiedCategoryStatus,
-  UnifiedCategoryImage,
-} from '../UnifiedCategory';
+import { UnifiedCategory, UnifiedCategoryStatus, UnifiedCategoryImage } from '../UnifiedCategory';
 
 /**
  * ============================================================================
@@ -45,14 +41,16 @@ interface ShopifyCollection {
 export function mapShopifyCollection(data: ShopifyCollection): UnifiedCategory {
   const platformId = String(data.id);
   const platform = ECommercePlatform.SHOPIFY;
-  
-  const image: UnifiedCategoryImage | undefined = data.image ? {
-    url: data.image.src,
-    alt: data.image.alt,
-    width: data.image.width,
-    height: data.image.height,
-  } : undefined;
-  
+
+  const image: UnifiedCategoryImage | undefined = data.image
+    ? {
+        url: data.image.src,
+        alt: data.image.alt,
+        width: data.image.width,
+        height: data.image.height,
+      }
+    : undefined;
+
   return {
     id: generateCategoryId(platform, platformId),
     platformId,
@@ -93,22 +91,21 @@ interface WooCommerceCategory {
   count?: number;
 }
 
-export function mapWooCommerceCategory(
-  data: WooCommerceCategory,
-  allCategories?: WooCommerceCategory[]
-): UnifiedCategory {
+export function mapWooCommerceCategory(data: WooCommerceCategory, allCategories?: WooCommerceCategory[]): UnifiedCategory {
   const platformId = String(data.id);
   const platform = ECommercePlatform.WOOCOMMERCE;
-  
-  const image: UnifiedCategoryImage | undefined = data.image ? {
-    url: data.image.src,
-    alt: data.image.alt,
-  } : undefined;
-  
+
+  const image: UnifiedCategoryImage | undefined = data.image
+    ? {
+        url: data.image.src,
+        alt: data.image.alt,
+      }
+    : undefined;
+
   // Calculate level and path
   let level = 0;
   const path: string[] = [data.name];
-  
+
   if (allCategories && data.parent && data.parent > 0) {
     let parentId = data.parent;
     while (parentId > 0) {
@@ -122,7 +119,7 @@ export function mapWooCommerceCategory(
       }
     }
   }
-  
+
   return {
     id: generateCategoryId(platform, platformId),
     platformId,
@@ -130,9 +127,7 @@ export function mapWooCommerceCategory(
     name: data.name,
     description: data.description,
     handle: data.slug,
-    parentId: data.parent && data.parent > 0 
-      ? generateCategoryId(platform, String(data.parent)) 
-      : undefined,
+    parentId: data.parent && data.parent > 0 ? generateCategoryId(platform, String(data.parent)) : undefined,
     image,
     position: data.menu_order ?? 0,
     productCount: data.count ?? 0,
@@ -159,21 +154,20 @@ interface BigCommerceCategory {
   custom_url?: { url: string };
 }
 
-export function mapBigCommerceCategory(
-  data: BigCommerceCategory,
-  allCategories?: BigCommerceCategory[]
-): UnifiedCategory {
+export function mapBigCommerceCategory(data: BigCommerceCategory, allCategories?: BigCommerceCategory[]): UnifiedCategory {
   const platformId = String(data.id);
   const platform = ECommercePlatform.BIGCOMMERCE;
-  
-  const image: UnifiedCategoryImage | undefined = data.image_url ? {
-    url: data.image_url,
-  } : undefined;
-  
+
+  const image: UnifiedCategoryImage | undefined = data.image_url
+    ? {
+        url: data.image_url,
+      }
+    : undefined;
+
   // Calculate level and path
   let level = 0;
   const path: string[] = [data.name];
-  
+
   if (allCategories && data.parent_id && data.parent_id > 0) {
     let parentId = data.parent_id;
     while (parentId > 0) {
@@ -187,7 +181,7 @@ export function mapBigCommerceCategory(
       }
     }
   }
-  
+
   return {
     id: generateCategoryId(platform, platformId),
     platformId,
@@ -195,9 +189,7 @@ export function mapBigCommerceCategory(
     name: data.name,
     description: data.description,
     handle: data.custom_url?.url,
-    parentId: data.parent_id && data.parent_id > 0 
-      ? generateCategoryId(platform, String(data.parent_id)) 
-      : undefined,
+    parentId: data.parent_id && data.parent_id > 0 ? generateCategoryId(platform, String(data.parent_id)) : undefined,
     image,
     position: data.sort_order ?? 0,
     productCount: 0,
@@ -225,33 +217,30 @@ interface MagentoCategory {
   custom_attributes?: Array<{ attribute_code: string; value: string }>;
 }
 
-export function mapMagentoCategory(
-  data: MagentoCategory,
-  parentPath: string[] = []
-): UnifiedCategory {
+export function mapMagentoCategory(data: MagentoCategory, parentPath: string[] = []): UnifiedCategory {
   const platformId = String(data.id);
   const platform = ECommercePlatform.MAGENTO;
-  
+
   // Get image from custom attributes
   const imageAttr = data.custom_attributes?.find(a => a.attribute_code === 'image');
-  const image: UnifiedCategoryImage | undefined = imageAttr ? {
-    url: imageAttr.value,
-  } : undefined;
-  
+  const image: UnifiedCategoryImage | undefined = imageAttr
+    ? {
+        url: imageAttr.value,
+      }
+    : undefined;
+
   // Get description from custom attributes
   const descAttr = data.custom_attributes?.find(a => a.attribute_code === 'description');
-  
+
   const path = [...parentPath, data.name];
-  
+
   return {
     id: generateCategoryId(platform, platformId),
     platformId,
     platform,
     name: data.name,
     description: descAttr?.value,
-    parentId: data.parent_id && data.parent_id > 1 
-      ? generateCategoryId(platform, String(data.parent_id)) 
-      : undefined,
+    parentId: data.parent_id && data.parent_id > 1 ? generateCategoryId(platform, String(data.parent_id)) : undefined,
     image,
     position: data.position ?? 0,
     productCount: data.product_count ?? 0,
@@ -280,26 +269,20 @@ interface PrestaShopCategory {
 export function mapPrestaShopCategory(data: PrestaShopCategory): UnifiedCategory {
   const platformId = String(data.id);
   const platform = ECommercePlatform.PRESTASHOP;
-  
+
   // Handle multilingual fields
-  const name = Array.isArray(data.name) 
-    ? (data.name[0]?.value || 'Unnamed') 
-    : data.name;
-  const description = Array.isArray(data.description) 
-    ? data.description[0]?.value 
-    : data.description;
-  
+  const name = Array.isArray(data.name) ? data.name[0]?.value || 'Unnamed' : data.name;
+  const description = Array.isArray(data.description) ? data.description[0]?.value : data.description;
+
   const isActive = data.active === '1' || data.active === true;
-  
+
   return {
     id: generateCategoryId(platform, platformId),
     platformId,
     platform,
     name,
     description,
-    parentId: data.id_parent && data.id_parent > 1 
-      ? generateCategoryId(platform, String(data.id_parent)) 
-      : undefined,
+    parentId: data.id_parent && data.id_parent > 1 ? generateCategoryId(platform, String(data.id_parent)) : undefined,
     position: data.position ?? 0,
     productCount: 0,
     status: isActive ? 'active' : 'hidden',
@@ -324,25 +307,22 @@ interface GenericCategory {
   productCount?: number;
 }
 
-export function mapGenericCategory(
-  data: GenericCategory,
-  platform: ECommercePlatform = ECommercePlatform.CUSTOM
-): UnifiedCategory {
+export function mapGenericCategory(data: GenericCategory, platform: ECommercePlatform = ECommercePlatform.CUSTOM): UnifiedCategory {
   const platformId = String(data.id);
-  
-  const image: UnifiedCategoryImage | undefined = data.image ? {
-    url: data.image,
-  } : undefined;
-  
+
+  const image: UnifiedCategoryImage | undefined = data.image
+    ? {
+        url: data.image,
+      }
+    : undefined;
+
   return {
     id: generateCategoryId(platform, platformId),
     platformId,
     platform,
     name: data.name,
     description: data.description,
-    parentId: data.parentId 
-      ? generateCategoryId(platform, String(data.parentId)) 
-      : undefined,
+    parentId: data.parentId ? generateCategoryId(platform, String(data.parentId)) : undefined,
     image,
     position: data.position ?? 0,
     productCount: data.productCount ?? 0,
@@ -370,20 +350,11 @@ export function mapToUnifiedCategory(
     case ECommercePlatform.SHOPIFY:
       return mapShopifyCollection(data as ShopifyCollection);
     case ECommercePlatform.WOOCOMMERCE:
-      return mapWooCommerceCategory(
-        data as WooCommerceCategory,
-        context?.allCategories as WooCommerceCategory[]
-      );
+      return mapWooCommerceCategory(data as WooCommerceCategory, context?.allCategories as WooCommerceCategory[]);
     case ECommercePlatform.BIGCOMMERCE:
-      return mapBigCommerceCategory(
-        data as BigCommerceCategory,
-        context?.allCategories as BigCommerceCategory[]
-      );
+      return mapBigCommerceCategory(data as BigCommerceCategory, context?.allCategories as BigCommerceCategory[]);
     case ECommercePlatform.MAGENTO:
-      return mapMagentoCategory(
-        data as MagentoCategory,
-        context?.parentPath
-      );
+      return mapMagentoCategory(data as MagentoCategory, context?.parentPath);
     case ECommercePlatform.PRESTASHOP:
       return mapPrestaShopCategory(data as PrestaShopCategory);
     case ECommercePlatform.CUSTOM:
@@ -395,10 +366,7 @@ export function mapToUnifiedCategory(
 /**
  * Map multiple categories
  */
-export function mapToUnifiedCategories(
-  data: unknown[],
-  platform: ECommercePlatform
-): UnifiedCategory[] {
+export function mapToUnifiedCategories(data: unknown[], platform: ECommercePlatform): UnifiedCategory[] {
   // For hierarchical platforms, pass all categories for path calculation
   const context = { allCategories: data };
   return data.map(item => mapToUnifiedCategory(item, platform, context));

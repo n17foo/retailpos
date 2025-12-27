@@ -5,6 +5,7 @@ A comprehensive, cross-platform Point of Sale (POS) system built with React Nati
 ## 🚀 Features
 
 ### Core POS Functionality
+
 - **Product Management**: Browse, search, and manage products with real-time inventory tracking
 - **Category Navigation**: Hierarchical category system with intuitive navigation
 - **Shopping Cart**: Smart cart management with quantity controls and item customization
@@ -19,6 +20,7 @@ A comprehensive, cross-platform Point of Sale (POS) system built with React Nati
 - **Settings Management**: Comprehensive configuration for all integrations
 
 ### E-commerce Integrations
+
 RetailPOS integrates with leading e-commerce platforms, allowing you to manage products, inventory, and orders from a single interface:
 
 - **Shopify** - Complete product catalog, inventory, and order synchronization
@@ -31,6 +33,7 @@ RetailPOS integrates with leading e-commerce platforms, allowing you to manage p
 - **Squarespace** - Squarespace Commerce integration
 
 ### Payment Processing
+
 Multiple payment processor integrations for secure, reliable transactions:
 
 - **Worldpay** - Global payment processing with terminal support
@@ -38,11 +41,13 @@ Multiple payment processor integrations for secure, reliable transactions:
 - **Square** - In-app payments and terminal integration
 
 ### Hardware Integration
+
 - **Barcode Scanners**: Bluetooth and camera-based scanning
 - **Receipt Printers**: Thermal printer support with customizable receipts
 - **Payment Terminals**: Integrated card reader support
 
 ### Multi-platform Support
+
 - **iOS Mobile**: Native iOS app with tablet support
 - **Android Mobile**: Native Android app with edge-to-edge display
 - **Web Browser**: Responsive web application
@@ -51,6 +56,7 @@ Multiple payment processor integrations for secure, reliable transactions:
 ## 🏗️ Architecture
 
 ### Technology Stack
+
 - **Framework**: React Native with Expo
 - **Language**: TypeScript for type safety
 - **State Management**: React Context with custom hooks
@@ -59,12 +65,14 @@ Multiple payment processor integrations for secure, reliable transactions:
 - **Styling**: Theme-based component library
 
 ### Design Patterns
+
 - **Factory Pattern**: Service factories for platform-specific implementations
 - **Repository Pattern**: Data access layer abstraction
 - **Observer Pattern**: Event-driven architecture
 - **Strategy Pattern**: Payment processor abstraction
 
 ### Key Components
+
 - **Unified Models**: Platform-agnostic data structures
 - **Service Layer**: Platform-specific business logic
 - **UI Components**: Reusable, themeable components
@@ -73,15 +81,18 @@ Multiple payment processor integrations for secure, reliable transactions:
 ## 📱 Platform Support
 
 ### Mobile Applications
+
 - **iOS 13+**: Native iOS app with iPad support
 - **Android 8+**: Native Android app with modern UI
 
 ### Web Browser
+
 - **Chrome 90+**: Full-featured web application
 - **Safari 14+**: Optimized for iOS and macOS
 - **Firefox 88+**: Cross-platform web support
 
 ### Desktop Applications
+
 - **macOS**: Native .dmg installer
 - **Windows**: Native .exe installer
 - **Linux**: .AppImage distribution
@@ -89,6 +100,7 @@ Multiple payment processor integrations for secure, reliable transactions:
 ## 🛠️ Installation & Setup
 
 ### Prerequisites
+
 - **Node.js**: Version 20.19.4 or higher
 - **Yarn**: Package manager
 - **Expo CLI**: `npm install -g @expo/cli`
@@ -96,17 +108,20 @@ Multiple payment processor integrations for secure, reliable transactions:
 ### Quick Start
 
 1. **Clone the repository**
+
    ```bash
    git clone <repository-url>
    cd RetailPOS
    ```
 
 2. **Install dependencies**
+
    ```bash
    yarn install
    ```
 
 3. **Configure environment**
+
    ```bash
    cp .env.example .env
    # Edit .env with your configuration
@@ -120,6 +135,7 @@ Multiple payment processor integrations for secure, reliable transactions:
 ### Platform-Specific Setup
 
 #### iOS Development
+
 ```bash
 # Install iOS dependencies (macOS only)
 yarn ios
@@ -130,6 +146,7 @@ yarn start
 ```
 
 #### Android Development
+
 ```bash
 # Install Android dependencies
 yarn android
@@ -140,11 +157,13 @@ yarn start
 ```
 
 #### Web Development
+
 ```bash
 yarn web
 ```
 
 #### Desktop Development
+
 ```bash
 # Development with hot reload
 yarn desktop
@@ -184,6 +203,7 @@ USE_MOCK_SEARCH=true
 ### E-commerce Platform Configuration
 
 #### Shopify
+
 ```bash
 SHOPIFY_API_KEY=your_api_key
 SHOPIFY_API_SECRET=your_api_secret
@@ -192,6 +212,7 @@ SHOPIFY_STORE_URL=https://your-store.myshopify.com
 ```
 
 #### WooCommerce
+
 ```bash
 WOOCOMMERCE_URL=https://your-wordpress-site.com
 WOOCOMMERCE_CONSUMER_KEY=your_consumer_key
@@ -199,6 +220,7 @@ WOOCOMMERCE_CONSUMER_SECRET=your_consumer_secret
 ```
 
 #### BigCommerce
+
 ```bash
 BIGCOMMERCE_STORE_HASH=your_store_hash
 BIGCOMMERCE_CLIENT_ID=your_client_id
@@ -208,6 +230,7 @@ BIGCOMMERCE_ACCESS_TOKEN=your_access_token
 ### Payment Processor Configuration
 
 #### Worldpay
+
 ```bash
 WORLDPAY_MERCHANT_ID=your_merchant_id
 WORLDPAY_SITE_REFERENCE=your_site_reference
@@ -215,12 +238,14 @@ WORLDPAY_INSTALLATION_ID=your_installation_id
 ```
 
 #### Stripe
+
 ```bash
 STRIPE_PUBLISHABLE_KEY=your_publishable_key
 STRIPE_SECRET_KEY=your_secret_key
 ```
 
 #### Square
+
 ```bash
 SQUARE_APP_ID=your_app_id
 SQUARE_ACCESS_TOKEN=your_access_token
@@ -324,6 +349,7 @@ RetailPOS/
 ## 🌐 Internationalization
 
 Support for multiple languages with react-i18next:
+
 - English (default)
 - Spanish
 - French
@@ -332,6 +358,7 @@ Support for multiple languages with react-i18next:
 ## 📊 Monitoring & Logging
 
 Comprehensive logging system with Winston:
+
 - Console logging for development
 - File logging for production
 - Structured logging with metadata
@@ -360,6 +387,7 @@ Apache License 2.0 - see [LICENSE](LICENSE) file for details.
 ## 🆘 Support
 
 For support and questions:
+
 - Create an issue on GitHub
 - Check the documentation
 - Review existing issues and solutions

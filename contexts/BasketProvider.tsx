@@ -283,19 +283,25 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
     }
   }, []);
 
-  const incrementQuantity = useCallback(async (itemId: string) => {
-    const item = cartItems.find(i => i.id === itemId);
-    if (item) {
-      await updateQuantity(itemId, item.quantity + 1);
-    }
-  }, [cartItems, updateQuantity]);
+  const incrementQuantity = useCallback(
+    async (itemId: string) => {
+      const item = cartItems.find(i => i.id === itemId);
+      if (item) {
+        await updateQuantity(itemId, item.quantity + 1);
+      }
+    },
+    [cartItems, updateQuantity]
+  );
 
-  const decrementQuantity = useCallback(async (itemId: string) => {
-    const item = cartItems.find(i => i.id === itemId);
-    if (item) {
-      await updateQuantity(itemId, item.quantity - 1);
-    }
-  }, [cartItems, updateQuantity]);
+  const decrementQuantity = useCallback(
+    async (itemId: string) => {
+      const item = cartItems.find(i => i.id === itemId);
+      if (item) {
+        await updateQuantity(itemId, item.quantity - 1);
+      }
+    },
+    [cartItems, updateQuantity]
+  );
 
   const clearCart = useCallback(async () => {
     if (!serviceRef.current) return;
@@ -410,32 +416,31 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
     }
   }, []);
 
-  const completePayment = useCallback(async (
-    orderId: string,
-    paymentMethod: string,
-    transactionId?: string
-  ): Promise<CheckoutResult> => {
-    if (!serviceRef.current) {
-      return { success: false, orderId, error: 'Service not initialized' };
-    }
-
-    try {
-      const result = await serviceRef.current.completePayment(orderId, paymentMethod, transactionId);
-
-      if (result.success && mountedRef.current) {
-        await refreshBasket();
-        await refreshUnsyncedCount();
-        setCurrentOrder(null);
+  const completePayment = useCallback(
+    async (orderId: string, paymentMethod: string, transactionId?: string): Promise<CheckoutResult> => {
+      if (!serviceRef.current) {
+        return { success: false, orderId, error: 'Service not initialized' };
       }
 
-      return result;
-    } catch (err) {
-      if (mountedRef.current) {
-        setError((err as Error).message);
+      try {
+        const result = await serviceRef.current.completePayment(orderId, paymentMethod, transactionId);
+
+        if (result.success && mountedRef.current) {
+          await refreshBasket();
+          await refreshUnsyncedCount();
+          setCurrentOrder(null);
+        }
+
+        return result;
+      } catch (err) {
+        if (mountedRef.current) {
+          setError((err as Error).message);
+        }
+        return { success: false, orderId, error: (err as Error).message };
       }
-      return { success: false, orderId, error: (err as Error).message };
-    }
-  }, [refreshBasket, refreshUnsyncedCount]);
+    },
+    [refreshBasket, refreshUnsyncedCount]
+  );
 
   const cancelOrder = useCallback(async (orderId: string) => {
     if (!serviceRef.current) return;
@@ -454,21 +459,24 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   }, []);
 
   // Sync operations
-  const syncOrderToPlatform = useCallback(async (orderId: string): Promise<CheckoutResult> => {
-    if (!serviceRef.current) {
-      return { success: false, orderId, error: 'Service not initialized' };
-    }
-
-    try {
-      const result = await serviceRef.current.syncOrderToPlatform(orderId);
-      if (result.success) {
-        await refreshUnsyncedCount();
+  const syncOrderToPlatform = useCallback(
+    async (orderId: string): Promise<CheckoutResult> => {
+      if (!serviceRef.current) {
+        return { success: false, orderId, error: 'Service not initialized' };
       }
-      return result;
-    } catch (err) {
-      return { success: false, orderId, error: (err as Error).message };
-    }
-  }, [refreshUnsyncedCount]);
+
+      try {
+        const result = await serviceRef.current.syncOrderToPlatform(orderId);
+        if (result.success) {
+          await refreshUnsyncedCount();
+        }
+        return result;
+      } catch (err) {
+        return { success: false, orderId, error: (err as Error).message };
+      }
+    },
+    [refreshUnsyncedCount]
+  );
 
   const syncAllPendingOrders = useCallback(async (): Promise<SyncResult> => {
     if (!serviceRef.current) {

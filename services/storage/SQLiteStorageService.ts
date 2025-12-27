@@ -93,7 +93,7 @@ export class SQLiteStorageService {
       // Migration to Version 4: Add Baskets and Local Orders Tables
       if (fromVersion < 4) {
         this.logger.info('Applying migration to v4: Creating baskets and local_orders tables...');
-        
+
         // Baskets Table - stores the current shopping basket
         await this.db.runAsync(
           `CREATE TABLE IF NOT EXISTS baskets (
@@ -112,7 +112,7 @@ export class SQLiteStorageService {
             updated_at INTEGER NOT NULL
           );`
         );
-        
+
         // Local Orders Table - stores orders locally before/after syncing to platform
         await this.db.runAsync(
           `CREATE TABLE IF NOT EXISTS local_orders (
@@ -139,12 +139,12 @@ export class SQLiteStorageService {
             synced_at INTEGER
           );`
         );
-        
+
         // Add indexes for common queries
         await this.db.runAsync(`CREATE INDEX IF NOT EXISTS idx_local_orders_status ON local_orders(status);`);
         await this.db.runAsync(`CREATE INDEX IF NOT EXISTS idx_local_orders_sync_status ON local_orders(sync_status);`);
         await this.db.runAsync(`CREATE INDEX IF NOT EXISTS idx_baskets_status ON baskets(status);`);
-        
+
         this.logger.info('Baskets and local_orders tables created.');
       }
 

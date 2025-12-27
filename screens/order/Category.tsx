@@ -8,22 +8,14 @@ import { UnifiedCategory } from '../../models/UnifiedCategory';
 
 export const Category: React.FC = () => {
   const { selectedCategory, setSelectedCategory, setSelectedCategoryName, isLeftPanelOpen, setIsLeftPanelOpen } = useCategoryContext();
-  const {
-    displayCategories,
-    currentCategory,
-    canNavigateUp,
-    navigateTo,
-    navigateUp,
-    navigateToRoot,
-    hasChildren,
-    isLoading,
-  } = useCategoryNavigation();
+  const { displayCategories, currentCategory, canNavigateUp, navigateTo, navigateUp, navigateToRoot, hasChildren, isLoading } =
+    useCategoryNavigation();
 
   const handleCategorySelect = (category: UnifiedCategory) => {
     // Always select this category for filtering products
     setSelectedCategory(category.id);
     setSelectedCategoryName(category.name);
-    
+
     // If category has children, navigate into it to show subcategories
     // but keep the panel open so user can select a subcategory
     if (hasChildren(category.id)) {
@@ -62,21 +54,14 @@ export const Category: React.FC = () => {
     return (
       <View>
         {/* Show All option */}
-        <TouchableOpacity 
-          onPress={handleShowAll} 
-          style={[styles.categoryItem, !selectedCategory && styles.selectedCategory]}
-        >
-          <Text style={[styles.categoryText, !selectedCategory && styles.selectedCategoryText]}>
-            All Products
-          </Text>
+        <TouchableOpacity onPress={handleShowAll} style={[styles.categoryItem, !selectedCategory && styles.selectedCategory]}>
+          <Text style={[styles.categoryText, !selectedCategory && styles.selectedCategoryText]}>All Products</Text>
         </TouchableOpacity>
-        
+
         {/* Back button when navigated into a category */}
         {canNavigateUp && (
           <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>
-              ← Back {currentCategory ? `from ${currentCategory.name}` : ''}
-            </Text>
+            <Text style={styles.backButtonText}>← Back {currentCategory ? `from ${currentCategory.name}` : ''}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -97,12 +82,8 @@ export const Category: React.FC = () => {
                 onPress={() => handleCategorySelect(item)}
               >
                 <View style={styles.categoryRow}>
-                  <Text style={[styles.categoryText, selectedCategory === item.id && styles.selectedCategoryText]}>
-                    {item.name}
-                  </Text>
-                  {categoryHasChildren && (
-                    <Text style={styles.chevron}>›</Text>
-                  )}
+                  <Text style={[styles.categoryText, selectedCategory === item.id && styles.selectedCategoryText]}>{item.name}</Text>
+                  {categoryHasChildren && <Text style={styles.chevron}>›</Text>}
                 </View>
               </TouchableOpacity>
             );

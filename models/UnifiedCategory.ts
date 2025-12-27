@@ -36,56 +36,56 @@ export type UnifiedCategoryStatus = 'active' | 'hidden' | 'archived';
 export interface UnifiedCategory {
   /** Unique identifier in the app */
   id: string;
-  
+
   /** Original platform ID (before any prefixing) */
   platformId: string;
-  
+
   /** Source platform */
   platform: ECommercePlatform;
-  
+
   /** Category name */
   name: string;
-  
+
   /** Category description */
   description?: string;
-  
+
   /** SEO-friendly URL handle/slug */
   handle?: string;
-  
+
   /** Parent category ID (for hierarchical categories) */
   parentId?: string;
-  
+
   /** Category image */
   image?: UnifiedCategoryImage;
-  
+
   /** Display order (lower = first) */
   position: number;
-  
+
   /** Number of products in this category */
   productCount: number;
-  
+
   /** Category status */
   status: UnifiedCategoryStatus;
-  
+
   /** Whether this is a featured/highlighted category */
   isFeatured: boolean;
-  
+
   /** Depth level in hierarchy (0 = root) */
   level: number;
-  
+
   /** Full path of category names (e.g., ["Clothing", "Men", "Shirts"]) */
   path: string[];
-  
+
   /** When the category was created */
   createdAt?: Date;
-  
+
   /** When the category was last updated */
   updatedAt?: Date;
-  
+
   /** When the category was last synced from platform */
   syncedAt: Date;
-  
-  /** 
+
+  /**
    * Platform-specific metadata
    * Store any platform-specific data that doesn't fit the unified schema
    */
@@ -170,12 +170,12 @@ export function toCategorySummary(category: UnifiedCategory): UnifiedCategorySum
 export function buildCategoryTree(categories: UnifiedCategory[]): UnifiedCategoryTree[] {
   const categoryMap = new Map<string, UnifiedCategoryTree>();
   const roots: UnifiedCategoryTree[] = [];
-  
+
   // First pass: create tree nodes
   categories.forEach(cat => {
     categoryMap.set(cat.id, { ...cat, children: [] });
   });
-  
+
   // Second pass: build tree structure
   categories.forEach(cat => {
     const node = categoryMap.get(cat.id)!;
@@ -185,24 +185,21 @@ export function buildCategoryTree(categories: UnifiedCategory[]): UnifiedCategor
       roots.push(node);
     }
   });
-  
+
   // Sort children by position
   const sortChildren = (nodes: UnifiedCategoryTree[]) => {
     nodes.sort((a, b) => a.position - b.position);
     nodes.forEach(node => sortChildren(node.children));
   };
   sortChildren(roots);
-  
+
   return roots;
 }
 
 /**
  * Helper to find a category by ID in a tree
  */
-export function findCategoryInTree(
-  tree: UnifiedCategoryTree[],
-  id: string
-): UnifiedCategoryTree | undefined {
+export function findCategoryInTree(tree: UnifiedCategoryTree[], id: string): UnifiedCategoryTree | undefined {
   for (const node of tree) {
     if (node.id === id) return node;
     const found = findCategoryInTree(node.children, id);
@@ -214,31 +211,25 @@ export function findCategoryInTree(
 /**
  * Helper to get all ancestor IDs for a category
  */
-export function getCategoryAncestors(
-  categories: UnifiedCategory[],
-  categoryId: string
-): string[] {
+export function getCategoryAncestors(categories: UnifiedCategory[], categoryId: string): string[] {
   const ancestors: string[] = [];
   const categoryMap = new Map(categories.map(c => [c.id, c]));
-  
+
   let current = categoryMap.get(categoryId);
   while (current?.parentId) {
     ancestors.unshift(current.parentId);
     current = categoryMap.get(current.parentId);
   }
-  
+
   return ancestors;
 }
 
 /**
  * Helper to get all descendant IDs for a category
  */
-export function getCategoryDescendants(
-  categories: UnifiedCategory[],
-  categoryId: string
-): string[] {
+export function getCategoryDescendants(categories: UnifiedCategory[], categoryId: string): string[] {
   const descendants: string[] = [];
-  
+
   const findChildren = (parentId: string) => {
     categories
       .filter(c => c.parentId === parentId)
@@ -247,7 +238,7 @@ export function getCategoryDescendants(
         findChildren(child.id);
       });
   };
-  
+
   findChildren(categoryId);
   return descendants;
 }

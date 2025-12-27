@@ -1,7 +1,16 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { CategoryServiceFactory } from '../services/category/categoryServiceFactory';
 import { ECommercePlatform } from '../utils/platforms';
-import { buildCategoryTree, findCategoryInTree, getCategoryAncestors, getCategoryDescendants, toCategorySummary, UnifiedCategory, UnifiedCategorySummary, UnifiedCategoryTree } from '../models/UnifiedCategory';
+import {
+  buildCategoryTree,
+  findCategoryInTree,
+  getCategoryAncestors,
+  getCategoryDescendants,
+  toCategorySummary,
+  UnifiedCategory,
+  UnifiedCategorySummary,
+  UnifiedCategoryTree,
+} from '../models/UnifiedCategory';
 import { mapToUnifiedCategories } from '../models/mappers/CategoryMapper';
 
 /**
@@ -48,9 +57,7 @@ interface UseUnifiedCategoriesReturn extends UseUnifiedCategoriesState {
  * Hook for managing unified categories
  * Fetches categories from the configured platform and converts them to unified format
  */
-export const useUnifiedCategories = (
-  platform?: ECommercePlatform
-): UseUnifiedCategoriesReturn => {
+export const useUnifiedCategories = (platform?: ECommercePlatform): UseUnifiedCategoriesReturn => {
   const [categories, setCategories] = useState<UnifiedCategory[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -158,15 +165,13 @@ export const useUnifiedCategories = (
     (categoryId: string): UnifiedCategory[] => {
       const ancestorIds = getAncestorIds(categoryId);
       const category = getCategoryById(categoryId);
-      
-      const breadcrumb = ancestorIds
-        .map(id => getCategoryById(id))
-        .filter((c): c is UnifiedCategory => c !== undefined);
-      
+
+      const breadcrumb = ancestorIds.map(id => getCategoryById(id)).filter((c): c is UnifiedCategory => c !== undefined);
+
       if (category) {
         breadcrumb.push(category);
       }
-      
+
       return breadcrumb;
     },
     [getAncestorIds, getCategoryById]
@@ -200,16 +205,8 @@ export const useUnifiedCategories = (
  * Manages current category selection and navigation state
  */
 export const useCategoryNavigation = (platform?: ECommercePlatform) => {
-  const {
-    categories,
-    categoryTree,
-    isLoading,
-    error,
-    getCategoryById,
-    getChildCategories,
-    getBreadcrumb,
-    refresh,
-  } = useUnifiedCategories(platform);
+  const { categories, categoryTree, isLoading, error, getCategoryById, getChildCategories, getBreadcrumb, refresh } =
+    useUnifiedCategories(platform);
 
   const [currentCategoryId, setCurrentCategoryId] = useState<string | null>(null);
 
@@ -251,9 +248,12 @@ export const useCategoryNavigation = (platform?: ECommercePlatform) => {
   }, []);
 
   // Check if a category has children
-  const hasChildren = useCallback((categoryId: string): boolean => {
-    return categories.some(c => c.parentId === categoryId);
-  }, [categories]);
+  const hasChildren = useCallback(
+    (categoryId: string): boolean => {
+      return categories.some(c => c.parentId === categoryId);
+    },
+    [categories]
+  );
 
   // Check if we can navigate up
   const canNavigateUp = currentCategoryId !== null;

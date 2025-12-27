@@ -32,7 +32,7 @@ export class LocalOrderSyncService {
     }
 
     this.logger.info(`Starting auto sync with interval ${intervalMs}ms`);
-    
+
     // Run initial sync
     this.syncPendingOrders();
 

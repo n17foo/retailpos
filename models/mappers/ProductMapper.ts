@@ -1,11 +1,5 @@
 import { ECommercePlatform } from '../../utils/platforms';
-import {
-  UnifiedProduct,
-  UnifiedProductVariant,
-  UnifiedProductOption,
-  UnifiedProductImage,
-  UnifiedProductStatus,
-} from '../UnifiedProduct';
+import { UnifiedProduct, UnifiedProductVariant, UnifiedProductOption, UnifiedProductImage, UnifiedProductStatus } from '../UnifiedProduct';
 
 /**
  * ============================================================================
@@ -84,7 +78,7 @@ interface ShopifyProduct {
 export function mapShopifyProduct(data: ShopifyProduct): UnifiedProduct {
   const platformId = String(data.id);
   const platform = ECommercePlatform.SHOPIFY;
-  
+
   // Map images
   const images: UnifiedProductImage[] = (data.images || []).map((img, index) => ({
     id: String(img.id),
@@ -95,7 +89,7 @@ export function mapShopifyProduct(data: ShopifyProduct): UnifiedProduct {
     height: img.height,
     isPrimary: (img.position ?? index) === 0,
   }));
-  
+
   // Map options
   const options: UnifiedProductOption[] = (data.options || []).map(opt => ({
     id: String(opt.id),
@@ -103,22 +97,24 @@ export function mapShopifyProduct(data: ShopifyProduct): UnifiedProduct {
     values: opt.values,
     position: opt.position,
   }));
-  
+
   // Map variants
   const variants: UnifiedProductVariant[] = (data.variants || []).map((v, index) => {
     const optionValues: string[] = [];
     if (v.option1) optionValues.push(v.option1);
     if (v.option2) optionValues.push(v.option2);
     if (v.option3) optionValues.push(v.option3);
-    
+
     return {
       id: generateVariantId(platform, platformId, String(v.id)),
       title: v.title || optionValues.join(' / ') || 'Default',
       sku: v.sku,
       barcode: v.barcode,
       price: typeof v.price === 'string' ? parseFloat(v.price) : v.price,
-      compareAtPrice: v.compare_at_price 
-        ? (typeof v.compare_at_price === 'string' ? parseFloat(v.compare_at_price) : v.compare_at_price)
+      compareAtPrice: v.compare_at_price
+        ? typeof v.compare_at_price === 'string'
+          ? parseFloat(v.compare_at_price)
+          : v.compare_at_price
         : undefined,
       costPrice: undefined,
       inventoryQuantity: v.inventory_quantity ?? 0,
@@ -135,17 +131,21 @@ export function mapShopifyProduct(data: ShopifyProduct): UnifiedProduct {
       position: v.position ?? index,
     };
   });
-  
+
   // Parse tags
-  const tags = typeof data.tags === 'string' 
-    ? data.tags.split(',').map(t => t.trim()).filter(Boolean)
-    : (data.tags || []);
-  
+  const tags =
+    typeof data.tags === 'string'
+      ? data.tags
+          .split(',')
+          .map(t => t.trim())
+          .filter(Boolean)
+      : data.tags || [];
+
   // Map status
   let status: UnifiedProductStatus = 'active';
   if (data.status === 'draft') status = 'draft';
   else if (data.status === 'archived') status = 'archived';
-  
+
   return {
     id: generateProductId(platform, platformId),
     platformId,
@@ -223,7 +223,7 @@ interface WooCommerceProduct {
 export function mapWooCommerceProduct(data: WooCommerceProduct): UnifiedProduct {
   const platformId = String(data.id);
   const platform = ECommercePlatform.WOOCOMMERCE;
-  
+
   // Map images
   const images: UnifiedProductImage[] = (data.images || []).map((img, index) => ({
     id: String(img.id),
@@ -232,7 +232,7 @@ export function mapWooCommerceProduct(data: WooCommerceProduct): UnifiedProduct 
     position: index,
     isPrimary: index === 0,
   }));
-  
+
   // Map options from attributes
   const options: UnifiedProductOption[] = (data.attributes || [])
     .filter(attr => attr.variation)
@@ -242,10 +242,10 @@ export function mapWooCommerceProduct(data: WooCommerceProduct): UnifiedProduct 
       values: attr.options,
       position: index,
     }));
-  
+
   // Map variants
   let variants: UnifiedProductVariant[];
-  
+
   if (data.variations && data.variations.length > 0) {
     variants = data.variations.map((v, index) => {
       const optionValues = (v.attributes || []).map(a => a.option);
@@ -255,9 +255,7 @@ export function mapWooCommerceProduct(data: WooCommerceProduct): UnifiedProduct 
         sku: v.sku,
         barcode: undefined,
         price: parseFloat(v.price || v.regular_price || '0'),
-        compareAtPrice: v.sale_price && v.regular_price 
-          ? parseFloat(v.regular_price) 
-          : undefined,
+        compareAtPrice: v.sale_price && v.regular_price ? parseFloat(v.regular_price) : undefined,
         costPrice: undefined,
         inventoryQuantity: v.stock_quantity ?? 0,
         trackInventory: true,
@@ -274,35 +272,35 @@ export function mapWooCommerceProduct(data: WooCommerceProduct): UnifiedProduct 
     });
   } else {
     // Simple product - create single variant
-    variants = [{
-      id: generateVariantId(platform, platformId, 'default'),
-      title: 'Default',
-      sku: data.sku,
-      barcode: undefined,
-      price: parseFloat(data.price || data.regular_price || '0'),
-      compareAtPrice: data.sale_price && data.regular_price 
-        ? parseFloat(data.regular_price) 
-        : undefined,
-      costPrice: undefined,
-      inventoryQuantity: data.stock_quantity ?? 0,
-      trackInventory: data.manage_stock ?? false,
-      allowBackorder: data.backorders === 'yes' || data.backorders === 'notify',
-      weight: data.weight ? parseFloat(data.weight) : undefined,
-      weightUnit: 'g',
-      requiresShipping: true,
-      taxable: data.tax_status !== 'none',
-      taxCode: data.tax_class,
-      optionValues: [],
-      isAvailable: data.stock_status !== 'outofstock',
-      position: 0,
-    }];
+    variants = [
+      {
+        id: generateVariantId(platform, platformId, 'default'),
+        title: 'Default',
+        sku: data.sku,
+        barcode: undefined,
+        price: parseFloat(data.price || data.regular_price || '0'),
+        compareAtPrice: data.sale_price && data.regular_price ? parseFloat(data.regular_price) : undefined,
+        costPrice: undefined,
+        inventoryQuantity: data.stock_quantity ?? 0,
+        trackInventory: data.manage_stock ?? false,
+        allowBackorder: data.backorders === 'yes' || data.backorders === 'notify',
+        weight: data.weight ? parseFloat(data.weight) : undefined,
+        weightUnit: 'g',
+        requiresShipping: true,
+        taxable: data.tax_status !== 'none',
+        taxCode: data.tax_class,
+        optionValues: [],
+        isAvailable: data.stock_status !== 'outofstock',
+        position: 0,
+      },
+    ];
   }
-  
+
   // Map status
   let status: UnifiedProductStatus = 'active';
   if (data.status === 'draft' || data.status === 'pending') status = 'draft';
   else if (data.status === 'trash') status = 'archived';
-  
+
   return {
     id: generateProductId(platform, platformId),
     platformId,
@@ -370,7 +368,7 @@ interface BigCommerceProduct {
 export function mapBigCommerceProduct(data: BigCommerceProduct): UnifiedProduct {
   const platformId = String(data.id);
   const platform = ECommercePlatform.BIGCOMMERCE;
-  
+
   // Map images
   const images: UnifiedProductImage[] = (data.images || []).map((img, index) => ({
     id: String(img.id),
@@ -379,10 +377,10 @@ export function mapBigCommerceProduct(data: BigCommerceProduct): UnifiedProduct 
     position: img.sort_order ?? index,
     isPrimary: img.is_thumbnail ?? index === 0,
   }));
-  
+
   // Map variants
   let variants: UnifiedProductVariant[];
-  
+
   if (data.variants && data.variants.length > 0) {
     variants = data.variants.map((v, index) => {
       const optionValues = (v.option_values || []).map(ov => ov.label);
@@ -408,27 +406,29 @@ export function mapBigCommerceProduct(data: BigCommerceProduct): UnifiedProduct 
       };
     });
   } else {
-    variants = [{
-      id: generateVariantId(platform, platformId, 'default'),
-      title: 'Default',
-      sku: data.sku,
-      barcode: undefined,
-      price: data.sale_price || data.price,
-      compareAtPrice: data.sale_price ? data.price : undefined,
-      costPrice: data.cost_price,
-      inventoryQuantity: data.inventory_level ?? 0,
-      trackInventory: data.inventory_tracking === 'product',
-      allowBackorder: false,
-      weight: data.weight,
-      weightUnit: 'lb',
-      requiresShipping: true,
-      taxable: true,
-      optionValues: [],
-      isAvailable: (data.inventory_level ?? 0) > 0,
-      position: 0,
-    }];
+    variants = [
+      {
+        id: generateVariantId(platform, platformId, 'default'),
+        title: 'Default',
+        sku: data.sku,
+        barcode: undefined,
+        price: data.sale_price || data.price,
+        compareAtPrice: data.sale_price ? data.price : undefined,
+        costPrice: data.cost_price,
+        inventoryQuantity: data.inventory_level ?? 0,
+        trackInventory: data.inventory_tracking === 'product',
+        allowBackorder: false,
+        weight: data.weight,
+        weightUnit: 'lb',
+        requiresShipping: true,
+        taxable: true,
+        optionValues: [],
+        isAvailable: (data.inventory_level ?? 0) > 0,
+        position: 0,
+      },
+    ];
   }
-  
+
   return {
     id: generateProductId(platform, platformId),
     platformId,
@@ -487,7 +487,7 @@ interface GenericProduct {
 
 export function mapGenericProduct(data: GenericProduct, platform: ECommercePlatform = ECommercePlatform.CUSTOM): UnifiedProduct {
   const platformId = String(data.id);
-  
+
   // Handle images - support both string arrays and image objects
   let images: UnifiedProductImage[] = [];
   if (data.images && data.images.length > 0) {
@@ -509,14 +509,16 @@ export function mapGenericProduct(data: GenericProduct, platform: ECommercePlatf
       };
     });
   } else if (data.image) {
-    images = [{
-      id: 'img-0',
-      url: data.image,
-      position: 0,
-      isPrimary: true,
-    }];
+    images = [
+      {
+        id: 'img-0',
+        url: data.image,
+        position: 0,
+        isPrimary: true,
+      },
+    ];
   }
-  
+
   // Handle variants - use provided variants or create default
   let variants: UnifiedProductVariant[] = [];
   if (data.variants && data.variants.length > 0) {
@@ -540,26 +542,28 @@ export function mapGenericProduct(data: GenericProduct, platform: ECommercePlatf
     }));
   } else {
     // Create default variant from product-level data
-    variants = [{
-      id: generateVariantId(platform, platformId, 'default'),
-      title: 'Default',
-      sku: data.sku,
-      barcode: data.barcode,
-      price: data.price ?? 0,
-      inventoryQuantity: data.stock ?? 0,
-      trackInventory: true,
-      allowBackorder: false,
-      weightUnit: 'g',
-      requiresShipping: true,
-      taxable: true,
-      optionValues: [],
-      isAvailable: (data.stock ?? 0) > 0,
-      position: 0,
-    }];
+    variants = [
+      {
+        id: generateVariantId(platform, platformId, 'default'),
+        title: 'Default',
+        sku: data.sku,
+        barcode: data.barcode,
+        price: data.price ?? 0,
+        inventoryQuantity: data.stock ?? 0,
+        trackInventory: true,
+        allowBackorder: false,
+        weightUnit: 'g',
+        requiresShipping: true,
+        taxable: true,
+        optionValues: [],
+        isAvailable: (data.stock ?? 0) > 0,
+        position: 0,
+      },
+    ];
   }
-  
+
   const categoryIds = data.categoryId ? [`${platform}-${data.categoryId}`] : [];
-  
+
   return {
     id: generateProductId(platform, platformId),
     platformId,

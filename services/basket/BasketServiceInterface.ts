@@ -41,13 +41,13 @@ export interface Basket {
 /**
  * Status of a local order
  */
-export type LocalOrderStatus = 
-  | 'pending'      // Order created, awaiting payment
-  | 'processing'   // Payment in progress
-  | 'paid'         // Payment completed
-  | 'synced'       // Order synced to platform
-  | 'failed'       // Order/payment failed
-  | 'cancelled';   // Order cancelled
+export type LocalOrderStatus =
+  | 'pending' // Order created, awaiting payment
+  | 'processing' // Payment in progress
+  | 'paid' // Payment completed
+  | 'synced' // Order synced to platform
+  | 'failed' // Order/payment failed
+  | 'cancelled'; // Order cancelled
 
 /**
  * Represents an order stored locally
@@ -183,11 +183,7 @@ export interface BasketServiceInterface {
    * @param paymentMethod The payment method used
    * @param transactionId The payment transaction ID
    */
-  completePayment(
-    orderId: string,
-    paymentMethod: string,
-    transactionId?: string
-  ): Promise<CheckoutResult>;
+  completePayment(orderId: string, paymentMethod: string, transactionId?: string): Promise<CheckoutResult>;
 
   /**
    * Cancel an order

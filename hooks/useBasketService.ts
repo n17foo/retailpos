@@ -29,19 +29,19 @@ interface UseBasketServiceReturn extends UseBasketServiceState {
   removeDiscount: () => Promise<void>;
   setCustomer: (email?: string, name?: string) => Promise<void>;
   setNote: (note: string) => Promise<void>;
-  
+
   // Checkout operations
   startCheckout: (platform?: ECommercePlatform) => Promise<LocalOrder | null>;
   markPaymentProcessing: (orderId: string) => Promise<void>;
   completePayment: (orderId: string, paymentMethod: string, transactionId?: string) => Promise<CheckoutResult>;
   cancelOrder: (orderId: string) => Promise<void>;
-  
+
   // Sync operations
   syncOrderToPlatform: (orderId: string) => Promise<CheckoutResult>;
   syncAllPendingOrders: () => Promise<SyncResult>;
   getUnsyncedOrders: () => Promise<LocalOrder[]>;
   getLocalOrders: (status?: LocalOrderStatus) => Promise<LocalOrder[]>;
-  
+
   // Refresh
   refreshBasket: () => Promise<void>;
   refreshUnsyncedCount: () => Promise<void>;
@@ -66,15 +66,15 @@ export function useBasketService(): UseBasketServiceReturn {
   // Initialize the service
   useEffect(() => {
     mountedRef.current = true;
-    
+
     const initService = async () => {
       try {
         const service = await getBasketService();
         serviceRef.current = service;
-        
+
         const basket = await service.getBasket();
         const unsyncedOrders = await service.getUnsyncedOrders();
-        
+
         if (mountedRef.current) {
           setState(prev => ({
             ...prev,
@@ -103,7 +103,7 @@ export function useBasketService(): UseBasketServiceReturn {
 
   const refreshBasket = useCallback(async () => {
     if (!serviceRef.current) return;
-    
+
     try {
       const basket = await serviceRef.current.getBasket();
       if (mountedRef.current) {
@@ -118,7 +118,7 @@ export function useBasketService(): UseBasketServiceReturn {
 
   const refreshUnsyncedCount = useCallback(async () => {
     if (!serviceRef.current) return;
-    
+
     try {
       const unsyncedOrders = await serviceRef.current.getUnsyncedOrders();
       if (mountedRef.current) {
@@ -132,7 +132,7 @@ export function useBasketService(): UseBasketServiceReturn {
   // Basket operations
   const addItem = useCallback(async (item: Omit<BasketItem, 'id'>) => {
     if (!serviceRef.current) return;
-    
+
     try {
       const basket = await serviceRef.current.addItem(item);
       if (mountedRef.current) {
@@ -147,7 +147,7 @@ export function useBasketService(): UseBasketServiceReturn {
 
   const updateItemQuantity = useCallback(async (itemId: string, quantity: number) => {
     if (!serviceRef.current) return;
-    
+
     try {
       const basket = await serviceRef.current.updateItemQuantity(itemId, quantity);
       if (mountedRef.current) {
@@ -162,7 +162,7 @@ export function useBasketService(): UseBasketServiceReturn {
 
   const removeItem = useCallback(async (itemId: string) => {
     if (!serviceRef.current) return;
-    
+
     try {
       const basket = await serviceRef.current.removeItem(itemId);
       if (mountedRef.current) {
@@ -177,7 +177,7 @@ export function useBasketService(): UseBasketServiceReturn {
 
   const clearBasket = useCallback(async () => {
     if (!serviceRef.current) return;
-    
+
     try {
       await serviceRef.current.clearBasket();
       await refreshBasket();
@@ -190,7 +190,7 @@ export function useBasketService(): UseBasketServiceReturn {
 
   const applyDiscount = useCallback(async (code: string) => {
     if (!serviceRef.current) return;
-    
+
     try {
       const basket = await serviceRef.current.applyDiscount(code);
       if (mountedRef.current) {
@@ -205,7 +205,7 @@ export function useBasketService(): UseBasketServiceReturn {
 
   const removeDiscount = useCallback(async () => {
     if (!serviceRef.current) return;
-    
+
     try {
       const basket = await serviceRef.current.removeDiscount();
       if (mountedRef.current) {
@@ -220,7 +220,7 @@ export function useBasketService(): UseBasketServiceReturn {
 
   const setCustomer = useCallback(async (email?: string, name?: string) => {
     if (!serviceRef.current) return;
-    
+
     try {
       const basket = await serviceRef.current.setCustomer(email, name);
       if (mountedRef.current) {
@@ -235,7 +235,7 @@ export function useBasketService(): UseBasketServiceReturn {
 
   const setNote = useCallback(async (note: string) => {
     if (!serviceRef.current) return;
-    
+
     try {
       const basket = await serviceRef.current.setNote(note);
       if (mountedRef.current) {
@@ -251,7 +251,7 @@ export function useBasketService(): UseBasketServiceReturn {
   // Checkout operations
   const startCheckout = useCallback(async (platform?: ECommercePlatform): Promise<LocalOrder | null> => {
     if (!serviceRef.current) return null;
-    
+
     try {
       const order = await serviceRef.current.startCheckout(platform);
       if (mountedRef.current) {
@@ -268,7 +268,7 @@ export function useBasketService(): UseBasketServiceReturn {
 
   const markPaymentProcessing = useCallback(async (orderId: string) => {
     if (!serviceRef.current) return;
-    
+
     try {
       const order = await serviceRef.current.markPaymentProcessing(orderId);
       if (mountedRef.current) {
@@ -281,37 +281,36 @@ export function useBasketService(): UseBasketServiceReturn {
     }
   }, []);
 
-  const completePayment = useCallback(async (
-    orderId: string,
-    paymentMethod: string,
-    transactionId?: string
-  ): Promise<CheckoutResult> => {
-    if (!serviceRef.current) {
-      return { success: false, orderId, error: 'Service not initialized' };
-    }
-    
-    try {
-      const result = await serviceRef.current.completePayment(orderId, paymentMethod, transactionId);
-      
-      if (result.success && mountedRef.current) {
-        // Refresh basket and unsynced count after successful payment
-        await refreshBasket();
-        await refreshUnsyncedCount();
-        setState(prev => ({ ...prev, currentOrder: null }));
+  const completePayment = useCallback(
+    async (orderId: string, paymentMethod: string, transactionId?: string): Promise<CheckoutResult> => {
+      if (!serviceRef.current) {
+        return { success: false, orderId, error: 'Service not initialized' };
       }
-      
-      return result;
-    } catch (error) {
-      if (mountedRef.current) {
-        setState(prev => ({ ...prev, error: (error as Error).message }));
+
+      try {
+        const result = await serviceRef.current.completePayment(orderId, paymentMethod, transactionId);
+
+        if (result.success && mountedRef.current) {
+          // Refresh basket and unsynced count after successful payment
+          await refreshBasket();
+          await refreshUnsyncedCount();
+          setState(prev => ({ ...prev, currentOrder: null }));
+        }
+
+        return result;
+      } catch (error) {
+        if (mountedRef.current) {
+          setState(prev => ({ ...prev, error: (error as Error).message }));
+        }
+        return { success: false, orderId, error: (error as Error).message };
       }
-      return { success: false, orderId, error: (error as Error).message };
-    }
-  }, [refreshBasket, refreshUnsyncedCount]);
+    },
+    [refreshBasket, refreshUnsyncedCount]
+  );
 
   const cancelOrder = useCallback(async (orderId: string) => {
     if (!serviceRef.current) return;
-    
+
     try {
       await serviceRef.current.cancelOrder(orderId);
       if (mountedRef.current) {
@@ -325,27 +324,30 @@ export function useBasketService(): UseBasketServiceReturn {
   }, []);
 
   // Sync operations
-  const syncOrderToPlatform = useCallback(async (orderId: string): Promise<CheckoutResult> => {
-    if (!serviceRef.current) {
-      return { success: false, orderId, error: 'Service not initialized' };
-    }
-    
-    try {
-      const result = await serviceRef.current.syncOrderToPlatform(orderId);
-      if (result.success) {
-        await refreshUnsyncedCount();
+  const syncOrderToPlatform = useCallback(
+    async (orderId: string): Promise<CheckoutResult> => {
+      if (!serviceRef.current) {
+        return { success: false, orderId, error: 'Service not initialized' };
       }
-      return result;
-    } catch (error) {
-      return { success: false, orderId, error: (error as Error).message };
-    }
-  }, [refreshUnsyncedCount]);
+
+      try {
+        const result = await serviceRef.current.syncOrderToPlatform(orderId);
+        if (result.success) {
+          await refreshUnsyncedCount();
+        }
+        return result;
+      } catch (error) {
+        return { success: false, orderId, error: (error as Error).message };
+      }
+    },
+    [refreshUnsyncedCount]
+  );
 
   const syncAllPendingOrders = useCallback(async (): Promise<SyncResult> => {
     if (!serviceRef.current) {
       return { synced: 0, failed: 0, errors: [] };
     }
-    
+
     try {
       const result = await serviceRef.current.syncAllPendingOrders();
       await refreshUnsyncedCount();

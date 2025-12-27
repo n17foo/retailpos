@@ -30,10 +30,10 @@ export class BasketService implements BasketServiceInterface {
 
   async initialize(): Promise<void> {
     this.logger.info('Initializing basket service...');
-    
+
     // Wait for database to be fully initialized
     this.db = SQLiteStorageService.getInstance().getDatabase();
-    
+
     // Ensure we have a current basket
     await this.getOrCreateBasket();
     this.logger.info('Basket service initialized');
@@ -137,9 +137,7 @@ export class BasketService implements BasketServiceInterface {
    */
   private calculateTotals(items: BasketItem[], discountAmount: number = 0): { subtotal: number; tax: number; total: number } {
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const taxableAmount = items
-      .filter(item => item.taxable)
-      .reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const taxableAmount = items.filter(item => item.taxable).reduce((sum, item) => sum + item.price * item.quantity, 0);
     const tax = taxableAmount * DEFAULT_TAX_RATE;
     const total = Math.max(0, subtotal + tax - discountAmount);
 
@@ -182,11 +180,9 @@ export class BasketService implements BasketServiceInterface {
 
   async addItem(item: Omit<BasketItem, 'id'>): Promise<Basket> {
     const basket = await this.getOrCreateBasket();
-    
+
     // Check if item already exists (by productId and variantId)
-    const existingIndex = basket.items.findIndex(
-      i => i.productId === item.productId && i.variantId === item.variantId
-    );
+    const existingIndex = basket.items.findIndex(i => i.productId === item.productId && i.variantId === item.variantId);
 
     if (existingIndex !== -1) {
       // Update quantity
@@ -213,7 +209,7 @@ export class BasketService implements BasketServiceInterface {
 
   async updateItemQuantity(itemId: string, quantity: number): Promise<Basket> {
     const basket = await this.getOrCreateBasket();
-    
+
     if (quantity <= 0) {
       // Remove item
       basket.items = basket.items.filter(i => i.id !== itemId);
@@ -254,7 +250,7 @@ export class BasketService implements BasketServiceInterface {
 
   async applyDiscount(code: string): Promise<Basket> {
     const basket = await this.getOrCreateBasket();
-    
+
     // TODO: Validate discount code against platform/local discounts
     // For now, we'll just store the code
     basket.discountCode = code;
@@ -267,7 +263,7 @@ export class BasketService implements BasketServiceInterface {
 
   async removeDiscount(): Promise<Basket> {
     const basket = await this.getOrCreateBasket();
-    
+
     basket.discountCode = undefined;
     basket.discountAmount = undefined;
 
@@ -284,7 +280,7 @@ export class BasketService implements BasketServiceInterface {
 
   async setCustomer(email?: string, name?: string): Promise<Basket> {
     const basket = await this.getOrCreateBasket();
-    
+
     basket.customerEmail = email;
     basket.customerName = name;
     basket.updatedAt = new Date();
@@ -295,7 +291,7 @@ export class BasketService implements BasketServiceInterface {
 
   async setNote(note: string): Promise<Basket> {
     const basket = await this.getOrCreateBasket();
-    
+
     basket.note = note;
     basket.updatedAt = new Date();
 
@@ -365,11 +361,8 @@ export class BasketService implements BasketServiceInterface {
 
   async markPaymentProcessing(orderId: string): Promise<LocalOrder> {
     const now = Date.now();
-    
-    await this.db.runAsync(
-      `UPDATE local_orders SET status = ?, updated_at = ? WHERE id = ?`,
-      ['processing', now, orderId]
-    );
+
+    await this.db.runAsync(`UPDATE local_orders SET status = ?, updated_at = ? WHERE id = ?`, ['processing', now, orderId]);
 
     const order = await this.getLocalOrder(orderId);
     if (!order) {
@@ -379,11 +372,7 @@ export class BasketService implements BasketServiceInterface {
     return order;
   }
 
-  async completePayment(
-    orderId: string,
-    paymentMethod: string,
-    transactionId?: string
-  ): Promise<CheckoutResult> {
+  async completePayment(orderId: string, paymentMethod: string, transactionId?: string): Promise<CheckoutResult> {
     const now = Date.now();
 
     try {
@@ -411,12 +400,9 @@ export class BasketService implements BasketServiceInterface {
       };
     } catch (error) {
       this.logger.error({ message: `Failed to complete payment for order ${orderId}` }, error as Error);
-      
+
       // Mark order as failed
-      await this.db.runAsync(
-        `UPDATE local_orders SET status = ?, updated_at = ? WHERE id = ?`,
-        ['failed', now, orderId]
-      );
+      await this.db.runAsync(`UPDATE local_orders SET status = ?, updated_at = ? WHERE id = ?`, ['failed', now, orderId]);
 
       return {
         success: false,
@@ -428,11 +414,8 @@ export class BasketService implements BasketServiceInterface {
 
   async cancelOrder(orderId: string): Promise<void> {
     const now = Date.now();
-    
-    await this.db.runAsync(
-      `UPDATE local_orders SET status = ?, updated_at = ? WHERE id = ?`,
-      ['cancelled', now, orderId]
-    );
+
+    await this.db.runAsync(`UPDATE local_orders SET status = ?, updated_at = ? WHERE id = ?`, ['cancelled', now, orderId]);
 
     this.logger.info(`Order ${orderId} cancelled`);
   }
@@ -441,7 +424,7 @@ export class BasketService implements BasketServiceInterface {
 
   async syncOrderToPlatform(orderId: string): Promise<CheckoutResult> {
     const localOrder = await this.getLocalOrder(orderId);
-    
+
     if (!localOrder) {
       return {
         success: false,
@@ -510,10 +493,12 @@ export class BasketService implements BasketServiceInterface {
 
       // Update sync status to failed
       const now = Date.now();
-      await this.db.runAsync(
-        `UPDATE local_orders SET sync_status = ?, sync_error = ?, updated_at = ? WHERE id = ?`,
-        ['failed', (error as Error).message, now, orderId]
-      );
+      await this.db.runAsync(`UPDATE local_orders SET sync_status = ?, sync_error = ?, updated_at = ? WHERE id = ?`, [
+        'failed',
+        (error as Error).message,
+        now,
+        orderId,
+      ]);
 
       return {
         success: false,
@@ -525,7 +510,7 @@ export class BasketService implements BasketServiceInterface {
 
   async syncAllPendingOrders(): Promise<SyncResult> {
     const unsyncedOrders = await this.getUnsyncedOrders();
-    
+
     const result: SyncResult = {
       synced: 0,
       failed: 0,
@@ -534,7 +519,7 @@ export class BasketService implements BasketServiceInterface {
 
     for (const order of unsyncedOrders) {
       const syncResult = await this.syncOrderToPlatform(order.id);
-      
+
       if (syncResult.success) {
         result.synced++;
       } else {

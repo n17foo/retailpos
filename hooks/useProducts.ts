@@ -1,7 +1,13 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ProductServiceFactory } from '../services/product/productServiceFactory';
 import { ECommercePlatform } from '../utils/platforms';
-import { getDefaultVariant, toProductSummary, UnifiedProduct, UnifiedProductQueryOptions, UnifiedProductSummary } from '../models/UnifiedProduct';
+import {
+  getDefaultVariant,
+  toProductSummary,
+  UnifiedProduct,
+  UnifiedProductQueryOptions,
+  UnifiedProductSummary,
+} from '../models/UnifiedProduct';
 import { mapToUnifiedProducts } from '../models/mappers/ProductMapper';
 
 /**
@@ -50,19 +56,14 @@ interface UseUnifiedProductsReturn extends UseUnifiedProductsState {
  * Hook for managing unified products
  * Fetches products from the configured platform and converts them to unified format
  */
-export const useUnifiedProducts = (
-  platform?: ECommercePlatform,
-  initialOptions?: UnifiedProductQueryOptions
-): UseUnifiedProductsReturn => {
+export const useUnifiedProducts = (platform?: ECommercePlatform, initialOptions?: UnifiedProductQueryOptions): UseUnifiedProductsReturn => {
   const [products, setProducts] = useState<UnifiedProduct[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [currentOptions, setCurrentOptions] = useState<UnifiedProductQueryOptions>(
-    initialOptions || { page: 1, limit: 50 }
-  );
+  const [currentOptions, setCurrentOptions] = useState<UnifiedProductQueryOptions>(initialOptions || { page: 1, limit: 50 });
 
   // Compute product summaries from full products
   const productSummaries = useMemo(() => {
@@ -90,7 +91,7 @@ export const useUnifiedProducts = (
         }
 
         const queryOptions = options || currentOptions;
-        
+
         // Convert unified options to service options
         const serviceOptions = {
           page: queryOptions.page || 1,
@@ -222,29 +223,22 @@ export const useUnifiedProducts = (
 /**
  * Helper hook to get display-ready product data
  * Returns products in a format ready for ProductGrid
- * 
+ *
  * Uses backend/service filtering by category name (productType)
  */
-export const useProductsForDisplay = (
-  platform?: ECommercePlatform,
-  categoryId?: string | null,
-  categoryName?: string | null
-) => {
+export const useProductsForDisplay = (platform?: ECommercePlatform, categoryId?: string | null, categoryName?: string | null) => {
   // Memoize options to prevent unnecessary re-fetches
-  const options = useMemo(() => ({
-    page: 1,
-    limit: 100,
-    // Pass category name for service-level filtering (mock service uses productType)
-    categoryId: categoryName || undefined,
-  }), [categoryName]);
+  const options = useMemo(
+    () => ({
+      page: 1,
+      limit: 100,
+      // Pass category name for service-level filtering (mock service uses productType)
+      categoryId: categoryName || undefined,
+    }),
+    [categoryName]
+  );
 
-  const {
-    products,
-    productSummaries,
-    isLoading,
-    error,
-    refresh,
-  } = useUnifiedProducts(platform, options);
+  const { products, productSummaries, isLoading, error, refresh } = useUnifiedProducts(platform, options);
 
   // Convert to display format expected by ProductGrid
   const displayProducts = useMemo(() => {
