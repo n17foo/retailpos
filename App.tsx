@@ -27,7 +27,7 @@ const AppContent = () => {
 
     const handleLocalizationChange = async () => {
       try {
-        console.log('[Localization] Starting localization change handler');
+        logger.info({ message: '[Localization] Starting localization change handler' });
         const defaultLocale = 'en';
         let locale = defaultLocale;
         let currentLocaleTag = defaultLocale; // For RTL check
@@ -47,7 +47,7 @@ const AppContent = () => {
           }
         }
 
-        console.log(`[Localization] Using locale: ${locale}, languageTag: ${currentLocaleTag}`);
+        logger.info({ message: `[Localization] Using locale: ${locale}, languageTag: ${currentLocaleTag}` });
 
         if (isMounted) {
           // Check for RTL using the full language tag
@@ -64,15 +64,19 @@ const AppContent = () => {
           }
         }
       } catch (error) {
-        console.error('[Localization] Error handling localization change:', error);
-        logger.error({ message: 'Error handling localization change' }, error instanceof Error ? error : new Error(String(error)));
+        logger.error(
+          { message: '[Localization] Error handling localization change' },
+          error instanceof Error ? error : new Error(String(error))
+        );
       }
     };
 
     // Initial setup
     handleLocalizationChange().catch(error => {
-      console.error('[Localization] Failed to handle localization change:', error);
-      logger.error({ message: 'Failed to handle localization change' }, error instanceof Error ? error : new Error(String(error)));
+      logger.error(
+        { message: '[Localization] Failed to handle localization change' },
+        error instanceof Error ? error : new Error(String(error))
+      );
     });
 
     // Initialize sync queue manager
@@ -85,6 +89,7 @@ const AppContent = () => {
     return () => {
       isMounted = false;
       backgroundSyncService.stop();
+      queueManager.dispose();
     };
   }, []);
 
@@ -110,7 +115,7 @@ const AppContent = () => {
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={styles.root}>
       <I18nextProvider i18n={i18n}>
         <AppContent />
       </I18nextProvider>
@@ -119,6 +124,9 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     backgroundColor: lightColors.background,

@@ -7,6 +7,7 @@ import { AuthNavigator } from './AuthNavigator';
 import { MainTabNavigator } from './MainTabNavigator';
 import type { RootStackParamList } from './types';
 import { User } from '../repositories/UserRepository';
+import { logger } from '../services/logger';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -27,7 +28,7 @@ export const RootNavigator: React.FC = () => {
         : { username: 'Staff', pin };
       setUser(userData);
       setIsAuthenticated(true);
-      console.log('Login successful:', loggedInUser ? `User: ${loggedInUser.name}` : 'Development mode');
+      logger.info({ message: `Login successful: ${loggedInUser ? `User: ${loggedInUser.name}` : 'Development mode'}` });
     }
   };
 

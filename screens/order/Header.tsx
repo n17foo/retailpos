@@ -1,3 +1,4 @@
+import React, { memo } from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { lightColors, spacing, typography } from '../../utils/theme';
 import { useCategoryContext } from '../../contexts/CategoryProvider';
@@ -11,7 +12,7 @@ interface HeaderProps {
   onQuickAction?: (actionId: string) => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ username, cartItemTotal, onQuickAction }) => {
+const HeaderInner: React.FC<HeaderProps> = ({ username, cartItemTotal, onQuickAction }) => {
   const { isLeftPanelOpen, setIsLeftPanelOpen } = useCategoryContext();
   const { isRightPanelOpen, setIsRightPanelOpen, unsyncedOrdersCount } = useBasketContext();
   const { isMobile } = useResponsive();
@@ -68,6 +69,8 @@ export const Header: React.FC<HeaderProps> = ({ username, cartItemTotal, onQuick
     </View>
   );
 };
+
+export const Header = memo(HeaderInner);
 
 const styles = StyleSheet.create({
   header: {

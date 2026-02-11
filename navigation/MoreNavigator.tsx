@@ -1,16 +1,23 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { lazy, Suspense } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import SettingsScreen from '../screens/SettingsScreen';
-import RefundScreen from '../screens/RefundScreen';
-import PrinterScreen from '../screens/PrinterScreen';
-import PaymentTerminalScreen from '../screens/PaymentTerminalScreen';
-import UsersScreen from '../screens/UsersScreen';
-import DailyOrdersScreen from '../screens/DailyOrdersScreen';
 import type { MoreStackParamList, MoreStackScreenProps } from './types';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../utils/theme';
+
+const SettingsScreen = lazy(() => import('../screens/SettingsScreen'));
+const RefundScreen = lazy(() => import('../screens/RefundScreen'));
+const PrinterScreen = lazy(() => import('../screens/PrinterScreen'));
+const PaymentTerminalScreen = lazy(() => import('../screens/PaymentTerminalScreen'));
+const UsersScreen = lazy(() => import('../screens/UsersScreen'));
+const DailyOrdersScreen = lazy(() => import('../screens/DailyOrdersScreen'));
+
+const LazyFallback = () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <ActivityIndicator size="large" color={lightColors.primary} />
+  </View>
+);
 
 const Stack = createNativeStackNavigator<MoreStackParamList>();
 
@@ -109,12 +116,48 @@ export const MoreNavigator: React.FC<MoreNavigatorProps> = ({ onLogout }) => {
       <Stack.Screen name="MoreMenu" options={{ headerShown: false }}>
         {props => <MoreMenuScreen {...props} onLogout={onLogout} />}
       </Stack.Screen>
-      <Stack.Screen name="DailyOrders" component={DailyOrdersScreen} options={{ title: 'Daily Orders' }} />
-      <Stack.Screen name="Settings" component={SettingsScreen} options={{ title: 'Settings' }} />
-      <Stack.Screen name="Users" component={UsersScreen} options={{ title: 'User Management' }} />
-      <Stack.Screen name="Refund" component={RefundScreen} options={{ title: 'Process Refund' }} />
-      <Stack.Screen name="Printer" component={PrinterScreen} options={{ title: 'Printer' }} />
-      <Stack.Screen name="PaymentTerminal" component={PaymentTerminalScreen} options={{ title: 'Payment Terminal' }} />
+      <Stack.Screen name="DailyOrders" options={{ title: 'Daily Orders' }}>
+        {props => (
+          <Suspense fallback={<LazyFallback />}>
+            <DailyOrdersScreen {...props} />
+          </Suspense>
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="Settings" options={{ title: 'Settings' }}>
+        {() => (
+          <Suspense fallback={<LazyFallback />}>
+            <SettingsScreen />
+          </Suspense>
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="Users" options={{ title: 'User Management' }}>
+        {() => (
+          <Suspense fallback={<LazyFallback />}>
+            <UsersScreen />
+          </Suspense>
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="Refund" options={{ title: 'Process Refund' }}>
+        {() => (
+          <Suspense fallback={<LazyFallback />}>
+            <RefundScreen />
+          </Suspense>
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="Printer" options={{ title: 'Printer' }}>
+        {() => (
+          <Suspense fallback={<LazyFallback />}>
+            <PrinterScreen />
+          </Suspense>
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="PaymentTerminal" options={{ title: 'Payment Terminal' }}>
+        {props => (
+          <Suspense fallback={<LazyFallback />}>
+            <PaymentTerminalScreen {...props} />
+          </Suspense>
+        )}
+      </Stack.Screen>
     </Stack.Navigator>
   );
 };

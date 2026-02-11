@@ -1,5 +1,5 @@
 import { TouchableOpacity, View, Text, StyleSheet, FlatList } from 'react-native';
-import React from 'react';
+import React, { memo, useCallback } from 'react';
 import { lightColors, spacing, typography } from '../../utils/theme';
 import { useCategoryContext } from '../../contexts/CategoryProvider';
 import { useCategoryNavigation } from '../../hooks/useCategories';
@@ -13,7 +13,7 @@ interface CategoryListProps {
 /**
  * Inline category list component that can be used both in a sidebar and in a SwipeablePanel.
  */
-export const CategoryList: React.FC<CategoryListProps> = ({ showBreadcrumb = false }) => {
+const CategoryListInner: React.FC<CategoryListProps> = ({ showBreadcrumb = false }) => {
   const { selectedCategory, setSelectedCategory, setSelectedCategoryName } = useCategoryContext();
   const { displayCategories, currentCategory, canNavigateUp, navigateTo, navigateUp, navigateToRoot, hasChildren, breadcrumb } =
     useCategoryNavigation();
@@ -105,6 +105,9 @@ export const CategoryList: React.FC<CategoryListProps> = ({ showBreadcrumb = fal
         }}
         keyExtractor={item => item.id}
         showsVerticalScrollIndicator={true}
+        initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={5}
       />
     </View>
   );
@@ -151,4 +154,5 @@ const styles = StyleSheet.create({
   },
 });
 
+export const CategoryList = memo(CategoryListInner);
 export default CategoryList;

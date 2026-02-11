@@ -1,13 +1,21 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons } from '@expo/vector-icons';
 import OrderScreen from '../screens/OrderScreen';
-import { BarcodeScannerScreen } from '../screens/BarcodeScannerScreen';
-import SearchScreen from '../screens/SearchScreen';
-import InventoryScreen from '../screens/InventoryScreen';
 import { MoreNavigator } from './MoreNavigator';
 import type { MainTabParamList } from './types';
 import { lightColors, typography, spacing } from '../utils/theme';
+
+const BarcodeScannerScreen = lazy(() => import('../screens/BarcodeScannerScreen').then(m => ({ default: m.BarcodeScannerScreen })));
+const SearchScreen = lazy(() => import('../screens/SearchScreen'));
+const InventoryScreen = lazy(() => import('../screens/InventoryScreen'));
+
+const LazyFallback = () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+    <ActivityIndicator size="large" color={lightColors.primary} />
+  </View>
+);
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
@@ -23,8 +31,8 @@ interface MainTabNavigatorProps {
 export const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ username, onLogout }) => {
   // Handler for barcode scan success
   const handleScanSuccess = (productId: string) => {
-    console.log('Scanned product:', productId);
     // TODO: Add product to cart and navigate to Order tab
+    void productId;
   };
 
   return (
@@ -65,7 +73,11 @@ export const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ username, on
           tabBarLabel: 'Scan',
         }}
       >
-        {props => <BarcodeScannerScreen {...props} onScanSuccess={handleScanSuccess} onClose={() => {}} />}
+        {props => (
+          <Suspense fallback={<LazyFallback />}>
+            <BarcodeScannerScreen {...props} onScanSuccess={handleScanSuccess} onClose={() => {}} />
+          </Suspense>
+        )}
       </Tab.Screen>
 
       <Tab.Screen
@@ -75,7 +87,11 @@ export const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ username, on
           tabBarLabel: 'Search',
         }}
       >
-        {() => <SearchScreen />}
+        {() => (
+          <Suspense fallback={<LazyFallback />}>
+            <SearchScreen />
+          </Suspense>
+        )}
       </Tab.Screen>
 
       <Tab.Screen
@@ -85,7 +101,11 @@ export const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ username, on
           tabBarLabel: 'Inventory',
         }}
       >
-        {() => <InventoryScreen />}
+        {() => (
+          <Suspense fallback={<LazyFallback />}>
+            <InventoryScreen />
+          </Suspense>
+        )}
       </Tab.Screen>
 
       <Tab.Screen

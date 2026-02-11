@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "retail-pos",
+    "name": "RetailPOS",
     "slug": "retail-pos",
     "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/adaptive-icon-foreground.png",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
@@ -14,15 +14,34 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.n17foo.retail-pos"
+      "bundleIdentifier": "com.n17foo.retail-pos",
+      "infoPlist": {
+        "NSCameraUsageDescription": "RetailPOS uses the camera to scan product barcodes.",
+        "NSBluetoothAlwaysUsageDescription": "RetailPOS uses Bluetooth to connect to barcode scanners and receipt printers.",
+        "NSBluetoothPeripheralUsageDescription": "RetailPOS uses Bluetooth to connect to barcode scanners and receipt printers.",
+        "UIRequiresFullScreen": false,
+        "UISupportsDocumentBrowser": false
+      },
+      "requireFullScreen": false
     },
     "android": {
+      "package": "com.n17foo.retailpos",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon-foreground.png",
         "backgroundImage": "./assets/adaptive-icon-background.png",
         "backgroundColor": "#5B628F"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "CAMERA",
+        "BLUETOOTH",
+        "BLUETOOTH_ADMIN",
+        "BLUETOOTH_CONNECT",
+        "BLUETOOTH_SCAN",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_FINE_LOCATION",
+        "NFC"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -34,9 +53,16 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera",
-          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone",
-          "recordAudioAndroid": true
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to scan barcodes.",
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone.",
+          "recordAudioAndroid": false
+        }
+      ],
+      "expo-localization",
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": true
         }
       ]
     ]

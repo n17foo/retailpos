@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ImageSourcePropType } from 'react-native';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../../utils/theme';
 
@@ -14,7 +14,7 @@ interface ProductCardProps {
   widthPercent?: number;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({
+const ProductCardInner: React.FC<ProductCardProps> = ({
   id,
   name,
   price,
@@ -109,6 +109,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     </TouchableOpacity>
   );
 };
+
+export const ProductCard = memo(ProductCardInner);
 
 const styles = StyleSheet.create({
   card: {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo, useCallback } from 'react';
 import { View, FlatList, StyleSheet, ImageSourcePropType } from 'react-native';
 import { spacing } from '../../utils/theme';
 import { ProductCard } from './ProductCard';
@@ -48,36 +48,50 @@ interface ProductGridProps {
   numColumns?: number;
 }
 
-export const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, cartItems = {}, numColumns = 2 }) => {
+const ProductGridInner: React.FC<ProductGridProps> = ({ products, onAddToCart, cartItems = {}, numColumns = 2 }) => {
   // FlatList requires a key prop change to re-render when numColumns changes
   const cardWidthPercent = Math.floor(100 / numColumns) - 2;
+
+  const renderItem = useCallback(
+    ({ item }: { item: DisplayProduct }) => (
+      <ProductCard
+        id={item.id}
+        name={item.name}
+        price={item.price}
+        image={item.image}
+        stock={item.stock}
+        onAddToCart={onAddToCart}
+        inCart={!!cartItems[item.id]}
+        initialQuantity={cartItems[item.id] || 0}
+        widthPercent={cardWidthPercent}
+      />
+    ),
+    [onAddToCart, cartItems, cardWidthPercent]
+  );
+
+  const keyExtractor = useCallback((item: DisplayProduct) => item.id, []);
 
   return (
     <View style={styles.container}>
       <FlatList
         key={`grid-${numColumns}`}
         data={products}
-        renderItem={({ item }) => (
-          <ProductCard
-            id={item.id}
-            name={item.name}
-            price={item.price}
-            image={item.image}
-            stock={item.stock}
-            onAddToCart={onAddToCart}
-            inCart={!!cartItems[item.id]}
-            initialQuantity={cartItems[item.id] || 0}
-            widthPercent={cardWidthPercent}
-          />
-        )}
-        keyExtractor={item => item.id}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
         numColumns={numColumns}
         columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={12}
+        maxToRenderPerBatch={8}
+        windowSize={5}
+        removeClippedSubviews={true}
+        updateCellsBatchingPeriod={50}
       />
     </View>
   );
 };
+
+export const ProductGrid = memo(ProductGridInner);
 
 const styles = StyleSheet.create({
   container: {
