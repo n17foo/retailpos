@@ -18,14 +18,7 @@ interface CardProps {
   borderColor?: string;
 }
 
-export const Card: React.FC<CardProps> = ({
-  children,
-  elevationLevel = 'medium',
-  padding = spacing.md,
-  onPress,
-  style,
-  borderColor,
-}) => {
+export const Card: React.FC<CardProps> = ({ children, elevationLevel = 'medium', padding = spacing.md, onPress, style, borderColor }) => {
   const elevationStyle = elevation[elevationLevel] || elevation.none;
 
   const cardStyle: ViewStyle[] = [

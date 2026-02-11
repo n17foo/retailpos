@@ -28,7 +28,7 @@ const useSettings = () => {
 
   const getSetting = useCallback(
     <T>(key: string, defaultValue: T): T => {
-      return settings.hasOwnProperty(key) ? (settings[key] as T) : defaultValue;
+      return Object.prototype.hasOwnProperty.call(settings, key) ? (settings[key] as T) : defaultValue;
     },
     [settings]
   );

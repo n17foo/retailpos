@@ -97,7 +97,8 @@ export class BasketService implements BasketServiceInterface {
     try {
       // Try to get existing active basket
       const existingBasket = await this.db.getFirstAsync<BasketRow>(
-        'SELECT * FROM baskets WHERE status = ? ORDER BY created_at DESC LIMIT 1', ['active']
+        'SELECT * FROM baskets WHERE status = ? ORDER BY created_at DESC LIMIT 1',
+        ['active']
       );
 
       if (existingBasket) {
@@ -159,9 +160,7 @@ export class BasketService implements BasketServiceInterface {
     const lineTotals = items.map(item => multiplyMoney(item.price, item.quantity));
     const subtotal = sumMoney(lineTotals);
 
-    const taxableLineTotals = items
-      .filter(item => item.taxable)
-      .map(item => multiplyMoney(item.price, item.quantity));
+    const taxableLineTotals = items.filter(item => item.taxable).map(item => multiplyMoney(item.price, item.quantity));
     const taxableAmount = sumMoney(taxableLineTotals);
     const tax = calculateTax(taxableAmount, DEFAULT_TAX_RATE);
 
@@ -617,9 +616,7 @@ export class BasketService implements BasketServiceInterface {
   }
 
   async getLocalOrder(orderId: string): Promise<LocalOrder | null> {
-    const row = await this.db.getFirstAsync<LocalOrderRow>(
-      'SELECT * FROM local_orders WHERE id = ?', [orderId]
-    );
+    const row = await this.db.getFirstAsync<LocalOrderRow>('SELECT * FROM local_orders WHERE id = ?', [orderId]);
 
     if (!row) return null;
     return this.mapDbRowToLocalOrder(row);

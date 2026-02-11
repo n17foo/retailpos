@@ -59,6 +59,7 @@ services/[domain]/
 ```
 
 **Example - Product Service:**
+
 ```typescript
 // services/product/ProductServiceInterface.ts
 export interface ProductServiceInterface {
@@ -69,14 +70,14 @@ export interface ProductServiceInterface {
 // services/product/productServiceFactory.ts
 export class ProductServiceFactory {
   private static instance: ProductServiceFactory;
-  
+
   public static getInstance(): ProductServiceFactory {
     if (!ProductServiceFactory.instance) {
       ProductServiceFactory.instance = new ProductServiceFactory();
     }
     return ProductServiceFactory.instance;
   }
-  
+
   public getService(platform?: ECommercePlatform): ProductServiceInterface {
     switch (platform) {
       case ECommercePlatform.SHOPIFY:
@@ -142,7 +143,7 @@ const BasketContext = createContext<BasketContextType | undefined>(undefined);
 export const BasketProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // State and service initialization
   const [basket, setBasket] = useState<Basket | null>(null);
-  
+
   // Memoized context value
   const value = useMemo(() => ({
     basket,
@@ -188,19 +189,22 @@ export const useProducts = (platform?: ECommercePlatform): UseProductsReturn => 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchProducts = useCallback(async (options?: QueryOptions) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const service = ProductServiceFactory.getInstance().getService(platform);
-      const result = await service.getProducts(options);
-      setProducts(mapToUnifiedProducts(result.products));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch products');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [platform]);
+  const fetchProducts = useCallback(
+    async (options?: QueryOptions) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const service = ProductServiceFactory.getInstance().getService(platform);
+        const result = await service.getProducts(options);
+        setProducts(mapToUnifiedProducts(result.products));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch products');
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [platform]
+  );
 
   useEffect(() => {
     fetchProducts();
@@ -237,17 +241,17 @@ const user: any = { ... };
 
 ### Naming Conventions
 
-| Type | Convention | Example |
-|------|------------|---------|
-| Files (components) | PascalCase | `ProductCard.tsx` |
-| Files (hooks) | camelCase with `use` prefix | `useProducts.ts` |
-| Files (services) | PascalCase | `ProductService.ts` |
-| Interfaces | PascalCase | `ProductServiceInterface` |
-| Types | PascalCase | `UserRole` |
-| Functions | camelCase | `fetchProducts` |
-| Constants | SCREAMING_SNAKE_CASE | `DEFAULT_PAGE_SIZE` |
-| React Components | PascalCase | `ProductCard` |
-| Hooks | camelCase with `use` prefix | `useProducts` |
+| Type               | Convention                  | Example                   |
+| ------------------ | --------------------------- | ------------------------- |
+| Files (components) | PascalCase                  | `ProductCard.tsx`         |
+| Files (hooks)      | camelCase with `use` prefix | `useProducts.ts`          |
+| Files (services)   | PascalCase                  | `ProductService.ts`       |
+| Interfaces         | PascalCase                  | `ProductServiceInterface` |
+| Types              | PascalCase                  | `UserRole`                |
+| Functions          | camelCase                   | `fetchProducts`           |
+| Constants          | SCREAMING_SNAKE_CASE        | `DEFAULT_PAGE_SIZE`       |
+| React Components   | PascalCase                  | `ProductCard`             |
+| Hooks              | camelCase with `use` prefix | `useProducts`             |
 
 ### File Organization
 
@@ -269,12 +273,12 @@ interface ProductCardProps {
 const ProductCard: React.FC<ProductCardProps> = ({ product, onPress }) => {
   // Hooks first
   const [isLoading, setIsLoading] = useState(false);
-  
+
   // Callbacks
   const handlePress = useCallback(() => {
     onPress(product.id);
   }, [product.id, onPress]);
-  
+
   // Render
   return (
     <View style={styles.container}>
@@ -312,10 +316,10 @@ import { lightColors, spacing, typography, borderRadius, elevation } from '../ut
 
 const styles = StyleSheet.create({
   container: {
-    padding: spacing.md,           // Use spacing constants
+    padding: spacing.md, // Use spacing constants
     backgroundColor: lightColors.surface,
     borderRadius: borderRadius.lg,
-    ...elevation.low,              // Use elevation presets
+    ...elevation.low, // Use elevation presets
   },
   title: {
     fontSize: typography.fontSize.lg,
@@ -329,37 +333,37 @@ const styles = StyleSheet.create({
 
 ```typescript
 // Spacing
-spacing.xs  // 4
-spacing.sm  // 8
-spacing.md  // 16
-spacing.lg  // 24
-spacing.xl  // 32
+spacing.xs; // 4
+spacing.sm; // 8
+spacing.md; // 16
+spacing.lg; // 24
+spacing.xl; // 32
 
 // Colors
-lightColors.primary
-lightColors.secondary
-lightColors.success
-lightColors.warning
-lightColors.error
-lightColors.surface
-lightColors.background
-lightColors.textPrimary
-lightColors.textSecondary
-lightColors.border
-lightColors.divider
+lightColors.primary;
+lightColors.secondary;
+lightColors.success;
+lightColors.warning;
+lightColors.error;
+lightColors.surface;
+lightColors.background;
+lightColors.textPrimary;
+lightColors.textSecondary;
+lightColors.border;
+lightColors.divider;
 
 // Typography
-typography.fontSize.xs   // 12
-typography.fontSize.sm   // 14
-typography.fontSize.md   // 16
-typography.fontSize.lg   // 18
-typography.fontSize.xl   // 20
+typography.fontSize.xs; // 12
+typography.fontSize.sm; // 14
+typography.fontSize.md; // 16
+typography.fontSize.lg; // 18
+typography.fontSize.xl; // 20
 
 // Border Radius
-borderRadius.sm   // 4
-borderRadius.md   // 8
-borderRadius.lg   // 12
-borderRadius.round // 9999
+borderRadius.sm; // 4
+borderRadius.md; // 8
+borderRadius.lg; // 12
+borderRadius.round; // 9999
 ```
 
 ---
@@ -391,11 +395,11 @@ interface ScreenNameScreenProps extends StackScreenProps<'ScreenName'> {}
 
 const ScreenNameScreen: React.FC<ScreenNameScreenProps> = ({ navigation }) => {
   // State and hooks
-  
+
   // Handlers
-  
+
   // Render helpers
-  
+
   return (
     <View style={styles.container}>
       {/* Content */}
@@ -421,7 +425,7 @@ Settings tabs are placed in `screens/settings/`:
 // screens/settings/[Feature]SettingsTab.tsx
 const FeatureSettingsTab: React.FC = () => {
   const { settings, updateSettings, isLoading } = useFeatureSettings();
-  
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.section}>
@@ -445,32 +449,33 @@ export default FeatureSettingsTab;
 import { multiplyMoney, addMoney, sumMoney, calculateTax, calculateLineTotal, formatMoney, roundMoney } from '../utils/money';
 
 // ✅ Correct — uses integer-cent math internally
-const lineTotal = multiplyMoney(9.99, 3);       // 29.97
-const sum = addMoney(0.1, 0.2);                 // 0.3
-const tax = calculateTax(29.97, 0.08);           // 2.40
-const display = formatMoney(29.97);              // "$29.97"
+const lineTotal = multiplyMoney(9.99, 3); // 29.97
+const sum = addMoney(0.1, 0.2); // 0.3
+const tax = calculateTax(29.97, 0.08); // 2.40
+const display = formatMoney(29.97); // "$29.97"
 
 // ❌ NEVER do raw float math on money
-const bad = 9.99 * 3;           // 29.970000000000002
-const worse = 0.1 + 0.2;       // 0.30000000000000004
+const bad = 9.99 * 3; // 29.970000000000002
+const worse = 0.1 + 0.2; // 0.30000000000000004
 ```
 
 ### Available Functions
 
-| Function | Description |
-|----------|-------------|
-| `multiplyMoney(price, qty)` | Price × quantity, returns dollars |
-| `addMoney(a, b)` | Add two dollar amounts |
-| `subtractMoney(a, b)` | Subtract dollar amounts |
-| `sumMoney(amounts[])` | Sum an array of dollar amounts |
-| `calculateTax(amount, rate)` | Tax at decimal rate (0.08 = 8%) |
+| Function                                        | Description                        |
+| ----------------------------------------------- | ---------------------------------- |
+| `multiplyMoney(price, qty)`                     | Price × quantity, returns dollars  |
+| `addMoney(a, b)`                                | Add two dollar amounts             |
+| `subtractMoney(a, b)`                           | Subtract dollar amounts            |
+| `sumMoney(amounts[])`                           | Sum an array of dollar amounts     |
+| `calculateTax(amount, rate)`                    | Tax at decimal rate (0.08 = 8%)    |
 | `calculateLineTotal(price, qty, taxable, rate)` | Returns `{ lineTotal, taxAmount }` |
-| `roundMoney(amount)` | Round to 2 decimal places |
-| `formatMoney(amount, symbol?)` | Display string e.g. `"$19.99"` |
+| `roundMoney(amount)`                            | Round to 2 decimal places          |
+| `formatMoney(amount, symbol?)`                  | Display string e.g. `"$19.99"`     |
 
 ### Testing
 
 Unit tests live at `utils/__tests__/money.test.ts`. Run with:
+
 ```bash
 npx jest utils/__tests__/money.test.ts
 ```
@@ -540,11 +545,12 @@ export enum ECommercePlatform {
 ### Adding New Platform Support
 
 1. Create platform service in `services/[domain]/platforms/`:
+
    ```typescript
-   export class NewPlatformProductService 
-     extends BaseProductService 
+   export class NewPlatformProductService
+     extends BaseProductService
      implements PlatformProductServiceInterface {
-     
+
      async initialize(): Promise<boolean> { ... }
      async getProducts(options: QueryOptions): Promise<ProductResult> { ... }
    }
@@ -563,6 +569,7 @@ export enum ECommercePlatform {
 ### Test File Location
 
 Place tests adjacent to source files:
+
 ```
 components/
 ├── Button.tsx
@@ -647,4 +654,4 @@ describe('Button', () => {
 
 ---
 
-*Last updated: February 2026*
+_Last updated: February 2026_

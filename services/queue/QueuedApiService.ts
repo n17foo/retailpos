@@ -24,11 +24,7 @@ export class QueuedApiService {
    * Make a direct API request for read operations (GET)
    * Read operations are not queued as they are typically safe to retry immediately
    */
-  static async directRequest(
-    url: string,
-    method: 'GET' = 'GET',
-    headers?: Record<string, string>
-  ): Promise<Response> {
+  static async directRequest(url: string, method: 'GET' = 'GET', headers?: Record<string, string>): Promise<Response> {
     return fetch(url, {
       method,
       headers: {

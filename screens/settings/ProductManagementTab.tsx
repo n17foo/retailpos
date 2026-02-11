@@ -110,9 +110,7 @@ const ProductManagementTab: React.FC = () => {
           inventoryQuantity: parseInt(formData.stock) || 0,
         },
       ],
-      images: formData.imageUrl.trim()
-        ? [{ id: 'main', url: formData.imageUrl.trim(), alt: formData.title.trim() }]
-        : [],
+      images: formData.imageUrl.trim() ? [{ id: 'main', url: formData.imageUrl.trim(), alt: formData.title.trim() }] : [],
     };
 
     try {
@@ -240,9 +238,7 @@ const ProductManagementTab: React.FC = () => {
                 style={[styles.categoryOption, !formData.categoryId && styles.categoryOptionSelected]}
                 onPress={() => setFormData({ ...formData, categoryId: '' })}
               >
-                <Text style={[styles.categoryOptionText, !formData.categoryId && styles.categoryOptionTextSelected]}>
-                  None
-                </Text>
+                <Text style={[styles.categoryOptionText, !formData.categoryId && styles.categoryOptionTextSelected]}>None</Text>
               </TouchableOpacity>
               {categories.map(cat => (
                 <TouchableOpacity
@@ -250,9 +246,7 @@ const ProductManagementTab: React.FC = () => {
                   style={[styles.categoryOption, formData.categoryId === cat.name && styles.categoryOptionSelected]}
                   onPress={() => setFormData({ ...formData, categoryId: cat.name })}
                 >
-                  <Text
-                    style={[styles.categoryOptionText, formData.categoryId === cat.name && styles.categoryOptionTextSelected]}
-                  >
+                  <Text style={[styles.categoryOptionText, formData.categoryId === cat.name && styles.categoryOptionTextSelected]}>
                     {cat.name}
                   </Text>
                 </TouchableOpacity>

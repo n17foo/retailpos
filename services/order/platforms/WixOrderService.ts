@@ -28,7 +28,12 @@ export class WixOrderService extends BaseOrderService {
       // Test connection
       try {
         const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/orders/query`;
-        const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', { query: { paging: { limit: 1 } } }, this.getAuthHeaders());
+        const response = await QueuedApiService.directRequestWithBody(
+          apiUrl,
+          'POST',
+          { query: { paging: { limit: 1 } } },
+          this.getAuthHeaders()
+        );
 
         if (response.ok) {
           this.initialized = true;
@@ -68,10 +73,15 @@ export class WixOrderService extends BaseOrderService {
       // Use QueuedApiService for API call with X-Request-ID for idempotency
       const requestId = `wix_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', { order: wixOrder }, {
-        ...this.getAuthHeaders(),
-        'X-Request-ID': requestId,
-      });
+      const response = await QueuedApiService.directRequestWithBody(
+        apiUrl,
+        'POST',
+        { order: wixOrder },
+        {
+          ...this.getAuthHeaders(),
+          'X-Request-ID': requestId,
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to create order on Wix: ${response.statusText}`);
@@ -119,11 +129,16 @@ export class WixOrderService extends BaseOrderService {
       // Wix has limited order update - mainly fulfillment status
       const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/orders/${orderId}`;
 
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'PATCH', {
-        order: {
-          buyerNote: updates.note,
+      const response = await QueuedApiService.directRequestWithBody(
+        apiUrl,
+        'PATCH',
+        {
+          order: {
+            buyerNote: updates.note,
+          },
         },
-      }, this.getAuthHeaders());
+        this.getAuthHeaders()
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to update order on Wix: ${response.statusText}`);

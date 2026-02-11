@@ -34,9 +34,7 @@ class QueueManager {
       const { queue, processQueue } = useSyncStore.getState();
       const now = new Date();
 
-      const hasReadyRequests = queue.some(request =>
-        request.nextRetryAt && request.nextRetryAt <= now
-      );
+      const hasReadyRequests = queue.some(request => request.nextRetryAt && request.nextRetryAt <= now);
 
       if (hasReadyRequests) {
         this.logger.debug('Retryable requests found, processing...');

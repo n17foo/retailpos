@@ -57,7 +57,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const isOutOfStock = stock !== undefined && stock <= 0;
   const isLowStock = stock !== undefined && stock > 0 && stock <= 5;
 
-  const cardWidth = widthPercent ? `${widthPercent}%` as any : '47%';
+  const cardWidth = widthPercent ? (`${widthPercent}%` as any) : '47%';
 
   return (
     <TouchableOpacity

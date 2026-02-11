@@ -29,7 +29,13 @@ export const Header: React.FC<HeaderProps> = ({ username, cartItemTotal, onQuick
   const quickActions: QuickAction[] = [
     { id: 'reprint', label: 'Reprint Last Receipt', icon: '🖨', onPress: () => onQuickAction?.('reprint') },
     { id: 'report', label: 'Daily Report', icon: '📊', onPress: () => onQuickAction?.('report') },
-    { id: 'sync', label: 'Sync Orders', icon: '🔄', onPress: () => onQuickAction?.('sync'), badge: unsyncedOrdersCount > 0 ? unsyncedOrdersCount : undefined },
+    {
+      id: 'sync',
+      label: 'Sync Orders',
+      icon: '🔄',
+      onPress: () => onQuickAction?.('sync'),
+      badge: unsyncedOrdersCount > 0 ? unsyncedOrdersCount : undefined,
+    },
   ];
 
   return (
@@ -54,9 +60,7 @@ export const Header: React.FC<HeaderProps> = ({ username, cartItemTotal, onQuick
       <View style={styles.headerRightContainer}>
         {isMobile && (
           <TouchableOpacity style={styles.headerButton} onPress={toggleRightPanel}>
-            <Text style={styles.headerButtonText}>
-              🛒 {cartItemTotal > 0 ? `(${cartItemTotal})` : ''}
-            </Text>
+            <Text style={styles.headerButtonText}>🛒 {cartItemTotal > 0 ? `(${cartItemTotal})` : ''}</Text>
           </TouchableOpacity>
         )}
         <QuickActionsMenu actions={quickActions} />

@@ -13,8 +13,7 @@ const OfflineManagementTab: React.FC = () => {
     <ScrollView style={styles.overviewContainer}>
       <Text style={styles.overviewTitle}>Offline Mode Management</Text>
       <Text style={styles.overviewDescription}>
-        Manage your local products, categories, and users for offline POS operation. All data is stored locally on this
-        device using SQLite.
+        Manage your local products, categories, and users for offline POS operation. All data is stored locally on this device using SQLite.
       </Text>
 
       <View style={styles.menuGrid}>
@@ -40,11 +39,8 @@ const OfflineManagementTab: React.FC = () => {
       <View style={styles.infoBox}>
         <Text style={styles.infoTitle}>About Offline Mode</Text>
         <Text style={styles.infoText}>
-          • All data is stored locally on this device{'\n'}
-          • No internet connection required for operation{'\n'}
-          • Products can be added to basket and orders completed{'\n'}
-          • User roles: Admin, Manager, Cashier, Service Staff{'\n'}
-          • Data persists across app restarts
+          • All data is stored locally on this device{'\n'}• No internet connection required for operation{'\n'}• Products can be added to
+          basket and orders completed{'\n'}• User roles: Admin, Manager, Cashier, Service Staff{'\n'}• Data persists across app restarts
         </Text>
       </View>
     </ScrollView>

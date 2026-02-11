@@ -1,12 +1,6 @@
 import { Dispatch, ReactNode, SetStateAction, createContext, useContext, useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { ImageSourcePropType } from 'react-native';
-import {
-  Basket,
-  LocalOrder,
-  LocalOrderStatus,
-  CheckoutResult,
-  SyncResult,
-} from '../services/basket/BasketServiceInterface';
+import { Basket, LocalOrder, LocalOrderStatus, CheckoutResult, SyncResult } from '../services/basket/BasketServiceInterface';
 import { getBasketService } from '../services/basket/basketServiceFactory';
 import { BasketServiceInterface } from '../services/basket/BasketServiceInterface';
 import { ECommercePlatform } from '../utils/platforms';
@@ -389,23 +383,26 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   }, []);
 
   // Checkout operations
-  const startCheckout = useCallback(async (platform?: ECommercePlatform): Promise<LocalOrder | null> => {
-    if (!serviceRef.current) return null;
+  const startCheckout = useCallback(
+    async (platform?: ECommercePlatform): Promise<LocalOrder | null> => {
+      if (!serviceRef.current) return null;
 
-    try {
-      const order = await serviceRef.current.startCheckout(platform, user?.id, user?.username);
-      if (mountedRef.current) {
-        setCurrentOrder(order);
-        setError(null);
+      try {
+        const order = await serviceRef.current.startCheckout(platform, user?.id, user?.username);
+        if (mountedRef.current) {
+          setCurrentOrder(order);
+          setError(null);
+        }
+        return order;
+      } catch (err) {
+        if (mountedRef.current) {
+          setError((err as Error).message);
+        }
+        return null;
       }
-      return order;
-    } catch (err) {
-      if (mountedRef.current) {
-        setError((err as Error).message);
-      }
-      return null;
-    }
-  }, [user]);
+    },
+    [user]
+  );
 
   const markPaymentProcessing = useCallback(async (orderId: string) => {
     if (!serviceRef.current) return;

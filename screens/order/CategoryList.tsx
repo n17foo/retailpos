@@ -67,9 +67,7 @@ export const CategoryList: React.FC<CategoryListProps> = ({ showBreadcrumb = fal
   const renderHeader = () => {
     return (
       <View>
-        {showBreadcrumb && breadcrumbItems.length > 0 && (
-          <Breadcrumb items={breadcrumbItems} onNavigate={handleBreadcrumbNavigate} />
-        )}
+        {showBreadcrumb && breadcrumbItems.length > 0 && <Breadcrumb items={breadcrumbItems} onNavigate={handleBreadcrumbNavigate} />}
 
         {/* Show All option */}
         <TouchableOpacity onPress={handleShowAll} style={[styles.categoryItem, !selectedCategory && styles.selectedCategory]}>

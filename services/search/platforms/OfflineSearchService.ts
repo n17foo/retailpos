@@ -31,7 +31,10 @@ export class OfflineSearchService implements SearchServiceInterface {
       this.logger.info('Offline search service initialized (local-only mode)');
       return true;
     } catch (error) {
-      this.logger.error({ message: 'Error initializing offline search service' }, error instanceof Error ? error : new Error(String(error)));
+      this.logger.error(
+        { message: 'Error initializing offline search service' },
+        error instanceof Error ? error : new Error(String(error))
+      );
       this.initialized = false;
       return false;
     }

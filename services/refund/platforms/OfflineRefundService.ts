@@ -31,7 +31,10 @@ export class OfflineRefundService implements PlatformRefundServiceInterface {
       this.logger.info('Offline refund service initialized (local-only mode)');
       return true;
     } catch (error) {
-      this.logger.error({ message: 'Error initializing offline refund service' }, error instanceof Error ? error : new Error(String(error)));
+      this.logger.error(
+        { message: 'Error initializing offline refund service' },
+        error instanceof Error ? error : new Error(String(error))
+      );
       this.initialized = false;
       return false;
     }

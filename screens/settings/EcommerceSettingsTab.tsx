@@ -4,7 +4,16 @@ import { useEcommerceSettings } from '../../hooks/useEcommerceSettings';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../../utils/theme';
 import { Button } from '../../components';
 
-type ECommercePlatform = 'shopify' | 'woocommerce' | 'bigcommerce' | 'magento' | 'sylius' | 'wix' | 'prestashop' | 'squarespace' | 'offline';
+type ECommercePlatform =
+  | 'shopify'
+  | 'woocommerce'
+  | 'bigcommerce'
+  | 'magento'
+  | 'sylius'
+  | 'wix'
+  | 'prestashop'
+  | 'squarespace'
+  | 'offline';
 
 // Platform display names
 const PLATFORM_NAMES: Record<string, string> = {

@@ -54,13 +54,20 @@ const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'payment': return <PaymentSettingsTab />;
-      case 'printer': return <PrinterSettingsTab />;
-      case 'scanner': return <ScannerSettingsTab />;
-      case 'ecommerce': return <EcommerceSettingsTab />;
-      case 'generic': return <GenericSettingsTab />;
-      case 'offline': return <OfflineManagementTab />;
-      case 'receipt': return <ReceiptSettingsTab />;
+      case 'payment':
+        return <PaymentSettingsTab />;
+      case 'printer':
+        return <PrinterSettingsTab />;
+      case 'scanner':
+        return <ScannerSettingsTab />;
+      case 'ecommerce':
+        return <EcommerceSettingsTab />;
+      case 'generic':
+        return <GenericSettingsTab />;
+      case 'offline':
+        return <OfflineManagementTab />;
+      case 'receipt':
+        return <ReceiptSettingsTab />;
     }
   };
 
@@ -93,9 +100,7 @@ const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
           </View>
 
           {/* Content */}
-          <ScrollView style={styles.desktopContent}>
-            {renderTabContent()}
-          </ScrollView>
+          <ScrollView style={styles.desktopContent}>{renderTabContent()}</ScrollView>
         </View>
 
         <FloatingSaveBar
@@ -149,7 +154,12 @@ const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
         </View>
       ) : (
         // Tablet: Scrollable tab bar (fits better than mobile)
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabBarScroll} contentContainerStyle={styles.tabBarContent}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabBarScroll}
+          contentContainerStyle={styles.tabBarContent}
+        >
           {TAB_CONFIG.map(tab => (
             <TouchableOpacity
               key={tab.id}
@@ -162,9 +172,7 @@ const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
         </ScrollView>
       )}
 
-      <ScrollView style={styles.content}>
-        {renderTabContent()}
-      </ScrollView>
+      <ScrollView style={styles.content}>{renderTabContent()}</ScrollView>
 
       <FloatingSaveBar
         visible={saveStatus === 'unsaved'}

@@ -96,12 +96,17 @@ export class SyliusOrderService extends BaseOrderService {
       // Complete the order
       const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/orders/${cartToken}/complete`;
 
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'PUT', {
-        notes: order.note,
-      }, {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-      });
+      const response = await QueuedApiService.directRequestWithBody(
+        apiUrl,
+        'PUT',
+        {
+          notes: order.note,
+        },
+        {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to create order on Sylius: ${response.statusText}`);
@@ -121,13 +126,18 @@ export class SyliusOrderService extends BaseOrderService {
   private async createCart(): Promise<string> {
     const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/orders`;
 
-    const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', {
-      localeCode: 'en_US',
-      channelCode: 'default',
-    }, {
-      ...this.getAuthHeaders(),
-      'Content-Type': 'application/json',
-    });
+    const response = await QueuedApiService.directRequestWithBody(
+      apiUrl,
+      'POST',
+      {
+        localeCode: 'en_US',
+        channelCode: 'default',
+      },
+      {
+        ...this.getAuthHeaders(),
+        'Content-Type': 'application/json',
+      }
+    );
 
     if (!response.ok) {
       throw new Error('Failed to create cart');
@@ -143,13 +153,18 @@ export class SyliusOrderService extends BaseOrderService {
   private async addItemToCart(cartToken: string, item: Order['lineItems'][0]): Promise<void> {
     const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/orders/${cartToken}/items`;
 
-    const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', {
-      productCode: item.sku || item.productId,
-      quantity: item.quantity,
-    }, {
-      ...this.getAuthHeaders(),
-      'Content-Type': 'application/json',
-    });
+    const response = await QueuedApiService.directRequestWithBody(
+      apiUrl,
+      'POST',
+      {
+        productCode: item.sku || item.productId,
+        quantity: item.quantity,
+      },
+      {
+        ...this.getAuthHeaders(),
+        'Content-Type': 'application/json',
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to add item ${item.sku} to cart`);
@@ -195,12 +210,17 @@ export class SyliusOrderService extends BaseOrderService {
     try {
       const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/orders/${orderId}`;
 
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'PATCH', {
-        notes: updates.note,
-      }, {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/merge-patch+json',
-      });
+      const response = await QueuedApiService.directRequestWithBody(
+        apiUrl,
+        'PATCH',
+        {
+          notes: updates.note,
+        },
+        {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/merge-patch+json',
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to update order on Sylius: ${response.statusText}`);
@@ -224,11 +244,16 @@ export class SyliusOrderService extends BaseOrderService {
     try {
       const apiUrl = `${this.config.apiUrl}/api/oauth/v2/token`;
 
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', {
-        grant_type: 'client_credentials',
-        client_id: this.config.apiKey as string,
-        client_secret: this.config.apiSecret as string,
-      }, { 'Content-Type': 'application/x-www-form-urlencoded' });
+      const response = await QueuedApiService.directRequestWithBody(
+        apiUrl,
+        'POST',
+        {
+          grant_type: 'client_credentials',
+          client_id: this.config.apiKey as string,
+          client_secret: this.config.apiSecret as string,
+        },
+        { 'Content-Type': 'application/x-www-form-urlencoded' }
+      );
 
       if (!response.ok) {
         return null;

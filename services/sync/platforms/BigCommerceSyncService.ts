@@ -33,15 +33,8 @@ export class BigCommerceSyncService extends BasePlatformSyncService {
       return false;
     }
 
-    try {
-      // Additional BigCommerce-specific initialization could go here
-      // For now, we'll just return true
-      return true;
-    } catch (error) {
-      console.error('Error initializing BigCommerce sync service:', error);
-      this.initialized = false;
-      return false;
-    }
+    // Additional BigCommerce-specific initialization could go here
+    return true;
   }
 
   /**

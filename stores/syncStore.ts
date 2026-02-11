@@ -23,7 +23,7 @@ export const useSyncStore = create<SyncStoreState>()(
       isProcessing: false,
 
       // Add a request to the outbox
-      addToQueue: (request) => {
+      addToQueue: request => {
         const newRequest: QueuedRequest = {
           ...request,
           id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
@@ -32,8 +32,8 @@ export const useSyncStore = create<SyncStoreState>()(
           requestId: request.requestId || `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         };
 
-        set((state) => ({
-          queue: [...state.queue, newRequest]
+        set(state => ({
+          queue: [...state.queue, newRequest],
         }));
 
         // Start processing if not already processing
@@ -69,8 +69,8 @@ export const useSyncStore = create<SyncStoreState>()(
 
             if (response.ok) {
               // SUCCESS: Remove from queue
-              set((state) => ({
-                queue: state.queue.filter((item) => item.id !== action.id)
+              set(state => ({
+                queue: state.queue.filter(item => item.id !== action.id),
               }));
             } else if (response.status >= 500) {
               // SERVER ERROR: Stop processing, wait for next scheduled attempt
@@ -91,8 +91,8 @@ export const useSyncStore = create<SyncStoreState>()(
             } else if (response.status >= 400) {
               // CLIENT ERROR: Remove from queue (don't retry)
               console.warn(`Client error ${response.status} for request ${action.id}. Removing from queue.`);
-              set((state) => ({
-                queue: state.queue.filter((item) => item.id !== action.id)
+              set(state => ({
+                queue: state.queue.filter(item => item.id !== action.id),
               }));
             }
           } catch (error) {
@@ -106,18 +106,16 @@ export const useSyncStore = create<SyncStoreState>()(
       },
 
       // Remove a request from the queue
-      removeFromQueue: (id) => {
-        set((state) => ({
-          queue: state.queue.filter((item) => item.id !== id)
+      removeFromQueue: id => {
+        set(state => ({
+          queue: state.queue.filter(item => item.id !== id),
         }));
       },
 
       // Update a request in the queue
       updateRequest: (id, updates) => {
-        set((state) => ({
-          queue: state.queue.map((item) =>
-            item.id === id ? { ...item, ...updates } : item
-          )
+        set(state => ({
+          queue: state.queue.map(item => (item.id === id ? { ...item, ...updates } : item)),
         }));
       },
 
@@ -134,7 +132,7 @@ export const useSyncStore = create<SyncStoreState>()(
     {
       name: 'sync-queue-storage',
       storage: createJSONStorage(() => sqliteStorageAdapter),
-      partialize: (state) => ({
+      partialize: state => ({
         queue: state.queue,
         // Don't persist isProcessing state
       }),

@@ -136,7 +136,16 @@ const OnboardingScreen: React.FC = () => {
   };
 
   const STEP_LABELS = ['Welcome', 'Platform', 'Configure', 'Payment', 'Printer', 'Scanner', 'Admin User', 'Summary'];
-  const STEP_ORDER: OnboardingStep[] = ['welcome', 'platform_selection', 'platform_configuration', 'payment_provider_setup', 'printer_setup', 'scanner_setup', 'admin_user', 'summary'];
+  const STEP_ORDER: OnboardingStep[] = [
+    'welcome',
+    'platform_selection',
+    'platform_configuration',
+    'payment_provider_setup',
+    'printer_setup',
+    'scanner_setup',
+    'admin_user',
+    'summary',
+  ];
   const currentStepNumber = STEP_ORDER.indexOf(currentStep) + 1;
 
   return (

@@ -35,7 +35,7 @@ describe('money utilities', () => {
     });
 
     it('handles negative amounts', () => {
-      expect(toCents(-5.50)).toBe(-550);
+      expect(toCents(-5.5)).toBe(-550);
     });
   });
 
@@ -62,7 +62,7 @@ describe('money utilities', () => {
     });
 
     it('leaves clean values unchanged', () => {
-      expect(roundMoney(10.50)).toBe(10.5);
+      expect(roundMoney(10.5)).toBe(10.5);
       expect(roundMoney(0)).toBe(0);
     });
   });
@@ -71,8 +71,8 @@ describe('money utilities', () => {
   describe('multiplyMoney', () => {
     it('multiplies price by quantity without float errors', () => {
       // Classic float bug: 1.10 * 3 === 3.3000000000000003
-      expect(multiplyMoney(1.10, 3)).toBe(3.30);
-      expect(multiplyMoney(0.10, 3)).toBe(0.30);
+      expect(multiplyMoney(1.1, 3)).toBe(3.3);
+      expect(multiplyMoney(0.1, 3)).toBe(0.3);
       expect(multiplyMoney(19.99, 2)).toBe(39.98);
     });
 
@@ -94,11 +94,11 @@ describe('money utilities', () => {
     });
 
     it('handles zero', () => {
-      expect(addMoney(5.00, 0)).toBe(5);
+      expect(addMoney(5.0, 0)).toBe(5);
     });
 
     it('handles negatives', () => {
-      expect(addMoney(10, -3.50)).toBe(6.5);
+      expect(addMoney(10, -3.5)).toBe(6.5);
     });
   });
 
@@ -106,7 +106,7 @@ describe('money utilities', () => {
   describe('subtractMoney', () => {
     it('subtracts without float errors', () => {
       expect(subtractMoney(0.3, 0.1)).toBe(0.2);
-      expect(subtractMoney(10.00, 3.33)).toBe(6.67);
+      expect(subtractMoney(10.0, 3.33)).toBe(6.67);
     });
 
     it('can produce negative results', () => {
@@ -118,7 +118,7 @@ describe('money utilities', () => {
   describe('sumMoney', () => {
     it('sums an array without float errors', () => {
       expect(sumMoney([0.1, 0.2, 0.3])).toBe(0.6);
-      expect(sumMoney([19.99, 5.49, 3.00])).toBe(28.48);
+      expect(sumMoney([19.99, 5.49, 3.0])).toBe(28.48);
     });
 
     it('returns 0 for empty array', () => {
@@ -139,8 +139,8 @@ describe('money utilities', () => {
   describe('calculateTax', () => {
     it('calculates 8% tax correctly', () => {
       expect(calculateTax(100, 0.08)).toBe(8);
-      expect(calculateTax(10.00, 0.08)).toBe(0.80);
-      expect(calculateTax(19.99, 0.08)).toBe(1.60); // 1.5992 rounds to 1.60
+      expect(calculateTax(10.0, 0.08)).toBe(0.8);
+      expect(calculateTax(19.99, 0.08)).toBe(1.6); // 1.5992 rounds to 1.60
     });
 
     it('calculates 0% tax', () => {
@@ -148,12 +148,12 @@ describe('money utilities', () => {
     });
 
     it('handles small amounts', () => {
-      expect(calculateTax(0.50, 0.08)).toBe(0.04);
+      expect(calculateTax(0.5, 0.08)).toBe(0.04);
     });
 
     it('handles non-standard tax rates', () => {
       // 7.25% California rate
-      expect(calculateTax(10.00, 0.0725)).toBe(0.73); // 72.5 cents rounds to 73
+      expect(calculateTax(10.0, 0.0725)).toBe(0.73); // 72.5 cents rounds to 73
     });
   });
 
@@ -162,7 +162,7 @@ describe('money utilities', () => {
     it('returns correct line total and tax for taxable items', () => {
       const result = calculateLineTotal(9.99, 2, true, 0.08);
       expect(result.lineTotal).toBe(19.98);
-      expect(result.taxAmount).toBe(1.60); // 19.98 * 0.08 = 1.5984 → rounds to 1.60
+      expect(result.taxAmount).toBe(1.6); // 19.98 * 0.08 = 1.5984 → rounds to 1.60
     });
 
     it('returns 0 tax for non-taxable items', () => {
@@ -172,15 +172,15 @@ describe('money utilities', () => {
     });
 
     it('handles single quantity', () => {
-      const result = calculateLineTotal(1.10, 1, true, 0.08);
-      expect(result.lineTotal).toBe(1.10);
+      const result = calculateLineTotal(1.1, 1, true, 0.08);
+      expect(result.lineTotal).toBe(1.1);
       expect(result.taxAmount).toBe(0.09); // 110 * 0.08 = 8.8 → rounds to 9 cents
     });
 
     it('handles the classic 0.1 + 0.2 accumulation', () => {
       // 3 items at $0.10 each, taxable at 10%
-      const result = calculateLineTotal(0.10, 3, true, 0.10);
-      expect(result.lineTotal).toBe(0.30);
+      const result = calculateLineTotal(0.1, 3, true, 0.1);
+      expect(result.lineTotal).toBe(0.3);
       expect(result.taxAmount).toBe(0.03);
     });
   });

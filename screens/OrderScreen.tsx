@@ -33,9 +33,7 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
   const { products, isLoading: isProductLoading } = useProductsForDisplay(currentPlatform, selectedCategory, selectedCategoryName);
 
   // Filter by search query locally
-  const filteredProducts = searchQuery
-    ? products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : products;
+  const filteredProducts = searchQuery ? products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())) : products;
 
   // Responsive values
   const numColumns = getProductColumns(width);
@@ -44,7 +42,14 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
   // Keyboard shortcuts (desktop/web only)
   useKeyboardShortcuts(
     [
-      { key: 'k', meta: true, handler: () => {/* SearchBar will gain focus via ref in future */ }, description: 'Focus search' },
+      {
+        key: 'k',
+        meta: true,
+        handler: () => {
+          /* SearchBar will gain focus via ref in future */
+        },
+        description: 'Focus search',
+      },
     ],
     isTabletOrDesktop
   );
@@ -94,12 +99,7 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
           <Text style={styles.loadingText}>Loading products...</Text>
         </View>
       ) : (
-        <ProductGrid
-          products={filteredProducts}
-          onAddToCart={handleAddToCart}
-          cartItems={cartItemsMap}
-          numColumns={numColumns}
-        />
+        <ProductGrid products={filteredProducts} onAddToCart={handleAddToCart} cartItems={cartItemsMap} numColumns={numColumns} />
       )}
     </View>
   );
@@ -118,9 +118,7 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
           </View>
 
           {/* Center: Product Grid */}
-          <View style={styles.mainContent}>
-            {renderProductArea()}
-          </View>
+          <View style={styles.mainContent}>{renderProductArea()}</View>
 
           {/* Right sidebar: Basket (always visible) */}
           <View style={[styles.sidebar, styles.basketSidebar, { width: sidebarWidths.basket }]}>
@@ -137,9 +135,7 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
     <View style={styles.container}>
       <Header username={username} cartItemTotal={itemCount} />
 
-      <View style={styles.content}>
-        {renderProductArea()}
-      </View>
+      <View style={styles.content}>{renderProductArea()}</View>
 
       {/* Mobile: swipeable panels */}
       <Category />

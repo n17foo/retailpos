@@ -68,11 +68,16 @@ export class PrestaShopOrderService extends BaseOrderService {
       // Use QueuedApiService for API call with X-Request-ID for idempotency
       const requestId = `prestashop_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', { order: psOrder }, {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-        'X-Request-ID': requestId,
-      });
+      const response = await QueuedApiService.directRequestWithBody(
+        apiUrl,
+        'POST',
+        { order: psOrder },
+        {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+          'X-Request-ID': requestId,
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to create order on PrestaShop: ${response.statusText}`);

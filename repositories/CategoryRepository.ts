@@ -97,22 +97,14 @@ export class CategoryRepository {
   }
 
   async findByPlatform(platform: string): Promise<Category[]> {
-    return await this.db.getAllAsync<Category>(
-      'SELECT * FROM categories WHERE platform = ? ORDER BY position ASC',
-      [platform]
-    );
+    return await this.db.getAllAsync<Category>('SELECT * FROM categories WHERE platform = ? ORDER BY position ASC', [platform]);
   }
 
   async findByParentId(parentId: string | null): Promise<Category[]> {
     if (parentId === null) {
-      return await this.db.getAllAsync<Category>(
-        'SELECT * FROM categories WHERE parent_id IS NULL ORDER BY position ASC'
-      );
+      return await this.db.getAllAsync<Category>('SELECT * FROM categories WHERE parent_id IS NULL ORDER BY position ASC');
     }
-    return await this.db.getAllAsync<Category>(
-      'SELECT * FROM categories WHERE parent_id = ? ORDER BY position ASC',
-      [parentId]
-    );
+    return await this.db.getAllAsync<Category>('SELECT * FROM categories WHERE parent_id = ? ORDER BY position ASC', [parentId]);
   }
 
   async findRootCategories(platform?: string): Promise<Category[]> {
@@ -122,9 +114,7 @@ export class CategoryRepository {
         [platform]
       );
     }
-    return await this.db.getAllAsync<Category>(
-      'SELECT * FROM categories WHERE parent_id IS NULL ORDER BY position ASC'
-    );
+    return await this.db.getAllAsync<Category>('SELECT * FROM categories WHERE parent_id IS NULL ORDER BY position ASC');
   }
 
   async findActive(platform?: string): Promise<Category[]> {
@@ -134,9 +124,7 @@ export class CategoryRepository {
         [platform]
       );
     }
-    return await this.db.getAllAsync<Category>(
-      "SELECT * FROM categories WHERE status = 'active' ORDER BY position ASC"
-    );
+    return await this.db.getAllAsync<Category>("SELECT * FROM categories WHERE status = 'active' ORDER BY position ASC");
   }
 
   async update(id: string, data: Partial<Category>): Promise<void> {
@@ -158,9 +146,7 @@ export class CategoryRepository {
   }
 
   async count(platform?: string): Promise<number> {
-    const query = platform
-      ? 'SELECT COUNT(*) as count FROM categories WHERE platform = ?'
-      : 'SELECT COUNT(*) as count FROM categories';
+    const query = platform ? 'SELECT COUNT(*) as count FROM categories WHERE platform = ?' : 'SELECT COUNT(*) as count FROM categories';
     const params = platform ? [platform] : [];
     const result = await this.db.getFirstAsync<{ count: number }>(query, params);
     return result?.count ?? 0;

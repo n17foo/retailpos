@@ -38,14 +38,8 @@ export class ScannerServiceFactory {
   private initializeServices(): void {
     const useMock = USE_MOCK_SCANNER === 'true';
     this.logger.info(`Initializing scanner services (mock=${useMock})`);
-    this.services.set(
-      ScannerType.CAMERA,
-      useMock ? CameraScannerMockService.getInstance() : new CameraScannerService()
-    );
-    this.services.set(
-      ScannerType.BLUETOOTH,
-      useMock ? BluetoothScannerMockService.getInstance() : new BluetoothScannerService()
-    );
+    this.services.set(ScannerType.CAMERA, useMock ? CameraScannerMockService.getInstance() : new CameraScannerService());
+    this.services.set(ScannerType.BLUETOOTH, useMock ? BluetoothScannerMockService.getInstance() : new BluetoothScannerService());
     this.services.set(ScannerType.USB, useMock ? USBScannerMockService.getInstance() : new USBScannerService());
   }
 

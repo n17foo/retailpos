@@ -90,11 +90,16 @@ export class ShopifyOrderService extends BaseOrderService {
       // For now, keep using direct API call but add X-Request-ID header for idempotency
       const requestId = `shopify_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', { order: shopifyOrder }, {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-        'X-Request-ID': requestId,
-      });
+      const response = await QueuedApiService.directRequestWithBody(
+        apiUrl,
+        'POST',
+        { order: shopifyOrder },
+        {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+          'X-Request-ID': requestId,
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to create order on Shopify: ${response.statusText}`);

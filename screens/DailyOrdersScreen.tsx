@@ -1,15 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  RefreshControl,
-  Modal,
-  TextInput,
-} from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, RefreshControl, Modal, TextInput } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useBasketContext } from '../contexts/BasketProvider';
 import { useAuthContext } from '../contexts/AuthProvider';
@@ -21,22 +11,10 @@ import { LocalOrder } from '../services/basket/BasketServiceInterface';
 interface DailyOrdersScreenProps extends MoreStackScreenProps<'DailyOrders'> {}
 
 const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => {
-  const {
-    getLocalOrders,
-    syncOrderToPlatform,
-    getSyncQueueStatus,
-    unsyncedOrdersCount,
-  } = useBasketContext();
+  const { getLocalOrders, syncOrderToPlatform, getSyncQueueStatus, unsyncedOrdersCount } = useBasketContext();
 
   const { user } = useAuthContext();
-  const {
-    currentShift,
-    openShift,
-    closeShift,
-    generateReport,
-    getReportLines,
-    getReceiptLines,
-  } = useDailyReport();
+  const { currentShift, openShift, closeShift, generateReport, getReportLines, getReceiptLines } = useDailyReport();
 
   const [orders, setOrders] = useState<LocalOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,24 +64,27 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
     loadOrders();
   }, [loadOrders]);
 
-  const handleResyncOrder = useCallback(async (orderId: string) => {
-    try {
-      setSyncingOrderId(orderId);
-      const result = await syncOrderToPlatform(orderId);
+  const handleResyncOrder = useCallback(
+    async (orderId: string) => {
+      try {
+        setSyncingOrderId(orderId);
+        const result = await syncOrderToPlatform(orderId);
 
-      if (result.success) {
-        Alert.alert('Success', 'Order synced successfully!');
-        await loadOrders();
-      } else {
-        Alert.alert('Sync Failed', result.error || 'Unknown error occurred');
+        if (result.success) {
+          Alert.alert('Success', 'Order synced successfully!');
+          await loadOrders();
+        } else {
+          Alert.alert('Sync Failed', result.error || 'Unknown error occurred');
+        }
+      } catch (error) {
+        console.error('Failed to resync order:', error);
+        Alert.alert('Error', 'Failed to resync order');
+      } finally {
+        setSyncingOrderId(null);
       }
-    } catch (error) {
-      console.error('Failed to resync order:', error);
-      Alert.alert('Error', 'Failed to resync order');
-    } finally {
-      setSyncingOrderId(null);
-    }
-  }, [syncOrderToPlatform, loadOrders]);
+    },
+    [syncOrderToPlatform, loadOrders]
+  );
 
   const handleOpenShift = useCallback(() => {
     setShiftModalMode('open');
@@ -163,12 +144,15 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
     Alert.alert('Print', 'Report sent to printer. Check console for preview.');
   }, [currentReport, getReportLines]);
 
-  const handlePrintReceipt = useCallback((order: LocalOrder) => {
-    const lines = getReceiptLines(order);
-    console.log('=== RECEIPT ===');
-    lines.forEach(line => console.log(line));
-    Alert.alert('Print', 'Receipt sent to printer. Check console for preview.');
-  }, [getReceiptLines]);
+  const handlePrintReceipt = useCallback(
+    (order: LocalOrder) => {
+      const lines = getReceiptLines(order);
+      console.log('=== RECEIPT ===');
+      lines.forEach(line => console.log(line));
+      Alert.alert('Print', 'Receipt sent to printer. Check console for preview.');
+    },
+    [getReceiptLines]
+  );
 
   const getOrderStatusColor = (order: LocalOrder) => {
     if (order.syncStatus === 'synced') return lightColors.success;
@@ -190,14 +174,10 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
         <View style={styles.orderHeader}>
           <View style={styles.orderInfo}>
             <Text style={styles.orderId}>Order #{order.id.slice(-8)}</Text>
-            <Text style={styles.orderTime}>
-              {order.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Text>
+            <Text style={styles.orderTime}>{order.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: getOrderStatusColor(order) + '20' }]}>
-            <Text style={[styles.statusText, { color: getOrderStatusColor(order) }]}>
-              {getOrderStatusText(order)}
-            </Text>
+            <Text style={[styles.statusText, { color: getOrderStatusColor(order) }]}>{getOrderStatusText(order)}</Text>
           </View>
         </View>
 
@@ -218,10 +198,7 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
         )}
 
         <View style={styles.orderActions}>
-          <TouchableOpacity
-            style={styles.printButton}
-            onPress={() => handlePrintReceipt(order)}
-          >
+          <TouchableOpacity style={styles.printButton} onPress={() => handlePrintReceipt(order)}>
             <MaterialIcons name="print" size={16} color={lightColors.primary} />
             <Text style={styles.printButtonText}>Print</Text>
           </TouchableOpacity>
@@ -232,14 +209,8 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
               onPress={() => handleResyncOrder(order.id)}
               disabled={isSyncing}
             >
-              <MaterialIcons
-                name={isSyncing ? 'sync' : 'sync-problem'}
-                size={16}
-                color={lightColors.surface}
-              />
-              <Text style={styles.resyncButtonText}>
-                {isSyncing ? 'Syncing...' : 'Resync'}
-              </Text>
+              <MaterialIcons name={isSyncing ? 'sync' : 'sync-problem'} size={16} color={lightColors.surface} />
+              <Text style={styles.resyncButtonText}>{isSyncing ? 'Syncing...' : 'Resync'}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -251,9 +222,7 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
     <View style={styles.emptyContainer}>
       <MaterialIcons name="receipt-long" size={64} color={lightColors.textSecondary} />
       <Text style={styles.emptyTitle}>No Orders Today</Text>
-      <Text style={styles.emptySubtitle}>
-        Orders from today will appear here
-      </Text>
+      <Text style={styles.emptySubtitle}>Orders from today will appear here</Text>
     </View>
   );
 
@@ -263,9 +232,7 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
     <Modal visible={showShiftModal} animationType="slide" transparent>
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>
-            {shiftModalMode === 'open' ? 'Open Shift' : 'Close Shift'}
-          </Text>
+          <Text style={styles.modalTitle}>{shiftModalMode === 'open' ? 'Open Shift' : 'Close Shift'}</Text>
           <Text style={styles.modalDescription}>
             {shiftModalMode === 'open'
               ? 'Enter the opening cash amount in the drawer.'
@@ -283,10 +250,7 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
           />
 
           <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={styles.modalCancelButton}
-              onPress={() => setShowShiftModal(false)}
-            >
+            <TouchableOpacity style={styles.modalCancelButton} onPress={() => setShowShiftModal(false)}>
               <Text style={styles.modalCancelText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -330,18 +294,13 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
               </View>
               <View style={styles.reportRow}>
                 <Text style={styles.reportLabel}>Net Sales:</Text>
-                <Text style={[styles.reportValue, styles.reportTotal]}>
-                  ${currentReport.summary.netSales.toFixed(2)}
-                </Text>
+                <Text style={[styles.reportValue, styles.reportTotal]}>${currentReport.summary.netSales.toFixed(2)}</Text>
               </View>
             </View>
           )}
 
           <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={styles.modalCancelButton}
-              onPress={() => setShowReportModal(false)}
-            >
+            <TouchableOpacity style={styles.modalCancelButton} onPress={() => setShowReportModal(false)}>
               <Text style={styles.modalCancelText}>Close</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.printReportButton} onPress={handlePrintReport}>
@@ -403,12 +362,10 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
 
       <FlatList
         data={orders}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         renderItem={renderOrderItem}
         ListEmptyComponent={renderEmpty}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         contentContainerStyle={orders.length === 0 ? styles.emptyList : undefined}
         showsVerticalScrollIndicator={false}
       />

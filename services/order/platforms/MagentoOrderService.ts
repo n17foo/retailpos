@@ -100,14 +100,19 @@ export class MagentoOrderService extends BaseOrderService {
       // Set shipping/billing info and place order
       const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/carts/${cartId}/order`;
 
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'PUT', {
-        paymentMethod: {
-          method: 'checkmo', // Check/Money Order - for POS use
+      const response = await QueuedApiService.directRequestWithBody(
+        apiUrl,
+        'PUT',
+        {
+          paymentMethod: {
+            method: 'checkmo', // Check/Money Order - for POS use
+          },
         },
-      }, {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-      });
+        {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to create order on Magento: ${response.statusText}`);
@@ -129,10 +134,15 @@ export class MagentoOrderService extends BaseOrderService {
   private async createCart(): Promise<string> {
     const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/carts`;
 
-    const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', {}, {
-      ...this.getAuthHeaders(),
-      'Content-Type': 'application/json',
-    });
+    const response = await QueuedApiService.directRequestWithBody(
+      apiUrl,
+      'POST',
+      {},
+      {
+        ...this.getAuthHeaders(),
+        'Content-Type': 'application/json',
+      }
+    );
 
     if (!response.ok) {
       throw new Error('Failed to create cart');
@@ -147,16 +157,21 @@ export class MagentoOrderService extends BaseOrderService {
   private async addItemToCart(cartId: string, item: Order['lineItems'][0]): Promise<void> {
     const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/carts/${cartId}/items`;
 
-    const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', {
-      cartItem: {
-        sku: item.sku,
-        qty: item.quantity,
-        quote_id: cartId,
+    const response = await QueuedApiService.directRequestWithBody(
+      apiUrl,
+      'POST',
+      {
+        cartItem: {
+          sku: item.sku,
+          qty: item.quantity,
+          quote_id: cartId,
+        },
       },
-    }, {
-      ...this.getAuthHeaders(),
-      'Content-Type': 'application/json',
-    });
+      {
+        ...this.getAuthHeaders(),
+        'Content-Type': 'application/json',
+      }
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to add item ${item.sku} to cart`);
@@ -204,16 +219,21 @@ export class MagentoOrderService extends BaseOrderService {
       // We can add comments or update status
       const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/orders/${orderId}/comments`;
 
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', {
-        statusHistory: {
-          comment: updates.note || 'Order updated from POS',
-          is_customer_notified: 0,
-          is_visible_on_front: 0,
+      const response = await QueuedApiService.directRequestWithBody(
+        apiUrl,
+        'POST',
+        {
+          statusHistory: {
+            comment: updates.note || 'Order updated from POS',
+            is_customer_notified: 0,
+            is_visible_on_front: 0,
+          },
         },
-      }, {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-      });
+        {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        }
+      );
 
       if (!response.ok) {
         throw new Error(`Failed to update order on Magento: ${response.statusText}`);
@@ -237,10 +257,15 @@ export class MagentoOrderService extends BaseOrderService {
     try {
       const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/integration/admin/token`;
 
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', {
-        username: this.config.username,
-        password: this.config.password,
-      }, { 'Content-Type': 'application/json' });
+      const response = await QueuedApiService.directRequestWithBody(
+        apiUrl,
+        'POST',
+        {
+          username: this.config.username,
+          password: this.config.password,
+        },
+        { 'Content-Type': 'application/json' }
+      );
 
       if (!response.ok) {
         return null;

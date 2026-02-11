@@ -96,9 +96,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
                     <Text style={styles.paymentIcon}>{method.icon}</Text>
                     <View style={styles.paymentInfo}>
                       <Text style={[styles.paymentLabel, isSelected && styles.paymentLabelSelected]}>{method.label}</Text>
-                      <Text style={styles.paymentDescription}>
-                        {isDisabled ? 'Terminal not connected' : method.description}
-                      </Text>
+                      <Text style={styles.paymentDescription}>{isDisabled ? 'Terminal not connected' : method.description}</Text>
                     </View>
                     {isSelected && <Text style={styles.checkIcon}>✓</Text>}
                   </TouchableOpacity>

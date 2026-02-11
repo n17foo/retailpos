@@ -57,19 +57,22 @@ export const useDailyReport = (): UseDailyReportReturn => {
     }
   }, []);
 
-  const closeShift = useCallback(async (closingCash: number): Promise<ShiftData> => {
-    setError(null);
-    try {
-      const shift = await dailyReportService.closeShift(closingCash);
-      setCurrentShift(null);
-      await loadShiftHistory();
-      return shift;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to close shift';
-      setError(message);
-      throw new Error(message);
-    }
-  }, [loadShiftHistory]);
+  const closeShift = useCallback(
+    async (closingCash: number): Promise<ShiftData> => {
+      setError(null);
+      try {
+        const shift = await dailyReportService.closeShift(closingCash);
+        setCurrentShift(null);
+        await loadShiftHistory();
+        return shift;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to close shift';
+        setError(message);
+        throw new Error(message);
+      }
+    },
+    [loadShiftHistory]
+  );
 
   const generateReport = useCallback(async (orders: LocalOrder[], shift?: ShiftData): Promise<DailyReportData> => {
     setError(null);

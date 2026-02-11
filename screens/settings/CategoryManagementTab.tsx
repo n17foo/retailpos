@@ -120,9 +120,7 @@ const CategoryManagementTab: React.FC = () => {
                 {category.description}
               </Text>
             )}
-            {subcategories.length > 0 && (
-              <Text style={styles.subcategoryCount}>{subcategories.length} subcategories</Text>
-            )}
+            {subcategories.length > 0 && <Text style={styles.subcategoryCount}>{subcategories.length} subcategories</Text>}
           </View>
           <View style={styles.categoryActions}>
             <TouchableOpacity style={styles.editButton} onPress={() => handleEditCategory(category)}>
@@ -168,9 +166,7 @@ const CategoryManagementTab: React.FC = () => {
               style={[styles.parentOption, !formData.parentId && styles.parentOptionSelected]}
               onPress={() => setFormData({ ...formData, parentId: '' })}
             >
-              <Text style={[styles.parentOptionText, !formData.parentId && styles.parentOptionTextSelected]}>
-                None (Root Category)
-              </Text>
+              <Text style={[styles.parentOptionText, !formData.parentId && styles.parentOptionTextSelected]}>None (Root Category)</Text>
             </TouchableOpacity>
             {categories
               .filter(c => c.id !== selectedCategory?.id)
@@ -180,9 +176,7 @@ const CategoryManagementTab: React.FC = () => {
                   style={[styles.parentOption, formData.parentId === cat.id && styles.parentOptionSelected]}
                   onPress={() => setFormData({ ...formData, parentId: cat.id })}
                 >
-                  <Text style={[styles.parentOptionText, formData.parentId === cat.id && styles.parentOptionTextSelected]}>
-                    {cat.name}
-                  </Text>
+                  <Text style={[styles.parentOptionText, formData.parentId === cat.id && styles.parentOptionTextSelected]}>{cat.name}</Text>
                 </TouchableOpacity>
               ))}
           </View>

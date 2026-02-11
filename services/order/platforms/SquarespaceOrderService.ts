@@ -96,16 +96,21 @@ export class SquarespaceOrderService extends BaseOrderService {
       const apiUrl = `https://api.squarespace.com/${this.config.apiVersion}/commerce/orders/${orderId}/fulfillments`;
 
       if (updates.fulfillmentStatus === 'fulfilled') {
-        const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', {
-          shouldSendNotification: true,
-          shipments: [
-            {
-              carrierName: 'Other',
-              trackingNumber: '',
-              shipDate: new Date().toISOString(),
-            },
-          ],
-        }, this.getAuthHeaders());
+        const response = await QueuedApiService.directRequestWithBody(
+          apiUrl,
+          'POST',
+          {
+            shouldSendNotification: true,
+            shipments: [
+              {
+                carrierName: 'Other',
+                trackingNumber: '',
+                shipDate: new Date().toISOString(),
+              },
+            ],
+          },
+          this.getAuthHeaders()
+        );
 
         if (!response.ok) {
           throw new Error(`Failed to update order on Squarespace: ${response.statusText}`);

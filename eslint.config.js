@@ -8,9 +8,7 @@ const reactNative = require('eslint-plugin-react-native');
 const prettierConfig = require('eslint-config-prettier');
 
 module.exports = [
-  js.configs.recommended,
   {
-    files: ['**/*.{js,jsx,ts,tsx}'],
     ignores: [
       'node_modules/**',
       '.expo/**',
@@ -18,11 +16,16 @@ module.exports = [
       'dist/**',
       'build/**',
       'coverage/**',
+      'electron/**',
       '*.config.js',
       'babel.config.js',
       'metro.config.js',
       'jest.config.js',
+      'eslint.config.js',
     ],
+  },
+  js.configs.recommended,
+  {
     languageOptions: {
       ecmaVersion: 2020,
       sourceType: 'module',
@@ -36,6 +39,22 @@ module.exports = [
         __DEV__: 'readonly',
         console: 'readonly',
         process: 'readonly',
+        require: 'readonly',
+        module: 'readonly',
+        exports: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        fetch: 'readonly',
+        crypto: 'readonly',
+        URL: 'readonly',
+        AbortController: 'readonly',
+        FormData: 'readonly',
+        Headers: 'readonly',
+        Request: 'readonly',
+        Response: 'readonly',
+        alert: 'readonly',
       },
     },
     settings: {
@@ -79,6 +98,10 @@ module.exports = [
 
       // Prettier
       'prettier/prettier': ['error'],
+
+      // Disable base rules that conflict with TypeScript
+      'no-unused-vars': 'off',
+      'no-undef': 'off',
 
       // General
       'no-console': ['warn', { allow: ['warn', 'error'] }],

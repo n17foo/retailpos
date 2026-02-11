@@ -127,12 +127,12 @@ export class USBScannerService implements ScannerServiceInterface {
    * @returns Promise resolving to array of available devices
    */
   async discoverDevices(): Promise<Array<{ id: string; name: string }>> {
-    try {
-      // For a real implementation, you would use a native module to discover USB devices
-      // For demonstration purposes, we'll return mock data
+    // For a real implementation, you would use a native module to discover USB devices
+    // For demonstration purposes, we'll return mock data
 
-      // Example implementation with a hypothetical USB module:
-      /*
+    // Example implementation with a hypothetical USB module:
+    /*
+    try {
       const usbDevices = await USBModule.getConnectedDevices();
       return usbDevices
         .filter(device => device.vendorId === 0x05e0) // Example: Symbol/Zebra scanner vendor ID
@@ -140,17 +140,17 @@ export class USBScannerService implements ScannerServiceInterface {
           id: `${device.vendorId}-${device.productId}`,
           name: device.productName || `USB Scanner (${device.vendorId}:${device.productId})`
         }));
-      */
-
-      // Mock data for demonstration
-      return [
-        { id: 'usb-scanner-1', name: 'Symbol DS4308 USB Scanner' },
-        { id: 'usb-scanner-2', name: 'Honeywell Voyager 1250g' },
-      ];
     } catch (error) {
       this.logger.error('Error discovering USB devices:', error);
       return [];
     }
+    */
+
+    // Mock data for demonstration
+    return [
+      { id: 'usb-scanner-1', name: 'Symbol DS4308 USB Scanner' },
+      { id: 'usb-scanner-2', name: 'Honeywell Voyager 1250g' },
+    ];
   }
 
   // Simulate a barcode scan - for testing purposes only

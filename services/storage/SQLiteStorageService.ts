@@ -229,10 +229,7 @@ export class SQLiteStorageService {
    * Get a value from key-value storage
    */
   public async getItem(key: string): Promise<string | null> {
-    const result = await this.db.getFirstAsync<{ value: string }>(
-      'SELECT value FROM key_value_store WHERE key = ?',
-      [key]
-    );
+    const result = await this.db.getFirstAsync<{ value: string }>('SELECT value FROM key_value_store WHERE key = ?', [key]);
     return result?.value ?? null;
   }
 
@@ -271,10 +268,7 @@ export class SQLiteStorageService {
    * Check if a key exists in storage
    */
   public async containsKey(key: string): Promise<boolean> {
-    const result = await this.db.getFirstAsync<{ count: number }>(
-      'SELECT COUNT(*) as count FROM key_value_store WHERE key = ?',
-      [key]
-    );
+    const result = await this.db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM key_value_store WHERE key = ?', [key]);
     return (result?.count ?? 0) > 0;
   }
 
@@ -290,9 +284,7 @@ export class SQLiteStorageService {
    * Get all keys in storage
    */
   public async getAllKeys(): Promise<string[]> {
-    const results = await this.db.getAllAsync<{ key: string }>(
-      'SELECT key FROM key_value_store'
-    );
+    const results = await this.db.getAllAsync<{ key: string }>('SELECT key FROM key_value_store');
     return results.map(r => r.key);
   }
 

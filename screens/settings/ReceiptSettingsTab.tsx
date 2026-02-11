@@ -48,14 +48,17 @@ const ReceiptSettingsTab: React.FC = () => {
     }
   }, [localHeader, localFooter, localOptions, updateHeader, updateFooter, updateOptions]);
 
-  const handlePrinterModelChange = useCallback(async (model: PrinterModelType) => {
-    try {
-      await setPrinterModel(model);
-      Alert.alert('Success', `Printer model set to ${PRINTER_MODELS.find(m => m.value === model)?.label}`);
-    } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to set printer model');
-    }
-  }, [setPrinterModel]);
+  const handlePrinterModelChange = useCallback(
+    async (model: PrinterModelType) => {
+      try {
+        await setPrinterModel(model);
+        Alert.alert('Success', `Printer model set to ${PRINTER_MODELS.find(m => m.value === model)?.label}`);
+      } catch (err) {
+        Alert.alert('Error', err instanceof Error ? err.message : 'Failed to set printer model');
+      }
+    },
+    [setPrinterModel]
+  );
 
   const updateLocalHeader = (updates: Partial<typeof localHeader>) => {
     setLocalHeader(prev => ({ ...prev, ...updates }));
@@ -86,9 +89,7 @@ const ReceiptSettingsTab: React.FC = () => {
       {/* Printer Model Selection */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Printer Model</Text>
-        <Text style={styles.sectionDescription}>
-          Select your thermal printer model for optimal compatibility
-        </Text>
+        <Text style={styles.sectionDescription}>Select your thermal printer model for optimal compatibility</Text>
         <View style={styles.modelGrid}>
           {PRINTER_MODELS.map(model => (
             <TouchableOpacity
@@ -96,9 +97,7 @@ const ReceiptSettingsTab: React.FC = () => {
               style={[styles.modelOption, config.printerModel.type === model.value && styles.modelOptionSelected]}
               onPress={() => handlePrinterModelChange(model.value)}
             >
-              <Text style={[styles.modelText, config.printerModel.type === model.value && styles.modelTextSelected]}>
-                {model.label}
-              </Text>
+              <Text style={[styles.modelText, config.printerModel.type === model.value && styles.modelTextSelected]}>{model.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -109,11 +108,7 @@ const ReceiptSettingsTab: React.FC = () => {
         <Text style={styles.sectionTitle}>Paper Width</Text>
         <View style={styles.radioGroup}>
           {PAPER_WIDTHS.map(width => (
-            <TouchableOpacity
-              key={width.value}
-              style={styles.radioOption}
-              onPress={() => updateLocalOptions({ paperWidth: width.value })}
-            >
+            <TouchableOpacity key={width.value} style={styles.radioOption} onPress={() => updateLocalOptions({ paperWidth: width.value })}>
               <View style={[styles.radioButton, localOptions.paperWidth === width.value && styles.radioButtonSelected]}>
                 {localOptions.paperWidth === width.value && <View style={styles.radioButtonInner} />}
               </View>
@@ -126,9 +121,7 @@ const ReceiptSettingsTab: React.FC = () => {
       {/* Header Configuration */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Receipt Header</Text>
-        <Text style={styles.sectionDescription}>
-          This information appears at the top of every receipt
-        </Text>
+        <Text style={styles.sectionDescription}>This information appears at the top of every receipt</Text>
 
         <Text style={styles.inputLabel}>Business Name *</Text>
         <TextInput
@@ -194,9 +187,7 @@ const ReceiptSettingsTab: React.FC = () => {
       {/* Footer Configuration */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Receipt Footer</Text>
-        <Text style={styles.sectionDescription}>
-          Custom messages that appear at the bottom of receipts
-        </Text>
+        <Text style={styles.sectionDescription}>Custom messages that appear at the bottom of receipts</Text>
 
         <Text style={styles.inputLabel}>Footer Line 1</Text>
         <TextInput

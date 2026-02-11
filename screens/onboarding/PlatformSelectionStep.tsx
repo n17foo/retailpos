@@ -14,7 +14,14 @@ interface PlatformInfo {
 
 const PLATFORMS: PlatformInfo[] = [
   { id: 'shopify', name: 'Shopify', icon: '🛍', description: 'Best for most stores', popular: true, brandColor: semanticColors.shopify },
-  { id: 'woocommerce', name: 'WooCommerce', icon: '🔌', description: 'WordPress e-commerce', popular: true, brandColor: semanticColors.woocommerce },
+  {
+    id: 'woocommerce',
+    name: 'WooCommerce',
+    icon: '🔌',
+    description: 'WordPress e-commerce',
+    popular: true,
+    brandColor: semanticColors.woocommerce,
+  },
   { id: 'bigcommerce', name: 'BigCommerce', icon: '🏪', description: 'Enterprise e-commerce', brandColor: semanticColors.bigcommerce },
   { id: 'magento', name: 'Magento', icon: '🧲', description: 'Adobe Commerce', brandColor: semanticColors.magento },
   { id: 'sylius', name: 'Sylius', icon: '🧩', description: 'Open-source & flexible', brandColor: semanticColors.sylius },
@@ -35,7 +42,9 @@ const PlatformSelectionStep: React.FC<PlatformSelectionStepProps> = ({ onSelectP
     <ScrollView contentContainerStyle={styles.scrollContent}>
       <View style={styles.container}>
         <Text style={styles.title}>Select Your E-Commerce Platform</Text>
-        <Text style={styles.subtitle}>Choose the platform your online store is built on, or select Offline Mode to get started without one.</Text>
+        <Text style={styles.subtitle}>
+          Choose the platform your online store is built on, or select Offline Mode to get started without one.
+        </Text>
 
         <View style={[styles.platformGrid, isTabletOrDesktop && styles.platformGridWide]}>
           {PLATFORMS.map(platform => (
