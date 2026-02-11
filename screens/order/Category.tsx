@@ -4,7 +4,7 @@ import { lightColors, spacing, typography } from '../../utils/theme';
 import { SwipeablePanel } from '../../components/SwipeablePanel';
 import { useCategoryContext } from '../../contexts/CategoryProvider';
 import { useCategoryNavigation } from '../../hooks/useCategories';
-import { UnifiedCategory } from '../../models/UnifiedCategory';
+import { UnifiedCategory } from '../../services/category/types';
 
 export const Category: React.FC = () => {
   const { selectedCategory, setSelectedCategory, setSelectedCategoryName, isLeftPanelOpen, setIsLeftPanelOpen } = useCategoryContext();

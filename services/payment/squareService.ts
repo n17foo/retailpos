@@ -1,7 +1,21 @@
 import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from './paymentServiceInterface';
 
-// Import Square SDK v1.x named exports
-import { SQIPCore, SQIPCardEntry, SQIPApplePay, SQIPGooglePay } from 'react-native-square-in-app-payments';
+// Conditionally import Square SDK to avoid bundling issues
+let SQIPCore: any;
+let SQIPCardEntry: any;
+let SQIPApplePay: any;
+let SQIPGooglePay: any;
+
+try {
+  // Import Square SDK v1.x named exports
+  const squareSdk = require('react-native-square-in-app-payments');
+  SQIPCore = squareSdk.SQIPCore;
+  SQIPCardEntry = squareSdk.SQIPCardEntry;
+  SQIPApplePay = squareSdk.SQIPApplePay;
+  SQIPGooglePay = squareSdk.SQIPGooglePay;
+} catch (error) {
+  console.warn('Square SDK not available, running in mock mode:', error);
+}
 
 /**
  * Square Payment Service

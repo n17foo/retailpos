@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
-import { InventoryServiceFactory } from '../services/inventory/inventoryServiceFactory';
+import { useState, useCallback } from 'react';
+import { PlatformServiceRegistry } from '../services/platform';
 import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../services/inventory/InventoryServiceInterface';
 import { ECommercePlatform } from '../utils/platforms';
 
@@ -12,7 +12,7 @@ export const useInventory = (platform?: ECommercePlatform) => {
   const [error, setError] = useState<string | null>(null);
   const [inventory, setInventory] = useState<InventoryResult | null>(null);
 
-  const inventoryServiceFactory = InventoryServiceFactory.getInstance();
+  const registry = PlatformServiceRegistry.getInstance();
 
   /**
    * Get inventory for specific product IDs
@@ -23,7 +23,7 @@ export const useInventory = (platform?: ECommercePlatform) => {
         setIsLoading(true);
         setError(null);
 
-        const service = inventoryServiceFactory.getService(platform);
+        const service = registry.getInventoryService(platform || ECommercePlatform.OFFLINE);
         const result = await service.getInventory(productIds);
         setInventory(result);
         return result;
@@ -36,7 +36,7 @@ export const useInventory = (platform?: ECommercePlatform) => {
         setIsLoading(false);
       }
     },
-    [inventoryServiceFactory, platform]
+    [registry, platform]
   );
 
   /**
@@ -48,7 +48,7 @@ export const useInventory = (platform?: ECommercePlatform) => {
         setIsLoading(true);
         setError(null);
 
-        const service = inventoryServiceFactory.getService(platform);
+        const service = registry.getInventoryService(platform || ECommercePlatform.OFFLINE);
         const result = await service.updateInventory(updates);
 
         if (result.failed > 0) {
@@ -65,7 +65,7 @@ export const useInventory = (platform?: ECommercePlatform) => {
         setIsLoading(false);
       }
     },
-    [inventoryServiceFactory, platform]
+    [registry, platform]
   );
 
   /**

@@ -1,5 +1,5 @@
 import { ECommercePlatform } from '../../utils/platforms';
-import { UnifiedCategory, UnifiedCategoryStatus, UnifiedCategoryImage } from '../UnifiedCategory';
+import { UnifiedCategory, UnifiedCategoryStatus, UnifiedCategoryImage } from './types';
 
 /**
  * ============================================================================

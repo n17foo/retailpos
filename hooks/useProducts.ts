@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { ProductServiceFactory } from '../services/product/productServiceFactory';
 import { ECommercePlatform } from '../utils/platforms';
+import { PlatformServiceRegistry } from '../services/platform';
 import {
   getDefaultVariant,
   toProductSummary,
   UnifiedProduct,
   UnifiedProductQueryOptions,
   UnifiedProductSummary,
-} from '../models/UnifiedProduct';
-import { mapToUnifiedProducts } from '../models/mappers/ProductMapper';
+} from '../services/product/types';
+import { mapToUnifiedProducts } from '../services/product/mappers';
 
 /**
  * Hook state interface
@@ -76,15 +76,12 @@ export const useUnifiedProducts = (platform?: ECommercePlatform, initialOptions?
   // Fetch products from the service
   const fetchProducts = useCallback(
     async (options?: UnifiedProductQueryOptions) => {
-      console.log('[useProducts] Starting fetchProducts, platform:', platform, 'options:', options);
       setIsLoading(true);
       setError(null);
 
       try {
-        const productServiceFactory = ProductServiceFactory.getInstance();
-        console.log('[useProducts] Got factory instance');
-        const service = productServiceFactory.getService(platform);
-        console.log('[useProducts] Got service:', !!service);
+        const registry = PlatformServiceRegistry.getInstance();
+        const service = registry.getProductService(platform || ECommercePlatform.OFFLINE);
 
         if (!service) {
           throw new Error('Product service not available');
@@ -104,17 +101,12 @@ export const useUnifiedProducts = (platform?: ECommercePlatform, initialOptions?
         };
 
         const result = await service.getProducts(serviceOptions);
-        console.log('[useProducts] Service returned', result?.products?.length || 0, 'products');
-        if (result?.products?.length > 0) {
-          console.log('[useProducts] First product:', JSON.stringify(result.products[0]));
-        }
 
         // Determine the platform for mapping
         const mappingPlatform = platform || ECommercePlatform.OFFLINE;
 
         // Map to unified products
         const unifiedProducts = mapToUnifiedProducts(result.products, mappingPlatform);
-        console.log('[useProducts] Mapped to', unifiedProducts.length, 'unified products');
 
         // Update state
         if (queryOptions.page === 1) {
@@ -129,7 +121,6 @@ export const useUnifiedProducts = (platform?: ECommercePlatform, initialOptions?
         setTotalItems(result.pagination.totalItems);
         setCurrentOptions(queryOptions);
       } catch (err) {
-        console.error('[useProducts] Error fetching products:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch products');
       } finally {
         setIsLoading(false);

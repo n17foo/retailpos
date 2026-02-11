@@ -1,13 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefundServiceFactory, getRefundService } from '../services/refund/refundServiceFactory';
+import { RefundServiceFactory } from '../services/refund/refundServiceFactory';
+import { PlatformServiceRegistry } from '../services/platform';
 import { RefundData, RefundResult, RefundRecord } from '../services/refund/refundServiceInterface';
 import { LoggerFactory } from '../services/logger';
+import { ECommercePlatform } from '../utils/platforms';
 
 /**
  * Hook for refund operations in the POS system
  * Provides methods for processing refunds and accessing refund history
  */
-export function useRefund() {
+export function useRefund(platform?: ECommercePlatform) {
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +58,9 @@ export function useRefund() {
 
         logger.info(`Processing e-commerce refund for order: ${orderId}`);
 
-        const result = await getRefundService().processEcommerceRefund(orderId, refundData);
+        const registry = PlatformServiceRegistry.getInstance();
+        const refundService = registry.getRefundService(platform || ECommercePlatform.OFFLINE);
+        const result = await refundService.processEcommerceRefund(orderId, refundData);
 
         if (!result.success) {
           const errorMessage = result.error || 'Failed to process e-commerce refund';
@@ -102,7 +106,9 @@ export function useRefund() {
 
         logger.info(`Processing payment refund for transaction: ${transactionId}`);
 
-        const result = await getRefundService().processPaymentRefund(transactionId, amount, reason);
+        const registry = PlatformServiceRegistry.getInstance();
+        const refundService = registry.getRefundService(platform || ECommercePlatform.OFFLINE);
+        const result = await refundService.processPaymentRefund(transactionId, amount, reason);
 
         if (!result.success) {
           const errorMessage = result.error || 'Failed to process payment refund';
@@ -148,7 +154,9 @@ export function useRefund() {
 
         logger.info(`Retrieving refund history for order: ${orderId}`);
 
-        return await getRefundService().getRefundHistory(orderId);
+        const registry = PlatformServiceRegistry.getInstance();
+        const refundService = registry.getRefundService(platform || ECommercePlatform.OFFLINE);
+        return await refundService.getRefundHistory(orderId);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to get refund history';
         logger.error(

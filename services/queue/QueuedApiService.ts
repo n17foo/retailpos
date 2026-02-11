@@ -1,4 +1,4 @@
-import { addRequestToQueue } from '../../stores/syncStore';
+import { addRequestToQueue } from '../../hooks/useSyncStore';
 
 /**
  * Service for making API calls through the persistent request queue

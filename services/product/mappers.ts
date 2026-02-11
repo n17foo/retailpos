@@ -1,5 +1,5 @@
 import { ECommercePlatform } from '../../utils/platforms';
-import { UnifiedProduct, UnifiedProductVariant, UnifiedProductOption, UnifiedProductImage, UnifiedProductStatus } from '../UnifiedProduct';
+import { UnifiedProduct, UnifiedProductVariant, UnifiedProductOption, UnifiedProductImage, UnifiedProductStatus } from './types';
 
 /**
  * ============================================================================

@@ -4,7 +4,7 @@ import { lightColors, spacing, typography } from '../../utils/theme';
 import { useCategoryContext } from '../../contexts/CategoryProvider';
 import { useCategoryNavigation } from '../../hooks/useCategories';
 import { Breadcrumb, BreadcrumbItem } from '../../components/Breadcrumb';
-import { UnifiedCategory } from '../../models/UnifiedCategory';
+import { UnifiedCategory } from '../../services/category/types';
 
 interface CategoryListProps {
   showBreadcrumb?: boolean;

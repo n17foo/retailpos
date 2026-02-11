@@ -49,7 +49,18 @@ export class PaymentServiceFactory {
             ? StripeNfcMockService.getInstance()
             : require('./stripeNfcService').StripeNfcService.getInstance();
         case PaymentProvider.SQUARE:
-          return USE_MOCK_PAYMENT === 'true' ? SquareMockService.getInstance() : require('./squareService').SquareService.getInstance();
+          if (USE_MOCK_PAYMENT === 'true') {
+            return SquareMockService.getInstance();
+          } else {
+            // Lazy load to avoid bundling issues with react-native-square-in-app-payments
+            try {
+              const { SquareService } = require('./squareService');
+              return SquareService.getInstance();
+            } catch (error) {
+              this.logger.warn({ message: 'Square service not available, falling back to mock' }, error instanceof Error ? error : new Error(String(error)));
+              return SquareMockService.getInstance();
+            }
+          }
         case PaymentProvider.WORLDPAY:
         default:
           return USE_MOCK_PAYMENT === 'true'

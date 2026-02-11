@@ -10,8 +10,8 @@ import {
   UnifiedCategory,
   UnifiedCategorySummary,
   UnifiedCategoryTree,
-} from '../models/UnifiedCategory';
-import { mapToUnifiedCategories } from '../models/mappers/CategoryMapper';
+} from '../services/category/types';
+import { mapToUnifiedCategories } from '../services/category/mappers';
 
 /**
  * Hook state interface

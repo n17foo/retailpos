@@ -1,13 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
-import { SearchServiceFactory } from '../services/search/searchServiceFactory';
+import { PlatformServiceRegistry } from '../services/platform';
 import { SearchOptions, SearchResult } from '../services/search/searchServiceInterface';
 
 /**
  * Hook to interact with the SearchService
  */
 export const useSearch = () => {
-  const searchServiceFactory = SearchServiceFactory.getInstance();
-  const searchService = searchServiceFactory.getService();
+  const searchService = PlatformServiceRegistry.getInstance().getSearchService();
 
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
