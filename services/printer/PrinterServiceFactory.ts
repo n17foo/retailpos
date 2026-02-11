@@ -2,6 +2,7 @@ import { PrinterConfig, PrinterStatus, ReceiptData } from './PrinterTypes';
 import { BasePrinterService } from './BasePrinterService';
 import { USE_MOCK_PRINTERS } from '@env';
 import { UnifiedPrinterServiceMock } from './UnifiedPrinterServiceMock';
+import { LoggerFactory } from '../logger';
 
 // Define the connection type for the factory
 type PrinterConnectionType = 'network' | 'usb' | 'bluetooth';
@@ -12,6 +13,7 @@ type PrinterConnectionType = 'network' | 'usb' | 'bluetooth';
  */
 export class PrinterServiceFactory {
   private static instance: PrinterServiceFactory;
+  private logger = LoggerFactory.getInstance().createLogger('PrinterServiceFactory');
 
   // Available printers collection
   private availablePrinters: PrinterConfig[] = [
@@ -63,27 +65,25 @@ export class PrinterServiceFactory {
    */
   public static getInstance(): PrinterServiceFactory {
     if (!PrinterServiceFactory.instance) {
-      console.log('[PrinterService] Initializing printer service factory');
-      console.log('USE_MOCK_PRINTERS', USE_MOCK_PRINTERS);
-      // Create the instance
+      const factoryLogger = LoggerFactory.getInstance().createLogger('PrinterServiceFactory');
+      factoryLogger.info(`Initializing printer service factory (mock=${USE_MOCK_PRINTERS})`);
       const instance = new PrinterServiceFactory();
 
       try {
-        // Initialize the appropriate printer service based on environment
         if (USE_MOCK_PRINTERS === 'true') {
-          console.log('[PrinterService] Using mock printer service');
+          factoryLogger.info('Using mock printer service');
           instance.unifiedPrinterService = new UnifiedPrinterServiceMock();
         } else {
-          console.warn('[PrinterService] Failed to initialize real printer service, falling back to mock');
           const { UnifiedPrinterService } = require('./UnifiedPrinterService');
           instance.unifiedPrinterService = new UnifiedPrinterService();
+          factoryLogger.info('Using real printer service');
         }
 
-        // Store the instance only if initialization was successful
         PrinterServiceFactory.instance = instance;
       } catch (error) {
-        console.error('[PrinterService] Critical error initializing printer service:', error);
-        throw new Error('Failed to initialize printer service: ' + error.message);
+        const msg = error instanceof Error ? error.message : String(error);
+        factoryLogger.error({ message: 'Critical error initializing printer service' }, error instanceof Error ? error : new Error(msg));
+        throw new Error('Failed to initialize printer service: ' + msg);
       }
     }
 
@@ -117,7 +117,7 @@ export class PrinterServiceFactory {
    */
   public async connectToPrinter(printerName: string): Promise<boolean> {
     try {
-      console.log(`Connecting to printer: ${printerName}`);
+      this.logger.info(`Connecting to printer: ${printerName}`);
 
       // Find printer in available printers
       const printer = this.availablePrinters.find(p => p.printerName === printerName);
@@ -164,14 +164,14 @@ export class PrinterServiceFactory {
       if (connected) {
         this.activePrinterService = printerService;
         this.activePrinterConfig = printer;
-        console.log(`Connected to printer: ${printerName}`);
+        this.logger.info(`Connected to printer: ${printerName}`);
       } else {
         throw new Error(`Failed to connect to printer: ${printerName}`);
       }
 
       return connected;
     } catch (error) {
-      console.error('Error connecting to printer:', error);
+      this.logger.error({ message: 'Error connecting to printer' }, error instanceof Error ? error : new Error(String(error)));
       this.activePrinterService = null;
       this.activePrinterConfig = null;
       return false;
@@ -209,11 +209,11 @@ export class PrinterServiceFactory {
         ...this.availablePrinters[existingIndex],
         ...config,
       };
-      console.log(`Updated configuration for printer: ${printerName}`);
+      this.logger.info(`Updated configuration for printer: ${printerName}`);
     } else {
       // Add new printer
       this.availablePrinters.push(config);
-      console.log(`Added new printer configuration: ${printerName}`);
+      this.logger.info(`Added new printer configuration: ${printerName}`);
     }
 
     // Update active printer config if this is the active printer
@@ -235,10 +235,10 @@ export class PrinterServiceFactory {
     }
 
     try {
-      console.log(`Printing receipt for order ${data.orderId}`);
+      this.logger.info(`Printing receipt for order ${data.orderId}`);
       return await this.activePrinterService.printReceipt(data);
     } catch (error) {
-      console.error('Failed to print receipt:', error);
+      this.logger.error({ message: 'Failed to print receipt' }, error instanceof Error ? error : new Error(String(error)));
       return false;
     }
   }
@@ -258,7 +258,7 @@ export class PrinterServiceFactory {
     try {
       return await this.activePrinterService.getStatus();
     } catch (error) {
-      console.error('Failed to get printer status:', error);
+      this.logger.error({ message: 'Failed to get printer status' }, error instanceof Error ? error : new Error(String(error)));
       return {
         isOnline: false,
         hasPaper: false,

@@ -5,6 +5,7 @@ import { USBScannerMockService } from './mock/USBScannerMockService';
 import { CameraScannerService } from './CameraScannerService';
 import { BluetoothScannerService } from './BluetoothScannerService';
 import { USBScannerService } from './USBScannerService';
+import { LoggerFactory } from '../logger';
 import { USE_MOCK_SCANNER } from '@env';
 
 /**
@@ -23,6 +24,7 @@ export class ScannerServiceFactory {
   private static instance: ScannerServiceFactory;
   private currentService: ScannerServiceInterface | null = null;
   private currentType: ScannerType | null = null;
+  private logger = LoggerFactory.getInstance().createLogger('ScannerServiceFactory');
 
   private services: Map<ScannerType, ScannerServiceInterface> = new Map();
 
@@ -34,16 +36,17 @@ export class ScannerServiceFactory {
    * Initialize scanner services based on the USE_MOCK_SCANNER flag
    */
   private initializeServices(): void {
-    console.log('USE_MOCK_SCANNER', USE_MOCK_SCANNER);
+    const useMock = USE_MOCK_SCANNER === 'true';
+    this.logger.info(`Initializing scanner services (mock=${useMock})`);
     this.services.set(
       ScannerType.CAMERA,
-      USE_MOCK_SCANNER === 'true' ? CameraScannerMockService.getInstance() : new CameraScannerService()
+      useMock ? CameraScannerMockService.getInstance() : new CameraScannerService()
     );
     this.services.set(
       ScannerType.BLUETOOTH,
-      USE_MOCK_SCANNER === 'true' ? BluetoothScannerMockService.getInstance() : new BluetoothScannerService()
+      useMock ? BluetoothScannerMockService.getInstance() : new BluetoothScannerService()
     );
-    this.services.set(ScannerType.USB, USE_MOCK_SCANNER === 'true' ? USBScannerMockService.getInstance() : new USBScannerService());
+    this.services.set(ScannerType.USB, useMock ? USBScannerMockService.getInstance() : new USBScannerService());
   }
 
   /**
@@ -64,7 +67,7 @@ export class ScannerServiceFactory {
   public getService(type: ScannerType): ScannerServiceInterface | null {
     const service = this.services.get(type);
     if (!service) {
-      console.error(`No scanner service found for type: ${type}`);
+      this.logger.error(`No scanner service found for type: ${type}`);
       return null;
     }
 

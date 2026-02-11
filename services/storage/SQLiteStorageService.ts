@@ -19,7 +19,7 @@ export class SQLiteStorageService {
   }
 
   private async initializeDatabase(): Promise<void> {
-    const LATEST_VERSION = 6; // Increment this when schema changes
+    const LATEST_VERSION = 7; // Increment this when schema changes
 
     try {
       let currentVersion = (await this.db.getFirstAsync<{ user_version: number }>('PRAGMA user_version')).user_version;
@@ -169,6 +169,33 @@ export class SQLiteStorageService {
         await this.db.runAsync(`ALTER TABLE local_orders ADD COLUMN cashier_name TEXT;`);
         await this.db.runAsync(`CREATE INDEX IF NOT EXISTS idx_local_orders_cashier ON local_orders(cashier_id);`);
         this.logger.info('Cashier columns added to local_orders.');
+      }
+
+      // Migration to Version 7: Add Categories Table
+      if (fromVersion < 7) {
+        this.logger.info('Applying migration to v7: Creating categories table...');
+        await this.db.runAsync(
+          `CREATE TABLE IF NOT EXISTS categories (
+            id TEXT PRIMARY KEY NOT NULL,
+            name TEXT NOT NULL,
+            description TEXT,
+            parent_id TEXT,
+            image_url TEXT,
+            position INTEGER NOT NULL DEFAULT 0,
+            product_count INTEGER NOT NULL DEFAULT 0,
+            platform TEXT NOT NULL,
+            platform_id TEXT,
+            level INTEGER NOT NULL DEFAULT 0,
+            path TEXT NOT NULL DEFAULT '[]',
+            status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'hidden', 'archived')),
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+          );`
+        );
+        await this.db.runAsync(`CREATE INDEX IF NOT EXISTS idx_categories_platform ON categories(platform);`);
+        await this.db.runAsync(`CREATE INDEX IF NOT EXISTS idx_categories_parent_id ON categories(parent_id);`);
+        await this.db.runAsync(`CREATE INDEX IF NOT EXISTS idx_categories_status ON categories(status);`);
+        this.logger.info('Categories table created.');
       }
 
       // Update the version in a single step at the end

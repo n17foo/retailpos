@@ -1,48 +1,72 @@
-import NetInfo from '@react-native-community/netinfo';
-import { AppState, AppStateStatus } from 'react-native';
+import NetInfo, { NetInfoSubscription } from '@react-native-community/netinfo';
+import { AppState, AppStateStatus, NativeEventSubscription } from 'react-native';
 import { useSyncStore } from '../../stores/syncStore';
+import { LoggerFactory } from '../logger';
 
 class QueueManager {
   private initialized = false;
+  private logger = LoggerFactory.getInstance().createLogger('QueueManager');
+  private netInfoUnsubscribe: NetInfoSubscription | null = null;
+  private appStateSubscription: NativeEventSubscription | null = null;
+  private retryIntervalId: ReturnType<typeof setInterval> | null = null;
 
   initialize() {
     if (this.initialized) return;
 
     // 1. Trigger when connection returns
-    NetInfo.addEventListener(state => {
+    this.netInfoUnsubscribe = NetInfo.addEventListener(state => {
       if (state.isConnected && state.isInternetReachable) {
-        console.log('Network connection restored, processing sync queue...');
+        this.logger.info('Network connection restored, processing sync queue...');
         useSyncStore.getState().processQueue();
       }
     });
 
     // 2. Trigger on app foreground
-    AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+    this.appStateSubscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
-        console.log('App became active, processing sync queue...');
+        this.logger.info('App became active, processing sync queue...');
         useSyncStore.getState().processQueue();
       }
     });
 
-    // 3. Optional: Exponential backoff for 500 errors
-    // Check queue every 30 seconds for items that are ready to retry
-    setInterval(() => {
+    // 3. Exponential backoff retry — check every 30 seconds
+    this.retryIntervalId = setInterval(() => {
       const { queue, processQueue } = useSyncStore.getState();
       const now = new Date();
 
-      // Check if any requests are ready to retry
       const hasReadyRequests = queue.some(request =>
         request.nextRetryAt && request.nextRetryAt <= now
       );
 
       if (hasReadyRequests) {
-        console.log('Checking for retryable requests...');
+        this.logger.debug('Retryable requests found, processing...');
         processQueue();
       }
     }, 30000);
 
     this.initialized = true;
-    console.log('QueueManager initialized');
+    this.logger.info('QueueManager initialized');
+  }
+
+  /**
+   * Clean up all listeners and intervals.
+   * Call this when the app is shutting down or the manager is no longer needed.
+   */
+  dispose() {
+    if (this.netInfoUnsubscribe) {
+      this.netInfoUnsubscribe();
+      this.netInfoUnsubscribe = null;
+    }
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
+    if (this.retryIntervalId) {
+      clearInterval(this.retryIntervalId);
+      this.retryIntervalId = null;
+    }
+    this.initialized = false;
+    this.logger.info('QueueManager disposed');
   }
 
   // Manual trigger for processing queue

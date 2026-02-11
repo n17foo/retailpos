@@ -4,6 +4,7 @@ import { StripeMockService } from './mock/stripeMockService';
 import { StripeNfcMockService } from './mock/stripeNfcMockService';
 import { WorldpayMockService } from './mock/worldpayMockService';
 import { PaymentServiceInterface } from './paymentServiceInterface';
+import { LoggerFactory } from '../logger';
 import { USE_MOCK_PAYMENT } from '@env';
 /**
  * Available payment processors
@@ -22,6 +23,7 @@ export enum PaymentProvider {
 export class PaymentServiceFactory {
   private static instance: PaymentServiceFactory;
   private currentProvider: PaymentProvider = PaymentProvider.WORLDPAY; // Default provider
+  private logger = LoggerFactory.getInstance().createLogger('PaymentServiceFactory');
 
   private constructor() {}
 
@@ -37,7 +39,7 @@ export class PaymentServiceFactory {
    * Note: Only mock services are used in this build to avoid native module errors
    */
   public getPaymentService(): PaymentServiceInterface {
-    console.log(`[PAYMENT SERVICE] Using mock payment service: ${USE_MOCK_PAYMENT}`);
+    this.logger.info(`Getting payment service (mock=${USE_MOCK_PAYMENT}, provider=${this.currentProvider})`);
     try {
       switch (this.currentProvider) {
         case PaymentProvider.STRIPE:
@@ -55,8 +57,9 @@ export class PaymentServiceFactory {
             : require('./worldpayService').WorldpayService.getInstance();
       }
     } catch (error) {
-      console.error(`Failed to initialize payment service: ${error}`);
-      throw new Error('Failed to initialize payment service: ' + error.message);
+      const msg = error instanceof Error ? error.message : String(error);
+      this.logger.error({ message: 'Failed to initialize payment service' }, error instanceof Error ? error : new Error(msg));
+      throw new Error('Failed to initialize payment service: ' + msg);
     }
   }
 
@@ -65,7 +68,7 @@ export class PaymentServiceFactory {
    */
   public setPaymentProvider(provider: PaymentProvider): void {
     this.currentProvider = provider;
-    console.log(`Payment provider set to: ${provider}`);
+    this.logger.info(`Payment provider set to: ${provider}`);
   }
 
   /**

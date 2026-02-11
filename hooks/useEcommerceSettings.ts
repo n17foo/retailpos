@@ -2,7 +2,7 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { storage } from '../services/storage/storage';
 import { LoggerFactory } from '../services/logger';
-import { ECommercePlatform } from '../utils/platforms';
+import { ECommercePlatform, DEFAULT_PLATFORM } from '../utils/platforms';
 import { ServiceConfigBridge } from '../services/config/ServiceConfigBridge';
 
 export interface ECommerceSettings {
@@ -58,8 +58,8 @@ export interface ECommerceSettings {
 
 // Default e-commerce settings
 const DEFAULT_ECOMMERCE_SETTINGS: ECommerceSettings = {
-  enabled: false,
-  platform: '',
+  enabled: true,
+  platform: DEFAULT_PLATFORM,
   apiUrl: '',
   apiKey: '',
   syncInventory: false,
@@ -122,7 +122,7 @@ export const useEcommerceSettings = () => {
   // Add states to match useEcommerceConfig properties
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [currentPlatform, setCurrentPlatform] = useState<ECommercePlatform | null>(null);
+  const [currentPlatform, setCurrentPlatform] = useState<ECommercePlatform | null>(DEFAULT_PLATFORM);
 
   // Track if we've already initialized
   const initialized = useRef(false);

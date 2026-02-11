@@ -1,7 +1,9 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useLocalProducts } from '../hooks/useLocalProducts';
+import { useLocalCategories } from '../hooks/useLocalCategories';
 import { useOrders } from '../hooks/useOrders';
 import { Product } from '../repositories/ProductRepository';
+import { Category } from '../repositories/CategoryRepository';
 import { OrderWithItems } from '../hooks/useOrders';
 import { Order } from '../repositories/OrderRepository';
 import { OrderItem } from '../repositories/OrderItemRepository';
@@ -14,6 +16,14 @@ interface DataContextType {
   addProduct: (productData: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
   updateProduct: (id: string, productData: Partial<Product>) => Promise<void>;
   deleteProduct: (id: string) => Promise<void>;
+
+  categories: Category[];
+  categoryLoading: boolean;
+  categoryError: Error | null;
+  fetchCategories: () => Promise<void>;
+  addCategory: (categoryData: Omit<Category, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateCategory: (id: string, categoryData: Partial<Category>) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
 
   orders: OrderWithItems[];
   orderLoading: boolean;
@@ -37,6 +47,16 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     deleteProduct,
   } = useLocalProducts();
 
+  const {
+    categories,
+    loading: categoryLoading,
+    error: categoryError,
+    fetchCategories,
+    addCategory,
+    updateCategory: updateCat,
+    deleteCategory: deleteCat,
+  } = useLocalCategories();
+
   const { orders, loading: orderLoading, error: orderError, fetchOrders, addOrder, updateOrder, deleteOrder } = useOrders();
 
   const value = {
@@ -47,6 +67,13 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     addProduct,
     updateProduct,
     deleteProduct,
+    categories,
+    categoryLoading,
+    categoryError,
+    fetchCategories,
+    addCategory,
+    updateCategory: updateCat,
+    deleteCategory: deleteCat,
     orders,
     orderLoading,
     orderError,
