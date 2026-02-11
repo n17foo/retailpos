@@ -66,6 +66,12 @@ export class TokenServiceFactory {
         case ECommercePlatform.WIX:
           this.setupWixTokenProvider();
           break;
+        // These platforms use API key authentication and don't need token providers
+        case ECommercePlatform.PRESTASHOP:
+        case ECommercePlatform.SQUARESPACE:
+        case ECommercePlatform.OFFLINE:
+          this.logger.info(`Platform ${platform} does not require token management`);
+          return false;
         default:
           this.logger.warn(`No token provider implementation for platform: ${platform}`);
           return false;

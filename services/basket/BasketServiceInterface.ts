@@ -67,6 +67,8 @@ export interface LocalOrder {
   note?: string;
   paymentMethod?: string;
   paymentTransactionId?: string;
+  cashierId?: string;
+  cashierName?: string;
   status: LocalOrderStatus;
   syncStatus: 'pending' | 'synced' | 'failed';
   syncError?: string;
@@ -168,8 +170,10 @@ export interface BasketServiceInterface {
    * Start checkout - creates a local order from the basket
    * The order is created with 'pending' status
    * @param platform Optional platform to create order on
+   * @param cashierId Optional ID of the cashier placing the order
+   * @param cashierName Optional name of the cashier placing the order
    */
-  startCheckout(platform?: ECommercePlatform): Promise<LocalOrder>;
+  startCheckout(platform?: ECommercePlatform, cashierId?: string, cashierName?: string): Promise<LocalOrder>;
 
   /**
    * Mark order as processing (payment in progress)

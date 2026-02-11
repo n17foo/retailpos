@@ -2,13 +2,19 @@ import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
 import { lightColors, spacing, typography } from '../../utils/theme';
 import { useCategoryContext } from '../../contexts/CategoryProvider';
 import { useBasketContext } from '../../contexts/BasketProvider';
+import { QuickActionsMenu, QuickAction } from '../../components/QuickActionsMenu';
+import { useResponsive } from '../../hooks/useResponsive';
 
-export const Header: React.FC<{
+interface HeaderProps {
   username: string;
   cartItemTotal: number;
-}> = ({ username, cartItemTotal }) => {
+  onQuickAction?: (actionId: string) => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({ username, cartItemTotal, onQuickAction }) => {
   const { isLeftPanelOpen, setIsLeftPanelOpen } = useCategoryContext();
-  const { isRightPanelOpen, setIsRightPanelOpen } = useBasketContext();
+  const { isRightPanelOpen, setIsRightPanelOpen, unsyncedOrdersCount } = useBasketContext();
+  const { isMobile } = useResponsive();
 
   const toggleLeftPanel = () => {
     setIsLeftPanelOpen(!isLeftPanelOpen);
@@ -20,19 +26,41 @@ export const Header: React.FC<{
     if (isLeftPanelOpen) setIsLeftPanelOpen(false);
   };
 
+  const quickActions: QuickAction[] = [
+    { id: 'reprint', label: 'Reprint Last Receipt', icon: '🖨', onPress: () => onQuickAction?.('reprint') },
+    { id: 'report', label: 'Daily Report', icon: '📊', onPress: () => onQuickAction?.('report') },
+    { id: 'sync', label: 'Sync Orders', icon: '🔄', onPress: () => onQuickAction?.('sync'), badge: unsyncedOrdersCount > 0 ? unsyncedOrdersCount : undefined },
+  ];
+
   return (
     <View style={styles.header}>
-      <TouchableOpacity style={styles.headerButton} onPress={toggleLeftPanel}>
-        <Text style={styles.headerButtonText}>☰ Categories</Text>
-      </TouchableOpacity>
+      {/* Left: Category toggle (mobile only) or store name */}
+      {isMobile ? (
+        <TouchableOpacity style={styles.headerButton} onPress={toggleLeftPanel}>
+          <Text style={styles.headerButtonText}>☰ Categories</Text>
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.brandContainer}>
+          <Text style={styles.brandText}>RetailPOS</Text>
+        </View>
+      )}
 
+      {/* Center: Username + status */}
       <View style={styles.headerTitleContainer}>
         <Text style={styles.usernameText}>Hi, {username}</Text>
       </View>
 
-      <TouchableOpacity style={styles.headerButton} onPress={toggleRightPanel}>
-        <Text style={styles.headerButtonText}>Cart {cartItemTotal > 0 ? `(${cartItemTotal})` : ''} ☰</Text>
-      </TouchableOpacity>
+      {/* Right: Cart toggle (mobile) or quick actions (all) */}
+      <View style={styles.headerRightContainer}>
+        {isMobile && (
+          <TouchableOpacity style={styles.headerButton} onPress={toggleRightPanel}>
+            <Text style={styles.headerButtonText}>
+              🛒 {cartItemTotal > 0 ? `(${cartItemTotal})` : ''}
+            </Text>
+          </TouchableOpacity>
+        )}
+        <QuickActionsMenu actions={quickActions} />
+      </View>
     </View>
   );
 };
@@ -43,31 +71,37 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: lightColors.primary,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    height: 56,
   },
   headerButton: {
     padding: spacing.xs,
   },
   headerButtonText: {
     color: lightColors.textOnPrimary,
-    fontWeight: '700', // Using literal value as React Native expects specific string literals
+    fontWeight: '700',
   },
-  headerTitleContainer: {
-    alignItems: 'center',
+  brandContainer: {
+    paddingHorizontal: spacing.xs,
   },
-  headerTitle: {
+  brandText: {
     color: lightColors.textOnPrimary,
     fontSize: typography.fontSize.lg,
-    fontWeight: '700', // Using literal value as React Native expects specific string literals
+    fontWeight: '700',
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
   },
   usernameText: {
     color: lightColors.primaryLight,
-    fontSize: typography.fontSize.xs,
-    marginTop: spacing.xs / 2, // Half of the smallest spacing unit
+    fontSize: typography.fontSize.sm,
+    fontWeight: '500',
   },
   headerRightContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.xs,
   },
 });

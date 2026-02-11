@@ -258,7 +258,7 @@ export const useProductsForDisplay = (platform?: ECommercePlatform, categoryId?:
         sku: defaultVariant?.sku,
         barcode: defaultVariant?.barcode,
         stock: defaultVariant?.inventoryQuantity || 0,
-        isEcommerceProduct: true,
+        isEcommerceProduct: product.platform !== ECommercePlatform.OFFLINE,
         variantId: defaultVariant?.id,
         platform: product.platform,
       };

@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { SafeAreaView, StyleSheet } from 'react-native';
+import { SafeAreaView, View, StyleSheet } from 'react-native';
 import { useOnboardingContext } from '../contexts/OnboardingProvider';
 import { useEcommerceSettings } from '../hooks/useEcommerceSettings';
+import { ProgressIndicator } from '../components/ProgressIndicator';
+import { spacing } from '../utils/theme';
 
 import WelcomeStep from './onboarding/WelcomeStep';
 import PlatformSelectionStep from './onboarding/PlatformSelectionStep';
@@ -133,12 +135,29 @@ const OnboardingScreen: React.FC = () => {
     }
   };
 
-  return <SafeAreaView style={styles.container}>{renderStep()}</SafeAreaView>;
+  const STEP_LABELS = ['Welcome', 'Platform', 'Configure', 'Payment', 'Printer', 'Scanner', 'Admin User', 'Summary'];
+  const STEP_ORDER: OnboardingStep[] = ['welcome', 'platform_selection', 'platform_configuration', 'payment_provider_setup', 'printer_setup', 'scanner_setup', 'admin_user', 'summary'];
+  const currentStepNumber = STEP_ORDER.indexOf(currentStep) + 1;
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {currentStep !== 'welcome' && (
+        <View style={styles.progressContainer}>
+          <ProgressIndicator currentStep={currentStepNumber} totalSteps={STEP_ORDER.length} labels={STEP_LABELS} />
+        </View>
+      )}
+      {renderStep()}
+    </SafeAreaView>
+  );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  progressContainer: {
+    paddingTop: spacing.sm,
+    paddingHorizontal: spacing.md,
   },
 });
 

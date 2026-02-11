@@ -10,24 +10,33 @@ interface ProductCardProps {
   onAddToCart: (id: string, quantity: number) => void;
   inCart?: boolean;
   initialQuantity?: number;
+  stock?: number;
+  widthPercent?: number;
 }
 
-export const ProductCard: React.FC<ProductCardProps> = ({ id, name, price, image, onAddToCart, inCart = false, initialQuantity = 0 }) => {
+export const ProductCard: React.FC<ProductCardProps> = ({
+  id,
+  name,
+  price,
+  image,
+  onAddToCart,
+  inCart = false,
+  initialQuantity = 0,
+  stock,
+  widthPercent,
+}) => {
   const [quantity, setQuantity] = useState(initialQuantity);
 
-  // Sync local quantity state with prop when it changes (e.g., from basket context)
   useEffect(() => {
     setQuantity(initialQuantity);
   }, [initialQuantity]);
 
-  // Tap on card - add to cart or increment quantity
   const handleCardPress = () => {
     const newQuantity = quantity + 1;
     setQuantity(newQuantity);
     onAddToCart(id, newQuantity);
   };
 
-  // Increment quantity
   const handleIncrement = (e: any) => {
     e.stopPropagation?.();
     const newQuantity = quantity + 1;
@@ -35,7 +44,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({ id, name, price, image
     onAddToCart(id, newQuantity);
   };
 
-  // Decrement quantity
   const handleDecrement = (e: any) => {
     e.stopPropagation?.();
     if (quantity > 0) {
@@ -46,22 +54,40 @@ export const ProductCard: React.FC<ProductCardProps> = ({ id, name, price, image
   };
 
   const isInCart = inCart || quantity > 0;
+  const isOutOfStock = stock !== undefined && stock <= 0;
+  const isLowStock = stock !== undefined && stock > 0 && stock <= 5;
+
+  const cardWidth = widthPercent ? `${widthPercent}%` as any : '47%';
 
   return (
-    <TouchableOpacity style={[styles.card, isInCart && styles.cardInCart]} onPress={handleCardPress} activeOpacity={0.7}>
-      {/* Product Image - takes most of the card */}
+    <TouchableOpacity
+      style={[styles.card, { width: cardWidth }, isInCart && styles.cardInCart, isOutOfStock && styles.cardOutOfStock]}
+      onPress={handleCardPress}
+      activeOpacity={0.7}
+      disabled={isOutOfStock}
+    >
       <View style={styles.imageContainer}>
         <Image source={image} style={styles.image} resizeMode="cover" />
 
-        {/* Quantity badge overlay when in cart */}
         {isInCart && (
           <View style={styles.quantityBadge}>
             <Text style={styles.quantityBadgeText}>{quantity}</Text>
           </View>
         )}
+
+        {/* Stock indicator */}
+        {isOutOfStock && (
+          <View style={styles.outOfStockOverlay}>
+            <Text style={styles.outOfStockText}>Out of Stock</Text>
+          </View>
+        )}
+        {isLowStock && !isInCart && (
+          <View style={styles.lowStockBadge}>
+            <Text style={styles.lowStockText}>{stock} left</Text>
+          </View>
+        )}
       </View>
 
-      {/* Product info at the bottom */}
       <View style={styles.infoContainer}>
         <Text style={styles.name} numberOfLines={2} ellipsizeMode="tail">
           {name}
@@ -69,7 +95,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({ id, name, price, image
         <Text style={styles.price}>${price.toFixed(2)}</Text>
       </View>
 
-      {/* Quantity controls overlay - only show when in cart */}
       {isInCart && (
         <View style={styles.quantityOverlay}>
           <TouchableOpacity style={styles.quantityButton} onPress={handleDecrement} activeOpacity={0.8}>
@@ -89,8 +114,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: lightColors.surface,
     borderRadius: borderRadius.md,
+    flex: 1,
     margin: spacing.xs,
-    width: '47%',
     ...elevation.medium,
     overflow: 'hidden',
   },
@@ -98,9 +123,12 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: lightColors.primary,
   },
+  cardOutOfStock: {
+    opacity: 0.6,
+  },
   imageContainer: {
     width: '100%',
-    height: 100,
+    height: 120,
     position: 'relative',
   },
   image: {
@@ -124,6 +152,31 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.sm,
     fontWeight: '700',
   },
+  outOfStockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outOfStockText: {
+    color: lightColors.textOnPrimary,
+    fontSize: typography.fontSize.sm,
+    fontWeight: '700',
+  },
+  lowStockBadge: {
+    position: 'absolute',
+    bottom: spacing.xs,
+    left: spacing.xs,
+    backgroundColor: lightColors.warning,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+  },
+  lowStockText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: lightColors.textPrimary,
+  },
   infoContainer: {
     padding: spacing.sm,
     alignItems: 'center',
@@ -134,7 +187,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.xs,
     color: lightColors.textPrimary,
-    height: 36, // Fixed height for 2 lines
+    height: 36,
   },
   price: {
     fontSize: typography.fontSize.md,

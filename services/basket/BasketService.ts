@@ -12,11 +12,55 @@ import {
   CheckoutResult,
   SyncResult,
 } from './BasketServiceInterface';
+import { multiplyMoney, sumMoney, calculateTax, calculateLineTotal, roundMoney } from '../../utils/money';
 
 /**
  * Default tax rate (8%)
  */
 const DEFAULT_TAX_RATE = 0.08;
+
+/** Shared DB row shape for baskets table */
+interface BasketRow {
+  id: string;
+  items: string;
+  subtotal: number;
+  tax: number;
+  total: number;
+  discount_amount: number | null;
+  discount_code: string | null;
+  customer_email: string | null;
+  customer_name: string | null;
+  note: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+/** Shared DB row shape for local_orders table */
+interface LocalOrderRow {
+  id: string;
+  platform_order_id: string | null;
+  platform: string | null;
+  items: string;
+  subtotal: number;
+  tax: number;
+  total: number;
+  discount_amount: number | null;
+  discount_code: string | null;
+  customer_email: string | null;
+  customer_name: string | null;
+  note: string | null;
+  payment_method: string | null;
+  payment_transaction_id: string | null;
+  cashier_id: string | null;
+  cashier_name: string | null;
+  status: string;
+  sync_status: string;
+  sync_error: string | null;
+  created_at: number;
+  updated_at: number;
+  paid_at: number | null;
+  synced_at: number | null;
+}
 
 /**
  * Basket service implementation
@@ -43,7 +87,7 @@ export class BasketService implements BasketServiceInterface {
    * Generate a unique ID
    */
   private generateId(): string {
-    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    return crypto.randomUUID();
   }
 
   /**
@@ -52,20 +96,9 @@ export class BasketService implements BasketServiceInterface {
   private async getOrCreateBasket(): Promise<Basket> {
     try {
       // Try to get existing active basket
-      const existingBasket = await this.db.getFirstAsync<{
-        id: string;
-        items: string;
-        subtotal: number;
-        tax: number;
-        total: number;
-        discount_amount: number | null;
-        discount_code: string | null;
-        customer_email: string | null;
-        customer_name: string | null;
-        note: string | null;
-        created_at: number;
-        updated_at: number;
-      }>('SELECT * FROM baskets WHERE status = ? ORDER BY created_at DESC LIMIT 1', ['active']);
+      const existingBasket = await this.db.getFirstAsync<BasketRow>(
+        'SELECT * FROM baskets WHERE status = ? ORDER BY created_at DESC LIMIT 1', ['active']
+      );
 
       if (existingBasket) {
         this.currentBasketId = existingBasket.id;
@@ -102,20 +135,7 @@ export class BasketService implements BasketServiceInterface {
   /**
    * Map database basket row to Basket interface
    */
-  private mapDbBasketToBasket(row: {
-    id: string;
-    items: string;
-    subtotal: number;
-    tax: number;
-    total: number;
-    discount_amount: number | null;
-    discount_code: string | null;
-    customer_email: string | null;
-    customer_name: string | null;
-    note: string | null;
-    created_at: number;
-    updated_at: number;
-  }): Basket {
+  private mapDbBasketToBasket(row: BasketRow): Basket {
     return {
       id: row.id,
       items: JSON.parse(row.items) as BasketItem[],
@@ -133,13 +153,19 @@ export class BasketService implements BasketServiceInterface {
   }
 
   /**
-   * Calculate basket totals
+   * Calculate basket totals using integer-cent math to avoid floating point errors.
    */
   private calculateTotals(items: BasketItem[], discountAmount: number = 0): { subtotal: number; tax: number; total: number } {
-    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const taxableAmount = items.filter(item => item.taxable).reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const tax = taxableAmount * DEFAULT_TAX_RATE;
-    const total = Math.max(0, subtotal + tax - discountAmount);
+    const lineTotals = items.map(item => multiplyMoney(item.price, item.quantity));
+    const subtotal = sumMoney(lineTotals);
+
+    const taxableLineTotals = items
+      .filter(item => item.taxable)
+      .map(item => multiplyMoney(item.price, item.quantity));
+    const taxableAmount = sumMoney(taxableLineTotals);
+    const tax = calculateTax(taxableAmount, DEFAULT_TAX_RATE);
+
+    const total = Math.max(0, roundMoney(subtotal + tax - discountAmount));
 
     return { subtotal, tax, total };
   }
@@ -301,7 +327,7 @@ export class BasketService implements BasketServiceInterface {
 
   // ============ Checkout Operations ============
 
-  async startCheckout(platform?: ECommercePlatform): Promise<LocalOrder> {
+  async startCheckout(platform?: ECommercePlatform, cashierId?: string, cashierName?: string): Promise<LocalOrder> {
     const basket = await this.getOrCreateBasket();
 
     if (basket.items.length === 0) {
@@ -323,6 +349,8 @@ export class BasketService implements BasketServiceInterface {
       customerEmail: basket.customerEmail,
       customerName: basket.customerName,
       note: basket.note,
+      cashierId,
+      cashierName,
       status: 'pending',
       syncStatus: 'pending',
       createdAt: new Date(now),
@@ -334,8 +362,9 @@ export class BasketService implements BasketServiceInterface {
       `INSERT INTO local_orders (
         id, platform, items, subtotal, tax, total,
         discount_amount, discount_code, customer_email, customer_name, note,
+        cashier_id, cashier_name,
         status, sync_status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         orderId,
         platform ?? null,
@@ -348,6 +377,8 @@ export class BasketService implements BasketServiceInterface {
         basket.customerEmail ?? null,
         basket.customerName ?? null,
         basket.note ?? null,
+        cashierId ?? null,
+        cashierName ?? null,
         'pending',
         'pending',
         now,
@@ -569,57 +600,13 @@ export class BasketService implements BasketServiceInterface {
 
     query += ' ORDER BY created_at DESC';
 
-    const rows = await this.db.getAllAsync<{
-      id: string;
-      platform_order_id: string | null;
-      platform: string | null;
-      items: string;
-      subtotal: number;
-      tax: number;
-      total: number;
-      discount_amount: number | null;
-      discount_code: string | null;
-      customer_email: string | null;
-      customer_name: string | null;
-      note: string | null;
-      payment_method: string | null;
-      payment_transaction_id: string | null;
-      status: string;
-      sync_status: string;
-      sync_error: string | null;
-      created_at: number;
-      updated_at: number;
-      paid_at: number | null;
-      synced_at: number | null;
-    }>(query, params);
+    const rows = await this.db.getAllAsync<LocalOrderRow>(query, params);
 
     return rows.map(row => this.mapDbRowToLocalOrder(row));
   }
 
   async getUnsyncedOrders(): Promise<LocalOrder[]> {
-    const rows = await this.db.getAllAsync<{
-      id: string;
-      platform_order_id: string | null;
-      platform: string | null;
-      items: string;
-      subtotal: number;
-      tax: number;
-      total: number;
-      discount_amount: number | null;
-      discount_code: string | null;
-      customer_email: string | null;
-      customer_name: string | null;
-      note: string | null;
-      payment_method: string | null;
-      payment_transaction_id: string | null;
-      status: string;
-      sync_status: string;
-      sync_error: string | null;
-      created_at: number;
-      updated_at: number;
-      paid_at: number | null;
-      synced_at: number | null;
-    }>(
+    const rows = await this.db.getAllAsync<LocalOrderRow>(
       `SELECT * FROM local_orders 
        WHERE status = ? AND sync_status != ? 
        ORDER BY created_at ASC`,
@@ -630,29 +617,9 @@ export class BasketService implements BasketServiceInterface {
   }
 
   async getLocalOrder(orderId: string): Promise<LocalOrder | null> {
-    const row = await this.db.getFirstAsync<{
-      id: string;
-      platform_order_id: string | null;
-      platform: string | null;
-      items: string;
-      subtotal: number;
-      tax: number;
-      total: number;
-      discount_amount: number | null;
-      discount_code: string | null;
-      customer_email: string | null;
-      customer_name: string | null;
-      note: string | null;
-      payment_method: string | null;
-      payment_transaction_id: string | null;
-      status: string;
-      sync_status: string;
-      sync_error: string | null;
-      created_at: number;
-      updated_at: number;
-      paid_at: number | null;
-      synced_at: number | null;
-    }>('SELECT * FROM local_orders WHERE id = ?', [orderId]);
+    const row = await this.db.getFirstAsync<LocalOrderRow>(
+      'SELECT * FROM local_orders WHERE id = ?', [orderId]
+    );
 
     if (!row) return null;
     return this.mapDbRowToLocalOrder(row);
@@ -661,29 +628,7 @@ export class BasketService implements BasketServiceInterface {
   /**
    * Map database row to LocalOrder
    */
-  private mapDbRowToLocalOrder(row: {
-    id: string;
-    platform_order_id: string | null;
-    platform: string | null;
-    items: string;
-    subtotal: number;
-    tax: number;
-    total: number;
-    discount_amount: number | null;
-    discount_code: string | null;
-    customer_email: string | null;
-    customer_name: string | null;
-    note: string | null;
-    payment_method: string | null;
-    payment_transaction_id: string | null;
-    status: string;
-    sync_status: string;
-    sync_error: string | null;
-    created_at: number;
-    updated_at: number;
-    paid_at: number | null;
-    synced_at: number | null;
-  }): LocalOrder {
+  private mapDbRowToLocalOrder(row: LocalOrderRow): LocalOrder {
     return {
       id: row.id,
       platformOrderId: row.platform_order_id ?? undefined,
@@ -694,6 +639,8 @@ export class BasketService implements BasketServiceInterface {
       total: row.total,
       discountAmount: row.discount_amount ?? undefined,
       discountCode: row.discount_code ?? undefined,
+      cashierId: row.cashier_id ?? undefined,
+      cashierName: row.cashier_name ?? undefined,
       customerEmail: row.customer_email ?? undefined,
       customerName: row.customer_name ?? undefined,
       note: row.note ?? undefined,
@@ -732,18 +679,22 @@ export class BasketService implements BasketServiceInterface {
   }
 
   basketItemsToLineItems(items: BasketItem[]): OrderLineItem[] {
-    return items.map(item => ({
-      productId: item.originalId ?? item.productId,
-      variantId: item.variantId,
-      sku: item.sku,
-      name: item.name,
-      quantity: item.quantity,
-      price: item.price,
-      taxable: item.taxable,
-      taxRate: item.taxRate ?? DEFAULT_TAX_RATE,
-      taxAmount: item.taxable ? item.price * item.quantity * (item.taxRate ?? DEFAULT_TAX_RATE) : 0,
-      total: item.price * item.quantity,
-      properties: item.properties,
-    }));
+    return items.map(item => {
+      const rate = item.taxRate ?? DEFAULT_TAX_RATE;
+      const { lineTotal, taxAmount } = calculateLineTotal(item.price, item.quantity, item.taxable, rate);
+      return {
+        productId: item.originalId ?? item.productId,
+        variantId: item.variantId,
+        sku: item.sku,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        taxable: item.taxable,
+        taxRate: rate,
+        taxAmount,
+        total: lineTotal,
+        properties: item.properties,
+      };
+    });
   }
 }

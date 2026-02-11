@@ -1,6 +1,7 @@
 import { storage } from '../storage/storage';
 import { LocalOrder } from '../basket/BasketServiceInterface';
 import { receiptConfigService, ReceiptConfig } from './ReceiptConfigService';
+import { addMoney, multiplyMoney, roundMoney, subtractMoney, sumMoney } from '../../utils/money';
 
 export interface ShiftData {
   id: string;
@@ -115,27 +116,27 @@ export class DailyReportService {
       throw new Error('No shift data available for report.');
     }
 
-    // Filter orders for this shift
+    // Filter orders for this shift by time range and cashier
     const shiftOrders = orders.filter(order => {
       const orderTime = order.createdAt.getTime();
       const shiftStart = new Date(shiftData.startTime).getTime();
       const shiftEnd = shiftData.endTime ? new Date(shiftData.endTime).getTime() : Date.now();
-      return orderTime >= shiftStart && orderTime <= shiftEnd;
+      const inTimeRange = orderTime >= shiftStart && orderTime <= shiftEnd;
+
+      // If the order has a cashierId, match it against the shift's cashierId
+      if (order.cashierId && shiftData.cashierId) {
+        return inTimeRange && order.cashierId === shiftData.cashierId;
+      }
+
+      return inTimeRange;
     });
 
-    // Calculate summary
+    // Calculate summary using safe money math
     const paymentBreakdown: Record<string, { count: number; total: number }> = {};
-    let totalSales = 0;
-    let totalTax = 0;
-    let totalDiscount = 0;
     let itemsSold = 0;
     let refunds = 0;
-    let refundAmount = 0;
 
     for (const order of shiftOrders) {
-      totalSales += order.total;
-      totalTax += order.tax || 0;
-      totalDiscount += order.discountAmount || 0;
       itemsSold += order.items.reduce((sum, item) => sum + item.quantity, 0);
 
       const paymentMethod = order.paymentMethod || 'Unknown';
@@ -143,13 +144,17 @@ export class DailyReportService {
         paymentBreakdown[paymentMethod] = { count: 0, total: 0 };
       }
       paymentBreakdown[paymentMethod].count++;
-      paymentBreakdown[paymentMethod].total += order.total;
+      paymentBreakdown[paymentMethod].total = addMoney(paymentBreakdown[paymentMethod].total, order.total);
 
       if (order.total < 0) {
         refunds++;
-        refundAmount += Math.abs(order.total);
       }
     }
+
+    const totalSales = sumMoney(shiftOrders.map(o => o.total));
+    const totalTax = sumMoney(shiftOrders.map(o => o.tax || 0));
+    const totalDiscount = sumMoney(shiftOrders.map(o => o.discountAmount || 0));
+    const refundAmount = sumMoney(shiftOrders.filter(o => o.total < 0).map(o => Math.abs(o.total)));
 
     return {
       date: new Date(),
@@ -160,8 +165,8 @@ export class DailyReportService {
         totalSales,
         totalTax,
         totalDiscount,
-        netSales: totalSales - totalTax,
-        averageOrderValue: shiftOrders.length > 0 ? totalSales / shiftOrders.length : 0,
+        netSales: subtractMoney(totalSales, totalTax),
+        averageOrderValue: shiftOrders.length > 0 ? roundMoney(totalSales / shiftOrders.length) : 0,
         paymentBreakdown,
         itemsSold,
         refunds,
@@ -234,12 +239,12 @@ export class DailyReportService {
       const cashPayments = report.summary.paymentBreakdown['Cash']?.total || 0;
       lines.push(receiptConfigService.formatLine('Cash Sales:', `$${cashPayments.toFixed(2)}`));
 
-      const expectedCash = report.shift.openingCash + cashPayments;
+      const expectedCash = addMoney(report.shift.openingCash, cashPayments);
       lines.push(receiptConfigService.formatLine('Expected Cash:', `$${expectedCash.toFixed(2)}`));
 
       if (report.shift.closingCash !== null) {
         lines.push(receiptConfigService.formatLine('Actual Cash:', `$${report.shift.closingCash.toFixed(2)}`));
-        const difference = report.shift.closingCash - expectedCash;
+        const difference = subtractMoney(report.shift.closingCash, expectedCash);
         const diffStr = difference >= 0 ? `+$${difference.toFixed(2)}` : `-$${Math.abs(difference).toFixed(2)}`;
         lines.push(receiptConfigService.formatLine('Difference:', diffStr));
       }
@@ -302,7 +307,7 @@ export class DailyReportService {
 
     // Items
     for (const item of order.items) {
-      const itemTotal = item.quantity * item.price;
+      const itemTotal = multiplyMoney(item.price, item.quantity);
       if (item.quantity > 1) {
         lines.push(item.name);
         lines.push(receiptConfigService.formatLine(`  ${item.quantity} x $${item.price.toFixed(2)}`, `$${itemTotal.toFixed(2)}`));
@@ -313,7 +318,7 @@ export class DailyReportService {
     lines.push(divider);
 
     // Totals
-    const subtotal = order.total - (order.tax || 0);
+    const subtotal = subtractMoney(order.total, order.tax || 0);
     lines.push(receiptConfigService.formatLine('Subtotal:', `$${subtotal.toFixed(2)}`));
     if (order.tax) {
       lines.push(receiptConfigService.formatLine('Tax:', `$${order.tax.toFixed(2)}`));

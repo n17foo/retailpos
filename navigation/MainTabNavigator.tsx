@@ -13,7 +13,6 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 interface MainTabNavigatorProps {
   username: string;
-  onOrderComplete: (orderTotal: number, items: any[]) => void;
   onLogout: () => void;
 }
 
@@ -21,7 +20,7 @@ interface MainTabNavigatorProps {
  * Main Tab Navigator
  * Bottom tab navigation for the main app after login
  */
-export const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ username, onOrderComplete, onLogout }) => {
+export const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ username, onLogout }) => {
   // Handler for barcode scan success
   const handleScanSuccess = (productId: string) => {
     console.log('Scanned product:', productId);
@@ -56,7 +55,7 @@ export const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ username, on
           tabBarLabel: 'Order',
         }}
       >
-        {props => <OrderScreen {...props} username={username} onOrderComplete={onOrderComplete} />}
+        {props => <OrderScreen {...props} username={username} />}
       </Tab.Screen>
 
       <Tab.Screen

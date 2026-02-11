@@ -50,6 +50,19 @@ export interface StoredECommerceSettings {
     accessToken: string;
     storeUrl: string;
   };
+  prestashop?: {
+    apiKey: string;
+    storeUrl: string;
+  };
+  squarespace?: {
+    apiKey: string;
+    siteId: string;
+  };
+  offline?: {
+    menuUrl: string;
+    storeName: string;
+    lastSync: string;
+  };
 }
 
 /**
@@ -154,6 +167,9 @@ export class ServiceConfigBridge {
       magento: ECommercePlatform.MAGENTO,
       sylius: ECommercePlatform.SYLIUS,
       wix: ECommercePlatform.WIX,
+      prestashop: ECommercePlatform.PRESTASHOP,
+      squarespace: ECommercePlatform.SQUARESPACE,
+      offline: ECommercePlatform.OFFLINE,
     };
 
     return platformMap[platformName.toLowerCase()] || null;
@@ -205,6 +221,24 @@ export class ServiceConfigBridge {
           apiKey: settings.wix.apiKey || settings.apiKey,
           accessToken: settings.wix.accessToken,
           storeUrl: settings.wix.storeUrl || settings.apiUrl,
+        };
+
+      case ECommercePlatform.PRESTASHOP:
+        return {
+          apiKey: settings.prestashop?.apiKey || settings.apiKey,
+          storeUrl: settings.prestashop?.storeUrl || settings.apiUrl,
+        };
+
+      case ECommercePlatform.SQUARESPACE:
+        return {
+          apiKey: settings.squarespace?.apiKey || settings.apiKey,
+          siteId: settings.squarespace?.siteId,
+        };
+
+      case ECommercePlatform.OFFLINE:
+        return {
+          menuUrl: settings.offline?.menuUrl,
+          storeName: settings.offline?.storeName,
         };
 
       default:

@@ -19,7 +19,7 @@ export class SQLiteStorageService {
   }
 
   private async initializeDatabase(): Promise<void> {
-    const LATEST_VERSION = 5; // Increment this when schema changes
+    const LATEST_VERSION = 6; // Increment this when schema changes
 
     try {
       let currentVersion = (await this.db.getFirstAsync<{ user_version: number }>('PRAGMA user_version')).user_version;
@@ -160,6 +160,15 @@ export class SQLiteStorageService {
           );`
         );
         this.logger.info('key_value_store table created.');
+      }
+
+      // Migration to Version 6: Add cashier tracking to local_orders
+      if (fromVersion < 6) {
+        this.logger.info('Applying migration to v6: Adding cashier columns to local_orders...');
+        await this.db.runAsync(`ALTER TABLE local_orders ADD COLUMN cashier_id TEXT;`);
+        await this.db.runAsync(`ALTER TABLE local_orders ADD COLUMN cashier_name TEXT;`);
+        await this.db.runAsync(`CREATE INDEX IF NOT EXISTS idx_local_orders_cashier ON local_orders(cashier_id);`);
+        this.logger.info('Cashier columns added to local_orders.');
       }
 
       // Update the version in a single step at the end

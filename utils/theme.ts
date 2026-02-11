@@ -127,6 +127,47 @@ export const typography = {
   },
 };
 
+/**
+ * Semantic colors for status, interactive states, and platform branding
+ */
+export const semanticColors = {
+  // Status
+  success: lightColors.success,
+  warning: lightColors.warning,
+  error: lightColors.error,
+  info: lightColors.info,
+
+  // Interactive states
+  hover: '#E3F2FD',
+  active: '#BBDEFB',
+  focus: '#90CAF9',
+  disabled: lightColors.textDisabled,
+
+  // Platform branding
+  shopify: '#96BF48',
+  woocommerce: '#7F54B3',
+  bigcommerce: '#34313F',
+  magento: '#EE672F',
+  sylius: '#1ABE5D',
+  wix: '#0C6EFC',
+  prestashop: '#DF0067',
+  squarespace: '#000000',
+  offline: '#9E9E9E',
+};
+
+/**
+ * Layout constants for responsive sidebar widths
+ */
+export const layout = {
+  sidebar: {
+    tablet: { category: 230, basket: 300 },
+    desktop: { category: 260, basket: 340 },
+    wide: { category: 300, basket: 380 },
+  },
+  headerHeight: 56,
+  tabBarHeight: 56,
+};
+
 export const elevation = {
   none: {
     shadowColor: 'transparent',

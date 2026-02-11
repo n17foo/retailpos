@@ -45,12 +45,17 @@ interface ProductGridProps {
   products: DisplayProduct[];
   onAddToCart: (id: string, quantity: number) => void;
   cartItems?: Record<string, number>;
+  numColumns?: number;
 }
 
-export const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, cartItems = {} }) => {
+export const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, cartItems = {}, numColumns = 2 }) => {
+  // FlatList requires a key prop change to re-render when numColumns changes
+  const cardWidthPercent = Math.floor(100 / numColumns) - 2;
+
   return (
     <View style={styles.container}>
       <FlatList
+        key={`grid-${numColumns}`}
         data={products}
         renderItem={({ item }) => (
           <ProductCard
@@ -58,13 +63,15 @@ export const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart,
             name={item.name}
             price={item.price}
             image={item.image}
+            stock={item.stock}
             onAddToCart={onAddToCart}
             inCart={!!cartItems[item.id]}
             initialQuantity={cartItems[item.id] || 0}
+            widthPercent={cardWidthPercent}
           />
         )}
         keyExtractor={item => item.id}
-        numColumns={2}
+        numColumns={numColumns}
         columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
       />
@@ -78,6 +85,7 @@ const styles = StyleSheet.create({
     padding: spacing.xs,
   },
   row: {
-    justifyContent: 'space-between',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.xs,
   },
 });

@@ -127,6 +127,13 @@ export class SyncServiceFactory {
         service = this.createSquarespaceSyncService();
         break;
 
+      // These platforms use the offline sync service (no dedicated sync implementation)
+      case ECommercePlatform.MAGENTO:
+      case ECommercePlatform.SYLIUS:
+      case ECommercePlatform.WIX:
+        service = this.createOfflineSyncService();
+        break;
+
       default:
         console.warn(`Unknown platform: ${platform}, using offline sync service`);
         service = this.offlineDefaultService;
@@ -304,8 +311,16 @@ export class SyncServiceFactory {
         break;
       }
 
+      // These platforms use the offline sync service (no dedicated sync implementation)
+      case ECommercePlatform.MAGENTO:
+      case ECommercePlatform.SYLIUS:
+      case ECommercePlatform.WIX: {
+        this.serviceInstances[platform] = new OfflineSyncService();
+        break;
+      }
+
       default:
-        console.warn(`Platform ${platform} not supported for sync configuration`);
+        console.warn(`Unknown platform: ${platform}, not supported for sync configuration`);
         return;
     }
 

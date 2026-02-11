@@ -1,7 +1,6 @@
 import { Dispatch, ReactNode, SetStateAction, createContext, useContext, useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { ImageSourcePropType } from 'react-native';
 import {
-  BasketItem as ServiceBasketItem,
   Basket,
   LocalOrder,
   LocalOrderStatus,
@@ -11,6 +10,7 @@ import {
 import { getBasketService } from '../services/basket/basketServiceFactory';
 import { BasketServiceInterface } from '../services/basket/BasketServiceInterface';
 import { ECommercePlatform } from '../utils/platforms';
+import { useAuthContext } from './AuthProvider';
 import { queueManager } from '../services/queue/QueueManager';
 
 // Re-export basket item type for components
@@ -109,6 +109,9 @@ export interface BasketContextType {
 export const BasketContext = createContext<BasketContextType | null>(null);
 
 export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) => {
+  // Auth context for cashier tracking
+  const { user } = useAuthContext();
+
   // Panel state
   const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
 
@@ -390,7 +393,7 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
     if (!serviceRef.current) return null;
 
     try {
-      const order = await serviceRef.current.startCheckout(platform);
+      const order = await serviceRef.current.startCheckout(platform, user?.id, user?.username);
       if (mountedRef.current) {
         setCurrentOrder(order);
         setError(null);
@@ -402,7 +405,7 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
       }
       return null;
     }
-  }, []);
+  }, [user]);
 
   const markPaymentProcessing = useCallback(async (orderId: string) => {
     if (!serviceRef.current) return;
