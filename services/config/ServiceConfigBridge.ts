@@ -1,14 +1,7 @@
 import { ECommercePlatform } from '../../utils/platforms';
 import { LoggerFactory } from '../logger';
 import { storage } from '../storage/storage';
-import {
-  SHOPIFY_API_VERSION,
-  WOOCOMMERCE_API_VERSION,
-  BIGCOMMERCE_API_VERSION,
-  MAGENTO_API_VERSION,
-  SYLIUS_API_VERSION,
-  WIX_API_VERSION,
-} from './apiVersions';
+import { SHOPIFY_API_VERSION } from './apiVersions';
 
 // NOTE: Factory imports are lazy-loaded inside methods to break require cycles.
 // The cycle was: ServiceConfigBridge → factory → platform service → ServiceConfigBridge

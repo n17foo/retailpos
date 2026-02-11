@@ -6,20 +6,20 @@ This document covers the full technical setup of RetailPOS for developers, DevOp
 
 ## Technology Stack
 
-| Layer | Technology | Version |
-|---|---|---|
-| **Framework** | React Native + Expo | SDK 53 |
-| **Language** | TypeScript | 5.x |
-| **Navigation** | React Navigation | 7.x |
-| **State** | React Context + Zustand (sync queue) | — |
-| **Database** | SQLite via `expo-sqlite` | — |
-| **Networking** | Fetch with queued retry | — |
-| **Desktop** | Electron | — |
-| **Styling** | StyleSheet + custom theme system | — |
-| **i18n** | react-i18next + expo-localization | — |
-| **Logging** | Custom LoggerFactory (Winston-style) | — |
-| **Linting** | ESLint + Prettier | — |
-| **Testing** | Jest | — |
+| Layer          | Technology                           | Version |
+| -------------- | ------------------------------------ | ------- |
+| **Framework**  | React Native + Expo                  | SDK 53  |
+| **Language**   | TypeScript                           | 5.x     |
+| **Navigation** | React Navigation                     | 7.x     |
+| **State**      | React Context + Zustand (sync queue) | —       |
+| **Database**   | SQLite via `expo-sqlite`             | —       |
+| **Networking** | Fetch with queued retry              | —       |
+| **Desktop**    | Electron                             | —       |
+| **Styling**    | StyleSheet + custom theme system     | —       |
+| **i18n**       | react-i18next + expo-localization    | —       |
+| **Logging**    | Custom LoggerFactory (Winston-style) | —       |
+| **Linting**    | ESLint + Prettier                    | —       |
+| **Testing**    | Jest                                 | —       |
 
 ---
 
@@ -195,6 +195,7 @@ PlatformServiceRegistry.getInstance().getServices(platform)
 ```
 
 Each domain follows the same pattern:
+
 1. **Interface** — contract (e.g. `ProductServiceInterface`)
 2. **Factory** — singleton that creates/caches platform-specific implementations
 3. **Platform services** — one per e-commerce platform (Shopify, WooCommerce, etc.)
@@ -208,9 +209,9 @@ The `usePlatformServices()` hook reads the current platform from settings and re
 Every service domain uses a singleton factory:
 
 ```typescript
-ProductServiceFactory.getInstance().getService(platform)   // → ProductServiceInterface
-CategoryServiceFactory.getInstance().getService(platform)   // → CategoryServiceInterface
-OrderServiceFactory.getInstance().getService(platform)      // → OrderServiceInterface
+ProductServiceFactory.getInstance().getService(platform); // → ProductServiceInterface
+CategoryServiceFactory.getInstance().getService(platform); // → CategoryServiceInterface
+OrderServiceFactory.getInstance().getService(platform); // → OrderServiceInterface
 ```
 
 ### Repository Pattern
@@ -218,8 +219,8 @@ OrderServiceFactory.getInstance().getService(platform)      // → OrderServiceI
 Local data (orders, users) is accessed through repository classes that wrap SQLite:
 
 ```typescript
-OrderRepository.findAll()
-UserRepository.create({ name, pin, role })
+OrderRepository.findAll();
+UserRepository.create({ name, pin, role });
 ```
 
 ### Offline Queue
@@ -256,13 +257,13 @@ The key difference: offline mode lets the user create their product catalogue an
 
 Product and category types live alongside their services:
 
-| Canonical location | What |
-|---|---|
-| `services/product/types.ts` | `UnifiedProduct`, `UnifiedProductVariant`, `UnifiedProductSummary`, helpers |
-| `services/product/mappers.ts` | Platform → `UnifiedProduct` mappers |
-| `services/category/types.ts` | `UnifiedCategory`, `UnifiedCategoryTree`, `UnifiedCategorySummary`, helpers |
-| `services/category/mappers.ts` | Platform → `UnifiedCategory` mappers |
-| `models/index.ts` | Backward-compatible re-exports |
+| Canonical location             | What                                                                        |
+| ------------------------------ | --------------------------------------------------------------------------- |
+| `services/product/types.ts`    | `UnifiedProduct`, `UnifiedProductVariant`, `UnifiedProductSummary`, helpers |
+| `services/product/mappers.ts`  | Platform → `UnifiedProduct` mappers                                         |
+| `services/category/types.ts`   | `UnifiedCategory`, `UnifiedCategoryTree`, `UnifiedCategorySummary`, helpers |
+| `services/category/mappers.ts` | Platform → `UnifiedCategory` mappers                                        |
+| `models/index.ts`              | Backward-compatible re-exports                                              |
 
 All platform-specific API responses are mapped to unified types before reaching the UI.
 
@@ -352,11 +353,11 @@ yarn desktop:build-linux # Linux .AppImage
 
 Defined in `repositories/UserRepository.ts`:
 
-| Role | Value | Capabilities |
-|---|---|---|
-| Admin | `admin` | Full access — settings, users, reports, refunds |
-| Manager | `manager` | Products, reports, refunds, daily operations |
-| Cashier | `cashier` | Sales, product search, basic operations |
+| Role    | Value     | Capabilities                                    |
+| ------- | --------- | ----------------------------------------------- |
+| Admin   | `admin`   | Full access — settings, users, reports, refunds |
+| Manager | `manager` | Products, reports, refunds, daily operations    |
+| Cashier | `cashier` | Sales, product search, basic operations         |
 
 Users authenticate with a 6-digit PIN stored as a hash in SQLite.
 

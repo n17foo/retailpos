@@ -1,117 +1,195 @@
 # RetailPOS
 
-**The all-in-one Point of Sale system that connects your physical store to your online shop.**
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-Whether you run a coffee shop, a boutique, a restaurant, or a warehouse — RetailPOS gives your team one screen to sell, track inventory, and manage orders across every channel. It works on iPads, Android tablets, desktop computers, and in any web browser.
+A modern, cross-platform Point of Sale (POS) system built with React Native and Expo. Supports multiple e-commerce platforms, offline operation, and hardware integration.
+
+## 🚀 Features
+
+- **Multi-Platform Support**: Shopify, WooCommerce, BigCommerce, Magento, Wix, PrestaShop, Squarespace, Sylius
+- **Offline Mode**: Full functionality without internet connection
+- **Hardware Integration**: Receipt printers, barcode scanners, payment terminals
+- **Cross-Platform**: iOS, Android, Web, Desktop (Electron)
+- **Multi-Language**: English, Spanish, French, German
+- **Real-time Sync**: Inventory and orders sync across channels
+- **Role-Based Access**: Admin, Manager, Cashier permissions
+
+## 🏗️ Architecture
+
+RetailPOS follows a clean architecture pattern with separation of concerns:
+
+- **Presentation Layer**: React Native components with Expo
+- **Business Logic**: Service layer with platform abstractions
+- **Data Layer**: SQLite repositories with TypeORM-like patterns
+- **Infrastructure**: Hardware integrations and external APIs
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical documentation.
+
+## 🛠️ Tech Stack
+
+- **Framework**: React Native with Expo
+- **Language**: TypeScript
+- **State Management**: Zustand + React Context
+- **Database**: SQLite (expo-sqlite)
+- **Styling**: Custom theme system
+- **Internationalization**: react-i18next
+- **Testing**: Jest
+- **Linting**: ESLint + Prettier
+
+## 📋 Prerequisites
+
+- Node.js 20.x or later
+- Yarn package manager
+- Expo CLI (`npm install -g @expo/cli`)
+
+## 🚀 Quick Start
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/n17foo/retail-pos.git
+   cd retail-pos
+   ```
+
+2. **Install dependencies**
+   ```bash
+   yarn install
+   ```
+
+3. **Setup environment**
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+4. **Start development server**
+   ```bash
+   yarn ios        # iOS simulator
+   yarn android    # Android emulator
+   yarn web        # Web browser
+   yarn desktop    # Electron desktop app
+   ```
+
+5. **Run the onboarding**
+   - Open the app and follow the setup wizard
+   - Choose your e-commerce platform or offline mode
+   - Create admin account and configure hardware
+
+## 🧪 Testing
+
+```bash
+# Run tests
+yarn test
+
+# Run tests in watch mode
+yarn test:watch
+
+# Run tests with coverage
+yarn test:coverage
+```
+
+## 📁 Project Structure
+
+```
+retail-pos/
+├── components/        # Reusable UI components
+├── contexts/          # React contexts for global state
+├── hooks/            # Custom React hooks
+├── repositories/     # Data access layer (SQLite)
+├── screens/          # Screen components
+├── services/         # Business logic and external APIs
+│   ├── config/       # Configuration and service bridging
+│   ├── inventory/    # Inventory management
+│   ├── order/        # Order processing
+│   ├── product/      # Product management
+│   ├── search/       # Product search
+│   └── sync/         # Data synchronization
+├── utils/            # Utility functions and helpers
+├── locales/          # Internationalization files
+└── types/            # TypeScript type definitions
+```
+
+## 🔧 Configuration
+
+### Environment Variables
+
+Create a `.env` file based on `.env.example`:
+
+```env
+# Development mode
+APP_ENV=development
+
+# Mock services for development
+USE_MOCK_SCANNER=true
+USE_MOCK_PAYMENT=true
+USE_MOCK_ECOMMERCE=true
+USE_MOCK_PRINTERS=true
+USE_MOCK_PRODUCT=true
+USE_MOCK_ORDER=true
+USE_MOCK_INVENTORY=true
+USE_MOCK_SYNC=true
+USE_MOCK_SEARCH=true
+
+# Platform-specific settings
+SHOPIFY_STORE_URL=your-shop.myshopify.com
+SHOPIFY_API_VERSION=2024-01
+WOOCOMMERCE_URL=https://yourstore.com
+# ... other platform configs
+```
+
+### Platform Configuration
+
+RetailPOS supports multiple e-commerce platforms. Each platform has its own service implementation with consistent interfaces.
+
+For platform-specific setup instructions, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+### Development Workflow
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Make your changes following our coding standards
+4. Add tests for new functionality
+5. Ensure all tests pass: `yarn test`
+6. Submit a pull request
+
+### Code Standards
+
+- **TypeScript**: Strict type checking enabled
+- **Linting**: ESLint with React Native rules
+- **Formatting**: Prettier with custom configuration
+- **Commits**: Conventional commit format
+- **Testing**: Jest with React Native testing library
+
+## 📚 Documentation
+
+- **[ARCHITECTURE.md](ARCHITECTURE.md)**: Technical architecture and design decisions
+- **[CONTRIBUTING.md](CONTRIBUTING.md)**: Contribution guidelines and development setup
+- **[CHANGELOG.md](CHANGELOG.md)**: Version history and release notes
+- **[SECURITY.md](SECURITY.md)**: Security policy and vulnerability reporting
+
+## 🔒 Security
+
+See [SECURITY.md](SECURITY.md) for our security policy and how to report vulnerabilities.
+
+## 📄 License
+
+Licensed under the Apache License 2.0. See [LICENSE](LICENSE) for details.
+
+## 🙏 Acknowledgments
+
+- Built with [Expo](https://expo.dev/) and [React Native](https://reactnative.dev/)
+- Icons from [Lucide React](https://lucide.dev/)
+- UI components inspired by modern design systems
+
+## 📞 Support
+
+- **Issues**: [GitHub Issues](https://github.com/n17foo/retail-pos/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/n17foo/retail-pos/discussions)
+- **Documentation**: [ARCHITECTURE.md](ARCHITECTURE.md)
 
 ---
 
-## What RetailPOS Does
-
-### Sell in Person
-
-Ring up customers fast. Your product catalogue loads instantly with pictures, categories, and prices. Staff tap a product, adjust quantities, apply discounts, and check out — all in a few seconds.
-
-### Accept Any Payment
-
-Swipe, tap, or dip a card. RetailPOS integrates with **Worldpay**, **Stripe**, and **Square** so you can choose the payment provider that works best for your business. Cash payments are supported too.
-
-### Stay in Sync with Your Online Store
-
-Already selling online? Connect RetailPOS to your existing e-commerce store and your products, inventory, and orders stay in sync automatically:
-
-| Platform | What Syncs |
-|---|---|
-| **Shopify** | Products, inventory, orders |
-| **WooCommerce** | Products, inventory, orders |
-| **BigCommerce** | Products, inventory, orders |
-| **Magento** | Products, inventory, orders |
-| **Wix** | Products, inventory, orders |
-| **PrestaShop** | Products, inventory, orders |
-| **Squarespace** | Products, inventory, orders |
-| **Sylius** | Products, inventory, orders |
-
-Don't have an online store? No problem — choose **Offline Mode** during setup and manage everything locally on the device.
-
-### Track Inventory in Real Time
-
-Every sale automatically updates your stock counts. Get low-stock alerts before you run out. If you sell the same products online and in-store, inventory stays accurate across both channels.
-
-### Manage Your Team
-
-Create accounts for every employee with a simple 6-digit PIN login. Assign roles that control what each person can do:
-
-| Role | Can Do |
-|---|---|
-| **Admin** | Everything — settings, reports, refunds, user management |
-| **Manager** | Products, reports, refunds, daily operations |
-| **Cashier** | Ring up sales, search products, basic operations |
-
-### Print Receipts
-
-Connect a thermal receipt printer over USB, Bluetooth, or Wi-Fi. Receipts are generated automatically at checkout with your store name, items, totals, and payment details.
-
-### Scan Barcodes
-
-Use your device's camera or a Bluetooth barcode scanner to quickly find products and add them to the cart.
-
-### Process Refunds
-
-Handle returns directly from the POS. Refunds are processed back through the original payment method and, if connected, synced to your online store.
-
-### Works Everywhere
-
-| Device | How |
-|---|---|
-| **iPad / iPhone** | Native app via Expo Go or standalone build |
-| **Android tablet / phone** | Native app via Expo Go or standalone build |
-| **Desktop (Mac, Windows, Linux)** | Electron app with full hardware support |
-| **Web browser** | Any modern browser — nothing to install |
-
-### Works Offline
-
-Orders, products, and user data are stored locally on the device. If your internet drops, you can keep selling. Data syncs automatically when the connection comes back.
-
-### Multiple Languages
-
-The interface is available in English, Spanish, French, and German. The language is detected automatically from the device, or can be changed in settings.
-
----
-
-## Getting Started
-
-### 1. Install the App
-
-Your IT team or developer will set up the app on your devices. They can follow the detailed instructions in [ARCHITECTURE.md](ARCHITECTURE.md).
-
-### 2. Run the Setup Wizard
-
-When you open RetailPOS for the first time, a step-by-step wizard guides you through:
-
-1. **Choose your platform** — Pick your online store (Shopify, WooCommerce, etc.) or Offline Mode
-2. **Connect your store** — Enter your API credentials (online) or set up categories and products (offline)
-3. **Create an admin account** — Set your name and a 6-digit PIN
-4. **Add staff** — Create accounts for cashiers and managers (offline mode)
-5. **Set up payment** — Choose and configure your payment provider
-6. **Connect hardware** — Set up your receipt printer and barcode scanner
-7. **Review and confirm** — Check everything looks right, then start selling
-
-### 3. Start Selling
-
-That's it. Your team can log in with their PINs and start taking orders immediately.
-
----
-
-## Support
-
-For help setting up RetailPOS or troubleshooting issues, please contact your system administrator or create an issue on the project repository.
-
----
-
-## For Developers
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the full technical documentation, including project structure, design patterns, environment setup, and contribution guidelines.
-
-## License
-
-Apache License 2.0 — see [LICENSE](LICENSE) for details.
+**RetailPOS** - Bridging the gap between physical and digital retail experiences.
