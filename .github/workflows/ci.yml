@@ -43,6 +43,7 @@ jobs:
       run: yarn test --coverage --watchAll=false
 
     - name: Build Electron app
+      shell: bash
       run: |
         if [[ "${{ matrix.os }}" == "ubuntu-latest" ]]; then
           yarn desktop:build-linux
