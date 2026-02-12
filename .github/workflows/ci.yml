@@ -25,8 +25,9 @@ jobs:
     - name: Setup Expo
       uses: expo/expo-github-action@v8
 
-    - name: Clean yarn cache
-      run: yarn cache clean
+    - name: Delete yarn cache
+      shell: bash
+      run: rm -rf "$(yarn cache dir)"
 
     - name: Install dependencies
       run: yarn install --frozen-lockfile --network-timeout 100000
