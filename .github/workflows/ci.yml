@@ -25,12 +25,10 @@ jobs:
     - name: Setup Expo
       uses: expo/expo-github-action@v8
 
-    - name: Delete yarn cache
-      shell: bash
-      run: rm -rf "$(yarn cache dir)"
-
     - name: Install dependencies
       run: yarn install --frozen-lockfile --network-timeout 100000
+      env:
+        YARN_CACHE_FOLDER: ${{ runner.temp }}/yarn-cache
 
     - name: Run Expo Doctor
       run: npx expo-doctor
