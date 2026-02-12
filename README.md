@@ -41,7 +41,7 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed technical documentation.
 
 ## 📋 Prerequisites
 
-- Node.js 20.x or later
+- Node.js 22.x or later
 - Yarn package manager
 - Expo CLI (`npm install -g @expo/cli`)
 
