@@ -1,6 +1,7 @@
 # RetailPOS - Point of Sale System for E-commerce Platforms
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![CI](https://github.com/n17foo/retailpos/workflows/CI/badge.svg)](https://github.com/n17foo/retailpos/actions)
 
 A modern, cross-platform Point of Sale (POS) system built with React Native and Expo. Supports multiple e-commerce platforms, offline operation, and hardware integration.
 
@@ -143,6 +144,10 @@ WOOCOMMERCE_URL=https://yourstore.com
 RetailPOS supports multiple e-commerce platforms. Each platform has its own service implementation with consistent interfaces.
 
 For platform-specific setup instructions, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
+## 🚀 Builds
+
+Electron desktop installers are built automatically for Windows, macOS, and Linux on every push to the main branch. Download the latest builds from the [GitHub Actions](https://github.com/n17foo/retailpos/actions) page.
 
 ## 🤝 Contributing
 
