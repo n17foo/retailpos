@@ -24,7 +24,7 @@ jobs:
         cache: 'yarn'
 
     - name: Setup Expo
-      uses: expo/setup-expo@v1
+      uses: expo/expo-github-action@v8
 
     - name: Install dependencies
       run: yarn install --frozen-lockfile
