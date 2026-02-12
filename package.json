@@ -120,5 +120,18 @@
         ]
       }
     ]
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "@stripe/stripe-terminal-react-native",
+          "@tillpos/rn-receipt-printer-utils",
+          "@worldpay/access-worldpay-checkout-react-native-sdk",
+          "react-native-square-in-app-payments",
+          "react-native-esc-pos-printer"
+        ]
+      }
+    }
   }
 }

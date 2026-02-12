@@ -31,10 +31,4 @@ config.transformer = {
   },
 };
 
-// Optimise resolver: limit extensions tried per import
-config.resolver = {
-  ...config.resolver,
-  sourceExts: ['ts', 'tsx', 'js', 'jsx', 'json', 'cjs', 'mjs'],
-};
-
 module.exports = config;
