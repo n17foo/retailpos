@@ -639,6 +639,7 @@ describe('Button', () => {
 6. **Memoize expensive operations** - Use `useMemo` and `useCallback`
 7. **Clean up effects** - Return cleanup functions from `useEffect`
 8. **Use theme constants** - Never hardcode colors, spacing, or typography
+9. **Avoid index files** - Do not create index.ts or index.tsx files solely for re-exporting multiple files in a folder. Import files directly to save time and avoid unnecessary indirection.
 
 ---
 
