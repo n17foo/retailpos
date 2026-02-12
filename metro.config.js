@@ -31,4 +31,10 @@ config.transformer = {
   },
 };
 
+// Add .wasm to asset extensions for expo-sqlite web support
+config.resolver = {
+  ...config.resolver,
+  assetExts: [...config.resolver.assetExts, 'wasm'],
+};
+
 module.exports = config;

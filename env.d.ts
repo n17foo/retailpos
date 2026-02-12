@@ -9,9 +9,6 @@ declare module '@env' {
   export const WORLDPAY_SITE_REFERENCE: string;
   export const WORLDPAY_INSTALLATION_ID: string;
 
-  // E-commerce related environment variables
-  export const USE_MOCK_ECOMMERCE: string;
-
   // Scanner related environment variables
   export const USE_MOCK_SCANNER: string;
 

@@ -124,13 +124,7 @@ APP_ENV=development
 # Mock services for development
 USE_MOCK_SCANNER=true
 USE_MOCK_PAYMENT=true
-USE_MOCK_ECOMMERCE=true
 USE_MOCK_PRINTERS=true
-USE_MOCK_PRODUCT=true
-USE_MOCK_ORDER=true
-USE_MOCK_INVENTORY=true
-USE_MOCK_SYNC=true
-USE_MOCK_SEARCH=true
 
 # Platform-specific settings
 SHOPIFY_STORE_URL=your-shop.myshopify.com
