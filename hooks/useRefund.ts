@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { RefundServiceFactory } from '../services/refund/refundServiceFactory';
 import { PlatformServiceRegistry } from '../services/platform';
 import { RefundData, RefundResult, RefundRecord } from '../services/refund/refundServiceInterface';
-import { LoggerFactory } from '../services/logger';
+import { useLogger } from '../hooks/useLogger';
 import { ECommercePlatform } from '../utils/platforms';
 
 /**
@@ -13,7 +13,7 @@ export function useRefund(platform?: ECommercePlatform) {
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const logger = LoggerFactory.getInstance().createLogger('useRefund');
+  const logger = useLogger('useRefund');
 
   // Initialize the refund service
   useEffect(() => {

@@ -1,7 +1,7 @@
 import { getPlatformToken, hasValidPlatformToken } from './tokenUtils';
 import { TokenType } from './tokenServiceInterface';
 import { ECommercePlatform } from '../../utils/platforms';
-import { LoggerFactory } from '../logger';
+import { LoggerFactory } from '../logger/loggerFactory';
 import { TokenInitializer } from './tokenInitializer';
 
 const logger = LoggerFactory.getInstance().createLogger('TokenIntegration');

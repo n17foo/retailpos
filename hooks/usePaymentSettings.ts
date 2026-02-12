@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
 import { PaymentProvider } from '../services/payment/paymentServiceFactory';
 import { usePayment } from './usePayment';
-import { LoggerFactory } from '../services/logger';
+import { useLogger } from '../hooks/useLogger';
 
 // Interface for payment settings
 export interface PaymentSettings {
@@ -66,7 +66,7 @@ const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
 
 export const usePaymentSettings = () => {
   const { setPaymentProvider } = usePayment();
-  const logger = LoggerFactory.getInstance().createLogger('usePaymentSettings');
+  const logger = useLogger('usePaymentSettings');
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Alert, ActivityIndicator } from 'react-native';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../utils/theme';
-import { useCurrency } from '../hooks/useCurrency';
+import { formatMoney } from '../utils/money';
 import { useRefund } from '../hooks/useRefund';
 import { RefundRecord } from '../services/refund/refundServiceInterface';
 import { Button } from '../components/Button';
 import Input from '../components/Input';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface RefundScreenProps {
   onGoBack?: () => void;
 }
 
 const RefundScreen: React.FC<RefundScreenProps> = ({ onGoBack }) => {
-  const cs = useCurrency();
+  const currency = useCurrency();
   const { isInitialized, isLoading, error, processPaymentRefund, processEcommerceRefund, getRefundHistory } = useRefund();
   const [refundType, setRefundType] = useState<'payment' | 'ecommerce'>('payment');
   const [orderId, setOrderId] = useState('');
@@ -91,10 +92,7 @@ const RefundScreen: React.FC<RefundScreenProps> = ({ onGoBack }) => {
   const renderRefundHistoryItem = ({ item }: { item: RefundRecord }) => (
     <View style={styles.historyItem}>
       <Text style={styles.historyId}>ID: {item.id}</Text>
-      <Text style={styles.historyAmount}>
-        Amount: {cs}
-        {item.amount.toFixed(2)}
-      </Text>
+      <Text style={styles.historyAmount}>Amount: {formatMoney(item.amount, currency.code)}</Text>
       <Text style={styles.historyDate}>Date: {item.timestamp.toLocaleString()}</Text>
       <Text style={styles.historySource}>Source: {item.source}</Text>
       <Text style={styles.historyStatus}>Status: {item.status}</Text>

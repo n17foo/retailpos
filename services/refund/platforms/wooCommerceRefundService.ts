@@ -1,6 +1,6 @@
 import { PlatformRefundServiceInterface } from './platformRefundServiceInterface';
 import { RefundData, RefundResult, RefundRecord } from '../refundServiceInterface';
-import { LoggerFactory } from '../../logger';
+import { LoggerFactory } from '../../logger/loggerFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { SecretsServiceFactory } from '../../secrets/secretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';

@@ -1,7 +1,7 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
-import { LoggerFactory } from '../services/logger';
+import { useLogger } from '../hooks/useLogger';
 import { ECommercePlatform, DEFAULT_PLATFORM } from '../utils/platforms';
 import { ServiceConfigBridge } from '../services/config/ServiceConfigBridge';
 
@@ -142,7 +142,7 @@ export const useEcommerceSettings = () => {
   // Platform change management - decoupled from useEcommerceConfig
 
   // Initialize logger
-  const logger = LoggerFactory.getInstance().createLogger('useEcommerceSettings');
+  const logger = useLogger('useEcommerceSettings');
 
   // Load settings from storage
   const loadSettings = useCallback(async () => {

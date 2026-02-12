@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
 import { ScannerServiceFactory, ScannerType as ScannerTypeEnum } from '../services/scanner/scannerServiceFactory';
 import { ScannerServiceInterface } from '../services/scanner/ScannerServiceInterface';
-import { LoggerFactory } from '../services/logger';
+import { useLogger } from '../hooks/useLogger';
 
 export type ScannerType = 'camera' | 'bluetooth' | 'usb';
 
@@ -24,7 +24,7 @@ export const useScanner = () => {
   const scannerFactory = ScannerServiceFactory.getInstance();
   const scannerServiceRef = useRef<ScannerServiceInterface | null>(null);
   const scanListenerRef = useRef<string | null>(null);
-  const logger = LoggerFactory.getInstance().createLogger('useScanner');
+  const logger = useLogger('useScanner');
 
   // Load scanner settings from storage
   useEffect(() => {

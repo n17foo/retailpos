@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, Modal, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../utils/theme';
-import { useCurrency } from '../hooks/useCurrency';
+import { formatMoney } from '../utils/money';
 import { Button } from './Button';
+import { useCurrency } from '../hooks/useCurrency';
 
 export type PaymentMethod = 'cash' | 'card' | 'terminal';
 
@@ -27,7 +28,7 @@ const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: string; descrip
 ];
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
-  const cs = useCurrency();
+  const currency = useCurrency();
   const {
     visible,
     orderId,
@@ -69,24 +70,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Subtotal</Text>
-                <Text style={styles.summaryValue}>
-                  {cs}
-                  {orderSubtotal.toFixed(2)}
-                </Text>
+                <Text style={styles.summaryValue}>{formatMoney(orderSubtotal, currency.code)}</Text>
               </View>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Tax</Text>
-                <Text style={styles.summaryValue}>
-                  {cs}
-                  {orderTax.toFixed(2)}
-                </Text>
+                <Text style={styles.summaryValue}>{formatMoney(orderTax, currency.code)}</Text>
               </View>
               <View style={[styles.summaryRow, styles.totalRow]}>
                 <Text style={styles.totalLabel}>Total</Text>
-                <Text style={styles.totalValue}>
-                  {cs}
-                  {orderTotal.toFixed(2)}
-                </Text>
+                <Text style={styles.totalValue}>{formatMoney(orderTotal, currency.code)}</Text>
               </View>
             </View>
 
@@ -123,7 +115,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
               <Button title="Print Receipt" variant="outline" onPress={onPrintReceipt} disabled={isProcessing} style={styles.printButton} />
             )}
             <Button
-              title={isProcessing ? 'Processing...' : `Pay ${cs}${orderTotal.toFixed(2)}`}
+              title={isProcessing ? 'Processing...' : `Pay ${formatMoney(orderTotal, currency.code)}`}
               variant="success"
               size="lg"
               fullWidth

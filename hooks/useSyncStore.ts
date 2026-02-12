@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
+import { LoggerFactory } from '../services/logger/loggerFactory';
 
 export interface QueuedRequest {
   id: string;
@@ -69,6 +70,7 @@ export const useSyncStore = create<SyncStoreState>()(
       // Process the queue
       processQueue: async () => {
         const { queue } = get();
+        const logger = LoggerFactory.getInstance().createLogger('SyncStore');
 
         if (queue.length === 0) {
           set({ isProcessing: false });
@@ -98,7 +100,7 @@ export const useSyncStore = create<SyncStoreState>()(
               }));
             } else if (response.status >= 500) {
               // SERVER ERROR: Stop processing, wait for next scheduled attempt
-              console.warn(`Server error ${response.status} for request ${action.id}. Retrying later...`);
+              logger.warn(`Server error ${response.status} for request ${action.id}. Retrying later...`);
 
               // Update attempt count and next retry time (exponential backoff)
               const attempts = action.attempts + 1;
@@ -114,14 +116,14 @@ export const useSyncStore = create<SyncStoreState>()(
               break; // Stop processing queue
             } else if (response.status >= 400) {
               // CLIENT ERROR: Remove from queue (don't retry)
-              console.warn(`Client error ${response.status} for request ${action.id}. Removing from queue.`);
+              logger.warn(`Client error ${response.status} for request ${action.id}. Removing from queue.`);
               set(state => ({
                 queue: state.queue.filter(item => item.id !== action.id),
               }));
             }
           } catch (error) {
             // NETWORK ERROR: Stop processing, wait for NetInfo trigger
-            console.warn(`Network error for request ${action.id}:`, error);
+            logger.warn(`Network error for request ${action.id}`, error);
             break;
           }
         }

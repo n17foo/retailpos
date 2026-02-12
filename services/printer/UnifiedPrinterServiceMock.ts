@@ -1,6 +1,6 @@
 import { AbstractPrinterService } from './BasePrinterService';
 import { PrinterStatus, ReceiptData } from './PrinterTypes';
-import { LoggerFactory } from '../logger';
+import { LoggerFactory } from '../logger/loggerFactory';
 
 type PrinterConnectionType = 'network' | 'usb' | 'bluetooth';
 

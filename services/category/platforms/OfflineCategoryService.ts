@@ -1,5 +1,5 @@
 import { Category, CategoryServiceInterface } from '../CategoryServiceInterface';
-import { LoggerFactory } from '../../logger';
+import { LoggerFactory } from '../../logger/loggerFactory';
 import { KeyValueRepository } from '../../../repositories/KeyValueRepository';
 
 const CATEGORIES_STORAGE_KEY = 'offline_local_categories';

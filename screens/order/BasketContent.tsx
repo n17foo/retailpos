@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { lightColors, spacing, typography, borderRadius } from '../../utils/theme';
 import { useBasketContext, CartItem } from '../../contexts/BasketProvider';
-import { useCurrency } from '../../hooks/useCurrency';
+import { formatMoney } from '../../utils/money';
 import { CheckoutModal, PaymentMethod } from '../../components/CheckoutModal';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ECommercePlatform } from '../../utils/platforms';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface BasketContentProps {
   platform?: ECommercePlatform;
@@ -18,7 +19,7 @@ interface BasketContentProps {
  * Replaces Alert-based checkout with a proper CheckoutModal.
  */
 export const BasketContent: React.FC<BasketContentProps> = ({ platform, onCheckout, onPrintReceipt }) => {
-  const cs = useCurrency();
+  const currency = useCurrency();
   const {
     isLoading,
     cartItems,
@@ -108,10 +109,7 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
         <Text style={styles.itemName} numberOfLines={2}>
           {item.name}
         </Text>
-        <Text style={styles.itemPrice}>
-          {cs}
-          {item.price.toFixed(2)}
-        </Text>
+        <Text style={styles.itemPrice}>{formatMoney(item.price, currency.code)}</Text>
         {item.sku && <Text style={styles.itemSku}>SKU: {item.sku}</Text>}
       </View>
       <View style={styles.quantityContainer}>
@@ -123,10 +121,7 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
           <Text style={styles.quantityButtonText}>+</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.itemTotal}>
-        {cs}
-        {(item.price * item.quantity).toFixed(2)}
-      </Text>
+      <Text style={styles.itemTotal}>{formatMoney(item.price * item.quantity, currency.code)}</Text>
     </View>
   );
 
@@ -164,24 +159,15 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
 
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Subtotal</Text>
-          <Text style={styles.summaryValue}>
-            {cs}
-            {subtotal.toFixed(2)}
-          </Text>
+          <Text style={styles.summaryValue}>{formatMoney(subtotal, currency.code)}</Text>
         </View>
         <View style={styles.summaryRow}>
           <Text style={styles.summaryLabel}>Tax</Text>
-          <Text style={styles.summaryValue}>
-            {cs}
-            {tax.toFixed(2)}
-          </Text>
+          <Text style={styles.summaryValue}>{formatMoney(tax, currency.code)}</Text>
         </View>
         <View style={[styles.summaryRow, styles.totalRow]}>
           <Text style={styles.totalLabel}>Total</Text>
-          <Text style={styles.totalValue}>
-            {cs}
-            {total.toFixed(2)}
-          </Text>
+          <Text style={styles.totalValue}>{formatMoney(total, currency.code)}</Text>
         </View>
 
         <TouchableOpacity
@@ -194,10 +180,7 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
           {isProcessing ? (
             <ActivityIndicator size="small" color={lightColors.textOnPrimary} />
           ) : (
-            <Text style={styles.checkoutButtonText}>
-              COMPLETE ORDER — {cs}
-              {total.toFixed(2)}
-            </Text>
+            <Text style={styles.checkoutButtonText}>COMPLETE ORDER — {formatMoney(total, currency.code)}</Text>
           )}
         </TouchableOpacity>
       </View>

@@ -2,8 +2,9 @@ import React from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius } from '../../utils/theme';
-import { useCurrency } from '../../hooks/useCurrency';
+import { formatMoney } from '../../utils/money';
 import { DailyReportData } from '../../hooks/useDailyReport';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface ReportModalProps {
   visible: boolean;
@@ -12,8 +13,8 @@ interface ReportModalProps {
   onClose: () => void;
 }
 
-const ReportModal: React.FC<ReportModalProps> = ({ visible, report, onPrint, onClose }) => {
-  const cs = useCurrency();
+export const ReportModal: React.FC<ReportModalProps> = ({ visible, report, onClose, onPrint }) => {
+  const currency = useCurrency();
   return (
     <Modal visible={visible} animationType="slide" transparent>
       <View style={styles.modalOverlay}>
@@ -32,24 +33,15 @@ const ReportModal: React.FC<ReportModalProps> = ({ visible, report, onPrint, onC
               </View>
               <View style={styles.reportRow}>
                 <Text style={styles.reportLabel}>Gross Sales:</Text>
-                <Text style={styles.reportValue}>
-                  {cs}
-                  {report.summary.totalSales.toFixed(2)}
-                </Text>
+                <Text style={styles.reportValue}>{formatMoney(report.summary.totalSales, currency.code)}</Text>
               </View>
               <View style={styles.reportRow}>
                 <Text style={styles.reportLabel}>Tax Collected:</Text>
-                <Text style={styles.reportValue}>
-                  {cs}
-                  {report.summary.totalTax.toFixed(2)}
-                </Text>
+                <Text style={styles.reportValue}>{formatMoney(report.summary.totalTax, currency.code)}</Text>
               </View>
               <View style={styles.reportRow}>
                 <Text style={styles.reportLabel}>Net Sales:</Text>
-                <Text style={[styles.reportValue, styles.reportTotal]}>
-                  {cs}
-                  {report.summary.netSales.toFixed(2)}
-                </Text>
+                <Text style={[styles.reportValue, styles.reportTotal]}>{formatMoney(report.summary.netSales, currency.code)}</Text>
               </View>
             </View>
           )}

@@ -1,6 +1,6 @@
 import { TokenService } from './tokenService';
 import { TokenServiceInterface, TokenType } from './tokenServiceInterface';
-import { LoggerFactory } from '../logger';
+import { LoggerFactory } from '../logger/loggerFactory';
 import { ECommercePlatform } from '../../utils/platforms';
 
 /**

@@ -1,5 +1,5 @@
 import { ECommercePlatform } from '../../utils/platforms';
-import { LoggerFactory } from '../logger';
+import { LoggerFactory } from '../logger/loggerFactory';
 import { keyValueRepository } from '../../repositories/KeyValueRepository';
 import { SHOPIFY_API_VERSION } from './apiVersions';
 

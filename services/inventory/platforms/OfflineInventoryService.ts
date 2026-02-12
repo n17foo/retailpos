@@ -1,5 +1,5 @@
 import { InventoryServiceInterface, InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../InventoryServiceInterface';
-import { LoggerFactory } from '../../logger';
+import { LoggerFactory } from '../../logger/loggerFactory';
 import { keyValueRepository } from '../../../repositories/KeyValueRepository';
 
 const INVENTORY_STORAGE_KEY = 'offline_local_inventory';

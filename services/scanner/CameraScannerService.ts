@@ -1,7 +1,7 @@
 import { ScannerServiceInterface } from './ScannerServiceInterface';
 import { Camera } from 'expo-camera';
 import EventEmitter from 'eventemitter3';
-import { LoggerFactory } from '../logger';
+import { LoggerFactory } from '../logger/loggerFactory';
 
 /**
  * CameraScannerService - Implements the scanner interface for the device camera

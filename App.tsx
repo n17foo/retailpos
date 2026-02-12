@@ -11,16 +11,17 @@ import { AuthProvider } from './contexts/AuthProvider';
 import { OnboardingProvider } from './contexts/OnboardingProvider';
 import { DataProvider } from './contexts/DataProvider';
 import { SettingsProvider } from './contexts/SettingsProvider';
-import { RootNavigator } from './navigation';
-import { logger } from './services/logger';
+import { useLogger } from './hooks/useLogger';
 import { useTranslate } from './hooks/useTranslate';
 import { lightColors } from './utils/theme';
 import { queueManager } from './services/queue/QueueManager';
 import { backgroundSyncService } from './services/sync/BackgroundSyncService';
+import RootNavigator from './navigation/RootNavigator';
 //import { StripeTerminalBridgeProvider } from './contexts/StripeTerminalBridge';
 
 const AppContent = () => {
   const { changeLanguage } = useTranslate();
+  const logger = useLogger('AppContent');
 
   // Handle language changes when app starts or locale changes
   useEffect(() => {

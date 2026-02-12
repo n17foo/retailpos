@@ -1,7 +1,7 @@
 import NetInfo, { NetInfoSubscription } from '@react-native-community/netinfo';
 import { AppState, AppStateStatus, NativeEventSubscription } from 'react-native';
 import { useSyncStore } from '../../hooks/useSyncStore';
-import { LoggerFactory } from '../logger';
+import { LoggerFactory } from '../logger/loggerFactory';
 
 class QueueManager {
   private initialized = false;

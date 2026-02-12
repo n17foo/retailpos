@@ -1,18 +1,26 @@
 import { useMemo } from 'react';
 import { useEcommerceSettings } from './useEcommerceSettings';
-import { getCurrencySymbol } from '../utils/currency';
+import { getCurrencySymbol, getCurrencyInfo } from '../utils/currency';
 
 /**
- * Hook that returns the currency symbol for the currently configured currency.
- * Falls back to '£' (GBP) if no currency is configured.
+ * Hook that returns currency information for the currently configured currency.
+ * Returns an object with symbol, code, and full currency info.
+ * Falls back to GBP if no currency is configured.
  */
-export const useCurrency = (): string => {
+export const useCurrency = () => {
   const { ecommerceSettings } = useEcommerceSettings();
 
-  const symbol = useMemo(() => {
+  const currencyData = useMemo(() => {
     const code = ecommerceSettings?.offline?.currency || 'GBP';
-    return getCurrencySymbol(code);
+    const info = getCurrencyInfo(code);
+    const symbol = info?.symbol || '£';
+
+    return {
+      code,
+      symbol,
+      info,
+    };
   }, [ecommerceSettings?.offline?.currency]);
 
-  return symbol;
+  return currencyData;
 };

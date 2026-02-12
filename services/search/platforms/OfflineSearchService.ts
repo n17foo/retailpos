@@ -1,5 +1,5 @@
 import { SearchServiceInterface, SearchOptions, SearchResult, SearchProduct } from '../searchServiceInterface';
-import { LoggerFactory } from '../../logger';
+import { LoggerFactory } from '../../logger/loggerFactory';
 import { keyValueRepository } from '../../../repositories/KeyValueRepository';
 import { ProductServiceFactory } from '../../product/productServiceFactory';
 import { ECommercePlatform } from '../../../utils/platforms';

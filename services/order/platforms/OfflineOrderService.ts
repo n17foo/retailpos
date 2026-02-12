@@ -1,6 +1,6 @@
 import { Order } from '../OrderServiceInterface';
 import { PlatformOrderServiceInterface, PlatformConfigRequirements, PlatformOrderConfig } from './PlatformOrderServiceInterface';
-import { LoggerFactory } from '../../logger';
+import { LoggerFactory } from '../../logger/loggerFactory';
 import { keyValueRepository } from '../../../repositories/KeyValueRepository';
 
 const ORDERS_STORAGE_KEY = 'offline_local_orders';

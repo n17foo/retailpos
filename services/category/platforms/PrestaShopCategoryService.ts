@@ -1,5 +1,5 @@
 import { Category, CategoryServiceInterface } from '../CategoryServiceInterface';
-import { LoggerFactory } from '../../logger';
+import { LoggerFactory } from '../../logger/loggerFactory';
 
 /**
  * PrestaShop-specific category service implementation

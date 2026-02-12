@@ -14,7 +14,7 @@
  */
 
 import { ECommercePlatform } from '../../utils/platforms';
-import { LoggerFactory } from '../logger';
+import { LoggerFactory } from '../logger/loggerFactory';
 
 // Domain service interfaces
 import { ProductServiceInterface } from '../product/ProductServiceInterface';

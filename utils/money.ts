@@ -1,12 +1,4 @@
-/**
- * Money utility functions for safe currency calculations.
- *
- * All monetary math is done in integer cents to avoid IEEE 754
- * floating-point rounding errors (e.g. 0.1 + 0.2 !== 0.3).
- *
- * Public API works with dollar amounts (number) so callers don't
- * need to think about cents — conversion happens internally.
- */
+import { getCurrencyInfo } from './currency';
 
 /** Convert dollars to integer cents, rounding to the nearest cent. */
 export function toCents(dollars: number): number {
@@ -54,11 +46,20 @@ export function calculateTax(amount: number, rate: number): number {
 }
 
 /**
- * Format a dollar amount for display (e.g. "$19.99").
+ * Format a dollar amount for display (e.g. "$19.99" or "19.99₽").
  * Always shows exactly 2 decimal places.
+ * Symbol placement depends on the currency (before or after).
  */
-export function formatMoney(amount: number, currencySymbol: string = '£'): string {
-  return `${currencySymbol}${roundMoney(amount).toFixed(2)}`;
+export function formatMoney(amount: number, currencyCode: string = 'GBP'): string {
+  const currencyInfo = getCurrencyInfo(currencyCode);
+  const symbol = currencyInfo?.symbol || currencyCode;
+  const placement = currencyInfo?.symbolPlacement || 'before';
+  const formattedAmount = roundMoney(amount).toFixed(2);
+
+  if (placement === 'after') {
+    return `${formattedAmount}${symbol}`;
+  }
+  return `${symbol}${formattedAmount}`;
 }
 
 /**

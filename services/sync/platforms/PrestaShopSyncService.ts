@@ -1,5 +1,5 @@
 import { SyncServiceInterface, SyncOptions, SyncStatus, SyncOperationResult, SyncEntityType, SyncDirection } from '../SyncServiceInterface';
-import { LoggerFactory } from '../../logger';
+import { LoggerFactory } from '../../logger/loggerFactory';
 
 /**
  * PrestaShop-specific sync service for offline-first POS operation

@@ -1,5 +1,5 @@
 import { TokenServiceInterface, TokenType, TokenInfo, TokenProviderFunction } from './tokenServiceInterface';
-import { LoggerFactory } from '../logger';
+import { LoggerFactory } from '../logger/loggerFactory';
 import { keyValueRepository } from '../../repositories/KeyValueRepository';
 
 /**

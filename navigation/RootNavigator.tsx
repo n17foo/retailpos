@@ -7,7 +7,7 @@ import { AuthNavigator } from './AuthNavigator';
 import { MainTabNavigator } from './MainTabNavigator';
 import type { RootStackParamList } from './types';
 import { User } from '../repositories/UserRepository';
-import { logger } from '../services/logger';
+import { useLogger } from '../hooks/useLogger';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -18,6 +18,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export const RootNavigator: React.FC = () => {
   const { isAuthenticated, setIsAuthenticated, user, setUser } = useAuthContext();
   const { isOnboarded } = useOnboardingContext();
+  const logger = useLogger('RootNavigator');
 
   // Handle login with PIN
   const handleLogin = (pin: string, loggedInUser?: User) => {

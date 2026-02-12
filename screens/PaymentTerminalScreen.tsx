@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../utils/theme';
-import { useCurrency } from '../hooks/useCurrency';
+import { formatMoney } from '../utils/money';
 import { usePayment } from '../hooks/usePayment';
 import { PaymentResponse } from '../services/payment/paymentServiceInterface';
 import { PaymentProvider } from '../services/payment/paymentServiceFactory';
 import StripeNfcPaymentTerminal from '../components/StripeNfcPaymentTerminal';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface PaymentTerminalScreenProps {
   route?: {
@@ -34,8 +35,8 @@ const AVAILABLE_TERMINALS = [
   { id: 'TERM-003', name: 'Mobile POS' },
 ];
 
-const PaymentTerminalScreen: React.FC<PaymentTerminalScreenProps> = ({ route, navigation }) => {
-  const cs = useCurrency();
+const PaymentTerminalScreen: React.FC<PaymentTerminalScreenProps> = ({ navigation, route }) => {
+  const currency = useCurrency();
   // Handle optional route params with defaults for demo mode
   const routeParams = route?.params || {};
   const amount = routeParams.amount || 25.99; // Demo amount
@@ -143,10 +144,7 @@ const PaymentTerminalScreen: React.FC<PaymentTerminalScreenProps> = ({ route, na
 
       <View style={styles.amountContainer}>
         <Text style={styles.amountLabel}>Total Amount:</Text>
-        <Text style={styles.amount}>
-          {cs}
-          {amount.toFixed(2)}
-        </Text>
+        <Text style={styles.amount}>{formatMoney(amount, currency.code)}</Text>
       </View>
 
       {!connected ? (

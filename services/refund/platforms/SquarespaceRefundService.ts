@@ -1,6 +1,6 @@
 import { PlatformRefundServiceInterface } from './platformRefundServiceInterface';
 import { RefundData, RefundResult, RefundRecord } from '../refundServiceInterface';
-import { LoggerFactory } from '../../logger';
+import { LoggerFactory } from '../../logger/loggerFactory';
 
 /**
  * Squarespace-specific implementation of the refund service

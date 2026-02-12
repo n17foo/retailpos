@@ -18,7 +18,7 @@ interface UseDailyReportReturn {
 }
 
 export const useDailyReport = (): UseDailyReportReturn => {
-  const currencySymbol = useCurrency();
+  const { symbol: currencySymbol } = useCurrency();
   const [currentShift, setCurrentShift] = useState<ShiftData | null>(null);
   const [shiftHistory, setShiftHistory] = useState<ShiftData[]>([]);
   const [isLoading, setIsLoading] = useState(true);

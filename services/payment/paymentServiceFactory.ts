@@ -4,7 +4,7 @@ import { StripeMockService } from './mock/stripeMockService';
 import { StripeNfcMockService } from './mock/stripeNfcMockService';
 import { WorldpayMockService } from './mock/worldpayMockService';
 import { PaymentServiceInterface } from './paymentServiceInterface';
-import { LoggerFactory } from '../logger';
+import { LoggerFactory } from '../logger/loggerFactory';
 import { USE_MOCK_PAYMENT } from '@env';
 /**
  * Available payment processors

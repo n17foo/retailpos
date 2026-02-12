@@ -1,6 +1,6 @@
 import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../ProductServiceInterface';
 import { PlatformProductServiceInterface, PlatformConfigRequirements, PlatformProductConfig } from './PlatformProductServiceInterface';
-import { LoggerFactory } from '../../logger';
+import { LoggerFactory } from '../../logger/loggerFactory';
 import { keyValueRepository } from '../../../repositories/KeyValueRepository';
 
 const PRODUCTS_STORAGE_KEY = 'offline_local_products';

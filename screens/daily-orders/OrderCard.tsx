@@ -2,8 +2,9 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../utils/theme';
-import { useCurrency } from '../../hooks/useCurrency';
+import { formatMoney } from '../../utils/money';
 import { LocalOrder } from '../../services/basket/BasketServiceInterface';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface OrderCardProps {
   order: LocalOrder;
@@ -24,8 +25,8 @@ const getOrderStatusText = (order: LocalOrder) => {
   return 'Pending';
 };
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, isSyncing, onResync, onPrintReceipt }) => {
-  const cs = useCurrency();
+export const OrderCard: React.FC<OrderCardProps> = ({ order, isSyncing, onResync, onPrintReceipt }) => {
+  const currency = useCurrency();
   const statusColor = getOrderStatusColor(order);
 
   return (
@@ -42,8 +43,7 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, isSyncing, onResync, onPri
 
       <View style={styles.orderDetails}>
         <Text style={styles.customerInfo}>
-          {order.customerName || 'Guest'} • {cs}
-          {order.total.toFixed(2)}
+          {order.customerName || 'Guest'} • {formatMoney(order.total, currency.code)}
         </Text>
         <Text style={styles.itemCount}>
           {order.items.length} item{order.items.length !== 1 ? 's' : ''}

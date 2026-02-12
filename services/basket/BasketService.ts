@@ -1,6 +1,6 @@
 import { OrderServiceFactory } from '../order/orderServiceFactory';
 import { Order, OrderLineItem } from '../order/OrderServiceInterface';
-import { LoggerFactory } from '../logger';
+import { LoggerFactory } from '../logger/loggerFactory';
 import { ECommercePlatform } from '../../utils/platforms';
 import {
   BasketServiceInterface,

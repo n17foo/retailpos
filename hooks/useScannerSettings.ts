@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
-import { LoggerFactory } from '../services/logger';
+import { useLogger } from '../hooks/useLogger';
 
 export interface ScannerSettings {
   enabled: boolean;
@@ -21,7 +21,7 @@ export const useScannerSettings = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'unsaved' | 'saving' | 'error'>('saved');
-  const logger = LoggerFactory.getInstance().createLogger('useScannerSettings');
+  const logger = useLogger('useScannerSettings');
 
   // Load scanner settings from storage
   const loadSettings = useCallback(async () => {

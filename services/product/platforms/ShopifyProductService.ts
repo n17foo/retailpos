@@ -6,7 +6,7 @@ import { getPlatformToken } from '../../token/tokenUtils';
 import { TokenType } from '../../token/tokenServiceInterface';
 import { TokenInitializer } from '../../token/tokenInitializer';
 import { withTokenRefresh } from '../../token/tokenIntegration';
-import { LoggerFactory } from '../../logger';
+import { LoggerFactory } from '../../logger/loggerFactory';
 import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 
 /**

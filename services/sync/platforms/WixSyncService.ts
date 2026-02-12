@@ -2,20 +2,20 @@ import { SyncServiceInterface, SyncOptions, SyncStatus, SyncOperationResult, Syn
 import { LoggerFactory } from '../../logger/loggerFactory';
 
 /**
- * Squarespace-specific sync service for offline-first POS operation
- * Handles syncing data between POS and Squarespace
+ * Wix-specific sync service for offline-first POS operation
+ * Handles syncing data between POS and Wix
  * Currently implements mock behavior - ready for full API integration
  */
-export class SquarespaceSyncService implements SyncServiceInterface {
+export class WixSyncService implements SyncServiceInterface {
   private initialized: boolean = false;
-  private logger = LoggerFactory.getInstance().createLogger('SquarespaceSyncService');
+  private logger = LoggerFactory.getInstance().createLogger('WixSyncService');
 
   /**
-   * Initialize the Squarespace sync service
+   * Initialize the Wix sync service
    */
   async initialize(): Promise<boolean> {
     this.initialized = true;
-    this.logger.info('Squarespace sync service initialized (mock implementation)');
+    this.logger.info('Wix sync service initialized (mock implementation)');
     return true;
   }
 
@@ -30,8 +30,8 @@ export class SquarespaceSyncService implements SyncServiceInterface {
    * Start a sync operation (mock implementation)
    */
   async startSync(options: SyncOptions): Promise<string> {
-    const syncId = `squarespace-sync-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    this.logger.info(`Squarespace sync started (mock): ${syncId}`, { options });
+    const syncId = `wix-sync-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    this.logger.info(`Wix sync started (mock): ${syncId}`, { options });
     return syncId;
   }
 
@@ -65,7 +65,7 @@ export class SquarespaceSyncService implements SyncServiceInterface {
    * Cancel an ongoing sync operation
    */
   async cancelSync(syncId: string): Promise<boolean> {
-    this.logger.info(`Squarespace sync canceled (mock): ${syncId}`);
+    this.logger.info(`Wix sync canceled (mock): ${syncId}`);
     return true;
   }
 
@@ -80,8 +80,8 @@ export class SquarespaceSyncService implements SyncServiceInterface {
    * Schedule a recurring sync operation
    */
   async scheduleSync(options: SyncOptions, schedule: string): Promise<string> {
-    const scheduleId = `squarespace-schedule-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    this.logger.info(`Squarespace sync scheduled (mock): ${scheduleId}`, { options, schedule });
+    const scheduleId = `wix-schedule-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    this.logger.info(`Wix sync scheduled (mock): ${scheduleId}`, { options, schedule });
     return scheduleId;
   }
 
@@ -89,7 +89,7 @@ export class SquarespaceSyncService implements SyncServiceInterface {
    * Cancel a scheduled sync
    */
   async cancelScheduledSync(scheduleId: string): Promise<boolean> {
-    this.logger.info(`Squarespace scheduled sync canceled (mock): ${scheduleId}`);
+    this.logger.info(`Wix scheduled sync canceled (mock): ${scheduleId}`);
     return true;
   }
 }

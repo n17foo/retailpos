@@ -11,7 +11,7 @@ import { WixRefundService } from './platforms/wixRefundService';
 import { OfflineRefundService } from './platforms/OfflineRefundService';
 import { PrestaShopRefundService } from './platforms/PrestaShopRefundService';
 import { SquarespaceRefundService } from './platforms/SquarespaceRefundService';
-import { LoggerFactory } from '../logger';
+import { LoggerFactory } from '../logger/loggerFactory';
 import { RefundData, RefundRecord, RefundResult } from './refundServiceInterface';
 import { ECommercePlatform } from '../../utils/platforms';
 

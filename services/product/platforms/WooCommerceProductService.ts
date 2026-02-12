@@ -5,7 +5,7 @@ import { TokenInitializer } from '../../token/tokenInitializer';
 import { TokenType } from '../../token/tokenServiceInterface';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { getPlatformToken, withTokenRefresh } from '../../token/tokenUtils';
-import { LoggerFactory } from '../../logger';
+import { LoggerFactory } from '../../logger/loggerFactory';
 import { createBasicAuthHeader } from '../../../utils/base64';
 import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
 

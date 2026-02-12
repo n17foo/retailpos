@@ -8,11 +8,12 @@ import type { MoreStackScreenProps } from '../navigation/types';
 import { lightColors, spacing, typography, borderRadius } from '../utils/theme';
 import { LocalOrder } from '../services/basket/BasketServiceInterface';
 import { basketRepository } from '../repositories/BasketRepository';
-import { useCurrency } from '../hooks/useCurrency';
+import { formatMoney } from '../utils/money';
 import OrderCard from './daily-orders/OrderCard';
 import ShiftModal from './daily-orders/ShiftModal';
 import ReportModal from './daily-orders/ReportModal';
 import ReceiptModal from './daily-orders/ReceiptModal';
+import { useCurrency } from '../hooks/useCurrency';
 
 interface DailyOrdersScreenProps extends MoreStackScreenProps<'DailyOrders'> {}
 
@@ -40,7 +41,7 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
   const { user } = useAuthContext();
   const { currentShift, openShift, closeShift, generateReport, getReportLines, getReceiptLines } = useDailyReport();
 
-  const cs = useCurrency();
+  const currency = useCurrency();
   const userRole = user?.role || 'cashier';
   const isAdmin = userRole === 'admin';
   const isCashier = userRole === 'cashier';
@@ -188,7 +189,7 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
     try {
       if (shiftModalMode === 'open') {
         await openShift(user?.username || 'Unknown', user?.id || 'unknown', amount);
-        Alert.alert('Shift Opened', `Shift started with ${cs}${amount.toFixed(2)} opening cash.`);
+        Alert.alert('Shift Opened', `Shift started with ${formatMoney(amount, currency.code)} opening cash.`);
       } else {
         const closedShift = await closeShift(amount);
         const report = await generateReport(orders, closedShift);

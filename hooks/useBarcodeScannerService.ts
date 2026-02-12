@@ -3,6 +3,7 @@ import { Alert } from 'react-native';
 import { CameraView, type BarcodeScanningResult } from 'expo-camera';
 import { ScannerType, ScannerServiceFactory } from '../services/scanner/scannerServiceFactory';
 import { ScannerServiceInterface } from '../services/scanner/ScannerServiceInterface';
+import { formatMoney } from '../utils/money';
 import { useCurrency } from './useCurrency';
 
 interface ScannerSettings {
@@ -25,7 +26,7 @@ interface UseBarcodeScannerServiceProps {
 }
 
 export const useBarcodeScannerService = ({ scannerSettings, products, onScanSuccess }: UseBarcodeScannerServiceProps) => {
-  const cs = useCurrency();
+  const currency = useCurrency();
   // Scanner state
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
@@ -86,7 +87,7 @@ export const useBarcodeScannerService = ({ scannerSettings, products, onScanSucc
 
       if (product) {
         // Product found
-        showScannerAlert('Product Found', `Found: ${product.name} - ${cs}${product.price.toFixed(2)}`, [
+        showScannerAlert('Product Found', `Found: ${product.name} - ${formatMoney(product.price, currency.code)}`, [
           {
             text: 'Add to Cart',
             onPress: () => {

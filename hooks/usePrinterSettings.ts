@@ -3,7 +3,8 @@ import { Alert } from 'react-native';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
 import { PrinterConnectionType } from '../services/printer/UnifiedPrinterService';
 import { useTranslate } from './useTranslate';
-import { LoggerFactory } from '../services/logger';
+import { useLogger } from '../hooks/useLogger';
+import { LoggerFactory } from '../services/logger/loggerFactory';
 
 export interface PrinterSettings {
   enabled: boolean;
@@ -69,7 +70,7 @@ const validatePrinterSettings = (settings: PrinterSettings): { isValid: boolean;
 
 export const usePrinterSettings = () => {
   const { t } = useTranslate();
-  const logger = LoggerFactory.getInstance().createLogger('usePrinterSettings');
+  const logger = useLogger('usePrinterSettings');
 
   const [printerSettings, setPrinterSettings] = useState<PrinterSettings>(DEFAULT_PRINTER_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);

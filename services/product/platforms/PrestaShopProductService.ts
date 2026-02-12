@@ -4,7 +4,7 @@ import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { TokenInitializer } from '../../token/tokenInitializer';
 import { withTokenRefresh } from '../../token/tokenIntegration';
-import { LoggerFactory } from '../../logger';
+import { LoggerFactory } from '../../logger/loggerFactory';
 import { createBasicAuthHeader } from '../../../utils/base64';
 
 // PrestaShop API version - typically doesn't change

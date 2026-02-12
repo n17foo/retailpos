@@ -14,16 +14,16 @@ export class SecretsServiceFactory {
 
   private constructor() {
     const logger = LoggerFactory.getInstance().createLogger('SecretsServiceFactory');
-    console.log('USE_MOCK_SECRETS', USE_MOCK_SECRETS);
+    logger.debug('USE_MOCK_SECRETS', USE_MOCK_SECRETS);
     // Initialize the appropriate service based on the USE_MOCK_SECRETS flag
     if (USE_MOCK_SECRETS) {
       // Use mock service for Expo Go or testing
       this.currentService = MemorySecretsService.getInstance();
-      logger.info('Using MemorySecretsService (mock)');
+      logger.debug('Using MemorySecretsService (mock)');
     } else {
       // Use real keychain service for production
       this.currentService = KeychainSecretsService.getInstance();
-      logger.info('Using KeychainSecretsService');
+      logger.debug('Using KeychainSecretsService');
     }
   }
 

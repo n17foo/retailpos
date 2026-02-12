@@ -1,5 +1,5 @@
 import { type SQLiteDatabase } from 'expo-sqlite';
-import { LoggerFactory } from '../services/logger';
+import { LoggerFactory } from '../services/logger/loggerFactory';
 
 const logger = LoggerFactory.getInstance().createLogger('dbSchema');
 

@@ -3,8 +3,9 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndi
 import { lightColors, spacing, typography, borderRadius } from '../../utils/theme';
 import { SwipeablePanel } from '../../components/SwipeablePanel';
 import { useBasketContext, CartItem } from '../../contexts/BasketProvider';
-import { useCurrency } from '../../hooks/useCurrency';
+import { formatMoney } from '../../utils/money';
 import { ECommercePlatform } from '../../utils/platforms';
+import { useCurrency } from '../../hooks/useCurrency';
 
 interface BasketProps {
   onCheckout?: () => void;
@@ -14,7 +15,7 @@ interface BasketProps {
 }
 
 export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, onPrintReceipt, platform }) => {
-  const cs = useCurrency();
+  const currency = useCurrency();
   const {
     isRightPanelOpen,
     setIsRightPanelOpen,
@@ -66,7 +67,7 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
       // Show payment options
       Alert.alert(
         'Complete Order',
-        `Order #${order.id.slice(-8)}\nTotal: ${cs}${total.toFixed(2)}`,
+        `Order #${order.id.slice(-8)}\nTotal: ${formatMoney(total, currency.code)}`,
         [
           {
             text: 'Process Payment',
@@ -136,10 +137,7 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
         <Text style={styles.itemName} numberOfLines={2}>
           {item.name}
         </Text>
-        <Text style={styles.itemPrice}>
-          {cs}
-          {item.price.toFixed(2)}
-        </Text>
+        <Text style={styles.itemPrice}>{formatMoney(item.price, currency.code)}</Text>
         {item.sku && <Text style={styles.itemSku}>SKU: {item.sku}</Text>}
       </View>
       <View style={styles.quantityContainer}>
@@ -151,10 +149,7 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
           <Text style={styles.quantityButtonText}>+</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.itemTotal}>
-        {cs}
-        {(item.price * item.quantity).toFixed(2)}
-      </Text>
+      <Text style={styles.itemTotal}>{formatMoney(item.price * item.quantity, currency.code)}</Text>
     </View>
   );
 
@@ -198,24 +193,15 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
 
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal:</Text>
-              <Text style={styles.summaryValue}>
-                {cs}
-                {subtotal.toFixed(2)}
-              </Text>
+              <Text style={styles.summaryValue}>{formatMoney(subtotal, currency.code)}</Text>
             </View>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Tax (8%):</Text>
-              <Text style={styles.summaryValue}>
-                {cs}
-                {tax.toFixed(2)}
-              </Text>
+              <Text style={styles.summaryValue}>{formatMoney(tax, currency.code)}</Text>
             </View>
             <View style={[styles.summaryRow, styles.totalRow]}>
               <Text style={styles.totalLabel}>Total:</Text>
-              <Text style={styles.totalValue}>
-                {cs}
-                {total.toFixed(2)}
-              </Text>
+              <Text style={styles.totalValue}>{formatMoney(total, currency.code)}</Text>
             </View>
 
             <View style={styles.buttonsContainer}>

@@ -5,7 +5,7 @@ import { USBScannerMockService } from './mock/USBScannerMockService';
 import { CameraScannerService } from './CameraScannerService';
 import { BluetoothScannerService } from './BluetoothScannerService';
 import { USBScannerService } from './USBScannerService';
-import { LoggerFactory } from '../logger';
+import { LoggerFactory } from '../logger/loggerFactory';
 import { USE_MOCK_SCANNER } from '@env';
 
 /**

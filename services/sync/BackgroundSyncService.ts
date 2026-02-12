@@ -1,4 +1,5 @@
 import { getBasketService } from '../basket/basketServiceFactory';
+import { LoggerFactory } from '../logger/loggerFactory';
 
 /**
  * Background service for syncing pending orders
@@ -7,6 +8,7 @@ import { getBasketService } from '../basket/basketServiceFactory';
 export class BackgroundSyncService {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
+  private logger = LoggerFactory.getInstance().createLogger('BackgroundSyncService');
 
   /**
    * Start the background sync service
@@ -14,11 +16,11 @@ export class BackgroundSyncService {
    */
   start(intervalMs: number = 300000) {
     if (this.isRunning) {
-      console.log('Background sync service is already running');
+      this.logger.info('Background sync service is already running');
       return;
     }
 
-    console.log(`Starting background sync service with ${intervalMs}ms interval`);
+    this.logger.info(`Starting background sync service with ${intervalMs}ms interval`);
     this.isRunning = true;
 
     // Run immediately on start
@@ -39,7 +41,7 @@ export class BackgroundSyncService {
       this.intervalId = null;
     }
     this.isRunning = false;
-    console.log('Background sync service stopped');
+    this.logger.info('Background sync service stopped');
   }
 
   /**
@@ -51,10 +53,10 @@ export class BackgroundSyncService {
       const result = await basketService.syncAllPendingOrders();
 
       if (result.synced > 0 || result.failed > 0) {
-        console.log(`Background sync: ${result.synced} synced, ${result.failed} failed`);
+        this.logger.info(`Background sync: ${result.synced} synced, ${result.failed} failed`);
       }
     } catch (error) {
-      console.error('Background sync failed:', error);
+      this.logger.error('Background sync failed:', error);
     }
   }
 
