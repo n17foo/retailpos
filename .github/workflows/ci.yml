@@ -30,6 +30,9 @@ jobs:
       env:
         YARN_CACHE_FOLDER: ${{ runner.temp }}/yarn-cache
 
+    - name: Setup environment
+      run: cp .env.example .env
+
     - name: Run Expo Doctor
       run: npx expo-doctor
 
