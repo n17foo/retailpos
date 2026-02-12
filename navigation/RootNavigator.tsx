@@ -50,7 +50,9 @@ export const RootNavigator: React.FC = () => {
         {!isAuthenticated ? (
           <Stack.Screen name="Auth">{() => <AuthNavigator onLogin={handleLogin} showOnboarding={!isOnboarded} />}</Stack.Screen>
         ) : (
-          <Stack.Screen name="Main">{() => <MainTabNavigator username={user?.username || ''} userRole={user?.role} onLogout={handleLogout} />}</Stack.Screen>
+          <Stack.Screen name="Main">
+            {() => <MainTabNavigator username={user?.username || ''} userRole={user?.role} onLogout={handleLogout} />}
+          </Stack.Screen>
         )}
       </Stack.Navigator>
     </NavigationContainer>
