@@ -15,7 +15,10 @@ import PaymentProviderStep from './onboarding/PaymentProviderStep';
 import PrinterSetupStep from './onboarding/PrinterSetupStep';
 import ScannerSetupStep from './onboarding/ScannerSetupStep';
 import AdminUserStep from './onboarding/AdminUserStep';
+import POSSetupStep from './onboarding/POSSetupStep';
+import type { POSSetupValues } from './onboarding/POSSetupStep';
 import SummaryStep from './onboarding/SummaryStep';
+import { posConfig } from '../services/config/POSConfigService';
 
 type OnboardingStep =
   | 'welcome'
@@ -23,6 +26,7 @@ type OnboardingStep =
   | 'platform_configuration'
   | 'offline_setup'
   | 'staff_setup'
+  | 'pos_setup'
   | 'payment_provider_setup'
   | 'printer_setup'
   | 'scanner_setup'
@@ -119,7 +123,24 @@ const OnboardingScreen: React.FC = () => {
   };
 
   const handleNextFromScanner = () => {
+    setCurrentStep('pos_setup');
+  };
+
+  const handleNextFromPOSSetup = async (values: POSSetupValues) => {
+    await posConfig.updateAll({
+      storeName: values.storeName,
+      storeAddress: values.storeAddress,
+      storePhone: values.storePhone,
+      taxRate: parseFloat(values.taxRate) / 100,
+      currencySymbol: values.currencySymbol,
+      maxSyncRetries: parseInt(values.maxSyncRetries, 10) || 3,
+      drawerOpenOnCash: values.drawerOpenOnCash,
+    });
     setCurrentStep('admin_user');
+  };
+
+  const handleBackToPOSSetup = () => {
+    setCurrentStep('pos_setup');
   };
 
   const handleBackToScanner = () => {
@@ -185,10 +206,12 @@ const OnboardingScreen: React.FC = () => {
         return <PrinterSetupStep onBack={handleBackToPayment} onNext={handleNextFromPrinter} />;
       case 'scanner_setup':
         return <ScannerSetupStep onBack={handleBackToPrinter} onComplete={handleNextFromScanner} />;
+      case 'pos_setup':
+        return <POSSetupStep onBack={handleBackToScanner} onComplete={handleNextFromPOSSetup} />;
       case 'admin_user':
         return (
           <AdminUserStep
-            onBack={isOffline ? () => setCurrentStep('offline_setup') : handleBackToScanner}
+            onBack={isOffline ? () => setCurrentStep('offline_setup') : handleBackToPOSSetup}
             onComplete={handleNextFromAdminUser}
           />
         );
@@ -200,8 +223,8 @@ const OnboardingScreen: React.FC = () => {
   };
 
   const STEP_LABELS = isOffline
-    ? ['Welcome', 'Platform', 'Store Setup', 'Admin', 'Staff', 'Payment', 'Printer', 'Scanner', 'Summary']
-    : ['Welcome', 'Platform', 'Configure', 'Payment', 'Printer', 'Scanner', 'Admin', 'Summary'];
+    ? ['Welcome', 'Platform', 'Store Setup', 'Admin', 'Staff', 'Payment', 'Printer', 'Scanner', 'POS Config', 'Summary']
+    : ['Welcome', 'Platform', 'Configure', 'Payment', 'Printer', 'Scanner', 'POS Config', 'Admin', 'Summary'];
   const STEP_ORDER: OnboardingStep[] = isOffline
     ? [
         'welcome',
@@ -212,6 +235,7 @@ const OnboardingScreen: React.FC = () => {
         'payment_provider_setup',
         'printer_setup',
         'scanner_setup',
+        'pos_setup',
         'summary',
       ]
     : [
@@ -221,6 +245,7 @@ const OnboardingScreen: React.FC = () => {
         'payment_provider_setup',
         'printer_setup',
         'scanner_setup',
+        'pos_setup',
         'admin_user',
         'summary',
       ];

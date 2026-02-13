@@ -4,7 +4,6 @@ import { keyValueRepository } from '../repositories/KeyValueRepository';
 import { PrinterConnectionType } from '../services/printer/UnifiedPrinterService';
 import { useTranslate } from './useTranslate';
 import { useLogger } from '../hooks/useLogger';
-import { LoggerFactory } from '../services/logger/loggerFactory';
 
 export interface PrinterSettings {
   enabled: boolean;

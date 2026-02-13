@@ -16,6 +16,7 @@ import { useTranslate } from './hooks/useTranslate';
 import { lightColors } from './utils/theme';
 import { queueManager } from './services/queue/QueueManager';
 import { backgroundSyncService } from './services/sync/BackgroundSyncService';
+import { posConfig } from './services/config/POSConfigService';
 import RootNavigator from './navigation/RootNavigator';
 //import { StripeTerminalBridgeProvider } from './contexts/StripeTerminalBridge';
 
@@ -79,6 +80,11 @@ const AppContent = () => {
         { message: '[Localization] Failed to handle localization change' },
         error instanceof Error ? error : new Error(String(error))
       );
+    });
+
+    // Load dynamic POS config from settings DB (tax rate, store info, etc.)
+    posConfig.load().catch(err => {
+      logger.error({ message: 'Failed to load POS config — using defaults' }, err instanceof Error ? err : new Error(String(err)));
     });
 
     // Initialize sync queue manager

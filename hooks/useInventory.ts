@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { PlatformServiceRegistry } from '../services/platform';
+import { PlatformServiceRegistry } from '../services/platform/PlatformServiceRegistry';
 import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../services/inventory/InventoryServiceInterface';
 import { ECommercePlatform } from '../utils/platforms';
 

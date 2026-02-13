@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { PlatformServiceRegistry } from '../services/platform';
+import { PlatformServiceRegistry } from '../services/platform/PlatformServiceRegistry';
 import { SearchOptions, SearchResult } from '../services/search/searchServiceInterface';
 
 /**

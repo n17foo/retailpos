@@ -14,12 +14,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Security policy for vulnerability reporting
 - GitHub issue and pull request templates
 - UUID utility for React Native compatibility
+- **POSConfigService** (`services/config/POSConfigService.ts`) — runtime POS configuration with no hardcoded defaults; all values set during onboarding
+- **POSSetupStep** onboarding screen — collects store name, tax rate, currency, drawer settings
+- **POS Config** settings tab — edit configuration values after onboarding
+- **LogTransport** interface for pluggable logging providers (Sentry, Datadog, NewRelic)
+- **CheckoutService** — separated from BasketService, handles payment + order queries
+- **OrderSyncService** — separated from BasketService, handles platform sync with per-order retry tracking
+- **BackgroundSyncService** — exponential backoff (capped at 15 min), pauses when app is backgrounded
+- **CashDrawerServiceInterface** — standalone peripheral decoupled from printer, with `PrinterDrawerDriver` and `NoOpDrawerDriver`
+- `CheckoutResult.openDrawer` flag — service decides if drawer opens, UI executes
+- `onDisconnect()` / `offDisconnect()` callbacks on `ScannerServiceInterface`
+- `openDrawer(pin)` method on `BasePrinterService` with ESC/POS drawer kick commands
+- 55 tests across 4 suites (money, BasketService, CheckoutService, POSConfigService)
 
 ### Changed
 
 - Updated README to be developer-focused
 - Improved require cycle resolution in service architecture
 - Enhanced TypeScript compilation and linting
+- **Moved** `config/pos.ts` → `services/config/POSConfigService.ts`
+- **Consolidated** `SettingsRepository` and `KeyValueRepository` — both now use the single `key_value_store` table; `SettingsRepository` is a typed JSON facade over `KeyValueRepository`
+- **DB schema v2** — migrates data from legacy `settings` table into `key_value_store` and drops `settings`
+- `DEFAULT_TAX_RATE` and `MAX_SYNC_RETRIES` are now functions (not constants) — loaded from settings DB
+- `PaymentServiceInterface.disconnect()` is now `Promise<void> | void` (async-compatible)
+- `ErrorReportingService` removed — all services use `LoggerInterface` with pluggable transports
+- Updated `ARCHITECTURE.md` and `AGENT.md` with all architectural changes
 
 ### Fixed
 

@@ -1,12 +1,36 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Order, OrderRepository } from '../repositories/OrderRepository';
-import { OrderItem, OrderItemRepository } from '../repositories/OrderItemRepository';
+import { orderRepository, OrderRow } from '../repositories/OrderRepository';
+import { orderItemRepository, OrderItemRow } from '../repositories/OrderItemRepository';
 
-const orderRepository = new OrderRepository();
-const orderItemRepository = new OrderItemRepository();
+/** Lightweight order + items type returned by this hook */
+export interface OrderWithItems {
+  id: string;
+  subtotal: number;
+  tax: number;
+  total: number;
+  status: string;
+  syncStatus: string;
+  paymentMethod: string | null;
+  customerName: string | null;
+  cashierName: string | null;
+  createdAt: Date;
+  items: OrderItemRow[];
+}
 
-export interface OrderWithItems extends Order {
-  items: OrderItem[];
+function rowToOrder(row: OrderRow, items: OrderItemRow[]): OrderWithItems {
+  return {
+    id: row.id,
+    subtotal: row.subtotal,
+    tax: row.tax,
+    total: row.total,
+    status: row.status,
+    syncStatus: row.sync_status,
+    paymentMethod: row.payment_method,
+    customerName: row.customer_name,
+    cashierName: row.cashier_name,
+    createdAt: new Date(row.created_at),
+    items,
+  };
 }
 
 export const useOrders = () => {
@@ -17,15 +41,15 @@ export const useOrders = () => {
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
-      const allOrders = await orderRepository.findAll();
-      const ordersWithItems: OrderWithItems[] = [];
+      const rows = await orderRepository.findAll();
+      const result: OrderWithItems[] = [];
 
-      for (const order of allOrders) {
-        const items = await orderItemRepository.findByOrderId(order.id);
-        ordersWithItems.push({ ...order, items });
+      for (const row of rows) {
+        const items = await orderItemRepository.findByOrderId(row.id);
+        result.push(rowToOrder(row, items));
       }
 
-      setOrders(ordersWithItems);
+      setOrders(result);
       setError(null);
     } catch (e) {
       setError(e as Error);
@@ -38,38 +62,11 @@ export const useOrders = () => {
     fetchOrders();
   }, [fetchOrders]);
 
-  const addOrder = async (orderData: Omit<Order, 'id' | 'created_at' | 'updated_at'>, items: Omit<OrderItem, 'id' | 'order_id'>[]) => {
-    try {
-      // This should ideally be a transaction, but expo-sqlite's withTransactionAsync makes it tricky to return the new order ID.
-      // For now, we'll perform the operations sequentially.
-      const newOrderId = await orderRepository.create(orderData);
-
-      for (const item of items) {
-        await orderItemRepository.create({ ...item, order_id: newOrderId });
-      }
-
-      await fetchOrders(); // Refresh the list
-    } catch (e) {
-      setError(e as Error);
-      throw e;
-    }
-  };
-
-  const updateOrder = async (id: string, orderData: Partial<Order>) => {
-    try {
-      await orderRepository.update(id, orderData);
-      await fetchOrders(); // Refresh the list
-    } catch (e) {
-      setError(e as Error);
-      throw e;
-    }
-  };
-
   const deleteOrder = async (id: string) => {
     try {
-      // The database is set up with cascading deletes, so this will also remove associated order items.
+      // CASCADE delete removes associated order_items automatically
       await orderRepository.delete(id);
-      await fetchOrders(); // Refresh the list
+      await fetchOrders();
     } catch (e) {
       setError(e as Error);
       throw e;
@@ -81,8 +78,6 @@ export const useOrders = () => {
     loading,
     error,
     fetchOrders,
-    addOrder,
-    updateOrder,
     deleteOrder,
   };
 };

@@ -1,7 +1,5 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useOrders, OrderWithItems } from '../hooks/useOrders';
-import { Order } from '../repositories/OrderRepository';
-import { OrderItem } from '../repositories/OrderItemRepository';
 import { useOfflineProducts } from '../hooks/useOfflineProducts';
 import { useOfflineCategories } from '../hooks/useOfflineCategories';
 import { Product } from '../services/product/ProductServiceInterface';
@@ -28,8 +26,6 @@ interface DataContextType {
   orderLoading: boolean;
   orderError: Error | null;
   fetchOrders: () => Promise<void>;
-  addOrder: (orderData: Omit<Order, 'id' | 'created_at' | 'updated_at'>, items: Omit<OrderItem, 'id' | 'order_id'>[]) => Promise<void>;
-  updateOrder: (id: string, orderData: Partial<Order>) => Promise<void>;
   deleteOrder: (id: string) => Promise<void>;
 }
 
@@ -56,7 +52,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     deleteCategory,
   } = useOfflineCategories();
 
-  const { orders, loading: orderLoading, error: orderError, fetchOrders, addOrder, updateOrder, deleteOrder } = useOrders();
+  const { orders, loading: orderLoading, error: orderError, fetchOrders, deleteOrder } = useOrders();
 
   const value: DataContextType = {
     products,
@@ -77,8 +73,6 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     orderLoading,
     orderError,
     fetchOrders,
-    addOrder,
-    updateOrder,
     deleteOrder,
   };
 

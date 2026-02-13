@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { SettingsRepository } from '../repositories/SettingsRepository';
+import { KeyValueRepository } from '../repositories/KeyValueRepository';
 
-const settingsRepository = new SettingsRepository();
+const settingsRepository = new KeyValueRepository();
 
 const useSettings = () => {
   const [settings, setSettings] = useState<{ [key: string]: any }>({});
@@ -11,7 +11,7 @@ const useSettings = () => {
   const fetchSettings = useCallback(async () => {
     try {
       setLoading(true);
-      const allSettings = await settingsRepository.getAllSettings();
+      const allSettings = await settingsRepository.getAllKeys();
       setSettings(allSettings);
       setError(null);
     } catch (e) {
@@ -35,7 +35,7 @@ const useSettings = () => {
 
   const updateSetting = async <T>(key: string, value: T) => {
     try {
-      await settingsRepository.setSetting(key, value);
+      await settingsRepository.setObject(key, value);
       // Optimistically update local state before refetching
       setSettings(prevSettings => ({ ...prevSettings, [key]: value }));
     } catch (e) {

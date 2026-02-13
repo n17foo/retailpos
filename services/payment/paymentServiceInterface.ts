@@ -39,7 +39,7 @@ export interface PaymentServiceInterface {
   processPayment(request: PaymentRequest): Promise<PaymentResponse>;
 
   // Disconnect from terminal
-  disconnect(): void;
+  disconnect(): Promise<void> | void;
 
   // Check if connected to a terminal
   isTerminalConnected(): boolean;

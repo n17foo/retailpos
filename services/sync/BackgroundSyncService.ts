@@ -1,35 +1,47 @@
-import { getBasketService } from '../basket/basketServiceFactory';
+import { getServiceContainer } from '../basket/basketServiceFactory';
 import { LoggerFactory } from '../logger/loggerFactory';
+import { AppState, AppStateStatus } from 'react-native';
 
 /**
- * Background service for syncing pending orders
- * This service runs periodically to retry failed order syncs
+ * Background service for syncing pending orders.
+ *
+ * Improvements over the naive setInterval approach:
+ *  - Exponential backoff on consecutive failures (caps at 15 min)
+ *  - Resets backoff on any successful sync
+ *  - Pauses when the app is backgrounded, resumes on foreground
+ *  - Exposes consecutiveFailures count for diagnostics
  */
 export class BackgroundSyncService {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
   private logger = LoggerFactory.getInstance().createLogger('BackgroundSyncService');
 
+  private baseIntervalMs = 300_000; // 5 min default
+  private consecutiveFailures = 0;
+  private static readonly MAX_BACKOFF_MS = 900_000; // 15 min cap
+
+  private appStateSubscription: { remove(): void } | null = null;
+
   /**
    * Start the background sync service
-   * @param intervalMs How often to check for pending syncs (default: 5 minutes)
+   * @param intervalMs Base interval between syncs (default: 5 minutes)
    */
-  start(intervalMs: number = 300000) {
+  start(intervalMs: number = 300_000) {
     if (this.isRunning) {
       this.logger.info('Background sync service is already running');
       return;
     }
 
-    this.logger.info(`Starting background sync service with ${intervalMs}ms interval`);
+    this.baseIntervalMs = intervalMs;
+    this.consecutiveFailures = 0;
     this.isRunning = true;
+    this.logger.info(`Starting background sync service with ${intervalMs}ms base interval`);
 
-    // Run immediately on start
-    this.performSync();
+    // Listen for app state to pause/resume
+    this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
 
-    // Then run periodically
-    this.intervalId = setInterval(() => {
-      this.performSync();
-    }, intervalMs);
+    // Run immediately, then schedule next
+    this.performSyncAndScheduleNext();
   }
 
   /**
@@ -37,34 +49,72 @@ export class BackgroundSyncService {
    */
   stop() {
     if (this.intervalId) {
-      clearInterval(this.intervalId);
+      clearTimeout(this.intervalId);
       this.intervalId = null;
+    }
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
     }
     this.isRunning = false;
     this.logger.info('Background sync service stopped');
   }
 
-  /**
-   * Perform a sync operation for all pending orders
-   */
+  isActive(): boolean {
+    return this.isRunning;
+  }
+
+  getConsecutiveFailures(): number {
+    return this.consecutiveFailures;
+  }
+
+  // ── Internals ─────────────────────────────────────────────────────────
+
+  private handleAppStateChange = (state: AppStateStatus) => {
+    if (state === 'active' && this.isRunning) {
+      this.logger.info('App foregrounded — triggering sync');
+      this.performSyncAndScheduleNext();
+    }
+  };
+
+  private async performSyncAndScheduleNext() {
+    // Clear any existing timer
+    if (this.intervalId) {
+      clearTimeout(this.intervalId);
+      this.intervalId = null;
+    }
+
+    await this.performSync();
+
+    if (!this.isRunning) return;
+
+    // Exponential backoff: base * 2^failures, capped
+    const delay = Math.min(this.baseIntervalMs * Math.pow(2, this.consecutiveFailures), BackgroundSyncService.MAX_BACKOFF_MS);
+
+    this.intervalId = setTimeout(() => {
+      this.performSyncAndScheduleNext();
+    }, delay);
+  }
+
   private async performSync() {
     try {
-      const basketService = await getBasketService();
-      const result = await basketService.syncAllPendingOrders();
+      const { orderSyncService } = await getServiceContainer();
+      const result = await orderSyncService.syncAllPendingOrders();
 
       if (result.synced > 0 || result.failed > 0) {
         this.logger.info(`Background sync: ${result.synced} synced, ${result.failed} failed`);
       }
-    } catch (error) {
-      this.logger.error('Background sync failed:', error);
-    }
-  }
 
-  /**
-   * Check if the service is currently running
-   */
-  isActive(): boolean {
-    return this.isRunning;
+      // Reset backoff on any success
+      if (result.synced > 0) {
+        this.consecutiveFailures = 0;
+      } else if (result.failed > 0) {
+        this.consecutiveFailures++;
+      }
+    } catch (error) {
+      this.consecutiveFailures++;
+      this.logger.error('Background sync failed', error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 

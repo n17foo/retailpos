@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ECommercePlatform } from '../utils/platforms';
-import { PlatformServiceRegistry } from '../services/platform';
+import { PlatformServiceRegistry } from '../services/platform/PlatformServiceRegistry';
 import {
   getDefaultVariant,
   toProductSummary,

@@ -6,20 +6,20 @@ This document covers the full technical setup of RetailPOS for developers, DevOp
 
 ## Technology Stack
 
-| Layer          | Technology                           | Version |
-| -------------- | ------------------------------------ | ------- |
-| **Framework**  | React Native + Expo                  | SDK 53  |
-| **Language**   | TypeScript                           | 5.x     |
-| **Navigation** | React Navigation                     | 7.x     |
-| **State**      | React Context + Zustand (sync queue) | —       |
-| **Database**   | SQLite via `expo-sqlite`             | —       |
-| **Networking** | Fetch with queued retry              | —       |
-| **Desktop**    | Electron                             | —       |
-| **Styling**    | StyleSheet + custom theme system     | —       |
-| **i18n**       | react-i18next + expo-localization    | —       |
-| **Logging**    | Custom LoggerFactory (Winston-style) | —       |
-| **Linting**    | ESLint + Prettier                    | —       |
-| **Testing**    | Jest                                 | —       |
+| Layer          | Technology                                  | Version |
+| -------------- | ------------------------------------------- | ------- |
+| **Framework**  | React Native + Expo                         | SDK 53  |
+| **Language**   | TypeScript                                  | 5.x     |
+| **Navigation** | React Navigation                            | 7.x     |
+| **State**      | React Context + Zustand (sync queue)        | —       |
+| **Database**   | SQLite via `expo-sqlite`                    | —       |
+| **Networking** | Fetch with queued retry                     | —       |
+| **Desktop**    | Electron                                    | —       |
+| **Styling**    | StyleSheet + custom theme system            | —       |
+| **i18n**       | react-i18next + expo-localization           | —       |
+| **Logging**    | Custom LoggerFactory + pluggable transports | —       |
+| **Linting**    | ESLint + Prettier                           | —       |
+| **Testing**    | Jest                                        | —       |
 
 ---
 
@@ -37,7 +37,7 @@ retailpos/
 │
 ├── assets/                     # Static images and icons
 ├── locales/                    # i18n translation files (en, es, fr, de)
-├── types/                      # Global TypeScript declarations
+├── types/                      # Shared TypeScript types (basket, order)
 │
 ├── components/                 # Shared UI components
 │   ├── Breadcrumb.tsx
@@ -103,15 +103,19 @@ retailpos/
 │       └── Header.tsx
 │
 ├── repositories/               # SQLite data access layer
+│   ├── BasketRepository.ts
 │   ├── OrderRepository.ts
 │   ├── OrderItemRepository.ts
+│   ├── SettingsRepository.ts
+│   ├── KeyValueRepository.ts
 │   └── UserRepository.ts
 │
 ├── services/                   # ★ Core business logic
 │   ├── platform/                # Unified service registry
 │   │   ├── PlatformServiceRegistry.ts
 │   │   └── index.ts
-│   ├── config/                  # Settings → factory bridge
+│   ├── config/                  # Runtime POS config + settings bridge
+│   │   ├── POSConfigService.ts   # POSConfigService (tax, store info, currency)
 │   │   └── ServiceConfigBridge.ts
 │   ├── product/                 # Product domain
 │   │   ├── types.ts              # UnifiedProduct types + helpers
@@ -143,11 +147,20 @@ retailpos/
 │   │   └── platforms/
 │   ├── basket/                  # Shopping cart (local)
 │   │   ├── BasketServiceInterface.ts
-│   │   └── basketServiceFactory.ts
+│   │   ├── BasketService.ts        # Cart CRUD only
+│   │   └── basketServiceFactory.ts # Wires ServiceContainer
+│   ├── checkout/                # Checkout + order queries
+│   │   ├── CheckoutServiceInterface.ts
+│   │   └── CheckoutService.ts
+│   ├── drawer/                  # Cash drawer peripheral
+│   │   ├── CashDrawerServiceInterface.ts
+│   │   └── PrinterCashDrawerService.ts  # PrinterDrawerDriver + NoOpDrawerDriver
 │   ├── token/                   # OAuth / API token management
 │   │   ├── tokenServiceInterface.ts
 │   │   └── tokenServiceFactory.ts
 │   ├── sync/                    # Background data sync
+│   │   ├── OrderSyncService.ts     # Platform sync with retry + backoff
+│   │   ├── BackgroundSyncService.ts # Periodic sync with exponential backoff
 │   │   ├── syncServiceFactory.ts
 │   │   └── platforms/
 │   ├── payment/                 # Payment processing
@@ -166,6 +179,9 @@ retailpos/
 │   │   ├── SQLiteStorageService.ts
 │   │   └── storage.ts
 │   ├── logger/                  # Logging infrastructure
+│   │   ├── LoggerInterface.ts      # LoggerInterface + LogTransport + LogEntry
+│   │   ├── loggerFactory.ts        # Singleton with transport management
+│   │   └── ReactNativeLogger.ts    # Default logger with multi-transport forwarding
 │   └── secrets/                 # Secure credential storage
 │
 ├── models/                     # Backward-compat re-exports (→ services/*/types.ts)
@@ -240,14 +256,16 @@ Factory imports are lazy-loaded (`require()`) inside methods to avoid circular d
 ### Online Mode
 
 ```
-Welcome → Platform Selection → API Configuration → Payment → Printer → Scanner → Admin User → Summary
+Welcome → Platform Selection → API Configuration → Payment → Printer → Scanner → POS Config → Admin User → Summary
 ```
 
 ### Offline Mode
 
 ```
-Welcome → Platform Selection → Store Setup (name, categories, products) → Admin User → Staff Setup (cashiers, managers) → Payment → Printer → Scanner → Summary
+Welcome → Platform Selection → Store Setup → Admin User → Staff Setup → Payment → Printer → Scanner → POS Config → Summary
 ```
+
+The **POS Config** step collects store name, tax rate, currency, and other operational settings. These are persisted via `POSConfigService` and can be edited later in Settings → POS Config.
 
 The key difference: offline mode lets the user create their product catalogue and staff accounts directly on the device, while online mode pulls data from the connected e-commerce platform.
 
@@ -364,23 +382,98 @@ SQLite database managed by `SQLiteStorageService`. Key tables:
 - **users** — id, name, email, pin (hashed), role, is_active, timestamps
 - **orders** — id, total, status, payment details, timestamps
 - **order_items** — id, order_id (FK), product details, quantity, price
-- **Key-value store** — settings, sync state, cached data
+- **baskets** — id, items (JSON), subtotal, tax, total, timestamps
+- **key_value_store** — unified key-value storage for settings, config (`pos.*` keys), sync state, cached data
+
+`SettingsRepository` is a typed JSON facade over `KeyValueRepository` — both use the same `key_value_store` table. The legacy `settings` table is migrated and dropped in DB schema v2.
 
 Schema versioning is handled by the storage service with automatic migrations.
 
 ---
 
+## Service Architecture: Basket → Checkout → Sync
+
+The original monolithic `BasketService` has been split into three focused services with constructor injection:
+
+| Service              | Responsibility                                  | File                                   |
+| -------------------- | ----------------------------------------------- | -------------------------------------- |
+| **BasketService**    | Cart CRUD (add/remove/update items, totals)     | `services/basket/BasketService.ts`     |
+| **CheckoutService**  | Start checkout, complete payment, order queries | `services/checkout/CheckoutService.ts` |
+| **OrderSyncService** | Sync paid orders to e-commerce platforms        | `services/sync/OrderSyncService.ts`    |
+
+`basketServiceFactory.ts` wires all three into a `ServiceContainer` and exposes `getServiceContainer()`.
+
+### Checkout + Cash Drawer Flow
+
+`CheckoutService.completePayment()` returns `CheckoutResult` with an `openDrawer?: boolean` flag. The service sets it to `true` when `paymentMethod === 'cash'` and `posConfig.values.drawerOpenOnCash` is enabled. The **UI** reads this flag and calls the drawer service — the service decides _if_, the UI _does_.
+
+---
+
+## POS Configuration
+
+`POSConfigService` (`services/config/POSConfigService.ts`) — a singleton backed by `SettingsRepository`:
+
+- **No built-in defaults** — all values must be set during onboarding
+- `posConfig.load()` called at app startup in `App.tsx`
+- `posConfig.update(field, value)` persists to the settings DB immediately
+- `posConfig.values` — synchronous read of current config
+- `posConfig.isConfigured` — true only when all required fields are set
+
+**Config fields:** `taxRate`, `maxSyncRetries`, `storeName`, `storeAddress`, `storePhone`, `currencySymbol`, `drawerOpenOnCash`
+
+The `POSSetupStep` in onboarding collects these values. After onboarding, the **POS Config** tab in Settings allows editing.
+
+---
+
 ## Logging
 
-`LoggerFactory` provides structured logging:
+`LoggerFactory` provides structured logging with pluggable transports:
 
 ```typescript
 const logger = LoggerFactory.getInstance().createLogger('MyComponent');
 logger.info({ message: 'Operation completed' });
 logger.error({ message: 'Something failed' }, error);
+
+// Add external transport (Sentry, Datadog, New Relic)
+LoggerFactory.getInstance().addTransport({
+  name: 'SentryTransport',
+  minLevel: LogLevel.ERROR,
+  log: entry => Sentry.captureException(entry.error ?? entry.message),
+});
 ```
 
-Log levels: `debug`, `info`, `warn`, `error`.
+Log levels: `debug`, `info`, `warn`, `error`. Transports implement the `LogTransport` interface and receive structured `LogEntry` objects. Child loggers share their parent's transports.
+
+---
+
+## Peripheral Services
+
+### Cash Drawer
+
+`CashDrawerServiceInterface` — standalone peripheral (not coupled to the printer):
+
+- `PrinterDrawerDriver` — ESC/POS drawer-kick via receipt printer
+- `NoOpDrawerDriver` — no-op when no drawer is configured
+- `DrawerDriverType`: `'printer' | 'usb' | 'bluetooth' | 'network' | 'none'`
+
+### Scanner
+
+Optional `onDisconnect()` / `offDisconnect()` callbacks for handling unexpected disconnections.
+
+### Payment
+
+`PaymentServiceInterface.disconnect()` is `Promise<void> | void` (async-compatible).
+
+### Printer
+
+`openDrawer(pin?: 2 | 5)` on `BasePrinterService` with ESC/POS drawer kick commands. Subclasses override `sendBytes()` for raw byte writing.
+
+---
+
+## Background Sync
+
+- **OrderSyncService** — per-order retry count, `MAX_SYNC_RETRIES()` enforcement, `isRetryable()`
+- **BackgroundSyncService** — exponential backoff (`base × 2^failures`, capped at 15 min), pauses when app is backgrounded, resumes on foreground
 
 ---
 

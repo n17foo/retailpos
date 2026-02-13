@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { RefundServiceFactory } from '../services/refund/refundServiceFactory';
-import { PlatformServiceRegistry } from '../services/platform';
+import { PlatformServiceRegistry } from '../services/platform/PlatformServiceRegistry';
 import { RefundData, RefundResult, RefundRecord } from '../services/refund/refundServiceInterface';
 import { useLogger } from '../hooks/useLogger';
 import { ECommercePlatform } from '../utils/platforms';

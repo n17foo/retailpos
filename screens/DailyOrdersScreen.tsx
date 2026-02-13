@@ -7,7 +7,7 @@ import { useDailyReport, DailyReportData } from '../hooks/useDailyReport';
 import type { MoreStackScreenProps } from '../navigation/types';
 import { lightColors, spacing, typography, borderRadius } from '../utils/theme';
 import { LocalOrder } from '../services/basket/BasketServiceInterface';
-import { basketRepository } from '../repositories/BasketRepository';
+import { orderRepository } from '../repositories/OrderRepository';
 import { formatMoney } from '../utils/money';
 import OrderCard from './daily-orders/OrderCard';
 import ShiftModal from './daily-orders/ShiftModal';
@@ -77,7 +77,7 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
 
       // Cashiers only see their own orders
       const cashierFilter = isCashier ? user?.id : undefined;
-      const rows = await basketRepository.findOrdersByDateRange(fromTs, toTs, cashierFilter);
+      const rows = await orderRepository.findByDateRange(fromTs, toTs, cashierFilter);
 
       // Convert rows to LocalOrder format using getLocalOrders as reference
       const allOrders = await getLocalOrders();
@@ -137,7 +137,7 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
           style: 'destructive',
           onPress: async () => {
             try {
-              await basketRepository.deleteOrder(orderId);
+              await orderRepository.delete(orderId);
               await loadOrders();
               Alert.alert('Deleted', 'Order removed successfully');
             } catch (error) {

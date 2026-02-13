@@ -7,6 +7,8 @@ import { ReceiptData, PrinterStatus } from './PrinterTypes';
 export const ESC_POS_COMMANDS = {
   INIT: [0x1b, 0x40], // Initialize printer
   CUT: [0x1d, 0x56, 0x41, 0x10], // Full cut with feed
+  DRAWER_KICK_PIN2: [0x1b, 0x70, 0x00, 0x19, 0xfa], // Open cash drawer (pin 2)
+  DRAWER_KICK_PIN5: [0x1b, 0x70, 0x01, 0x19, 0xfa], // Open cash drawer (pin 5)
   FEED: [0x1b, 0x64, 0x10], // Feed paper 16 lines
   ALIGN_CENTER: [0x1b, 0x61, 0x01], // Center align
   ALIGN_LEFT: [0x1b, 0x61, 0x00], // Left align
@@ -61,6 +63,12 @@ export interface BasePrinterService {
    * @param data Receipt data
    */
   formatReceiptBuffer(data: ReceiptData): Buffer;
+
+  /**
+   * Send an ESC/POS drawer kick pulse to open the cash drawer.
+   * @param pin Which connector pin to pulse (2 or 5, default 2)
+   */
+  openDrawer(pin?: 2 | 5): Promise<boolean>;
 }
 
 /**
@@ -74,6 +82,23 @@ export abstract class AbstractPrinterService implements BasePrinterService {
   abstract connect(connectionConfig: any): Promise<boolean>;
   abstract printReceipt(data: ReceiptData): Promise<boolean>;
   abstract getStatus(): Promise<PrinterStatus>;
+
+  /**
+   * Open cash drawer via ESC/POS command.
+   * Subclasses that support raw byte writing should override sendBytes.
+   */
+  async openDrawer(pin: 2 | 5 = 2): Promise<boolean> {
+    if (!this._isConnected) return false;
+    const cmd = pin === 5 ? ESC_POS_COMMANDS.DRAWER_KICK_PIN5 : ESC_POS_COMMANDS.DRAWER_KICK_PIN2;
+    return this.sendBytes(Buffer.from(cmd));
+  }
+
+  /**
+   * Send raw bytes to the printer. Override in concrete implementations.
+   */
+  protected async sendBytes(_data: Buffer): Promise<boolean> {
+    return false;
+  }
 
   /**
    * Disconnect from the printer

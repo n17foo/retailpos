@@ -1,8 +1,8 @@
 import { Dispatch, ReactNode, SetStateAction, createContext, useContext, useMemo, useState, useEffect, useCallback, useRef } from 'react';
 import { ImageSourcePropType } from 'react-native';
-import { Basket, LocalOrder, LocalOrderStatus, CheckoutResult, SyncResult } from '../services/basket/BasketServiceInterface';
-import { getBasketService } from '../services/basket/basketServiceFactory';
-import { BasketServiceInterface } from '../services/basket/BasketServiceInterface';
+import { Basket } from '../services/basket/basket';
+import { LocalOrder, LocalOrderStatus, CheckoutResult, SyncResult } from '../services/order/order';
+import { getServiceContainer, ServiceContainer } from '../services/basket/basketServiceFactory';
 import { ECommercePlatform } from '../utils/platforms';
 import { useAuthContext } from './AuthProvider';
 import { queueManager } from '../services/queue/QueueManager';
@@ -116,21 +116,20 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   const [currentOrder, setCurrentOrder] = useState<LocalOrder | null>(null);
   const [unsyncedOrdersCount, setUnsyncedOrdersCount] = useState(0);
 
-  const serviceRef = useRef<BasketServiceInterface | null>(null);
+  const containerRef = useRef<ServiceContainer | null>(null);
   const mountedRef = useRef(true);
 
-  // Initialize the service
+  // Initialize the services
   useEffect(() => {
     mountedRef.current = true;
 
     const initService = async () => {
       try {
-        const service = await getBasketService();
-        await service.initialize(); // Initialize the service (database connection)
-        serviceRef.current = service;
+        const container = await getServiceContainer();
+        containerRef.current = container;
 
-        const basketData = await service.getBasket();
-        const unsyncedOrders = await service.getUnsyncedOrders();
+        const basketData = await container.basketService.getBasket();
+        const unsyncedOrders = await container.checkoutService.getUnsyncedOrders();
 
         if (mountedRef.current) {
           setBasket(basketData);
@@ -188,10 +187,10 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
 
   // Refresh basket from service
   const refreshBasket = useCallback(async () => {
-    if (!serviceRef.current) return;
+    if (!containerRef.current) return;
 
     try {
-      const basketData = await serviceRef.current.getBasket();
+      const basketData = await containerRef.current.basketService.getBasket();
       if (mountedRef.current) {
         setBasket(basketData);
         setError(null);
@@ -204,10 +203,10 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   }, []);
 
   const refreshUnsyncedCount = useCallback(async () => {
-    if (!serviceRef.current) return;
+    if (!containerRef.current) return;
 
     try {
-      const unsyncedOrders = await serviceRef.current.getUnsyncedOrders();
+      const unsyncedOrders = await containerRef.current.checkoutService.getUnsyncedOrders();
       if (mountedRef.current) {
         setUnsyncedOrdersCount(unsyncedOrders.length);
       }
@@ -226,10 +225,10 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
 
   // Cart operations
   const addToCart = useCallback(async (product: CartProduct, quantity: number = 1) => {
-    if (!serviceRef.current) return;
+    if (!containerRef.current) return;
 
     try {
-      const newBasket = await serviceRef.current.addItem({
+      const newBasket = await containerRef.current.basketService.addItem({
         productId: product.id,
         variantId: product.variantId,
         sku: product.sku,
@@ -253,10 +252,10 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   }, []);
 
   const removeFromCart = useCallback(async (itemId: string) => {
-    if (!serviceRef.current) return;
+    if (!containerRef.current) return;
 
     try {
-      const newBasket = await serviceRef.current.removeItem(itemId);
+      const newBasket = await containerRef.current.basketService.removeItem(itemId);
       if (mountedRef.current) {
         setBasket(newBasket);
         setError(null);
@@ -269,10 +268,10 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   }, []);
 
   const updateQuantity = useCallback(async (itemId: string, quantity: number) => {
-    if (!serviceRef.current) return;
+    if (!containerRef.current) return;
 
     try {
-      const newBasket = await serviceRef.current.updateItemQuantity(itemId, quantity);
+      const newBasket = await containerRef.current.basketService.updateItemQuantity(itemId, quantity);
       if (mountedRef.current) {
         setBasket(newBasket);
         setError(null);
@@ -305,10 +304,10 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   );
 
   const clearCart = useCallback(async () => {
-    if (!serviceRef.current) return;
+    if (!containerRef.current) return;
 
     try {
-      await serviceRef.current.clearBasket();
+      await containerRef.current.basketService.clearBasket();
       await refreshBasket();
     } catch (err) {
       if (mountedRef.current) {
@@ -319,10 +318,10 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
 
   // Customer and discount operations
   const setCustomer = useCallback(async (email?: string, name?: string) => {
-    if (!serviceRef.current) return;
+    if (!containerRef.current) return;
 
     try {
-      const newBasket = await serviceRef.current.setCustomer(email, name);
+      const newBasket = await containerRef.current.basketService.setCustomer(email, name);
       if (mountedRef.current) {
         setBasket(newBasket);
         setError(null);
@@ -335,10 +334,10 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   }, []);
 
   const setNote = useCallback(async (note: string) => {
-    if (!serviceRef.current) return;
+    if (!containerRef.current) return;
 
     try {
-      const newBasket = await serviceRef.current.setNote(note);
+      const newBasket = await containerRef.current.basketService.setNote(note);
       if (mountedRef.current) {
         setBasket(newBasket);
         setError(null);
@@ -351,10 +350,10 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   }, []);
 
   const applyDiscount = useCallback(async (code: string) => {
-    if (!serviceRef.current) return;
+    if (!containerRef.current) return;
 
     try {
-      const newBasket = await serviceRef.current.applyDiscount(code);
+      const newBasket = await containerRef.current.basketService.applyDiscount(code);
       if (mountedRef.current) {
         setBasket(newBasket);
         setError(null);
@@ -367,10 +366,10 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   }, []);
 
   const removeDiscount = useCallback(async () => {
-    if (!serviceRef.current) return;
+    if (!containerRef.current) return;
 
     try {
-      const newBasket = await serviceRef.current.removeDiscount();
+      const newBasket = await containerRef.current.basketService.removeDiscount();
       if (mountedRef.current) {
         setBasket(newBasket);
         setError(null);
@@ -385,10 +384,10 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   // Checkout operations
   const startCheckout = useCallback(
     async (platform?: ECommercePlatform): Promise<LocalOrder | null> => {
-      if (!serviceRef.current) return null;
+      if (!containerRef.current) return null;
 
       try {
-        const order = await serviceRef.current.startCheckout(platform, user?.id, user?.username);
+        const order = await containerRef.current.checkoutService.startCheckout(platform, user?.id, user?.username);
         if (mountedRef.current) {
           setCurrentOrder(order);
           setError(null);
@@ -405,10 +404,10 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   );
 
   const markPaymentProcessing = useCallback(async (orderId: string) => {
-    if (!serviceRef.current) return;
+    if (!containerRef.current) return;
 
     try {
-      const order = await serviceRef.current.markPaymentProcessing(orderId);
+      const order = await containerRef.current.checkoutService.markPaymentProcessing(orderId);
       if (mountedRef.current) {
         setCurrentOrder(order);
         setError(null);
@@ -422,12 +421,12 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
 
   const completePayment = useCallback(
     async (orderId: string, paymentMethod: string, transactionId?: string): Promise<CheckoutResult> => {
-      if (!serviceRef.current) {
+      if (!containerRef.current) {
         return { success: false, orderId, error: 'Service not initialized' };
       }
 
       try {
-        const result = await serviceRef.current.completePayment(orderId, paymentMethod, transactionId);
+        const result = await containerRef.current.checkoutService.completePayment(orderId, paymentMethod, transactionId);
 
         if (result.success && mountedRef.current) {
           await refreshBasket();
@@ -447,10 +446,10 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   );
 
   const cancelOrder = useCallback(async (orderId: string) => {
-    if (!serviceRef.current) return;
+    if (!containerRef.current) return;
 
     try {
-      await serviceRef.current.cancelOrder(orderId);
+      await containerRef.current.checkoutService.cancelOrder(orderId);
       if (mountedRef.current) {
         setCurrentOrder(null);
         setError(null);
@@ -465,12 +464,12 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   // Sync operations
   const syncOrderToPlatform = useCallback(
     async (orderId: string): Promise<CheckoutResult> => {
-      if (!serviceRef.current) {
+      if (!containerRef.current) {
         return { success: false, orderId, error: 'Service not initialized' };
       }
 
       try {
-        const result = await serviceRef.current.syncOrderToPlatform(orderId);
+        const result = await containerRef.current.orderSyncService.syncOrderToPlatform(orderId);
         if (result.success) {
           await refreshUnsyncedCount();
         }
@@ -483,12 +482,12 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   );
 
   const syncAllPendingOrders = useCallback(async (): Promise<SyncResult> => {
-    if (!serviceRef.current) {
+    if (!containerRef.current) {
       return { synced: 0, failed: 0, errors: [] };
     }
 
     try {
-      const result = await serviceRef.current.syncAllPendingOrders();
+      const result = await containerRef.current.orderSyncService.syncAllPendingOrders();
       await refreshUnsyncedCount();
       return result;
     } catch (err) {
@@ -497,13 +496,13 @@ export const BasketProvider = ({ children }: Readonly<{ children: ReactNode }>) 
   }, [refreshUnsyncedCount]);
 
   const getUnsyncedOrders = useCallback(async (): Promise<LocalOrder[]> => {
-    if (!serviceRef.current) return [];
-    return serviceRef.current.getUnsyncedOrders();
+    if (!containerRef.current) return [];
+    return containerRef.current.checkoutService.getUnsyncedOrders();
   }, []);
 
   const getLocalOrders = useCallback(async (status?: LocalOrderStatus): Promise<LocalOrder[]> => {
-    if (!serviceRef.current) return [];
-    return serviceRef.current.getLocalOrders(status);
+    if (!containerRef.current) return [];
+    return containerRef.current.checkoutService.getLocalOrders(status);
   }, []);
 
   // Sync queue status

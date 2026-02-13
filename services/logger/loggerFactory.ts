@@ -1,4 +1,4 @@
-import { LoggerInterface, LogLevel } from './LoggerInterface';
+import { LoggerInterface, LogLevel, LogTransport } from './LoggerInterface';
 import { ReactNativeLogger } from './ReactNativeLogger';
 
 /**
@@ -54,5 +54,36 @@ export class LoggerFactory {
    */
   public setLogger(logger: LoggerInterface): void {
     this.currentLogger = logger;
+  }
+
+  // ── Transport management ────────────────────────────────────────────
+
+  /**
+   * Register a log transport (Sentry, Datadog, New Relic, etc.).
+   * Transports receive every log entry at or above their configured minLevel.
+   */
+  public addTransport(transport: LogTransport): void {
+    if (this.currentLogger instanceof ReactNativeLogger) {
+      this.currentLogger.addTransport(transport);
+    }
+  }
+
+  /**
+   * Remove a previously registered transport by name.
+   */
+  public removeTransport(name: string): void {
+    if (this.currentLogger instanceof ReactNativeLogger) {
+      this.currentLogger.removeTransport(name);
+    }
+  }
+
+  /**
+   * List currently registered transport names.
+   */
+  public getTransportNames(): string[] {
+    if (this.currentLogger instanceof ReactNativeLogger) {
+      return this.currentLogger.getTransportNames();
+    }
+    return [];
   }
 }

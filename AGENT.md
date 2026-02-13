@@ -20,20 +20,24 @@ RetailPOS/
 │   ├── order/              # Order-related screens
 │   └── onboarding/         # Onboarding flow screens
 ├── services/               # Business logic and API integrations
-│   ├── basket/             # Shopping cart services
+│   ├── basket/             # Shopping cart (BasketService — CRUD only)
+│   ├── checkout/           # CheckoutService (payment, order queries)
+│   ├── config/             # POSConfigService + ServiceConfigBridge
+│   ├── drawer/             # Cash drawer peripheral (decoupled from printer)
 │   ├── category/           # Category management
 │   ├── inventory/          # Inventory tracking
+│   ├── logger/             # LoggerFactory + pluggable LogTransport providers
 │   ├── order/              # Order processing
-│   ├── payment/            # Payment processing
-│   ├── printer/            # Receipt/report printing
+│   ├── payment/            # Payment processing (disconnect is async-compatible)
+│   ├── printer/            # Receipt printing + openDrawer() ESC/POS
 │   ├── product/            # Product management
-│   ├── scanner/            # Barcode scanning
+│   ├── scanner/            # Barcode scanning + onDisconnect callback
 │   ├── search/             # Search functionality
 │   ├── storage/            # SQLite storage
-│   ├── sync/               # Data synchronization
+│   ├── sync/               # OrderSyncService + BackgroundSyncService (exponential backoff)
 │   └── [domain]/           # Other domain services
 │       └── platforms/      # Platform-specific implementations
-├── types/                  # TypeScript type definitions
+├── types/                  # Shared TypeScript types (basket.ts, order.ts)
 └── utils/                  # Utility functions and helpers
 ```
 
@@ -213,6 +217,48 @@ export const useProducts = (platform?: ECommercePlatform): UseProductsReturn => 
   return { products, isLoading, error, fetchProducts, refresh: fetchProducts };
 };
 ```
+
+---
+
+## 🏗️ Key Architectural Decisions
+
+### Service Split: Basket → Checkout → Sync
+
+The monolithic `BasketService` was split into three focused services:
+
+- **BasketService** — cart CRUD only (add/remove/update items, totals)
+- **CheckoutService** — start checkout, complete payment, order queries
+- **OrderSyncService** — sync paid orders to e-commerce platforms
+
+All use **constructor injection** with `LoggerInterface`. Wired by `basketServiceFactory.ts` into a `ServiceContainer`.
+
+### POS Configuration (`services/config/POSConfigService.ts`)
+
+`POSConfigService` — singleton backed by `SettingsRepository` (which delegates to `KeyValueRepository`):
+
+- **No built-in defaults** — every value must be explicitly set during onboarding
+- `posConfig.load()` at app startup, `posConfig.update(field, value)` persists immediately
+- `posConfig.isConfigured` — false until all required fields are set
+- `DEFAULT_TAX_RATE()` and `MAX_SYNC_RETRIES()` are **functions** (not constants)
+- Config fields: `taxRate`, `maxSyncRetries`, `storeName`, `storeAddress`, `storePhone`, `currencySymbol`, `drawerOpenOnCash`
+
+### Logger with Pluggable Transports
+
+- `LogTransport` interface: `{ name, minLevel?, log(entry) }`
+- Add Sentry/Datadog/NewRelic via `LoggerFactory.getInstance().addTransport(...)`
+- Child loggers share parent's transports
+- **ErrorReportingService was removed** — all services use `LoggerInterface` directly
+
+### Cash Drawer (Decoupled from Printer)
+
+- `CashDrawerServiceInterface` — standalone peripheral with `driverType`, `open()`, `isOpen()`
+- `PrinterDrawerDriver` (ESC/POS via printer) and `NoOpDrawerDriver` (no hardware)
+- `CheckoutResult.openDrawer?: boolean` — service decides _if_, UI _does_ the opening
+
+### Background Sync
+
+- `OrderSyncService` — per-order retry count, `MAX_SYNC_RETRIES()` enforcement
+- `BackgroundSyncService` — exponential backoff (`base × 2^failures`, capped 15 min), pauses when backgrounded
 
 ---
 
@@ -571,9 +617,35 @@ export enum ECommercePlatform {
 Place tests adjacent to source files:
 
 ```
-components/
-├── Button.tsx
-├── Button.test.tsx
+services/basket/
+├── BasketService.ts
+├── BasketService.test.ts
+config/
+├── pos.ts
+├── pos.test.ts
+```
+
+### Required Mocks for Service Tests
+
+Native modules (expo-sqlite, react-native) are unavailable in Jest. Always mock:
+
+```typescript
+// Mock uuid to avoid react-native dependency
+jest.mock('../../utils/uuid', () => ({
+  generateUUID: () => `mock-uuid-${++counter}`,
+}));
+
+// Mock config/pos to avoid expo-sqlite dependency
+jest.mock('../../config/pos', () => ({
+  DEFAULT_TAX_RATE: () => 0.08,
+  MAX_SYNC_RETRIES: () => 3,
+  posConfig: { values: { taxRate: 0.08, maxSyncRetries: 3, drawerOpenOnCash: true }, load: jest.fn() },
+}));
+
+// Mock DB layer directly for config tests
+jest.mock('../utils/db', () => ({
+  db: { getFirstAsync: jest.fn(), getAllAsync: jest.fn(), runAsync: jest.fn() },
+}));
 ```
 
 ### Test Structure
@@ -640,6 +712,9 @@ describe('Button', () => {
 7. **Clean up effects** - Return cleanup functions from `useEffect`
 8. **Use theme constants** - Never hardcode colors, spacing, or typography
 9. **Avoid index files** - Do not create index.ts or index.tsx files solely for re-exporting multiple files in a folder. Import files directly to save time and avoid unnecessary indirection.
+10. **No hardcoded config** - Use `posConfig.values` for tax rates, store info, currency, etc. Never hardcode business configuration values.
+11. **Logger over console** - Use `LoggerInterface` (via constructor injection) for all service logging. Never use `console.log/error` in services.
+12. **Drawer is UI-driven** - The `CheckoutService` sets `openDrawer` on `CheckoutResult`. The UI layer reads the flag and calls the drawer service. Services never open hardware directly.
 
 ---
 
@@ -655,4 +730,4 @@ describe('Button', () => {
 
 ---
 
-_Last updated: February 2026_
+_Last updated: February 13, 2026_

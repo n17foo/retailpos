@@ -39,4 +39,17 @@ export interface ScannerServiceInterface {
    * @returns Promise resolving to list of available devices
    */
   discoverDevices(): Promise<Array<{ id: string; name: string }>>;
+
+  /**
+   * Register a callback for unexpected disconnection events.
+   * @param callback Called with the device ID (if known) when the connection drops
+   * @returns A subscription ID that can be used to unregister
+   */
+  onDisconnect?(callback: (deviceId?: string) => void): string;
+
+  /**
+   * Unregister a previously registered disconnect callback.
+   * @param subscriptionId The ID returned from onDisconnect
+   */
+  offDisconnect?(subscriptionId: string): void;
 }

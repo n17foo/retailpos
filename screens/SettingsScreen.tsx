@@ -11,12 +11,14 @@ import EcommerceSettingsTab from './settings/EcommerceSettingsTab';
 import GenericSettingsTab from './settings/GenericSettingsTab';
 import OfflineManagementTab from './settings/OfflineManagementTab';
 import ReceiptSettingsTab from './settings/ReceiptSettingsTab';
+import POSConfigSettingsTab from './settings/POSConfigSettingsTab';
 
-type SettingsTab = 'generic' | 'payment' | 'printer' | 'scanner' | 'ecommerce' | 'offline' | 'receipt';
+type SettingsTab = 'generic' | 'pos' | 'payment' | 'printer' | 'scanner' | 'ecommerce' | 'offline' | 'receipt';
 type SaveStatus = 'unsaved' | 'saving' | 'saved';
 
 const TAB_CONFIG: { id: SettingsTab; label: string; icon: string }[] = [
   { id: 'generic', label: 'General', icon: '⚙️' },
+  { id: 'pos', label: 'POS Config', icon: '🏪' },
   { id: 'payment', label: 'Payment', icon: '💳' },
   { id: 'printer', label: 'Printer', icon: '🖨' },
   { id: 'scanner', label: 'Scanner', icon: '📷' },
@@ -64,6 +66,8 @@ const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
         return <EcommerceSettingsTab />;
       case 'generic':
         return <GenericSettingsTab />;
+      case 'pos':
+        return <POSConfigSettingsTab />;
       case 'offline':
         return <OfflineManagementTab />;
       case 'receipt':

@@ -1,10 +1,11 @@
 import { logger, consoleTransport } from 'react-native-logs';
-import { LoggerInterface, LogLevel, LogPayload } from './LoggerInterface';
+import { LoggerInterface, LogLevel, LogPayload, LogTransport, LogEntry } from './LoggerInterface';
 
 export class ReactNativeLogger implements LoggerInterface {
   private logger: any;
   private context: string;
   private currentLevel: LogLevel;
+  private transports: LogTransport[] = [];
 
   constructor(context: string = 'App', level: LogLevel = LogLevel.INFO) {
     this.context = context;
@@ -52,41 +53,53 @@ export class ReactNativeLogger implements LoggerInterface {
   }
 
   debug(payload: LogPayload | string, ...args: any[]): void {
+    const message = typeof payload === 'string' ? payload : payload.message;
+    const metadata = typeof payload === 'string' ? undefined : (({ message: _m, ...rest }) => rest)(payload);
     if (typeof payload === 'string') {
       this.logger.debug(`[${this.context}] ${payload}`, ...args);
     } else {
-      const { message, ...rest } = payload;
-      this.logger.debug(`[${this.context}] ${message}`, { ...rest, ...args });
+      const { message: _m, ...rest } = payload;
+      this.logger.debug(`[${this.context}] ${_m}`, { ...rest, ...args });
     }
+    this.forward(LogLevel.DEBUG, message, undefined, metadata);
   }
 
   info(payload: LogPayload | string, ...args: any[]): void {
+    const message = typeof payload === 'string' ? payload : payload.message;
+    const metadata = typeof payload === 'string' ? undefined : (({ message: _m, ...rest }) => rest)(payload);
     if (typeof payload === 'string') {
       this.logger.info(`[${this.context}] ${payload}`, ...args);
     } else {
-      const { message, ...rest } = payload;
-      this.logger.info(`[${this.context}] ${message}`, { ...rest, ...args });
+      const { message: _m, ...rest } = payload;
+      this.logger.info(`[${this.context}] ${_m}`, { ...rest, ...args });
     }
+    this.forward(LogLevel.INFO, message, undefined, metadata);
   }
 
   warn(payload: LogPayload | string, ...args: any[]): void {
+    const message = typeof payload === 'string' ? payload : payload.message;
+    const metadata = typeof payload === 'string' ? undefined : (({ message: _m, ...rest }) => rest)(payload);
     if (typeof payload === 'string') {
       this.logger.warn(`[${this.context}] ${payload}`, ...args);
     } else {
-      const { message, ...rest } = payload;
-      this.logger.warn(`[${this.context}] ${message}`, { ...rest, ...args });
+      const { message: _m, ...rest } = payload;
+      this.logger.warn(`[${this.context}] ${_m}`, { ...rest, ...args });
     }
+    this.forward(LogLevel.WARN, message, undefined, metadata);
   }
 
   error(payload: LogPayload | string, error?: Error, ...args: any[]): void {
+    const message = typeof payload === 'string' ? payload : payload.message;
+    const metadata = typeof payload === 'string' ? undefined : (({ message: _m, ...rest }) => rest)(payload);
     if (typeof payload === 'string') {
       const errorDetails = error ? { error: error.message, stack: error.stack } : {};
       this.logger.error(`[${this.context}] ${payload}`, { ...errorDetails, ...args });
     } else {
-      const { message, ...rest } = payload;
+      const { message: _m, ...rest } = payload;
       const errorDetails = error ? { error: error.message, stack: error.stack } : {};
-      this.logger.error(`[${this.context}] ${message}`, { ...rest, ...errorDetails, ...args });
+      this.logger.error(`[${this.context}] ${_m}`, { ...rest, ...errorDetails, ...args });
     }
+    this.forward(LogLevel.ERROR, message, error, metadata);
   }
 
   setLevel(level: LogLevel): void {
@@ -99,7 +112,50 @@ export class ReactNativeLogger implements LoggerInterface {
   }
 
   createChild(context: string): LoggerInterface {
-    return new ReactNativeLogger(`${this.context}:${context}`, this.currentLevel);
+    const child = new ReactNativeLogger(`${this.context}:${context}`, this.currentLevel);
+    // Share transports with child loggers
+    child.transports = this.transports;
+    return child;
+  }
+
+  // ── Transport management ────────────────────────────────────────────
+
+  addTransport(transport: LogTransport): void {
+    this.transports.push(transport);
+  }
+
+  removeTransport(name: string): void {
+    this.transports = this.transports.filter(t => t.name !== name);
+  }
+
+  getTransportNames(): string[] {
+    return this.transports.map(t => t.name);
+  }
+
+  private forward(level: LogLevel, message: string, error?: Error, metadata?: Record<string, unknown>): void {
+    if (this.transports.length === 0) return;
+
+    const entry: LogEntry = {
+      level,
+      context: this.context,
+      message,
+      error,
+      metadata,
+      timestamp: new Date(),
+    };
+
+    const levelOrder = { [LogLevel.DEBUG]: 0, [LogLevel.INFO]: 1, [LogLevel.WARN]: 2, [LogLevel.ERROR]: 3 };
+
+    for (const transport of this.transports) {
+      const minLevel = transport.minLevel ?? LogLevel.DEBUG;
+      if (levelOrder[level] >= levelOrder[minLevel]) {
+        try {
+          transport.log(entry);
+        } catch {
+          // Never let a broken transport crash the app
+        }
+      }
+    }
   }
 
   private mapLogLevel(level: LogLevel): number {

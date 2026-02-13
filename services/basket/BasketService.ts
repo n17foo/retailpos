@@ -1,145 +1,28 @@
-import { OrderServiceFactory } from '../order/orderServiceFactory';
-import { Order, OrderLineItem } from '../order/OrderServiceInterface';
-import { LoggerFactory } from '../logger/loggerFactory';
-import { ECommercePlatform } from '../../utils/platforms';
-import {
-  BasketServiceInterface,
-  Basket,
-  BasketItem,
-  LocalOrder,
-  LocalOrderStatus,
-  CheckoutResult,
-  SyncResult,
-} from './BasketServiceInterface';
-import { multiplyMoney, sumMoney, calculateTax, calculateLineTotal, roundMoney } from '../../utils/money';
+import { BasketServiceInterface } from './BasketServiceInterface';
+import { Basket, BasketItem } from './basket';
+import { BasketRepository, BasketRow } from '../../repositories/BasketRepository';
+import { LoggerInterface } from '../logger/LoggerInterface';
+import { DEFAULT_TAX_RATE } from '../config/POSConfigService';
+import { multiplyMoney, sumMoney, calculateTax, roundMoney } from '../../utils/money';
 import { generateUUID } from '../../utils/uuid';
-import { basketRepository, BasketRow, LocalOrderRow } from '../../repositories/BasketRepository';
 
 /**
- * Default tax rate (8%)
- */
-const DEFAULT_TAX_RATE = 0.08;
-
-/**
- * Basket service implementation
- * Manages basket state locally and syncs orders to platform
+ * Basket service — cart CRUD only.
+ * Checkout, payment and sync live in their own services.
  */
 export class BasketService implements BasketServiceInterface {
-  private logger = LoggerFactory.getInstance().createLogger('BasketService');
   private currentBasketId: string | null = null;
-  private orderServiceFactory: OrderServiceFactory;
+
+  constructor(
+    private basketRepo: BasketRepository,
+    private logger: LoggerInterface
+  ) {}
 
   async initialize(): Promise<void> {
-    this.logger.info('Initializing basket service...');
-
-    // Ensure we have a current basket
     await this.getOrCreateBasket();
-    this.logger.info('Basket service initialized');
   }
 
-  /**
-   * Generate a unique ID
-   */
-  private generateId(): string {
-    return generateUUID();
-  }
-
-  /**
-   * Get or create the current basket
-   */
-  private async getOrCreateBasket(): Promise<Basket> {
-    try {
-      // Try to get existing active basket
-      const existingBasket = await basketRepository.findActiveBasket();
-
-      if (existingBasket) {
-        this.currentBasketId = existingBasket.id;
-        return this.mapDbBasketToBasket(existingBasket);
-      }
-
-      // Create new basket
-      const newBasketId = this.generateId();
-
-      await basketRepository.createBasket({
-        id: newBasketId,
-        items: '[]',
-        subtotal: 0,
-        tax: 0,
-        total: 0,
-      });
-
-      this.currentBasketId = newBasketId;
-
-      const now = Date.now();
-      return {
-        id: newBasketId,
-        items: [],
-        subtotal: 0,
-        tax: 0,
-        total: 0,
-        createdAt: new Date(now),
-        updatedAt: new Date(now),
-      };
-    } catch (error) {
-      this.logger.error({ message: 'Failed to get or create basket' }, error as Error);
-      throw error;
-    }
-  }
-
-  /**
-   * Map database basket row to Basket interface
-   */
-  private mapDbBasketToBasket(row: BasketRow): Basket {
-    return {
-      id: row.id,
-      items: JSON.parse(row.items) as BasketItem[],
-      subtotal: row.subtotal,
-      tax: row.tax,
-      total: row.total,
-      discountAmount: row.discount_amount ?? undefined,
-      discountCode: row.discount_code ?? undefined,
-      customerEmail: row.customer_email ?? undefined,
-      customerName: row.customer_name ?? undefined,
-      note: row.note ?? undefined,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-    };
-  }
-
-  /**
-   * Calculate basket totals using integer-cent math to avoid floating point errors.
-   */
-  private calculateTotals(items: BasketItem[], discountAmount: number = 0): { subtotal: number; tax: number; total: number } {
-    const lineTotals = items.map(item => multiplyMoney(item.price, item.quantity));
-    const subtotal = sumMoney(lineTotals);
-
-    const taxableLineTotals = items.filter(item => item.taxable).map(item => multiplyMoney(item.price, item.quantity));
-    const taxableAmount = sumMoney(taxableLineTotals);
-    const tax = calculateTax(taxableAmount, DEFAULT_TAX_RATE);
-
-    const total = Math.max(0, roundMoney(subtotal + tax - discountAmount));
-
-    return { subtotal, tax, total };
-  }
-
-  /**
-   * Update basket in database
-   */
-  private async updateBasketInDb(basket: Basket): Promise<void> {
-    await basketRepository.updateBasket(basket.id, {
-      items: JSON.stringify(basket.items),
-      subtotal: basket.subtotal,
-      tax: basket.tax,
-      total: basket.total,
-      discountAmount: basket.discountAmount ?? null,
-      discountCode: basket.discountCode ?? null,
-      customerEmail: basket.customerEmail ?? null,
-      customerName: basket.customerName ?? null,
-      note: basket.note ?? null,
-    });
-  }
-
-  // ============ Basket Operations ============
+  // ── Public API ──────────────────────────────────────────────────────
 
   async getBasket(): Promise<Basket> {
     return this.getOrCreateBasket();
@@ -148,55 +31,28 @@ export class BasketService implements BasketServiceInterface {
   async addItem(item: Omit<BasketItem, 'id'>): Promise<Basket> {
     const basket = await this.getOrCreateBasket();
 
-    // Check if item already exists (by productId and variantId)
     const existingIndex = basket.items.findIndex(i => i.productId === item.productId && i.variantId === item.variantId);
 
     if (existingIndex !== -1) {
-      // Update quantity
       basket.items[existingIndex].quantity += item.quantity;
     } else {
-      // Add new item
-      const newItem: BasketItem = {
-        ...item,
-        id: this.generateId(),
-      };
-      basket.items.push(newItem);
+      basket.items.push({ ...item, id: generateUUID() });
     }
 
-    // Recalculate totals
-    const totals = this.calculateTotals(basket.items, basket.discountAmount);
-    basket.subtotal = totals.subtotal;
-    basket.tax = totals.tax;
-    basket.total = totals.total;
-    basket.updatedAt = new Date();
-
-    await this.updateBasketInDb(basket);
-    return basket;
+    return this.recalculateAndSave(basket);
   }
 
   async updateItemQuantity(itemId: string, quantity: number): Promise<Basket> {
     const basket = await this.getOrCreateBasket();
 
     if (quantity <= 0) {
-      // Remove item
       basket.items = basket.items.filter(i => i.id !== itemId);
     } else {
-      // Update quantity
       const item = basket.items.find(i => i.id === itemId);
-      if (item) {
-        item.quantity = quantity;
-      }
+      if (item) item.quantity = quantity;
     }
 
-    // Recalculate totals
-    const totals = this.calculateTotals(basket.items, basket.discountAmount);
-    basket.subtotal = totals.subtotal;
-    basket.tax = totals.tax;
-    basket.total = totals.total;
-    basket.updatedAt = new Date();
-
-    await this.updateBasketInDb(basket);
-    return basket;
+    return this.recalculateAndSave(basket);
   }
 
   async removeItem(itemId: string): Promise<Basket> {
@@ -205,97 +61,105 @@ export class BasketService implements BasketServiceInterface {
 
   async clearBasket(): Promise<void> {
     if (!this.currentBasketId) return;
-
-    await basketRepository.clearBasket(this.currentBasketId);
+    await this.basketRepo.clearBasket(this.currentBasketId);
+    this.currentBasketId = null;
   }
 
   async applyDiscount(code: string): Promise<Basket> {
     const basket = await this.getOrCreateBasket();
-
     // TODO: Validate discount code against platform/local discounts
-    // For now, we'll just store the code
     basket.discountCode = code;
-    basket.discountAmount = 0; // Would be calculated based on discount rules
+    basket.discountAmount = 0;
     basket.updatedAt = new Date();
-
     await this.updateBasketInDb(basket);
     return basket;
   }
 
   async removeDiscount(): Promise<Basket> {
     const basket = await this.getOrCreateBasket();
-
     basket.discountCode = undefined;
     basket.discountAmount = undefined;
-
-    // Recalculate totals
-    const totals = this.calculateTotals(basket.items);
-    basket.subtotal = totals.subtotal;
-    basket.tax = totals.tax;
-    basket.total = totals.total;
-    basket.updatedAt = new Date();
-
-    await this.updateBasketInDb(basket);
-    return basket;
+    return this.recalculateAndSave(basket);
   }
 
   async setCustomer(email?: string, name?: string): Promise<Basket> {
     const basket = await this.getOrCreateBasket();
-
     basket.customerEmail = email;
     basket.customerName = name;
     basket.updatedAt = new Date();
-
     await this.updateBasketInDb(basket);
     return basket;
   }
 
   async setNote(note: string): Promise<Basket> {
     const basket = await this.getOrCreateBasket();
-
     basket.note = note;
     basket.updatedAt = new Date();
-
     await this.updateBasketInDb(basket);
     return basket;
   }
 
-  // ============ Checkout Operations ============
+  // ── Private helpers ─────────────────────────────────────────────────
 
-  async startCheckout(platform?: ECommercePlatform, cashierId?: string, cashierName?: string): Promise<LocalOrder> {
-    const basket = await this.getOrCreateBasket();
+  private async getOrCreateBasket(): Promise<Basket> {
+    try {
+      const existing = await this.basketRepo.findActiveBasket();
 
-    if (basket.items.length === 0) {
-      throw new Error('Cannot checkout with empty basket');
+      if (existing) {
+        this.currentBasketId = existing.id;
+        return this.mapRow(existing);
+      }
+
+      const id = generateUUID();
+      await this.basketRepo.createBasket({ id, items: '[]', subtotal: 0, tax: 0, total: 0 });
+      this.currentBasketId = id;
+
+      const now = Date.now();
+      return { id, items: [], subtotal: 0, tax: 0, total: 0, createdAt: new Date(now), updatedAt: new Date(now) };
+    } catch (error) {
+      this.logger.error({ message: 'Failed to get or create basket' }, error as Error);
+      throw error;
     }
+  }
 
-    const now = Date.now();
-    const orderId = this.generateId();
-
-    const localOrder: LocalOrder = {
-      id: orderId,
-      platform,
-      items: [...basket.items],
-      subtotal: basket.subtotal,
-      tax: basket.tax,
-      total: basket.total,
-      discountAmount: basket.discountAmount,
-      discountCode: basket.discountCode,
-      customerEmail: basket.customerEmail,
-      customerName: basket.customerName,
-      note: basket.note,
-      cashierId,
-      cashierName,
-      status: 'pending',
-      syncStatus: 'pending',
-      createdAt: new Date(now),
-      updatedAt: new Date(now),
+  private mapRow(row: BasketRow): Basket {
+    return {
+      id: row.id,
+      items: JSON.parse(row.items) as BasketItem[],
+      subtotal: row.subtotal,
+      tax: row.tax,
+      total: row.total,
+      discountAmount: row.discount_amount ?? undefined,
+      discountCode: row.discount_code ?? undefined,
+      customerEmail: row.customer_email ?? undefined,
+      customerName: row.customer_name ?? undefined,
+      note: row.note ?? undefined,
+      createdAt: new Date(row.created_at),
+      updatedAt: new Date(row.updated_at),
     };
+  }
 
-    // Save to local orders table
-    await basketRepository.createLocalOrder({
-      id: orderId,
-      platform: platform ?? null,
+  private calculateTotals(items: BasketItem[], discountAmount: number = 0) {
+    const lineTotals = items.map(item => multiplyMoney(item.price, item.quantity));
+    const subtotal = sumMoney(lineTotals);
+    const taxableAmount = sumMoney(items.filter(i => i.taxable).map(i => multiplyMoney(i.price, i.quantity)));
+    const tax = calculateTax(taxableAmount, DEFAULT_TAX_RATE());
+    const total = Math.max(0, roundMoney(subtotal + tax - discountAmount));
+    return { subtotal, tax, total };
+  }
+
+  private async recalculateAndSave(basket: Basket): Promise<Basket> {
+    const totals = this.calculateTotals(basket.items, basket.discountAmount);
+    basket.subtotal = totals.subtotal;
+    basket.tax = totals.tax;
+    basket.total = totals.total;
+    basket.updatedAt = new Date();
+    await this.updateBasketInDb(basket);
+    return basket;
+  }
+
+  private async updateBasketInDb(basket: Basket): Promise<void> {
+    await this.basketRepo.updateBasket(basket.id, {
       items: JSON.stringify(basket.items),
       subtotal: basket.subtotal,
       tax: basket.tax,
@@ -305,269 +169,6 @@ export class BasketService implements BasketServiceInterface {
       customerEmail: basket.customerEmail ?? null,
       customerName: basket.customerName ?? null,
       note: basket.note ?? null,
-      cashierId: cashierId ?? null,
-      cashierName: cashierName ?? null,
-    });
-
-    this.logger.info(`Created local order ${orderId} from basket`);
-    return localOrder;
-  }
-
-  async markPaymentProcessing(orderId: string): Promise<LocalOrder> {
-    await basketRepository.updateOrderStatus(orderId, 'processing');
-
-    const order = await this.getLocalOrder(orderId);
-    if (!order) {
-      throw new Error(`Order ${orderId} not found`);
-    }
-
-    return order;
-  }
-
-  async completePayment(orderId: string, paymentMethod: string, transactionId?: string): Promise<CheckoutResult> {
-    try {
-      // Update order status to paid
-      await basketRepository.updateOrderPayment(orderId, paymentMethod, transactionId ?? null);
-
-      // Clear the basket
-      await this.clearBasket();
-
-      // Create a new basket for next transaction
-      this.currentBasketId = null;
-      await this.getOrCreateBasket();
-
-      this.logger.info(`Payment completed for order ${orderId}`);
-
-      return {
-        success: true,
-        orderId,
-      };
-    } catch (error) {
-      this.logger.error({ message: `Failed to complete payment for order ${orderId}` }, error as Error);
-
-      // Mark order as failed
-      await basketRepository.updateOrderStatus(orderId, 'failed');
-
-      return {
-        success: false,
-        orderId,
-        error: (error as Error).message,
-      };
-    }
-  }
-
-  async cancelOrder(orderId: string): Promise<void> {
-    await basketRepository.updateOrderStatus(orderId, 'cancelled');
-
-    this.logger.info(`Order ${orderId} cancelled`);
-  }
-
-  // ============ Order Sync Operations ============
-
-  async syncOrderToPlatform(orderId: string): Promise<CheckoutResult> {
-    const localOrder = await this.getLocalOrder(orderId);
-
-    if (!localOrder) {
-      return {
-        success: false,
-        orderId,
-        error: 'Order not found',
-      };
-    }
-
-    if (localOrder.status !== 'paid') {
-      return {
-        success: false,
-        orderId,
-        error: 'Order must be paid before syncing',
-      };
-    }
-
-    if (localOrder.syncStatus === 'synced') {
-      return {
-        success: true,
-        orderId,
-        platformOrderId: localOrder.platformOrderId,
-      };
-    }
-
-    try {
-      // Get the order service for the platform
-      const orderService = this.orderServiceFactory.getService(localOrder.platform);
-
-      // Convert to platform order format
-      const platformOrder: Order = {
-        customerEmail: localOrder.customerEmail,
-        customerName: localOrder.customerName,
-        lineItems: this.basketItemsToLineItems(localOrder.items),
-        subtotal: localOrder.subtotal,
-        tax: localOrder.tax,
-        total: localOrder.total,
-        discounts: localOrder.discountCode
-          ? [{ code: localOrder.discountCode, amount: localOrder.discountAmount ?? 0, type: 'fixed_amount' }]
-          : undefined,
-        paymentStatus: 'paid',
-        note: localOrder.note,
-        createdAt: localOrder.createdAt,
-      };
-
-      // Create order on platform
-      const createdOrder = await orderService.createOrder(platformOrder);
-
-      // Update local order with platform ID
-      await basketRepository.updateOrderSyncSuccess(orderId, createdOrder.id ?? createdOrder.platformOrderId);
-
-      this.logger.info(`Order ${orderId} synced to platform as ${createdOrder.id}`);
-
-      return {
-        success: true,
-        orderId,
-        platformOrderId: createdOrder.id ?? createdOrder.platformOrderId,
-      };
-    } catch (error) {
-      const errorMessage = (error as Error).message;
-      this.logger.error({ message: `Failed to sync order ${orderId} to platform` }, error as Error);
-
-      // Check if this is a network error or server error that should be retried
-      const isRetryableError = this.isRetryableError(error);
-
-      if (isRetryableError) {
-        // For retryable errors, mark as pending and let the queue system handle retries
-        await basketRepository.updateOrderSyncError(orderId, 'pending', errorMessage);
-
-        this.logger.info(`Order ${orderId} queued for retry due to: ${errorMessage}`);
-
-        return {
-          success: false,
-          orderId,
-          error: `Order queued for retry: ${errorMessage}`,
-        };
-      } else {
-        // For non-retryable errors (like 4xx client errors), mark as failed
-        await basketRepository.updateOrderSyncError(orderId, 'failed', errorMessage);
-
-        return {
-          success: false,
-          orderId,
-          error: errorMessage,
-        };
-      }
-    }
-  }
-
-  async syncAllPendingOrders(): Promise<SyncResult> {
-    const unsyncedOrders = await this.getUnsyncedOrders();
-
-    const result: SyncResult = {
-      synced: 0,
-      failed: 0,
-      errors: [],
-    };
-
-    for (const order of unsyncedOrders) {
-      const syncResult = await this.syncOrderToPlatform(order.id);
-
-      if (syncResult.success) {
-        result.synced++;
-      } else {
-        result.failed++;
-        result.errors.push({
-          orderId: order.id,
-          error: syncResult.error ?? 'Unknown error',
-        });
-      }
-    }
-
-    this.logger.info(`Synced ${result.synced} orders, ${result.failed} failed`);
-    return result;
-  }
-
-  async getLocalOrders(status?: LocalOrderStatus): Promise<LocalOrder[]> {
-    const rows = await basketRepository.findLocalOrders(status);
-    return rows.map(row => this.mapDbRowToLocalOrder(row));
-  }
-
-  async getUnsyncedOrders(): Promise<LocalOrder[]> {
-    const rows = await basketRepository.findUnsyncedOrders();
-    return rows.map(row => this.mapDbRowToLocalOrder(row));
-  }
-
-  async getLocalOrder(orderId: string): Promise<LocalOrder | null> {
-    const row = await basketRepository.findLocalOrderById(orderId);
-    if (!row) return null;
-    return this.mapDbRowToLocalOrder(row);
-  }
-
-  /**
-   * Map database row to LocalOrder
-   */
-  private mapDbRowToLocalOrder(row: LocalOrderRow): LocalOrder {
-    return {
-      id: row.id,
-      platformOrderId: row.platform_order_id ?? undefined,
-      platform: row.platform as ECommercePlatform | undefined,
-      items: JSON.parse(row.items) as BasketItem[],
-      subtotal: row.subtotal,
-      tax: row.tax,
-      total: row.total,
-      discountAmount: row.discount_amount ?? undefined,
-      discountCode: row.discount_code ?? undefined,
-      cashierId: row.cashier_id ?? undefined,
-      cashierName: row.cashier_name ?? undefined,
-      customerEmail: row.customer_email ?? undefined,
-      customerName: row.customer_name ?? undefined,
-      note: row.note ?? undefined,
-      paymentMethod: row.payment_method ?? undefined,
-      paymentTransactionId: row.payment_transaction_id ?? undefined,
-      status: row.status as LocalOrderStatus,
-      syncStatus: row.sync_status as 'pending' | 'synced' | 'failed',
-      syncError: row.sync_error ?? undefined,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-      paidAt: row.paid_at ? new Date(row.paid_at) : undefined,
-      syncedAt: row.synced_at ? new Date(row.synced_at) : undefined,
-    };
-  }
-
-  /**
-   * Determine if an error is retryable (network errors or server errors)
-   */
-  private isRetryableError(error: any): boolean {
-    // Network errors (connection failures, timeouts, etc.)
-    if (error.name === 'TypeError' && error.message.includes('fetch')) {
-      return true;
-    }
-
-    // Check for HTTP status codes in error message
-    const errorMessage = error.message || '';
-    const statusMatch = errorMessage.match(/status (\d+)/);
-    if (statusMatch) {
-      const status = parseInt(statusMatch[1]);
-      // Retry on 5xx server errors, but not 4xx client errors
-      return status >= 500;
-    }
-
-    // Default to retry for unknown errors that might be transient
-    return true;
-  }
-
-  basketItemsToLineItems(items: BasketItem[]): OrderLineItem[] {
-    return items.map(item => {
-      const rate = item.taxRate ?? DEFAULT_TAX_RATE;
-      const { lineTotal, taxAmount } = calculateLineTotal(item.price, item.quantity, item.taxable, rate);
-      return {
-        productId: item.originalId ?? item.productId,
-        variantId: item.variantId,
-        sku: item.sku,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        taxable: item.taxable,
-        taxRate: rate,
-        taxAmount,
-        total: lineTotal,
-        properties: item.properties,
-      };
     });
   }
 }
