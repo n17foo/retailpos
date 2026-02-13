@@ -1,16 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Switch, Alert } from 'react-native';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../utils/theme';
-
-const CURRENCY_OPTIONS = [
-  { symbol: '£', label: 'GBP (£)' },
-  { symbol: '$', label: 'USD ($)' },
-  { symbol: '€', label: 'EUR (€)' },
-  { symbol: '¥', label: 'JPY (¥)' },
-  { symbol: 'A$', label: 'AUD (A$)' },
-  { symbol: 'C$', label: 'CAD (C$)' },
-  { symbol: 'Fr', label: 'CHF (Fr)' },
-];
+import { getCurrencyOptions } from '../../utils/currency';
 
 export interface POSSetupValues {
   storeName: string;
@@ -132,7 +123,7 @@ const POSSetupStep: React.FC<POSSetupStepProps> = ({ onBack, onComplete }) => {
           Currency <Text style={styles.required}>*</Text>
         </Text>
         <View style={styles.currencyGrid}>
-          {CURRENCY_OPTIONS.map(opt => (
+          {getCurrencyOptions().map(opt => (
             <TouchableOpacity
               key={opt.symbol}
               style={[styles.currencyOption, values.currencySymbol === opt.symbol && styles.currencyOptionActive]}

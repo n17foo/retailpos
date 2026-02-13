@@ -2,16 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Switch, Alert, ActivityIndicator } from 'react-native';
 import { posConfig } from '../../services/config/POSConfigService';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../utils/theme';
-
-const CURRENCY_OPTIONS = [
-  { symbol: '£', label: 'GBP (£)' },
-  { symbol: '$', label: 'USD ($)' },
-  { symbol: '€', label: 'EUR (€)' },
-  { symbol: '¥', label: 'JPY (¥)' },
-  { symbol: 'A$', label: 'AUD (A$)' },
-  { symbol: 'C$', label: 'CAD (C$)' },
-  { symbol: 'Fr', label: 'CHF (Fr)' },
-];
+import { getCurrencyOptions } from '../../utils/currency';
 
 const POSConfigSettingsTab: React.FC = () => {
   const [storeName, setStoreName] = useState('');
@@ -124,7 +115,7 @@ const POSConfigSettingsTab: React.FC = () => {
 
         <Text style={styles.label}>Currency</Text>
         <View style={styles.currencyGrid}>
-          {CURRENCY_OPTIONS.map(opt => (
+          {getCurrencyOptions().map(opt => (
             <TouchableOpacity
               key={opt.symbol}
               style={[styles.currencyOption, currencySymbol === opt.symbol && styles.currencyOptionActive]}

@@ -73,4 +73,12 @@ export function getCurrencyInfo(code: string): CurrencyInfo | undefined {
   return currencyInfoMap.get(code);
 }
 
+export function getCurrencyOptions() {
+  return CURRENCIES.map(c => ({
+    symbol: c.symbol,
+    label: `${c.name} (${c.symbol})`,
+    code: c.code,
+  }));
+}
+
 export const CURRENCY_CODES = CURRENCIES.map(c => c.code);
