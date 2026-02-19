@@ -14,6 +14,8 @@ const PrinterScreen = lazy(() => import('../screens/PrinterScreen'));
 const PaymentTerminalScreen = lazy(() => import('../screens/PaymentTerminalScreen'));
 const UsersScreen = lazy(() => import('../screens/UsersScreen'));
 const DailyOrdersScreen = lazy(() => import('../screens/DailyOrdersScreen'));
+const SyncQueueScreen = lazy(() => import('../screens/SyncQueueScreen'));
+const ReportingScreen = lazy(() => import('../screens/ReportingScreen'));
 
 const LazyFallback = () => (
   <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
@@ -76,6 +78,20 @@ const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ userRole, onLogout }) =
       label: 'Payment Terminal',
       onPress: () => navigation.navigate('PaymentTerminal', {}),
       color: lightColors.success,
+    },
+    {
+      key: 'SyncQueue' as const,
+      icon: 'sync' as const,
+      label: 'Sync Queue',
+      onPress: () => navigation.navigate('SyncQueue'),
+      color: lightColors.info,
+    },
+    {
+      key: 'Reports' as const,
+      icon: 'bar-chart' as const,
+      label: 'Reports',
+      onPress: () => navigation.navigate('Reports'),
+      color: lightColors.secondary,
     },
   ];
 
@@ -170,6 +186,20 @@ export const MoreNavigator: React.FC<MoreNavigatorProps> = ({ userRole, onLogout
         {props => (
           <Suspense fallback={<LazyFallback />}>
             <PaymentTerminalScreen {...props} />
+          </Suspense>
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="SyncQueue" options={{ title: 'Sync Queue' }}>
+        {() => (
+          <Suspense fallback={<LazyFallback />}>
+            <SyncQueueScreen />
+          </Suspense>
+        )}
+      </Stack.Screen>
+      <Stack.Screen name="Reports" options={{ title: 'Reports' }}>
+        {() => (
+          <Suspense fallback={<LazyFallback />}>
+            <ReportingScreen />
           </Suspense>
         )}
       </Stack.Screen>

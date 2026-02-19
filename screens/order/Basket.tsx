@@ -141,11 +141,23 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
         {item.sku && <Text style={styles.itemSku}>SKU: {item.sku}</Text>}
       </View>
       <View style={styles.quantityContainer}>
-        <TouchableOpacity style={styles.quantityButton} onPress={() => handleDecrement(item.id, item.quantity)}>
+        <TouchableOpacity
+          style={styles.quantityButton}
+          onPress={() => handleDecrement(item.id, item.quantity)}
+          accessibilityLabel={`Decrease quantity of ${item.name}`}
+          accessibilityRole="button"
+        >
           <Text style={styles.quantityButtonText}>-</Text>
         </TouchableOpacity>
-        <Text style={styles.quantity}>{item.quantity}</Text>
-        <TouchableOpacity style={styles.quantityButton} onPress={() => incrementQuantity(item.id)}>
+        <Text style={styles.quantity} accessibilityLabel={`Quantity: ${item.quantity}`}>
+          {item.quantity}
+        </Text>
+        <TouchableOpacity
+          style={styles.quantityButton}
+          onPress={() => incrementQuantity(item.id)}
+          accessibilityLabel={`Increase quantity of ${item.name}`}
+          accessibilityRole="button"
+        >
           <Text style={styles.quantityButtonText}>+</Text>
         </TouchableOpacity>
       </View>

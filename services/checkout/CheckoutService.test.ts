@@ -11,6 +11,11 @@ jest.mock('../config/POSConfigService', () => ({
   posConfig: { values: { taxRate: 0.08, maxSyncRetries: 3, drawerOpenOnCash: true }, load: jest.fn() },
 }));
 
+// Mock AuditLogService to avoid expo-sqlite dependency
+jest.mock('../audit/AuditLogService', () => ({
+  auditLogService: { log: jest.fn() },
+}));
+
 import { CheckoutService } from './CheckoutService';
 import { BasketServiceInterface } from '../basket/BasketServiceInterface';
 import { OrderRepository } from '../../repositories/OrderRepository';

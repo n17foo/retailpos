@@ -17,6 +17,7 @@ import ScannerSetupStep from './onboarding/ScannerSetupStep';
 import AdminUserStep from './onboarding/AdminUserStep';
 import POSSetupStep from './onboarding/POSSetupStep';
 import type { POSSetupValues } from './onboarding/POSSetupStep';
+import AuthMethodSetupStep from './onboarding/AuthMethodSetupStep';
 import SummaryStep from './onboarding/SummaryStep';
 import { posConfig } from '../services/config/POSConfigService';
 
@@ -27,6 +28,7 @@ type OnboardingStep =
   | 'offline_setup'
   | 'staff_setup'
   | 'pos_setup'
+  | 'auth_method_setup'
   | 'payment_provider_setup'
   | 'printer_setup'
   | 'scanner_setup'
@@ -136,7 +138,15 @@ const OnboardingScreen: React.FC = () => {
       maxSyncRetries: parseInt(values.maxSyncRetries, 10) || 3,
       drawerOpenOnCash: values.drawerOpenOnCash,
     });
+    setCurrentStep('auth_method_setup');
+  };
+
+  const handleNextFromAuthMethodSetup = () => {
     setCurrentStep('admin_user');
+  };
+
+  const handleBackToAuthMethodSetup = () => {
+    setCurrentStep('auth_method_setup');
   };
 
   const handleBackToPOSSetup = () => {
@@ -208,10 +218,18 @@ const OnboardingScreen: React.FC = () => {
         return <ScannerSetupStep onBack={handleBackToPrinter} onComplete={handleNextFromScanner} />;
       case 'pos_setup':
         return <POSSetupStep onBack={handleBackToScanner} onComplete={handleNextFromPOSSetup} />;
+      case 'auth_method_setup':
+        return (
+          <AuthMethodSetupStep
+            onBack={handleBackToPOSSetup}
+            onComplete={handleNextFromAuthMethodSetup}
+            selectedPlatform={selectedPlatform}
+          />
+        );
       case 'admin_user':
         return (
           <AdminUserStep
-            onBack={isOffline ? () => setCurrentStep('offline_setup') : handleBackToPOSSetup}
+            onBack={isOffline ? () => setCurrentStep('offline_setup') : handleBackToAuthMethodSetup}
             onComplete={handleNextFromAdminUser}
           />
         );
@@ -223,8 +241,8 @@ const OnboardingScreen: React.FC = () => {
   };
 
   const STEP_LABELS = isOffline
-    ? ['Welcome', 'Platform', 'Store Setup', 'Admin', 'Staff', 'Payment', 'Printer', 'Scanner', 'POS Config', 'Summary']
-    : ['Welcome', 'Platform', 'Configure', 'Payment', 'Printer', 'Scanner', 'POS Config', 'Admin', 'Summary'];
+    ? ['Welcome', 'Platform', 'Store Setup', 'Admin', 'Staff', 'Payment', 'Printer', 'Scanner', 'POS Config', 'Auth', 'Summary']
+    : ['Welcome', 'Platform', 'Configure', 'Payment', 'Printer', 'Scanner', 'POS Config', 'Auth', 'Admin', 'Summary'];
   const STEP_ORDER: OnboardingStep[] = isOffline
     ? [
         'welcome',
@@ -236,6 +254,7 @@ const OnboardingScreen: React.FC = () => {
         'printer_setup',
         'scanner_setup',
         'pos_setup',
+        'auth_method_setup',
         'summary',
       ]
     : [
@@ -246,6 +265,7 @@ const OnboardingScreen: React.FC = () => {
         'printer_setup',
         'scanner_setup',
         'pos_setup',
+        'auth_method_setup',
         'admin_user',
         'summary',
       ];

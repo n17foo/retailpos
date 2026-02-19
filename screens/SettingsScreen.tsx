@@ -12,19 +12,23 @@ import GenericSettingsTab from './settings/GenericSettingsTab';
 import OfflineManagementTab from './settings/OfflineManagementTab';
 import ReceiptSettingsTab from './settings/ReceiptSettingsTab';
 import POSConfigSettingsTab from './settings/POSConfigSettingsTab';
+import AuthMethodSettingsTab from './settings/AuthMethodSettingsTab';
+import LocalApiSettingsTab from './settings/LocalApiSettingsTab';
 
-type SettingsTab = 'generic' | 'pos' | 'payment' | 'printer' | 'scanner' | 'ecommerce' | 'offline' | 'receipt';
+type SettingsTab = 'generic' | 'pos' | 'auth' | 'payment' | 'printer' | 'scanner' | 'ecommerce' | 'offline' | 'receipt' | 'multiregister';
 type SaveStatus = 'unsaved' | 'saving' | 'saved';
 
 const TAB_CONFIG: { id: SettingsTab; label: string; icon: string }[] = [
   { id: 'generic', label: 'General', icon: '⚙️' },
   { id: 'pos', label: 'POS Config', icon: '🏪' },
+  { id: 'auth', label: 'Authentication', icon: '🔐' },
   { id: 'payment', label: 'Payment', icon: '💳' },
   { id: 'printer', label: 'Printer', icon: '🖨' },
   { id: 'scanner', label: 'Scanner', icon: '📷' },
   { id: 'ecommerce', label: 'E-Commerce', icon: '🛒' },
   { id: 'offline', label: 'Offline', icon: '📴' },
   { id: 'receipt', label: 'Receipt', icon: '🧾' },
+  { id: 'multiregister', label: 'Multi-Register', icon: '🔗' },
 ];
 
 interface SettingsScreenProps {
@@ -68,10 +72,14 @@ const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
         return <GenericSettingsTab />;
       case 'pos':
         return <POSConfigSettingsTab />;
+      case 'auth':
+        return <AuthMethodSettingsTab />;
       case 'offline':
         return <OfflineManagementTab />;
       case 'receipt':
         return <ReceiptSettingsTab />;
+      case 'multiregister':
+        return <LocalApiSettingsTab />;
     }
   };
 

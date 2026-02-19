@@ -25,8 +25,11 @@ export interface LocalOrder {
   total: number;
   discountAmount?: number;
   discountCode?: string;
+  customerId?: string;
   customerEmail?: string;
   customerName?: string;
+  giftCardCode?: string;
+  giftCardAmount?: number;
   note?: string;
   paymentMethod?: string;
   paymentTransactionId?: string;
@@ -35,6 +38,7 @@ export interface LocalOrder {
   status: LocalOrderStatus;
   syncStatus: 'pending' | 'synced' | 'failed';
   syncError?: string;
+  registerId?: string;
   createdAt: Date;
   updatedAt: Date;
   paidAt?: Date;

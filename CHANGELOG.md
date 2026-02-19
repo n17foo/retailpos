@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `CheckoutResult.openDrawer` flag — service decides if drawer opens, UI executes
 - `onDisconnect()` / `offDisconnect()` callbacks on `ScannerServiceInterface`
 - `openDrawer(pin)` method on `BasePrinterService` with ESC/POS drawer kick commands
+- **All Planned Features Complete** — final integration session implementing all remaining POS capabilities
+- **Platform Extensions**: BigCommerce, Magento, Sylius, Wix, PrestaShop, Squarespace customer/discount/giftcard services (24 new implementations)
+- **Customer Search Modal**: Platform customer lookup and attachment during checkout
+- **Notification System**: Real-time alerts for sync events, inventory changes, returns processing
+- **Audit Logging**: Complete audit trail for user actions and system events
+- **Error Boundary**: Crash recovery with retry UI and basket persistence
+- **Refund + Returns Merge**: ReturnService now orchestrates platform refunds
+- **Accessibility Audit**: Full screen reader support across all interactive components
 - 55 tests across 4 suites (money, BasketService, CheckoutService, POSConfigService)
 
 ### Changed
@@ -39,6 +47,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PaymentServiceInterface.disconnect()` is now `Promise<void> | void` (async-compatible)
 - `ErrorReportingService` removed — all services use `LoggerInterface` with pluggable transports
 - Updated `ARCHITECTURE.md` and `AGENT.md` with all architectural changes
+- **README.md**: Updated with complete feature list and project structure
 
 ### Fixed
 

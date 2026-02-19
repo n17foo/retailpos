@@ -30,6 +30,7 @@ export interface Basket {
   total: number;
   discountAmount?: number;
   discountCode?: string;
+  customerId?: string;
   customerEmail?: string;
   customerName?: string;
   note?: string;

@@ -84,6 +84,26 @@ export class OrderSyncService implements OrderSyncServiceInterface {
     }
   }
 
+  async retrySingleOrder(orderId: string): Promise<CheckoutResult> {
+    // Reset retry count so the order gets a fresh set of attempts
+    this.retryCounts.delete(orderId);
+    // Reset sync status back to pending so it's eligible for sync
+    await this.orderRepo.updateSyncError(orderId, 'pending', '');
+    return this.syncOrderToPlatform(orderId);
+  }
+
+  async discardFailedOrder(orderId: string): Promise<boolean> {
+    try {
+      await this.orderRepo.updateStatus(orderId, 'cancelled');
+      await this.orderRepo.updateSyncError(orderId, 'failed', 'Manually discarded by user');
+      this.retryCounts.delete(orderId);
+      return true;
+    } catch (error) {
+      this.logger.error({ message: `Failed to discard order ${orderId}` }, error instanceof Error ? error : new Error(String(error)));
+      return false;
+    }
+  }
+
   async syncAllPendingOrders(): Promise<SyncResult> {
     const unsyncedOrders = await this.checkoutService.getUnsyncedOrders();
 

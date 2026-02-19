@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius } from '../../utils/theme';
 import { useBasketContext, CartItem } from '../../contexts/BasketProvider';
 import { formatMoney } from '../../utils/money';
@@ -7,6 +8,8 @@ import { CheckoutModal, PaymentMethod } from '../../components/CheckoutModal';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ECommercePlatform } from '../../utils/platforms';
 import { useCurrency } from '../../hooks/useCurrency';
+import CustomerSearchModal from '../../components/CustomerSearchModal';
+import { PlatformCustomer } from '../../services/customer/CustomerServiceInterface';
 
 interface BasketContentProps {
   platform?: ECommercePlatform;
@@ -22,6 +25,7 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
   const currency = useCurrency();
   const {
     isLoading,
+    basket,
     cartItems,
     subtotal,
     tax,
@@ -30,6 +34,7 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
     incrementQuantity,
     decrementQuantity,
     removeFromCart,
+    setCustomer,
     startCheckout,
     markPaymentProcessing,
     completePayment,
@@ -41,6 +46,7 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
   const [isSyncing, setIsSyncing] = useState(false);
   const [checkoutModalVisible, setCheckoutModalVisible] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [customerModalVisible, setCustomerModalVisible] = useState(false);
 
   const handleDecrement = async (itemId: string, currentQuantity: number) => {
     if (currentQuantity <= 1) {
@@ -92,6 +98,16 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
   const handleCancelCheckout = () => {
     setCheckoutModalVisible(false);
     setCurrentOrderId(null);
+  };
+
+  const handleSelectCustomer = async (customer: PlatformCustomer) => {
+    const name = [customer.firstName, customer.lastName].filter(Boolean).join(' ');
+    await setCustomer(customer.email, name || customer.email);
+    setCustomerModalVisible(false);
+  };
+
+  const handleRemoveCustomer = async () => {
+    await setCustomer(undefined, undefined);
   };
 
   const handleSyncOrders = async () => {
@@ -148,6 +164,41 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
         />
       )}
 
+      {/* Customer section */}
+      {basket?.customerEmail ? (
+        <View style={styles.customerBadge}>
+          <MaterialIcons name="person" size={16} color={lightColors.primary} />
+          <View style={styles.customerBadgeInfo}>
+            <Text style={styles.customerBadgeName} numberOfLines={1}>
+              {basket.customerName || basket.customerEmail}
+            </Text>
+            {basket.customerName && (
+              <Text style={styles.customerBadgeEmail} numberOfLines={1}>
+                {basket.customerEmail}
+              </Text>
+            )}
+          </View>
+          <TouchableOpacity
+            onPress={handleRemoveCustomer}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Remove customer"
+            accessibilityRole="button"
+          >
+            <MaterialIcons name="close" size={16} color={lightColors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity
+          style={styles.addCustomerButton}
+          onPress={() => setCustomerModalVisible(true)}
+          accessibilityLabel="Add customer to order"
+          accessibilityRole="button"
+        >
+          <MaterialIcons name="person-add" size={16} color={lightColors.primary} />
+          <Text style={styles.addCustomerText}>Add Customer</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Summary & Actions */}
       <View style={styles.summary}>
         {unsyncedOrdersCount > 0 && (
@@ -184,6 +235,14 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Customer Search Modal */}
+      <CustomerSearchModal
+        visible={customerModalVisible}
+        platform={platform}
+        onSelect={handleSelectCustomer}
+        onClose={() => setCustomerModalVisible(false)}
+      />
 
       {/* Checkout Modal */}
       <CheckoutModal
@@ -347,6 +406,41 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.5,
+  },
+  customerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.xs,
+    backgroundColor: lightColors.primary + '10',
+    borderRadius: borderRadius.sm,
+    gap: spacing.xs,
+  },
+  customerBadgeInfo: {
+    flex: 1,
+  },
+  customerBadgeName: {
+    fontSize: typography.fontSize.sm,
+    fontWeight: '600',
+    color: lightColors.textPrimary,
+  },
+  customerBadgeEmail: {
+    fontSize: typography.fontSize.xs,
+    color: lightColors.textSecondary,
+  },
+  addCustomerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.sm,
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.xs,
+    gap: spacing.xs,
+  },
+  addCustomerText: {
+    fontSize: typography.fontSize.sm,
+    color: lightColors.primary,
+    fontWeight: '600',
   },
 });
 

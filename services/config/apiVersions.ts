@@ -12,3 +12,5 @@ export const BIGCOMMERCE_API_VERSION = 'v3';
 export const MAGENTO_API_VERSION = 'V1';
 export const SYLIUS_API_VERSION = 'v1';
 export const WIX_API_VERSION = 'v1';
+export const PRESTASHOP_API_VERSION = 'api';
+export const SQUARESPACE_API_VERSION = '1.0';

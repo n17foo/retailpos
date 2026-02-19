@@ -17,7 +17,11 @@ import { lightColors } from './utils/theme';
 import { queueManager } from './services/queue/QueueManager';
 import { backgroundSyncService } from './services/sync/BackgroundSyncService';
 import { posConfig } from './services/config/POSConfigService';
+import { authConfig } from './services/auth/AuthConfigService';
 import RootNavigator from './navigation/RootNavigator';
+import ErrorBoundary from './components/ErrorBoundary';
+import { NotificationProvider, useNotifications } from './contexts/NotificationProvider';
+import Toast from './components/Toast';
 //import { StripeTerminalBridgeProvider } from './contexts/StripeTerminalBridge';
 
 const AppContent = () => {
@@ -87,6 +91,11 @@ const AppContent = () => {
       logger.error({ message: 'Failed to load POS config — using defaults' }, err instanceof Error ? err : new Error(String(err)));
     });
 
+    // Load auth method config (primary method, allowed methods)
+    authConfig.load().catch(err => {
+      logger.error({ message: 'Failed to load auth config — using PIN default' }, err instanceof Error ? err : new Error(String(err)));
+    });
+
     // Initialize sync queue manager
     queueManager.initialize();
 
@@ -104,21 +113,33 @@ const AppContent = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
-      <OnboardingProvider>
-        <AuthProvider>
-          <BasketProvider>
-            <CategoryProvider>
-              <SettingsProvider>
-                <DataProvider>
-                  <RootNavigator />
-                </DataProvider>
-              </SettingsProvider>
-            </CategoryProvider>
-          </BasketProvider>
-        </AuthProvider>
-      </OnboardingProvider>
+      <ErrorBoundary>
+        <NotificationProvider>
+          <OnboardingProvider>
+            <AuthProvider>
+              <BasketProvider>
+                <CategoryProvider>
+                  <SettingsProvider>
+                    <DataProvider>
+                      <RootNavigator />
+                    </DataProvider>
+                  </SettingsProvider>
+                </CategoryProvider>
+              </BasketProvider>
+            </AuthProvider>
+          </OnboardingProvider>
+          <AppToast />
+        </NotificationProvider>
+      </ErrorBoundary>
     </SafeAreaView>
   );
+};
+
+/** Renders the global toast from NotificationProvider */
+const AppToast: React.FC = () => {
+  const { latestToast, dismissToast } = useNotifications();
+  if (!latestToast) return null;
+  return <Toast notification={latestToast} onDismiss={dismissToast} />;
 };
 
 export default function App() {

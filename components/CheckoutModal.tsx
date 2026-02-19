@@ -55,7 +55,13 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>Complete Order</Text>
-            <TouchableOpacity onPress={onCancel} style={styles.closeButton} disabled={isProcessing}>
+            <TouchableOpacity
+              onPress={onCancel}
+              style={styles.closeButton}
+              disabled={isProcessing}
+              accessibilityLabel="Cancel checkout"
+              accessibilityRole="button"
+            >
               <Text style={styles.closeText}>✕</Text>
             </TouchableOpacity>
           </View>
@@ -96,6 +102,10 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
                     onPress={() => !isDisabled && setSelectedMethod(method.id)}
                     disabled={isDisabled}
                     activeOpacity={0.7}
+                    accessibilityLabel={`Pay with ${method.label}`}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSelected, disabled: isDisabled }}
+                    accessibilityHint={isDisabled ? 'Terminal not connected' : method.description}
                   >
                     <Text style={styles.paymentIcon}>{method.icon}</Text>
                     <View style={styles.paymentInfo}>

@@ -8,6 +8,7 @@ import { OrderItemRepository } from '../../repositories/OrderItemRepository';
 import { LoggerInterface } from '../logger/LoggerInterface';
 import { posConfig } from '../config/POSConfigService';
 import { generateUUID } from '../../utils/uuid';
+import { auditLogService } from '../audit/AuditLogService';
 
 /**
  * Handles checkout flow and order queries.
@@ -86,6 +87,13 @@ export class CheckoutService implements CheckoutServiceInterface {
       }))
     );
 
+    auditLogService.log('order:created', {
+      userId: cashierId,
+      userName: cashierName,
+      details: `Order ${orderId} created — ${basket.items.length} item(s), total ${basket.total.toFixed(2)}`,
+      metadata: { orderId, itemCount: basket.items.length, total: basket.total },
+    });
+
     return localOrder;
   }
 
@@ -110,6 +118,11 @@ export class CheckoutService implements CheckoutServiceInterface {
       const isCash = paymentMethod.toLowerCase() === 'cash';
       const openDrawer = isCash && posConfig.values.drawerOpenOnCash;
 
+      auditLogService.log('order:paid', {
+        details: `Order ${orderId} paid via ${paymentMethod}`,
+        metadata: { orderId, paymentMethod, transactionId },
+      });
+
       return { success: true, orderId, openDrawer };
     } catch (error) {
       this.logger.error({ message: `Failed to complete payment for order ${orderId}` }, error as Error);
@@ -122,6 +135,10 @@ export class CheckoutService implements CheckoutServiceInterface {
 
   async cancelOrder(orderId: string): Promise<void> {
     await this.orderRepo.updateStatus(orderId, 'cancelled');
+    auditLogService.log('order:cancelled', {
+      details: `Order ${orderId} cancelled`,
+      metadata: { orderId },
+    });
   }
 
   // ── Order queries ───────────────────────────────────────────────────

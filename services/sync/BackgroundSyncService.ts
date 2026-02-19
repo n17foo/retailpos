@@ -1,6 +1,7 @@
 import { getServiceContainer } from '../basket/basketServiceFactory';
 import { LoggerFactory } from '../logger/loggerFactory';
 import { AppState, AppStateStatus } from 'react-native';
+import { notificationService } from '../notifications/NotificationService';
 
 /**
  * Background service for syncing pending orders.
@@ -108,12 +109,18 @@ export class BackgroundSyncService {
       // Reset backoff on any success
       if (result.synced > 0) {
         this.consecutiveFailures = 0;
-      } else if (result.failed > 0) {
+        notificationService.notify('Orders Synced', `${result.synced} order(s) synced successfully.`, 'success');
+      }
+      if (result.failed > 0) {
         this.consecutiveFailures++;
+        notificationService.notify('Sync Failed', `${result.failed} order(s) failed to sync. Will retry automatically.`, 'error');
       }
     } catch (error) {
       this.consecutiveFailures++;
       this.logger.error('Background sync failed', error instanceof Error ? error : new Error(String(error)));
+      if (this.consecutiveFailures <= 3) {
+        notificationService.notify('Sync Error', `Background sync encountered an error. Retrying…`, 'warning');
+      }
     }
   }
 }

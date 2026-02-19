@@ -7,7 +7,7 @@ const logger = LoggerFactory.getInstance().createLogger('dbSchema');
  * Current database schema version.
  * Bump this number and add a migration block whenever the schema changes.
  */
-export const LATEST_DB_VERSION = 2;
+export const LATEST_DB_VERSION = 3;
 
 /**
  * Initialise (or migrate) the database schema.
@@ -224,6 +224,118 @@ async function migrateDatabase(db: SQLiteDatabase, fromVersion: number, toVersio
       } else {
         logger.info('No settings table found — nothing to migrate.');
       }
+    }
+
+    // ── v3 – Tax profiles, returns, customers cache, order customer_id ──
+    if (fromVersion < 3) {
+      logger.info('Applying v3: creating tax_profiles, returns, customers_cache tables…');
+
+      // Tax Profiles
+      await db.runAsync(`
+        CREATE TABLE IF NOT EXISTS tax_profiles (
+          id          TEXT PRIMARY KEY NOT NULL,
+          name        TEXT NOT NULL,
+          rate        REAL NOT NULL,
+          is_default  INTEGER NOT NULL DEFAULT 0,
+          is_active   INTEGER NOT NULL DEFAULT 1,
+          region      TEXT,
+          description TEXT,
+          created_at  INTEGER NOT NULL,
+          updated_at  INTEGER NOT NULL
+        );
+      `);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_tax_profiles_active ON tax_profiles(is_active);`);
+
+      // Returns
+      await db.runAsync(`
+        CREATE TABLE IF NOT EXISTS returns (
+          id                TEXT PRIMARY KEY NOT NULL,
+          order_id          TEXT NOT NULL,
+          order_item_id     TEXT,
+          product_id        TEXT NOT NULL,
+          variant_id        TEXT,
+          product_name      TEXT NOT NULL,
+          quantity          INTEGER NOT NULL,
+          refund_amount     REAL NOT NULL,
+          reason            TEXT,
+          restock           INTEGER NOT NULL DEFAULT 1,
+          status            TEXT NOT NULL DEFAULT 'pending'
+                              CHECK(status IN ('pending','approved','rejected','completed')),
+          processed_by      TEXT,
+          processed_at      INTEGER,
+          created_at        INTEGER NOT NULL,
+          updated_at        INTEGER NOT NULL,
+          FOREIGN KEY (order_id) REFERENCES orders(id)
+        );
+      `);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_returns_order   ON returns(order_id);`);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_returns_status  ON returns(status);`);
+
+      // Product Variants (offline cache of platform variant data)
+      await db.runAsync(`
+        CREATE TABLE IF NOT EXISTS product_variants (
+          id                  TEXT PRIMARY KEY NOT NULL,
+          product_id          TEXT NOT NULL,
+          title               TEXT NOT NULL,
+          sku                 TEXT,
+          barcode             TEXT,
+          price               REAL NOT NULL,
+          compare_at_price    REAL,
+          cost_price          REAL,
+          inventory_quantity  INTEGER NOT NULL DEFAULT 0,
+          track_inventory     INTEGER NOT NULL DEFAULT 1,
+          allow_backorder     INTEGER NOT NULL DEFAULT 0,
+          weight              REAL,
+          weight_unit         TEXT NOT NULL DEFAULT 'g',
+          requires_shipping   INTEGER NOT NULL DEFAULT 1,
+          taxable             INTEGER NOT NULL DEFAULT 1,
+          tax_code            TEXT,
+          option_values       TEXT NOT NULL DEFAULT '[]',
+          image_id            TEXT,
+          is_available        INTEGER NOT NULL DEFAULT 1,
+          position            INTEGER NOT NULL DEFAULT 0,
+          created_at          INTEGER NOT NULL,
+          updated_at          INTEGER NOT NULL,
+          FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+        );
+      `);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_product_variants_product ON product_variants(product_id);`);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_product_variants_sku     ON product_variants(sku);`);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_product_variants_barcode ON product_variants(barcode);`);
+
+      // Customers cache (for offline access to platform customers)
+      await db.runAsync(`
+        CREATE TABLE IF NOT EXISTS customers_cache (
+          id              TEXT PRIMARY KEY NOT NULL,
+          platform        TEXT NOT NULL,
+          platform_id     TEXT NOT NULL,
+          email           TEXT,
+          first_name      TEXT,
+          last_name       TEXT,
+          phone           TEXT,
+          total_orders    INTEGER NOT NULL DEFAULT 0,
+          total_spent     REAL NOT NULL DEFAULT 0,
+          cached_at       INTEGER NOT NULL
+        );
+      `);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_customers_cache_platform ON customers_cache(platform);`);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_customers_cache_email    ON customers_cache(email);`);
+
+      // Add customer_id column to orders table
+      const colExists = await db.getFirstAsync<{ cid: number }>(`SELECT cid FROM pragma_table_info('orders') WHERE name = 'customer_id'`);
+      if (!colExists) {
+        await db.runAsync(`ALTER TABLE orders ADD COLUMN customer_id TEXT`);
+      }
+
+      // Add customer_id column to baskets table
+      const basketColExists = await db.getFirstAsync<{ cid: number }>(
+        `SELECT cid FROM pragma_table_info('baskets') WHERE name = 'customer_id'`
+      );
+      if (!basketColExists) {
+        await db.runAsync(`ALTER TABLE baskets ADD COLUMN customer_id TEXT`);
+      }
+
+      logger.info('v3 tables and columns created.');
     }
 
     // Stamp the version

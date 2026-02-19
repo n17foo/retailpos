@@ -12,10 +12,16 @@ import { KeyValueRepository } from '../../repositories/KeyValueRepository';
 
 function createMockRepo(): jest.Mocked<KeyValueRepository> {
   return {
-    getSetting: jest.fn().mockResolvedValue(null),
-    setSetting: jest.fn().mockResolvedValue(undefined),
-    deleteSetting: jest.fn().mockResolvedValue(undefined),
-    getAllSettings: jest.fn().mockResolvedValue({}),
+    getObject: jest.fn().mockResolvedValue(null),
+    setObject: jest.fn().mockResolvedValue(undefined),
+    getItem: jest.fn().mockResolvedValue(null),
+    setItem: jest.fn().mockResolvedValue(undefined),
+    removeItem: jest.fn().mockResolvedValue(undefined),
+    containsKey: jest.fn().mockResolvedValue(false),
+    clearAll: jest.fn().mockResolvedValue(undefined),
+    getAllKeys: jest.fn().mockResolvedValue([]),
+    multiSet: jest.fn().mockResolvedValue(undefined),
+    multiGet: jest.fn().mockResolvedValue([]),
   } as any;
 }
 

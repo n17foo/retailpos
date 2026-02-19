@@ -4,7 +4,7 @@ This document provides coding standards, architectural patterns, and conventions
 
 ## 📁 Project Structure
 
-```
+````
 RetailPOS/
 ├── assets/                 # Static assets (images, icons, fonts)
 ├── components/             # Reusable UI components
@@ -20,6 +20,7 @@ RetailPOS/
 │   ├── order/              # Order-related screens
 │   └── onboarding/         # Onboarding flow screens
 ├── services/               # Business logic and API integrations
+│   ├── auth/              # Authentication service + pluggable providers
 │   ├── basket/             # Shopping cart (BasketService — CRUD only)
 │   ├── checkout/           # CheckoutService (payment, order queries)
 │   ├── config/             # POSConfigService + ServiceConfigBridge
@@ -39,7 +40,23 @@ RetailPOS/
 │       └── platforms/      # Platform-specific implementations
 ├── types/                  # Shared TypeScript types (basket.ts, order.ts)
 └── utils/                  # Utility functions and helpers
-```
+---
+
+## 🛠️ Development Environment
+
+### Package Manager
+This project uses **Yarn 1** for package management. If packages fail to install, ensure you're using Node.js v22:
+
+```bash
+nvm use 22
+yarn install
+````
+
+### Node Version
+
+- **Required**: Node.js v22
+- **Recommended**: Use `nvm` to manage Node versions
+- **Why v22**: Required for Expo SDK 53 compatibility
 
 ---
 
@@ -254,6 +271,47 @@ All use **constructor injection** with `LoggerInterface`. Wired by `basketServic
 - `CashDrawerServiceInterface` — standalone peripheral with `driverType`, `open()`, `isOpen()`
 - `PrinterDrawerDriver` (ESC/POS via printer) and `NoOpDrawerDriver` (no hardware)
 - `CheckoutResult.openDrawer?: boolean` — service decides _if_, UI _does_ the opening
+
+### Authentication (`services/auth/`)
+
+Pluggable multi-method authentication system with **platform-aware mode filtering**.
+
+Auth methods are split into two modes based on the selected e-commerce platform:
+
+- **Offline mode** (`ECommercePlatform.OFFLINE`) — all auth validates against local SQLite (`UserRepository` / `KeyValueRepository`)
+- **Online mode** (Shopify, WooCommerce, etc.) — `platform_auth` validates via the platform’s API token; offline methods can be enabled as fallback
+
+**Supported methods:**
+
+| Method                | Type            | Provider                | Mode    | Hardware           |
+| --------------------- | --------------- | ----------------------- | ------- | ------------------ |
+| 6-Digit PIN           | `pin`           | `PinAuthProvider`       | offline | None               |
+| Fingerprint / Face ID | `biometric`     | `BiometricAuthProvider` | offline | Device biometric   |
+| Password              | `password`      | `PasswordAuthProvider`  | offline | None               |
+| Magnetic Card Swipe   | `magstripe`     | `MagstripeAuthProvider` | offline | USB/BT card reader |
+| RFID / NFC Badge      | `rfid_nfc`      | `RfidNfcAuthProvider`   | offline | USB/BT NFC reader  |
+| Platform Login        | `platform_auth` | `PlatformAuthProvider`  | online  | None (internet)    |
+
+**Key classes:**
+
+- `AuthMethodInterface.ts` — `AuthMethodType`, `AuthMode`, `AuthMethodProvider` interface, `AUTH_METHOD_INFO` registry, `getAuthMethodsForMode(mode)`
+- `AuthConfigService.ts` — persists primary method + allowed methods + `authMode` to `KeyValueRepository`
+- `AuthService.ts` — central service, holds all providers, delegates `authenticate(method, credential)`
+- `providers/` — one file per method, each implements `AuthMethodProvider`
+- `PlatformAuthProvider` — uses `TokenService` to validate the e-commerce platform’s access token
+
+**Rules:**
+
+- PIN is always enabled in offline mode and cannot be disabled
+- `platform_auth` is always enabled in online mode and cannot be disabled
+- `authConfig.load()` called at app startup in `App.tsx`
+- `authConfig.authMode` determines which methods are shown in UI
+- `AuthMethodSetupStep` receives `selectedPlatform` prop to determine mode during onboarding
+- `AuthMethodSettingsTab` reads `authConfig.authMode` to filter methods post-onboarding
+- `LoginScreen` dynamically renders UI per active method and shows a method switcher when multiple are enabled
+- Biometric uses dynamic `require('expo-local-authentication')` — safe if package is not installed
+- Magstripe/RFID readers are USB HID devices that send keystrokes — captured via a hidden `TextInput`
+- All offline providers store credentials in SQLite via `UserRepository` or `KeyValueRepository`
 
 ### Background Sync
 
