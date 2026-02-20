@@ -1,6 +1,14 @@
 import { Platform } from 'react-native';
 
 /**
+ * Extended window type for Electron environment
+ */
+interface ElectronWindow extends Window {
+  isElectron?: boolean;
+  electronAPI?: ElectronAPI;
+}
+
+/**
  * Utility to detect if the app is running in Electron desktop environment
  */
 
@@ -14,7 +22,7 @@ export const isElectron = (): boolean => {
   // Check for Electron-specific globals
   if (typeof window !== 'undefined') {
     // Check for electronAPI exposed via preload script
-    if ((window as any).isElectron === true) {
+    if ((window as ElectronWindow).isElectron === true) {
       return true;
     }
 
@@ -68,7 +76,7 @@ export const isWeb = (): boolean => {
  */
 export const getElectronAPI = (): ElectronAPI | null => {
   if (isElectron() && typeof window !== 'undefined') {
-    return (window as any).electronAPI || null;
+    return (window as ElectronWindow).electronAPI || null;
   }
   return null;
 };

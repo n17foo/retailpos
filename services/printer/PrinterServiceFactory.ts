@@ -2,7 +2,7 @@ import { PrinterConfig, PrinterStatus, ReceiptData } from './PrinterTypes';
 import { BasePrinterService } from './BasePrinterService';
 import { USE_MOCK_PRINTERS } from '@env';
 import { UnifiedPrinterServiceMock } from './UnifiedPrinterServiceMock';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 // Define the connection type for the factory
 type PrinterConnectionType = 'network' | 'usb' | 'bluetooth';

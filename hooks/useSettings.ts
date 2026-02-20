@@ -1,24 +1,26 @@
 import { useState, useEffect, useCallback } from 'react';
 import { KeyValueRepository } from '../repositories/KeyValueRepository';
+import { useLogger } from './useLogger';
 
 const settingsRepository = new KeyValueRepository();
 
-const useSettings = () => {
-  const [settings, setSettings] = useState<{ [key: string]: any }>({});
-  const [loading, setLoading] = useState<boolean>(true);
+export const useSettings = () => {
+  const [settings, setSettings] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
+  const logger = useLogger('useSettings');
 
   const fetchSettings = useCallback(async () => {
     try {
-      setLoading(true);
+      setIsLoading(true);
       const allSettings = await settingsRepository.getAllKeys();
       setSettings(allSettings);
       setError(null);
     } catch (e) {
       setError(e as Error);
-      console.error('Failed to fetch settings:', e);
+      logger.error({ message: 'Failed to fetch settings' }, e instanceof Error ? e : new Error(String(e)));
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }, []);
 
@@ -40,7 +42,7 @@ const useSettings = () => {
       setSettings(prevSettings => ({ ...prevSettings, [key]: value }));
     } catch (e) {
       setError(e as Error);
-      console.error('Failed to update setting:', e);
+      logger.error({ message: 'Failed to update setting' }, e instanceof Error ? e : new Error(String(e)));
       // Optionally refetch to revert optimistic update on error
       await fetchSettings();
       throw e;
@@ -49,12 +51,10 @@ const useSettings = () => {
 
   return {
     settings,
-    loading,
+    isLoading,
     error,
     fetchSettings,
     getSetting,
     updateSetting,
   };
 };
-
-export default useSettings;

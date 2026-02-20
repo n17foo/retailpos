@@ -1,12 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { SearchOptions } from '../../services/search/searchServiceInterface';
+import { SearchOptions } from '../../services/search/SearchServiceInterface';
 import { Button } from '../../components/Button';
 import { lightColors, spacing, typography } from '../../utils/theme';
 
 interface FilterPanelProps {
   filterOptions: SearchOptions;
-  onFilterChange: (key: keyof SearchOptions, value: any) => void;
+  onFilterChange: (key: keyof SearchOptions, value: SearchOptions[keyof SearchOptions]) => void;
 }
 
 const FilterPanel: React.FC<FilterPanelProps> = ({ filterOptions, onFilterChange }) => {

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { LoggerFactory } from '../services/logger/loggerFactory';
+import { LoggerFactory } from '../services/logger/LoggerFactory';
 
 /**
  * Custom hook that wraps i18next's useTranslation to provide enhanced translation
@@ -23,6 +23,7 @@ export const useTranslate = () => {
    * @param params Optional parameters for interpolation
    * @returns Translated string
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-i18next t() has complex overloads
   const translate = (key: string, options?: any): string => {
     // Get the translation
     const translated = t(key, options);

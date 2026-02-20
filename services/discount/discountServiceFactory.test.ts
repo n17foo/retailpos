@@ -1,4 +1,4 @@
-import { discountServiceFactory } from './discountServiceFactory';
+import { discountServiceFactory } from './DiscountServiceFactory';
 import { BigCommerceDiscountService } from './platforms/BigCommerceDiscountService';
 import { MagentoDiscountService } from './platforms/MagentoDiscountService';
 import { SyliusDiscountService } from './platforms/SyliusDiscountService';
@@ -8,7 +8,7 @@ import { SquarespaceDiscountService } from './platforms/SquarespaceDiscountServi
 import { ECommercePlatform } from '../../utils/platforms';
 
 // Mock logger to avoid transitive expo-sqlite dependency
-jest.mock('../logger/loggerFactory', () => ({
+jest.mock('../logger/LoggerFactory', () => ({
   LoggerFactory: {
     getInstance: jest.fn(() => ({
       createLogger: jest.fn(() => ({

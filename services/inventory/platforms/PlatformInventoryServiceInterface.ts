@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
 import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../InventoryServiceInterface';
 
 /**

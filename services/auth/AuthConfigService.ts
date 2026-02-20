@@ -37,7 +37,7 @@ export class AuthConfigService {
 
   /** Reset the singleton (used by tests). */
   static resetInstance(): void {
-    AuthConfigService.instance = undefined as any;
+    AuthConfigService.instance = undefined as unknown as AuthConfigService;
   }
 
   /** Load persisted auth config from DB. Call once at app startup. */

@@ -1,12 +1,12 @@
 import { BaseGiftCardService } from './BaseGiftCardService';
 import { GiftCardInfo, GiftCardRedemptionResult } from '../GiftCardServiceInterface';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/tokenUtils';
-import { TokenType } from '../../token/tokenServiceInterface';
-import { TokenInitializer } from '../../token/tokenInitializer';
-import { withTokenRefresh } from '../../token/tokenIntegration';
-import { LoggerFactory } from '../../logger/loggerFactory';
-import secretsService from '../../secrets/secretsService';
+import { getPlatformToken } from '../../token/TokenUtils';
+import { TokenType } from '../../token/TokenServiceInterface';
+import { TokenInitializer } from '../../token/TokenInitializer';
+import { withTokenRefresh } from '../../token/TokenIntegration';
+import { LoggerFactory } from '../../logger/LoggerFactory';
+import secretsService from '../../secrets/SecretsService';
 
 export class SquarespaceGiftCardService extends BaseGiftCardService {
   constructor() {

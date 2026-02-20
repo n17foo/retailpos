@@ -2,7 +2,8 @@ import { logger, consoleTransport } from 'react-native-logs';
 import { LoggerInterface, LogLevel, LogPayload, LogTransport, LogEntry } from './LoggerInterface';
 
 export class ReactNativeLogger implements LoggerInterface {
-  private logger: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-native-logs returns untyped logger instance
+  private logger: Record<string, (...args: any[]) => void>;
   private context: string;
   private currentLevel: LogLevel;
   private transports: LogTransport[] = [];
@@ -52,7 +53,7 @@ export class ReactNativeLogger implements LoggerInterface {
     this.logger = logger.createLogger(loggerConfig);
   }
 
-  debug(payload: LogPayload | string, ...args: any[]): void {
+  debug(payload: LogPayload | string, ...args: unknown[]): void {
     const message = typeof payload === 'string' ? payload : payload.message;
     const metadata = typeof payload === 'string' ? undefined : (({ message: _m, ...rest }) => rest)(payload);
     if (typeof payload === 'string') {
@@ -64,7 +65,7 @@ export class ReactNativeLogger implements LoggerInterface {
     this.forward(LogLevel.DEBUG, message, undefined, metadata);
   }
 
-  info(payload: LogPayload | string, ...args: any[]): void {
+  info(payload: LogPayload | string, ...args: unknown[]): void {
     const message = typeof payload === 'string' ? payload : payload.message;
     const metadata = typeof payload === 'string' ? undefined : (({ message: _m, ...rest }) => rest)(payload);
     if (typeof payload === 'string') {
@@ -76,7 +77,7 @@ export class ReactNativeLogger implements LoggerInterface {
     this.forward(LogLevel.INFO, message, undefined, metadata);
   }
 
-  warn(payload: LogPayload | string, ...args: any[]): void {
+  warn(payload: LogPayload | string, ...args: unknown[]): void {
     const message = typeof payload === 'string' ? payload : payload.message;
     const metadata = typeof payload === 'string' ? undefined : (({ message: _m, ...rest }) => rest)(payload);
     if (typeof payload === 'string') {
@@ -88,7 +89,7 @@ export class ReactNativeLogger implements LoggerInterface {
     this.forward(LogLevel.WARN, message, undefined, metadata);
   }
 
-  error(payload: LogPayload | string, error?: Error, ...args: any[]): void {
+  error(payload: LogPayload | string, error?: Error, ...args: unknown[]): void {
     const message = typeof payload === 'string' ? payload : payload.message;
     const metadata = typeof payload === 'string' ? undefined : (({ message: _m, ...rest }) => rest)(payload);
     if (typeof payload === 'string') {

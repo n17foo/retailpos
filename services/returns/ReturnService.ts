@@ -1,9 +1,9 @@
 import { returnRepository, ReturnRow, CreateReturnInput } from '../../repositories/ReturnRepository';
 import { orderRepository } from '../../repositories/OrderRepository';
 import { OrderItemRepository } from '../../repositories/OrderItemRepository';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 import { auditLogService } from '../audit/AuditLogService';
-import { RefundServiceFactory } from '../refund/refundServiceFactory';
+import { RefundServiceFactory } from '../refund/RefundServiceFactory';
 import { ECommercePlatform } from '../../utils/platforms';
 import { notificationService } from '../notifications/NotificationService';
 

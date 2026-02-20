@@ -56,7 +56,7 @@ export class POSConfigService {
 
   /** Reset the singleton (used by tests). */
   static resetInstance(): void {
-    POSConfigService.instance = undefined as any;
+    POSConfigService.instance = undefined as unknown as POSConfigService;
   }
 
   /** Load all POS settings from the database. Call once at app startup. */
@@ -64,7 +64,7 @@ export class POSConfigService {
     for (const [field, key] of Object.entries(SETTINGS_KEYS)) {
       const stored = await this.settingsRepo.getObject<POSConfig[keyof POSConfig]>(key);
       if (stored !== null && stored !== undefined) {
-        (this.config as any)[field] = stored;
+        (this.config as Record<string, unknown>)[field] = stored;
       }
     }
     this.loaded = true;
@@ -72,7 +72,7 @@ export class POSConfigService {
 
   /** Update a single config value (persists to DB immediately). */
   async update<K extends keyof POSConfig>(field: K, value: POSConfig[K]): Promise<void> {
-    (this.config as any)[field] = value;
+    (this.config as Record<string, unknown>)[field as string] = value;
     await this.settingsRepo.setObject(SETTINGS_KEYS[field], value);
   }
 
@@ -80,7 +80,7 @@ export class POSConfigService {
   async updateAll(values: Partial<POSConfig>): Promise<void> {
     for (const [field, value] of Object.entries(values)) {
       if (value !== undefined) {
-        await this.update(field as keyof POSConfig, value as any);
+        await this.update(field as keyof POSConfig, value as POSConfig[keyof POSConfig]);
       }
     }
   }

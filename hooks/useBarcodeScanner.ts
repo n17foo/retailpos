@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Alert } from 'react-native';
 import { CameraView, type BarcodeScanningResult } from 'expo-camera';
-import { ScannerType, ScannerServiceFactory } from '../services/scanner/scannerServiceFactory';
+import { ScannerType, ScannerServiceFactory } from '../services/scanner/ScannerServiceFactory';
 import { ScannerServiceInterface } from '../services/scanner/ScannerServiceInterface';
 import { formatMoney } from '../utils/money';
 import { useCurrency } from './useCurrency';
+import { useLogger } from './useLogger';
 
 interface ScannerSettings {
   type: 'camera' | 'bluetooth' | 'usb' | 'qr_hardware';
@@ -27,6 +28,7 @@ interface UseBarcodeScannerServiceProps {
 
 export const useBarcodeScanner = ({ scannerSettings, products, onScanSuccess }: UseBarcodeScannerServiceProps) => {
   const currency = useCurrency();
+  const logger = useLogger('useBarcodeScanner');
   // Scanner state
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
@@ -48,7 +50,7 @@ export const useBarcodeScanner = ({ scannerSettings, products, onScanSuccess }: 
     try {
       await action();
     } catch (error) {
-      console.error(`Error ${operation}:`, error);
+      logger.error({ message: `Error ${operation}` }, error instanceof Error ? error : new Error(String(error)));
     }
   }, []);
 

@@ -1,4 +1,4 @@
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { ScannerServiceInterface } from '../ScannerServiceInterface';
 
 /**

@@ -1,11 +1,11 @@
-import { PlatformRefundServiceInterface } from './platformRefundServiceInterface';
-import { RefundData, RefundResult, RefundRecord } from '../refundServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { PlatformRefundServiceInterface, PlatformCredentials, RefundApiClient } from './PlatformRefundServiceInterface';
+import { RefundData, RefundResult, RefundRecord } from '../RefundServiceInterface';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { SecretsServiceFactory } from '../../secrets/secretsService';
+import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { getPlatformToken } from '../../token/tokenUtils';
-import { TokenType } from '../../token/tokenServiceInterface';
+import { getPlatformToken } from '../../token/TokenUtils';
+import { TokenType } from '../../token/TokenServiceInterface';
 
 /**
  * Shopify-specific implementation of the refund service
@@ -53,7 +53,7 @@ export class ShopifyRefundService implements PlatformRefundServiceInterface {
    * Get Shopify API credentials from secrets service
    * @returns Shopify API credentials or null if not found
    */
-  private async getShopifyCredentials(): Promise<any> {
+  private async getShopifyCredentials(): Promise<PlatformCredentials | null> {
     try {
       const credentials = await this.secretsService.getSecret('shopify_api_credentials');
       if (!credentials) {
@@ -73,7 +73,7 @@ export class ShopifyRefundService implements PlatformRefundServiceInterface {
    * @param credentials Shopify API credentials
    * @returns HTTP client object
    */
-  private async createShopifyApiClient(credentials: any): Promise<any> {
+  private async createShopifyApiClient(_credentials: PlatformCredentials): Promise<RefundApiClient> {
     // Get the access token from the token management system
     const accessToken = await getPlatformToken(ECommercePlatform.SHOPIFY, TokenType.ACCESS);
 
@@ -82,7 +82,7 @@ export class ShopifyRefundService implements PlatformRefundServiceInterface {
       throw new Error('Failed to get Shopify access token');
     }
     return {
-      post: async (endpoint: string, data: any) => {
+      post: async (endpoint: string, data: unknown) => {
         // In a real implementation, this would make an authenticated API call
         // const response = await fetch(`${credentials.apiUrl}${endpoint}`, {
         //   method: 'POST',
@@ -95,10 +95,11 @@ export class ShopifyRefundService implements PlatformRefundServiceInterface {
         this.logger.info(`Making API call to Shopify ${endpoint}`);
 
         // For now, simulate a successful response
+        const payload = data as Record<string, unknown>;
         return {
           data: {
             id: `shopify-refund-${Date.now()}`,
-            order_id: data.order_id,
+            order_id: payload.order_id,
             status: 'success',
           },
         };
@@ -149,7 +150,7 @@ export class ShopifyRefundService implements PlatformRefundServiceInterface {
       });
 
       // Process response
-      const refundId = response.data.id;
+      const refundId = String(response.data.id);
 
       return {
         success: true,

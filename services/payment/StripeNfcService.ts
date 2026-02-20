@@ -1,4 +1,4 @@
-import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from './paymentServiceInterface';
+import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from './PaymentServiceInterface';
 import { Platform } from 'react-native';
 import { keyValueRepository } from '../../repositories/KeyValueRepository';
 import { StripeTerminalBridgeManager } from '../../contexts/StripeTerminalBridge';
@@ -136,11 +136,11 @@ export class StripeNfcService implements PaymentServiceInterface {
           message: 'Connection test successful but no readers found. Make sure a reader is powered on and nearby.',
         };
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Test connection error:', error);
       return {
         success: false,
-        message: error?.message || 'An unknown error occurred while testing the terminal connection',
+        message: error instanceof Error ? error.message : 'An unknown error occurred while testing the terminal connection',
       };
     }
   }
@@ -237,7 +237,7 @@ export class StripeNfcService implements PaymentServiceInterface {
 
           if (readers && readers.length > 0) {
             // Connect to the first reader
-            const connectSuccess = await this.connectToTerminal(readers[0].id);
+            const connectSuccess = await this.connectToTerminal(String(readers[0].id));
             if (!connectSuccess) {
               throw new Error('Failed to connect to discovered reader');
             }
@@ -306,11 +306,12 @@ export class StripeNfcService implements PaymentServiceInterface {
         last4: result.last4 || 'xxxx',
         amount: request.amount,
       } as PaymentResponse; // Explicitly cast to ensure TypeScript recognizes the type
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error processing Stripe NFC payment:', error);
+      const errMsg = error instanceof Error ? error.message : '';
 
       // Check if this is a terminal connection error
-      if (error.message?.includes('connect') || error.message?.includes('terminal') || error.message?.includes('reader')) {
+      if (errMsg.includes('connect') || errMsg.includes('terminal') || errMsg.includes('reader')) {
         // Reset connection state on terminal errors
         this.isConnected = false;
         this.deviceId = null;
@@ -318,15 +319,12 @@ export class StripeNfcService implements PaymentServiceInterface {
 
       // Determine if this was a connection error for more specific error code
       const isConnectionError =
-        error.message?.includes('connect') ||
-        error.message?.includes('terminal') ||
-        error.message?.includes('reader') ||
-        error.message?.includes('network');
+        errMsg.includes('connect') || errMsg.includes('terminal') || errMsg.includes('reader') || errMsg.includes('network');
 
       // Create a properly formatted error response using our enhanced interface
       return {
         success: false,
-        errorMessage: error?.message || 'Failed to process payment',
+        errorMessage: errMsg || 'Failed to process payment',
         errorCode: isConnectionError ? 'connection_error' : 'payment_error',
         timestamp: new Date(),
       };
@@ -421,59 +419,66 @@ export class StripeNfcService implements PaymentServiceInterface {
   }
 
   /**
+   * Get raw transaction data from Stripe API (internal use)
+   */
+  private async getRawTransactionStatus(transactionId: string): Promise<Record<string, unknown>> {
+    const apiKey = await keyValueRepository.getItem('stripe_nfc_apiKey');
+
+    if (!apiKey) {
+      throw new Error('Stripe API key not configured');
+    }
+
+    // Check for direct bridge availability first
+    const bridgeManager = StripeTerminalBridgeManager.getInstance();
+    if (bridgeManager.bridge && bridgeManager.isTerminalInitialized()) {
+      try {
+        const backendUrl = await keyValueRepository.getItem('stripe_nfc_backendUrl');
+        if (backendUrl) {
+          const response = await fetch(`${backendUrl}/stripe/payment_intent/${transactionId}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          });
+
+          if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
+          }
+
+          return (await response.json()) as Record<string, unknown>;
+        }
+      } catch (bridgeError) {
+        console.warn('Bridge transaction status check failed, falling back to Stripe API', bridgeError);
+      }
+    }
+
+    // Direct Stripe API call as fallback
+    const response = await fetch(`https://api.stripe.com/v1/payment_intents/${transactionId}`, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Stripe API error: ${response.status}`);
+    }
+
+    return (await response.json()) as Record<string, unknown>;
+  }
+
+  /**
    * Get transaction status by ID
    * @param transactionId ID of transaction to check
    */
-  async getTransactionStatus(transactionId: string): Promise<any> {
+  async getTransactionStatus(transactionId: string): Promise<PaymentResponse> {
     try {
       console.log(`Checking status of transaction: ${transactionId}`);
-
-      const apiKey = await keyValueRepository.getItem('stripe_nfc_apiKey');
-
-      if (!apiKey) {
-        throw new Error('Stripe API key not configured');
-      }
-
-      // Check for direct bridge availability first
-      const bridgeManager = StripeTerminalBridgeManager.getInstance();
-      if (bridgeManager.bridge && bridgeManager.isTerminalInitialized()) {
-        try {
-          // Try to use bridge to get status if available
-          const backendUrl = await keyValueRepository.getItem('stripe_nfc_backendUrl');
-          if (backendUrl) {
-            const response = await fetch(`${backendUrl}/stripe/payment_intent/${transactionId}`, {
-              method: 'GET',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            });
-
-            if (!response.ok) {
-              throw new Error(`API error: ${response.status}`);
-            }
-
-            return await response.json();
-          }
-        } catch (bridgeError) {
-          console.warn('Bridge transaction status check failed, falling back to Stripe API', bridgeError);
-          // Continue to direct API call as fallback
-        }
-      }
-
-      // Direct Stripe API call as fallback
-      const response = await fetch(`https://api.stripe.com/v1/payment_intents/${transactionId}`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Stripe API error: ${response.status}`);
-      }
-
-      return await response.json();
+      const raw = await this.getRawTransactionStatus(transactionId);
+      return {
+        success: raw.status === 'succeeded',
+        transactionId: String(raw.id || transactionId),
+        timestamp: new Date(),
+      };
     } catch (error) {
       console.error('Error checking transaction status:', error);
       throw error;
@@ -500,10 +505,14 @@ export class StripeNfcService implements PaymentServiceInterface {
       const bridgeManager = StripeTerminalBridgeManager.getInstance();
 
       // Check if the payment intent is still in a cancelable state
-      const status = await this.getTransactionStatus(transactionId);
+      const rawStatus = await this.getRawTransactionStatus(transactionId);
 
       // Only proceed with cancellation if the payment is in a cancellable state
-      if (status && ['requires_payment_method', 'requires_confirmation', 'requires_action'].includes(status.status)) {
+      if (
+        rawStatus &&
+        typeof rawStatus.status === 'string' &&
+        ['requires_payment_method', 'requires_confirmation', 'requires_action'].includes(rawStatus.status)
+      ) {
         if (bridgeManager.bridge?.actions?.cancelPayment) {
           const success = await bridgeManager.bridge.actions.cancelPayment(transactionId);
 
@@ -573,11 +582,11 @@ export class StripeNfcService implements PaymentServiceInterface {
         transactionId: transactionId,
         timestamp: new Date(),
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error voiding transaction:', error);
       return {
         success: false,
-        errorMessage: error?.message || 'Failed to void transaction',
+        errorMessage: error instanceof Error ? error.message : 'Failed to void transaction',
         timestamp: new Date(),
       };
     }
@@ -687,11 +696,11 @@ export class StripeNfcService implements PaymentServiceInterface {
         timestamp: new Date(),
         amount: amount,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error refunding transaction:', error);
       return {
         success: false,
-        errorMessage: error?.message || 'Failed to process refund',
+        errorMessage: error instanceof Error ? error.message : 'Failed to process refund',
         timestamp: new Date(),
       };
     }

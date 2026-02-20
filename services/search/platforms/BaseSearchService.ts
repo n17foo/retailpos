@@ -1,4 +1,4 @@
-import { SearchOptions, SearchProduct } from '../searchServiceInterface';
+import { SearchOptions, SearchProduct } from '../SearchServiceInterface';
 import { ProductQueryOptions, Product, ProductResult } from '../../product/ProductServiceInterface';
 import { PlatformSearchServiceInterface, PlatformConfigRequirements, PlatformSearchConfig } from './PlatformSearchServiceInterface';
 

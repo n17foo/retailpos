@@ -1,13 +1,13 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
-import { LoggerFactory } from '../services/logger/loggerFactory';
+import { LoggerFactory } from '../services/logger/LoggerFactory';
 
 export interface QueuedRequest {
   id: string;
   url: string;
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-  body?: any;
+  body?: unknown;
   headers?: Record<string, string>;
   attempts: number;
   maxAttempts?: number;
@@ -170,7 +170,7 @@ export const useSyncStore = create<SyncStoreState>()(
 export const addRequestToQueue = (
   url: string,
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
-  body?: any,
+  body?: unknown,
   headers?: Record<string, string>,
   requestId?: string
 ) => {

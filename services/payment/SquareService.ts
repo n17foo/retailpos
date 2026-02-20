@@ -1,10 +1,12 @@
-import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from './paymentServiceInterface';
+import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from './PaymentServiceInterface';
 
 // Conditionally import Square SDK to avoid bundling issues
-let SQIPCore: any;
-let SQIPCardEntry: any;
-let SQIPApplePay: any;
-let SQIPGooglePay: any;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party SDK with no type definitions
+type SquareSDKModule = Record<string, (...args: any[]) => any>;
+let SQIPCore: SquareSDKModule;
+let SQIPCardEntry: SquareSDKModule;
+let SQIPApplePay: SquareSDKModule;
+let SQIPGooglePay: SquareSDKModule;
 
 try {
   // Import Square SDK v1.x named exports
@@ -25,7 +27,7 @@ export class SquareService implements PaymentServiceInterface {
   private static instance: SquareService;
   private isConnected: boolean = false;
   private deviceId: string | null = null;
-  private connectedDevice: any = null;
+  private connectedDevice: unknown = null;
 
   private constructor() {
     try {
@@ -97,13 +99,13 @@ export class SquareService implements PaymentServiceInterface {
       console.log(`Processing payment of $${request.amount.toFixed(2)} with Square`);
 
       // Start card entry using SQIPCardEntry
-      const cardEntryResult = await new Promise<any>((resolve, reject) => {
+      const cardEntryResult = await new Promise<Record<string, unknown>>((resolve, reject) => {
         // Configure the card entry flow with callbacks
         const cardEntryConfig = {
           collectPostalCode: false,
         };
 
-        const onCardNonceRequestSuccess = (cardDetails: any) => {
+        const onCardNonceRequestSuccess = (cardDetails: Record<string, unknown>) => {
           // Card entry was successful, we now have a nonce
           SQIPCardEntry.completeCardEntry(() => {
             resolve(cardDetails);
@@ -180,14 +182,13 @@ export class SquareService implements PaymentServiceInterface {
   /**
    * Get transaction status
    */
-  public async getTransactionStatus(transactionId: string): Promise<any> {
+  public async getTransactionStatus(transactionId: string): Promise<PaymentResponse> {
     // In a real implementation, you would call Square's API to check the status
     // For now, we're simulating a response
     return {
+      success: true,
       transactionId,
-      status: 'COMPLETED',
-      amount: 0,
-      createdAt: new Date().toISOString(),
+      timestamp: new Date(),
     };
   }
 

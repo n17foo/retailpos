@@ -1,11 +1,11 @@
-import { PlatformRefundServiceInterface } from './platformRefundServiceInterface';
-import { RefundData, RefundResult, RefundRecord } from '../refundServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { PlatformRefundServiceInterface, PlatformCredentials, RefundApiClient } from './PlatformRefundServiceInterface';
+import { RefundData, RefundResult, RefundRecord } from '../RefundServiceInterface';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { SecretsServiceFactory } from '../../secrets/secretsService';
+import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { getPlatformToken } from '../../token/tokenUtils';
-import { TokenType } from '../../token/tokenServiceInterface';
+import { getPlatformToken } from '../../token/TokenUtils';
+import { TokenType } from '../../token/TokenServiceInterface';
 
 /**
  * Wix-specific implementation of the refund service
@@ -50,7 +50,7 @@ export class WixRefundService implements PlatformRefundServiceInterface {
    * Get Wix API credentials from secrets service
    * @returns Wix API credentials or null if not found
    */
-  private async getWixCredentials(): Promise<any> {
+  private async getWixCredentials(): Promise<PlatformCredentials | null> {
     try {
       const credentials = await this.secretsService.getSecret('wix_api_credentials');
       if (!credentials) {
@@ -70,7 +70,7 @@ export class WixRefundService implements PlatformRefundServiceInterface {
    * @param credentials Wix API credentials
    * @returns HTTP client object
    */
-  private async createWixApiClient(credentials: any): Promise<any> {
+  private async createWixApiClient(_credentials: PlatformCredentials): Promise<RefundApiClient> {
     // Get the access token from the token management system
     const accessToken = await getPlatformToken(ECommercePlatform.WIX, TokenType.ACCESS);
 
@@ -79,7 +79,7 @@ export class WixRefundService implements PlatformRefundServiceInterface {
       throw new Error('Failed to get Wix access token');
     }
     return {
-      post: async (endpoint: string, data: any) => {
+      post: async (endpoint: string, data: unknown) => {
         this.logger.info(`Making API call to Wix ${endpoint}`);
 
         // In a real implementation, this would make an authenticated API call
@@ -96,7 +96,7 @@ export class WixRefundService implements PlatformRefundServiceInterface {
         return {
           data: {
             id: `wix-refund-${Date.now()}`,
-            orderId: data.orderId,
+            orderId: (data as Record<string, unknown>).orderId,
             status: 'SUCCESS',
           },
         };
@@ -137,7 +137,7 @@ export class WixRefundService implements PlatformRefundServiceInterface {
       const response = await apiClient.post('/api/v1/orders/refunds', requestData);
 
       // Process response
-      const refundId = response.data.id;
+      const refundId = String(response.data.id);
 
       return {
         success: true,

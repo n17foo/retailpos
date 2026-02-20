@@ -1,5 +1,5 @@
 import React, { useState, useEffect, memo } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, ImageSourcePropType } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ImageSourcePropType, DimensionValue } from 'react-native';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../../utils/theme';
 import { formatMoney } from '../../utils/money';
 import { useCurrency } from '../../hooks/useCurrency';
@@ -40,14 +40,14 @@ const ProductCardInner: React.FC<ProductCardProps> = ({
     onAddToCart(id, newQuantity);
   };
 
-  const handleIncrement = (e: any) => {
+  const handleIncrement = (e: { stopPropagation?: () => void }) => {
     e.stopPropagation?.();
     const newQuantity = quantity + 1;
     setQuantity(newQuantity);
     onAddToCart(id, newQuantity);
   };
 
-  const handleDecrement = (e: any) => {
+  const handleDecrement = (e: { stopPropagation?: () => void }) => {
     e.stopPropagation?.();
     if (quantity > 0) {
       const newQuantity = quantity - 1;
@@ -60,7 +60,7 @@ const ProductCardInner: React.FC<ProductCardProps> = ({
   const isOutOfStock = stock !== undefined && stock <= 0;
   const isLowStock = stock !== undefined && stock > 0 && stock <= 5;
 
-  const cardWidth = widthPercent ? (`${widthPercent}%` as any) : '47%';
+  const cardWidth: DimensionValue = widthPercent ? (`${widthPercent}%` as DimensionValue) : '47%';
 
   return (
     <TouchableOpacity

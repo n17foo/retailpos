@@ -1,7 +1,7 @@
-import { TokenServiceFactory } from './tokenServiceFactory';
-import { TokenType } from './tokenServiceInterface';
+import { TokenServiceFactory } from './TokenServiceFactory';
+import { TokenType } from './TokenServiceInterface';
 import { ECommercePlatform } from '../../utils/platforms';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 const logger = LoggerFactory.getInstance().createLogger('TokenUtils');
 

@@ -1,8 +1,8 @@
-import { getPlatformToken, hasValidPlatformToken } from './tokenUtils';
-import { TokenType } from './tokenServiceInterface';
+import { getPlatformToken } from './TokenUtils';
+import { TokenType } from './TokenServiceInterface';
 import { ECommercePlatform } from '../../utils/platforms';
-import { LoggerFactory } from '../logger/loggerFactory';
-import { TokenInitializer } from './tokenInitializer';
+import { LoggerFactory } from '../logger/LoggerFactory';
+import { TokenInitializer } from './TokenInitializer';
 
 const logger = LoggerFactory.getInstance().createLogger('TokenIntegration');
 
@@ -19,7 +19,7 @@ export async function createAuthenticatedApiClient(
   platform: ECommercePlatform,
   baseUrl: string,
   options: ApiClientOptions = {}
-): Promise<any | null> {
+): Promise<PlatformApiClient | null> {
   try {
     // Make sure the platform token provider is initialized
     await TokenInitializer.getInstance().initializePlatformToken(platform);
@@ -52,7 +52,12 @@ export async function createAuthenticatedApiClient(
  * @param options Additional configuration options
  * @returns A configured API client
  */
-function createPlatformClient(platform: ECommercePlatform, baseUrl: string, accessToken: string, options: ApiClientOptions): any {
+function createPlatformClient(
+  platform: ECommercePlatform,
+  baseUrl: string,
+  accessToken: string,
+  options: ApiClientOptions
+): PlatformApiClient {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...options.additionalHeaders,
@@ -82,21 +87,21 @@ function createPlatformClient(platform: ECommercePlatform, baseUrl: string, acce
   // Return a simple HTTP client with the configured headers
   // In a real implementation, this could return an Axios instance or similar
   return {
-    get: async (endpoint: string, params: any = {}) => {
+    get: async (endpoint: string, _params: Record<string, unknown> = {}) => {
       logger.info(`Making GET request to ${platform} API: ${endpoint}`);
       // Here you would use fetch or axios to make the actual API call
       // This is just a placeholder implementation
       return { success: true, data: {} };
     },
 
-    post: async (endpoint: string, data: any) => {
+    post: async (endpoint: string, _data: unknown) => {
       logger.info(`Making POST request to ${platform} API: ${endpoint}`);
       // Here you would use fetch or axios to make the actual API call
       // This is just a placeholder implementation
       return { success: true, data: {} };
     },
 
-    put: async (endpoint: string, data: any) => {
+    put: async (endpoint: string, _data: unknown) => {
       logger.info(`Making PUT request to ${platform} API: ${endpoint}`);
       // Here you would use fetch or axios to make the actual API call
       // This is just a placeholder implementation
@@ -111,7 +116,7 @@ function createPlatformClient(platform: ECommercePlatform, baseUrl: string, acce
     },
 
     // Add custom request function
-    request: async (method: string, endpoint: string, options: any = {}) => {
+    request: async (method: string, endpoint: string, _options: Record<string, unknown> = {}) => {
       logger.info(`Making ${method} request to ${platform} API: ${endpoint}`);
       // Here you would use fetch or axios to make the actual API call
       // This is just a placeholder implementation
@@ -127,6 +132,25 @@ export interface ApiClientOptions {
   additionalHeaders?: Record<string, string>;
   timeout?: number;
   retries?: number;
+}
+
+/**
+ * Standard response shape from platform API calls
+ */
+export interface ApiResponse<T = unknown> {
+  success: boolean;
+  data: T;
+}
+
+/**
+ * Authenticated HTTP client for platform API calls
+ */
+export interface PlatformApiClient {
+  get(endpoint: string, params?: Record<string, unknown>): Promise<ApiResponse>;
+  post(endpoint: string, data: unknown): Promise<ApiResponse>;
+  put(endpoint: string, data: unknown): Promise<ApiResponse>;
+  delete(endpoint: string): Promise<ApiResponse>;
+  request(method: string, endpoint: string, options?: Record<string, unknown>): Promise<ApiResponse>;
 }
 
 /**
@@ -182,17 +206,22 @@ export async function withTokenRefresh<T>(platform: ECommercePlatform, apiCallFn
  * @param error The error to check
  * @returns True if it's an authentication error
  */
-function isAuthenticationError(error: any): boolean {
+function isAuthenticationError(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const err = error as Record<string, unknown>;
+
   // Check for common authentication error patterns
-  if (error.status === 401 || error.statusCode === 401) {
+  if (err.status === 401 || err.statusCode === 401) {
     return true;
   }
 
-  if (error.response?.status === 401) {
+  const response = err.response as Record<string, unknown> | undefined;
+  if (response?.status === 401) {
     return true;
   }
 
-  if (error.message?.includes('unauthorized') || error.message?.includes('authentication')) {
+  const message = typeof err.message === 'string' ? err.message : '';
+  if (message.includes('unauthorized') || message.includes('authentication')) {
     return true;
   }
 

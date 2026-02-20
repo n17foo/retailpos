@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { LoggerFactory } from '../services/logger/loggerFactory';
+import { LoggerFactory } from '../services/logger/LoggerFactory';
 import { LoggerInterface } from '../services/logger/LoggerInterface';
 
 /**

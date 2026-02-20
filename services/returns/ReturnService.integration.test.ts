@@ -1,5 +1,5 @@
 // Mock logger to avoid transitive expo-sqlite dependency (__DEV__ error)
-jest.mock('../logger/loggerFactory', () => ({
+jest.mock('../logger/LoggerFactory', () => ({
   LoggerFactory: {
     getInstance: jest.fn(() => ({
       createLogger: jest.fn(() => ({
@@ -38,7 +38,7 @@ jest.mock('../../repositories/OrderItemRepository', () => ({
 }));
 
 const mockGetRefundServiceForPlatform = jest.fn();
-jest.mock('../refund/refundServiceFactory', () => ({
+jest.mock('../refund/RefundServiceFactory', () => ({
   RefundServiceFactory: {
     getInstance: jest.fn(() => ({
       getRefundServiceForPlatform: mockGetRefundServiceForPlatform,

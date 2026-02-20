@@ -35,12 +35,12 @@ function rowToOrder(row: OrderRow, items: OrderItemRow[]): OrderWithItems {
 
 export const useOrders = () => {
   const [orders, setOrders] = useState<OrderWithItems[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchOrders = useCallback(async () => {
     try {
-      setLoading(true);
+      setIsLoading(true);
       const rows = await orderRepository.findAll();
       const result: OrderWithItems[] = [];
 
@@ -54,7 +54,7 @@ export const useOrders = () => {
     } catch (e) {
       setError(e as Error);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   }, []);
 
@@ -75,7 +75,7 @@ export const useOrders = () => {
 
   return {
     orders,
-    loading,
+    isLoading,
     error,
     fetchOrders,
     deleteOrder,

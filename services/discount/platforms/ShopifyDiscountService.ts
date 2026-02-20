@@ -2,13 +2,13 @@ import { BaseDiscountService } from './BaseDiscountService';
 import { CouponValidationResult } from '../DiscountServiceInterface';
 import { BasketItem } from '../../basket/basket';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/tokenUtils';
-import { TokenType } from '../../token/tokenServiceInterface';
-import { TokenInitializer } from '../../token/tokenInitializer';
-import { withTokenRefresh } from '../../token/tokenIntegration';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { getPlatformToken } from '../../token/TokenUtils';
+import { TokenType } from '../../token/TokenServiceInterface';
+import { TokenInitializer } from '../../token/TokenInitializer';
+import { withTokenRefresh } from '../../token/TokenIntegration';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
-import secretsService from '../../secrets/secretsService';
+import secretsService from '../../secrets/SecretsService';
 
 export class ShopifyDiscountService extends BaseDiscountService {
   private storeUrl = '';

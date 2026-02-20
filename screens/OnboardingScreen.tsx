@@ -40,7 +40,7 @@ const OnboardingScreen: React.FC = () => {
   const { saveSettings, updateSettings: updateEcommerceSettings } = useEcommerceSettings();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome');
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
-  const [ecommerceConfig, setEcommerceConfig] = useState<any>({});
+  const [ecommerceConfig, setEcommerceConfig] = useState<Record<string, string>>({});
   const [offlineConfig, setOfflineConfig] = useState<OfflineStoreConfig>({
     storeName: '',
     categories: [],

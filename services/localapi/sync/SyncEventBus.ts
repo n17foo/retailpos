@@ -1,6 +1,6 @@
 import { SyncEvent, SyncEventType } from './SyncEventTypes';
 import { localApiConfig } from '../LocalApiConfig';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 
 type SyncEventHandler = (event: SyncEvent) => void | Promise<void>;
 
@@ -32,7 +32,7 @@ export class SyncEventBus {
   }
 
   /** Emit a sync event */
-  emit(type: SyncEventType, payload: any): SyncEvent {
+  emit(type: SyncEventType, payload: unknown): SyncEvent {
     const event: SyncEvent = {
       id: `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       type,

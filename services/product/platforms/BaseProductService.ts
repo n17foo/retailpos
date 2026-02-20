@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
 import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../ProductServiceInterface';
 import { PlatformProductServiceInterface, PlatformConfigRequirements, PlatformProductConfig } from './PlatformProductServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 
 /**
  * Base abstract class for platform-specific product service implementations

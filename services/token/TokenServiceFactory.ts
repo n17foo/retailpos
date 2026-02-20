@@ -1,6 +1,6 @@
-import { TokenService } from './tokenService';
-import { TokenServiceInterface, TokenType } from './tokenServiceInterface';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { TokenService } from './TokenService';
+import { TokenServiceInterface, TokenType } from './TokenServiceInterface';
+import { LoggerFactory } from '../logger/LoggerFactory';
 import { ECommercePlatform } from '../../utils/platforms';
 
 /**
@@ -97,7 +97,7 @@ export class TokenServiceFactory {
     this.service.registerTokenProvider(ECommercePlatform.MAGENTO, async (platform, tokenType) => {
       // This provider would normally make API calls to Magento to get fresh tokens
       // For now, we're just demonstrating the pattern
-      const { SecretsServiceFactory } = require('../secrets/secretsService');
+      const { SecretsServiceFactory } = require('../secrets/SecretsService');
       const secretsService = SecretsServiceFactory.getInstance().getService();
 
       try {
@@ -136,7 +136,7 @@ export class TokenServiceFactory {
   private setupShopifyTokenProvider(): void {
     this.service.registerTokenProvider(ECommercePlatform.SHOPIFY, async (platform, tokenType) => {
       // Similar implementation to Magento but with Shopify-specific auth
-      const { SecretsServiceFactory } = require('../secrets/secretsService');
+      const { SecretsServiceFactory } = require('../secrets/SecretsService');
       const secretsService = SecretsServiceFactory.getInstance().getService();
 
       try {
@@ -163,7 +163,7 @@ export class TokenServiceFactory {
   private setupBigCommerceTokenProvider(): void {
     this.service.registerTokenProvider(ECommercePlatform.BIGCOMMERCE, async (platform, tokenType) => {
       // BigCommerce implementation
-      const { SecretsServiceFactory } = require('../secrets/secretsService');
+      const { SecretsServiceFactory } = require('../secrets/SecretsService');
       const secretsService = SecretsServiceFactory.getInstance().getService();
 
       try {
@@ -189,7 +189,7 @@ export class TokenServiceFactory {
   private setupWooCommerceTokenProvider(): void {
     this.service.registerTokenProvider(ECommercePlatform.WOOCOMMERCE, async (platform, tokenType) => {
       // WooCommerce implementation
-      const { SecretsServiceFactory } = require('../secrets/secretsService');
+      const { SecretsServiceFactory } = require('../secrets/SecretsService');
       const secretsService = SecretsServiceFactory.getInstance().getService();
 
       try {
@@ -216,7 +216,7 @@ export class TokenServiceFactory {
   private setupSyliusTokenProvider(): void {
     this.service.registerTokenProvider(ECommercePlatform.SYLIUS, async (platform, tokenType) => {
       // Sylius implementation
-      const { SecretsServiceFactory } = require('../secrets/secretsService');
+      const { SecretsServiceFactory } = require('../secrets/SecretsService');
       const secretsService = SecretsServiceFactory.getInstance().getService();
 
       try {
@@ -242,7 +242,7 @@ export class TokenServiceFactory {
   private setupWixTokenProvider(): void {
     this.service.registerTokenProvider(ECommercePlatform.WIX, async (platform, tokenType) => {
       // Wix implementation
-      const { SecretsServiceFactory } = require('../secrets/secretsService');
+      const { SecretsServiceFactory } = require('../secrets/SecretsService');
       const secretsService = SecretsServiceFactory.getInstance().getService();
 
       try {

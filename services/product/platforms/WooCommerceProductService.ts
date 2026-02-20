@@ -1,11 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
 import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../ProductServiceInterface';
 import { PlatformProductConfig, PlatformConfigRequirements } from './PlatformProductServiceInterface';
 import { BaseProductService } from './BaseProductService';
-import { TokenInitializer } from '../../token/tokenInitializer';
-import { TokenType } from '../../token/tokenServiceInterface';
+import { TokenInitializer } from '../../token/TokenInitializer';
+import { TokenType } from '../../token/TokenServiceInterface';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken, withTokenRefresh } from '../../token/tokenUtils';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { getPlatformToken, withTokenRefresh } from '../../token/TokenUtils';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { createBasicAuthHeader } from '../../../utils/base64';
 import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
 

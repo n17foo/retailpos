@@ -37,7 +37,7 @@ export class AuthService {
 
   /** Reset the singleton (used by tests). */
   static resetInstance(): void {
-    AuthService.instance = undefined as any;
+    AuthService.instance = undefined as unknown as AuthService;
   }
 
   /** Register a custom auth method provider */

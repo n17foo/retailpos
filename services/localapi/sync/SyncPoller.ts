@@ -2,7 +2,7 @@ import { localApiConfig } from '../LocalApiConfig';
 import { localApiClient } from '../LocalApiClient';
 import { syncEventBus } from './SyncEventBus';
 import { SyncEvent } from './SyncEventTypes';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 
 /**
  * Polls the server register for new sync events.

@@ -1,6 +1,6 @@
 import { localApiConfig } from './LocalApiConfig';
 import { localApiClient } from './LocalApiClient';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 export interface DiscoveredServer {
   address: string;

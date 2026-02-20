@@ -9,7 +9,7 @@ import { PrestaShopProductService } from './platforms/PrestaShopProductService';
 import { SquarespaceProductService } from './platforms/SquarespaceProductService';
 import { CompositeProductService } from './platforms/CompositeProductService';
 import { OfflineProductService } from './platforms/OfflineProductService';
-import { PlatformProductConfig } from './platforms/PlatformProductServiceInterface';
+import { PlatformProductConfig, PlatformProductServiceInterface } from './platforms/PlatformProductServiceInterface';
 import { ECommercePlatform } from '../../utils/platforms';
 
 /**
@@ -173,7 +173,7 @@ export class ProductServiceFactory {
 
       // Add the service to the composite
       if (this.compositeService) {
-        this.compositeService.addService(service as any);
+        this.compositeService.addService(service as unknown as PlatformProductServiceInterface);
       }
     });
 

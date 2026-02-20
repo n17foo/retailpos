@@ -1,4 +1,4 @@
-import { OrderServiceFactory } from '../order/orderServiceFactory';
+import { OrderServiceFactory } from '../order/OrderServiceFactory';
 import { Order, OrderLineItem } from '../order/OrderServiceInterface';
 import { BasketItem } from '../basket/basket';
 import { CheckoutResult, SyncResult } from '../order/order';

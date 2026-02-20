@@ -35,7 +35,7 @@ export interface BasePrinterService {
    * Connect to a printer
    * @param connectionConfig Connection configuration specific to the printer type
    */
-  connect(connectionConfig: any): Promise<boolean>;
+  connect(connectionConfig: unknown): Promise<boolean>;
 
   /**
    * Print a receipt
@@ -77,9 +77,9 @@ export interface BasePrinterService {
  */
 export abstract class AbstractPrinterService implements BasePrinterService {
   protected _isConnected: boolean = false;
-  protected _connectionConfig: any = null;
+  protected _connectionConfig: unknown = null;
 
-  abstract connect(connectionConfig: any): Promise<boolean>;
+  abstract connect(connectionConfig: unknown): Promise<boolean>;
   abstract printReceipt(data: ReceiptData): Promise<boolean>;
   abstract getStatus(): Promise<PrinterStatus>;
 

@@ -404,17 +404,34 @@ const user: any = { ... };
 
 ### Naming Conventions
 
-| Type               | Convention                  | Example                   |
-| ------------------ | --------------------------- | ------------------------- |
-| Files (components) | PascalCase                  | `ProductCard.tsx`         |
-| Files (hooks)      | camelCase with `use` prefix | `useProducts.ts`          |
-| Files (services)   | PascalCase                  | `ProductService.ts`       |
-| Interfaces         | PascalCase                  | `ProductServiceInterface` |
-| Types              | PascalCase                  | `UserRole`                |
-| Functions          | camelCase                   | `fetchProducts`           |
-| Constants          | SCREAMING_SNAKE_CASE        | `DEFAULT_PAGE_SIZE`       |
-| React Components   | PascalCase                  | `ProductCard`             |
-| Hooks              | camelCase with `use` prefix | `useProducts`             |
+| Type               | Convention                  | Example                      |
+| ------------------ | --------------------------- | ---------------------------- |
+| Files (components) | PascalCase                  | `ProductCard.tsx`            |
+| Files (hooks)      | camelCase with `use` prefix | `useProducts.ts`             |
+| Files (services)   | PascalCase                  | `ProductService.ts`          |
+| Files (interfaces) | PascalCase                  | `ProductServiceInterface.ts` |
+| Files (factories)  | PascalCase                  | `ProductServiceFactory.ts`   |
+| Files (mocks)      | PascalCase                  | `StripeMockService.ts`       |
+| Files (data/types) | camelCase                   | `basket.ts`, `types.ts`      |
+| Files (contexts)   | PascalCase                  | `BasketProvider.tsx`         |
+| Files (repos)      | PascalCase                  | `OrderRepository.ts`         |
+| Interfaces         | PascalCase                  | `ProductServiceInterface`    |
+| Types              | PascalCase                  | `UserRole`                   |
+| Functions          | camelCase                   | `fetchProducts`              |
+| Constants          | SCREAMING_SNAKE_CASE        | `DEFAULT_PAGE_SIZE`          |
+| React Components   | PascalCase                  | `ProductCard`                |
+| Hooks              | camelCase with `use` prefix | `useProducts`                |
+
+### Normalisation Rules
+
+These conventions are enforced across the codebase:
+
+- **Service files** — all PascalCase: `[Domain]Service.ts`, `[Domain]ServiceInterface.ts`, `[Domain]ServiceFactory.ts`
+- **Hooks** — always `export const useX = ()`, never `export default`. State uses `isLoading` (not `loading`).
+- **Error handling in hooks** — use `useLogger('hookName')` + `logger.error(...)`, never `console.error`
+- **Components** — `export default ComponentName` is fine (standard React pattern)
+- **Contexts** — named exports: `export const XProvider` + `export const useX`
+- **Data/type files** — camelCase: `basket.ts`, `order.ts`, `types.ts`, `mappers.ts`
 
 ### File Organization
 

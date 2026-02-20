@@ -1,6 +1,6 @@
 import { CashDrawerServiceInterface, DrawerDriverType } from './CashDrawerServiceInterface';
 import { BasePrinterService } from '../printer/BasePrinterService';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 /**
  * Drawer driver that sends the ESC/POS drawer-kick command

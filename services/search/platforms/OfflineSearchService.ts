@@ -1,7 +1,7 @@
-import { SearchServiceInterface, SearchOptions, SearchResult, SearchProduct } from '../searchServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { SearchServiceInterface, SearchOptions, SearchResult, SearchProduct } from '../SearchServiceInterface';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { keyValueRepository } from '../../../repositories/KeyValueRepository';
-import { ProductServiceFactory } from '../../product/productServiceFactory';
+import { ProductServiceFactory } from '../../product/ProductServiceFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
 
 const SEARCH_HISTORY_KEY = 'offline_search_history';

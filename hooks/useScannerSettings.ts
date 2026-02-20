@@ -99,5 +99,3 @@ export const useScannerSettings = () => {
     saveStatus,
   };
 };
-
-export default useScannerSettings;

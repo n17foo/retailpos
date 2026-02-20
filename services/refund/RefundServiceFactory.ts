@@ -1,5 +1,5 @@
-import { RefundServiceInterface } from './refundServiceInterface';
-import { PlatformRefundServiceInterface } from './platforms/platformRefundServiceInterface';
+import { RefundServiceInterface } from './RefundServiceInterface';
+import { PlatformRefundServiceInterface } from './platforms/PlatformRefundServiceInterface';
 
 // Import platform-specific refund services
 import { ShopifyRefundService } from './platforms/shopifyRefundService';
@@ -11,8 +11,8 @@ import { WixRefundService } from './platforms/wixRefundService';
 import { OfflineRefundService } from './platforms/OfflineRefundService';
 import { PrestaShopRefundService } from './platforms/PrestaShopRefundService';
 import { SquarespaceRefundService } from './platforms/SquarespaceRefundService';
-import { LoggerFactory } from '../logger/loggerFactory';
-import { RefundData, RefundRecord, RefundResult } from './refundServiceInterface';
+import { LoggerFactory } from '../logger/LoggerFactory';
+import { RefundData, RefundRecord, RefundResult } from './RefundServiceInterface';
 import { ECommercePlatform } from '../../utils/platforms';
 
 /**
@@ -220,7 +220,7 @@ export class RefundServiceFactory {
    * @param platform The platform to configure
    * @param config The configuration from storage
    */
-  public configureService(platform: ECommercePlatform, _config: Record<string, any>): void {
+  public configureService(platform: ECommercePlatform, _config: Record<string, unknown>): void {
     // Get or create the platform service - this ensures the service is created
     const service = this.getPlatformService(platform);
     if (service) {

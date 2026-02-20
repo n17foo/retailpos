@@ -1,12 +1,12 @@
-import { PlatformRefundServiceInterface } from './platformRefundServiceInterface';
-import { RefundData, RefundResult, RefundRecord } from '../refundServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { PlatformRefundServiceInterface, PlatformCredentials, RefundApiClient } from './PlatformRefundServiceInterface';
+import { RefundData, RefundResult, RefundRecord } from '../RefundServiceInterface';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { SecretsServiceFactory } from '../../secrets/secretsService';
+import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { getPlatformToken, withTokenRefresh } from '../../token/tokenUtils';
-import { TokenType } from '../../token/tokenServiceInterface';
-import { TokenInitializer } from '../../token/tokenInitializer';
+import { getPlatformToken, withTokenRefresh } from '../../token/TokenUtils';
+import { TokenType } from '../../token/TokenServiceInterface';
+import { TokenInitializer } from '../../token/TokenInitializer';
 
 /**
  * BigCommerce-specific implementation of the refund service
@@ -63,7 +63,7 @@ export class BigCommerceRefundService implements PlatformRefundServiceInterface 
    * Get BigCommerce API credentials from secrets service
    * @returns BigCommerce API credentials or null if not found
    */
-  private async getBigCommerceCredentials(): Promise<any> {
+  private async getBigCommerceCredentials(): Promise<PlatformCredentials | null> {
     try {
       const credentials = await this.secretsService.getSecret('bigcommerce_api_credentials');
       if (!credentials) {
@@ -83,7 +83,7 @@ export class BigCommerceRefundService implements PlatformRefundServiceInterface 
    * @param credentials BigCommerce API credentials
    * @returns HTTP client object
    */
-  private async createBigCommerceApiClient(credentials: any): Promise<any> {
+  private async createBigCommerceApiClient(_credentials: PlatformCredentials): Promise<RefundApiClient> {
     // Get the access token from the token management system
     const accessToken = await getPlatformToken(ECommercePlatform.BIGCOMMERCE, TokenType.ACCESS);
 
@@ -93,7 +93,7 @@ export class BigCommerceRefundService implements PlatformRefundServiceInterface 
     }
 
     return {
-      post: async (endpoint: string, data: any) => {
+      post: async (endpoint: string, data: unknown) => {
         this.logger.info(`Making API call to BigCommerce ${endpoint}`);
 
         // In a real implementation, this would make an authenticated API call
@@ -107,10 +107,11 @@ export class BigCommerceRefundService implements PlatformRefundServiceInterface 
         // });
 
         // For now, simulate a successful response
+        const payload = data as Record<string, unknown>;
         return {
           data: {
             id: `bigcommerce-refund-${Date.now()}`,
-            orderId: data.orderId,
+            orderId: payload.orderId,
             status: 'COMPLETED',
           },
         };
@@ -149,7 +150,7 @@ export class BigCommerceRefundService implements PlatformRefundServiceInterface 
       const response = await apiClient.post(`/orders/${orderId}/refunds`, requestData);
 
       // Process response
-      const refundId = response.data.id;
+      const refundId = String(response.data.id);
 
       return {
         success: true,

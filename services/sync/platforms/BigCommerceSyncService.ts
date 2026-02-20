@@ -1,10 +1,10 @@
 import { SyncDirection, SyncEntityType, SyncError, SyncOperationResult, SyncOptions } from '../SyncServiceInterface';
 import { BasePlatformSyncService } from './BasePlatformSyncService';
-import { PlatformSyncConfigRequirements } from './PlatformSyncServiceInterface';
-import { ProductServiceFactory } from '../../product/productServiceFactory';
-import { InventoryServiceFactory } from '../../inventory/inventoryServiceFactory';
-import { CategoryServiceFactory } from '../../category/categoryServiceFactory';
-import { OrderServiceFactory } from '../../order/orderServiceFactory';
+import { PlatformSyncConfig, PlatformSyncConfigRequirements } from './PlatformSyncServiceInterface';
+import { ProductServiceFactory } from '../../product/ProductServiceFactory';
+import { InventoryServiceFactory } from '../../inventory/InventoryServiceFactory';
+import { CategoryServiceFactory } from '../../category/CategoryServiceFactory';
+import { OrderServiceFactory } from '../../order/OrderServiceFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
 
 /**
@@ -26,7 +26,7 @@ export class BigCommerceSyncService extends BasePlatformSyncService {
   /**
    * Initialize the BigCommerce sync service
    */
-  async initialize(config: Record<string, any>): Promise<boolean> {
+  async initialize(config: PlatformSyncConfig): Promise<boolean> {
     // Call base class initialization
     const baseInitialized = await super.initialize(config);
     if (!baseInitialized) {

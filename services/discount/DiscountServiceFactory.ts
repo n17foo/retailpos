@@ -8,7 +8,7 @@ import { WixDiscountService } from './platforms/WixDiscountService';
 import { PrestaShopDiscountService } from './platforms/PrestaShopDiscountService';
 import { SquarespaceDiscountService } from './platforms/SquarespaceDiscountService';
 import { ECommercePlatform, isOnlinePlatform } from '../../utils/platforms';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 /**
  * Factory for creating platform-specific discount/coupon service instances.

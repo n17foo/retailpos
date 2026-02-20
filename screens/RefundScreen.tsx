@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, Alert, ActivityIndicator } from 'reac
 import { lightColors, spacing, typography, borderRadius, elevation } from '../utils/theme';
 import { formatMoney } from '../utils/money';
 import { useRefund } from '../hooks/useRefund';
-import { RefundRecord } from '../services/refund/refundServiceInterface';
+import { RefundRecord } from '../services/refund/RefundServiceInterface';
 import { Button } from '../components/Button';
 import Input from '../components/Input';
 import { useCurrency } from '../hooks/useCurrency';

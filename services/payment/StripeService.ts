@@ -1,4 +1,4 @@
-import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from './paymentServiceInterface';
+import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from './PaymentServiceInterface';
 
 // For React Native, we'll use a bridge pattern since Stripe Terminal SDK
 // requires React hooks which can't be used in a service class
@@ -12,7 +12,7 @@ export class StripeService implements PaymentServiceInterface {
   private static instance: StripeService;
   private isConnected: boolean = false;
   private deviceId: string | null = null;
-  private connectedDevice: any = null;
+  private connectedDevice: unknown = null;
   private stripeTerminalReady: boolean = false;
 
   private constructor() {
@@ -31,7 +31,7 @@ export class StripeService implements PaymentServiceInterface {
    * Set the connection status - called from the React component using the hook
    * This is part of the bridge pattern
    */
-  public setConnectionStatus(connected: boolean, deviceId: string | null, deviceInfo: any = null): void {
+  public setConnectionStatus(connected: boolean, deviceId: string | null, deviceInfo: unknown = null): void {
     this.isConnected = connected;
     this.deviceId = deviceId;
     this.connectedDevice = deviceInfo;
@@ -161,22 +161,22 @@ export class StripeService implements PaymentServiceInterface {
   }
 
   // Store transaction statuses as they're updated by the React component
-  private transactionStatuses: Map<string, any> = new Map();
+  private transactionStatuses: Map<string, PaymentResponse> = new Map();
 
   /**
    * Get transaction status from the cache
    * In the bridge pattern, this returns statuses that have been cached by the React component
    */
-  public async getTransactionStatus(transactionId: string): Promise<any> {
+  public async getTransactionStatus(transactionId: string): Promise<PaymentResponse> {
     console.log(`Getting transaction status for ${transactionId} from bridge cache`);
-    return this.transactionStatuses.get(transactionId) || null;
+    return this.transactionStatuses.get(transactionId) || { success: false, errorMessage: 'Transaction not found', timestamp: new Date() };
   }
 
   /**
    * Set a transaction status
    * Called by React component using the hook when a transaction status is retrieved
    */
-  public setTransactionStatus(transactionId: string, status: any): void {
+  public setTransactionStatus(transactionId: string, status: PaymentResponse): void {
     this.transactionStatuses.set(transactionId, status);
     console.log(`Updated transaction status for ${transactionId}`);
   }

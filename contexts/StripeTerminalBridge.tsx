@@ -2,9 +2,19 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { StripeTerminalProvider, useStripeTerminal } from '@stripe/stripe-terminal-react-native';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
 
-// Define types based on Stripe Terminal SDK
-type Reader = any;
-type StripeError = any;
+// Define types based on Stripe Terminal SDK (incomplete type definitions)
+interface Reader {
+  serialNumber: string;
+  deviceType?: string;
+  status?: string;
+  label?: string;
+  [key: string]: unknown;
+}
+interface StripeError {
+  message?: string;
+  code?: string;
+  [key: string]: unknown;
+}
 type CommonError = { message?: string; code?: string };
 type PaymentIntent = { id: string; status: string; amount: number };
 
@@ -108,6 +118,7 @@ export const StripeTerminalBridgeProvider: React.FC<{ children: ReactNode }> = (
       onUpdateDiscoveredReaders: readers => {
         setState(prev => ({ ...prev, discoveredReaders: readers }));
       },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Stripe Terminal SDK has incomplete TypeScript definitions
     }) as any;
 
     const {
@@ -221,7 +232,7 @@ export const StripeTerminalBridgeProvider: React.FC<{ children: ReactNode }> = (
           const timeout = parseInt(timeoutStr, 10) * 1000; // Convert to milliseconds
 
           // Construct proper configuration for reader discovery
-          const config: any = {
+          const config: Record<string, unknown> = {
             discoveryMethod,
             simulated,
           };
@@ -276,7 +287,7 @@ export const StripeTerminalBridgeProvider: React.FC<{ children: ReactNode }> = (
           }
 
           // Find the reader from discovered readers
-          const targetReader = terminal.discoveredReaders.find((r: any) => r.serialNumber === readerId);
+          const targetReader = terminal.discoveredReaders.find((r: Reader) => r.serialNumber === readerId);
           if (!targetReader) {
             throw new Error(`Reader ${readerId} not found`);
           }

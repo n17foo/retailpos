@@ -92,10 +92,14 @@ const AuthMethodSetupStep: React.FC<AuthMethodSetupStepProps> = ({ onBack, onCom
       const magProvider = authService.getProvider('magstripe');
       const rfidProvider = authService.getProvider('rfid_nfc');
       if (magProvider && 'setHardwareAvailable' in magProvider) {
-        await (magProvider as any).setHardwareAvailable(enabledMethods.has('magstripe'));
+        await (magProvider as unknown as { setHardwareAvailable: (v: boolean) => Promise<void> }).setHardwareAvailable(
+          enabledMethods.has('magstripe')
+        );
       }
       if (rfidProvider && 'setHardwareAvailable' in rfidProvider) {
-        await (rfidProvider as any).setHardwareAvailable(enabledMethods.has('rfid_nfc'));
+        await (rfidProvider as unknown as { setHardwareAvailable: (v: boolean) => Promise<void> }).setHardwareAvailable(
+          enabledMethods.has('rfid_nfc')
+        );
       }
 
       onComplete();

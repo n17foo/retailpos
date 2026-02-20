@@ -7,7 +7,7 @@ export enum LogLevel {
 
 export interface LogPayload {
   message: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -39,22 +39,22 @@ export interface LoggerInterface {
   /**
    * Log debug level information, typically for development/troubleshooting
    */
-  debug(payload: LogPayload | string, ...args: any[]): void;
+  debug(payload: LogPayload | string, ...args: unknown[]): void;
 
   /**
    * Log informational messages about normal application operation
    */
-  info(payload: LogPayload | string, ...args: any[]): void;
+  info(payload: LogPayload | string, ...args: unknown[]): void;
 
   /**
    * Log warning messages that might indicate potential issues
    */
-  warn(payload: LogPayload | string, ...args: any[]): void;
+  warn(payload: LogPayload | string, ...args: unknown[]): void;
 
   /**
    * Log error messages for application failures
    */
-  error(payload: LogPayload | string, error?: Error, ...args: any[]): void;
+  error(payload: LogPayload | string, error?: Error, ...args: unknown[]): void;
 
   /**
    * Set the current logger level

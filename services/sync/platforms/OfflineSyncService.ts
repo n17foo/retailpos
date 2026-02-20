@@ -1,5 +1,5 @@
 import { SyncServiceInterface, SyncOptions, SyncStatus, SyncEntityType, SyncDirection } from '../SyncServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 
 /**
  * Offline sync service for local-first POS operation

@@ -1,11 +1,11 @@
 import { SyncDirection, SyncEntityType, SyncError, SyncOperationResult, SyncOptions } from '../SyncServiceInterface';
 import { BasePlatformSyncService } from './BasePlatformSyncService';
-import { PlatformSyncConfigRequirements } from './PlatformSyncServiceInterface';
+import { PlatformSyncConfig, PlatformSyncConfigRequirements } from './PlatformSyncServiceInterface';
 
-import { ProductServiceFactory } from '../../product/productServiceFactory';
-import { InventoryServiceFactory } from '../../inventory/inventoryServiceFactory';
-import { CategoryServiceFactory } from '../../category/categoryServiceFactory';
-import { OrderServiceFactory } from '../../order/orderServiceFactory';
+import { ProductServiceFactory } from '../../product/ProductServiceFactory';
+import { InventoryServiceFactory } from '../../inventory/InventoryServiceFactory';
+import { CategoryServiceFactory } from '../../category/CategoryServiceFactory';
+import { OrderServiceFactory } from '../../order/OrderServiceFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 
@@ -35,7 +35,7 @@ export class ShopifySyncService extends BasePlatformSyncService {
   /**
    * Initialize the Shopify sync service
    */
-  async initialize(config: Record<string, any>): Promise<boolean> {
+  async initialize(config: PlatformSyncConfig): Promise<boolean> {
     if (!config.storeUrl || !config.accessToken) {
       console.error('Shopify storeUrl and accessToken are required');
       return false;

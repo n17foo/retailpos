@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
 import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../ProductServiceInterface';
 import { PlatformProductConfig, PlatformConfigRequirements } from './PlatformProductServiceInterface';
 import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { TokenInitializer } from '../../token/tokenInitializer';
-import { withTokenRefresh } from '../../token/tokenIntegration';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { TokenInitializer } from '../../token/TokenInitializer';
+import { withTokenRefresh } from '../../token/TokenIntegration';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { MAGENTO_API_VERSION } from '../../config/apiVersions';
 
 /**

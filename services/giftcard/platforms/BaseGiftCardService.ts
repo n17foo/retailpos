@@ -1,5 +1,5 @@
 import { GiftCardServiceInterface, GiftCardInfo, GiftCardRedemptionResult } from '../GiftCardServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 
 /**
  * Base abstract class for platform-specific gift card service implementations.

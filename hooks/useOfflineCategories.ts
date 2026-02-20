@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Category } from '../services/category/CategoryServiceInterface';
 import { OfflineCategoryService, offlineCategoryService } from '../services/category/platforms/OfflineCategoryService';
+import { useLogger } from './useLogger';
 
 interface UseOfflineCategoriesReturn {
   categories: Category[];
@@ -18,6 +19,7 @@ export const useOfflineCategories = (): UseOfflineCategoriesReturn => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const logger = useLogger('useOfflineCategories');
 
   const loadCategories = useCallback(async () => {
     setIsLoading(true);
@@ -27,7 +29,7 @@ export const useOfflineCategories = (): UseOfflineCategoriesReturn => {
       setCategories(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load categories');
-      console.error('Error loading categories:', err);
+      logger.error({ message: 'Error loading categories' }, err instanceof Error ? err : new Error(String(err)));
     } finally {
       setIsLoading(false);
     }

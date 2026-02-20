@@ -1,6 +1,6 @@
 import { AbstractPrinterService } from './BasePrinterService';
 import { PrinterStatus, ReceiptData } from './PrinterTypes';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 type PrinterConnectionType = 'network' | 'usb' | 'bluetooth';
 
@@ -20,17 +20,18 @@ export class UnifiedPrinterServiceMock extends AbstractPrinterService {
   /**
    * Connect to a printer
    */
-  async connect(config: any): Promise<boolean> {
-    this.logger.info(`Connecting to ${config.connectionType} printer: ${config.printerName}`, { mock: true });
+  async connect(config: unknown): Promise<boolean> {
+    const cfg = config as Record<string, unknown>;
+    this.logger.info(`Connecting to ${cfg.connectionType} printer: ${cfg.printerName}`, { mock: true });
 
-    this.printerType = config.connectionType;
+    this.printerType = cfg.connectionType as PrinterConnectionType;
     this._connectionConfig = config;
     this._isConnected = true;
 
     // Simulate connection delay
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    this.logger.info(`Successfully connected to ${config.printerName}`, { mock: true });
+    this.logger.info(`Successfully connected to ${cfg.printerName}`, { mock: true });
     return true;
   }
 

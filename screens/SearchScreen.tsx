@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSearch } from '../hooks/useSearch';
-import { SearchOptions, SearchProduct } from '../services/search/searchServiceInterface';
+import { SearchOptions, SearchProduct } from '../services/search/SearchServiceInterface';
 import { lightColors, spacing, typography } from '../utils/theme';
 import { Button } from '../components/Button';
 import SearchHeader from './search/SearchHeader';
@@ -44,7 +44,7 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ onGoBack, onSelectProduct }
     await searchProducts(query, { ...filterOptions, searchField });
   }, [query, filterOptions, searchProducts, searchField]);
 
-  const handleFilterChange = (key: keyof SearchOptions, value: any) => {
+  const handleFilterChange = (key: keyof SearchOptions, value: SearchOptions[keyof SearchOptions]) => {
     setFilterOptions(prev => ({
       ...prev,
       [key]: value,

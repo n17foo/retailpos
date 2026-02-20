@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
-import { PaymentProvider } from '../services/payment/paymentServiceFactory';
+import { PaymentProvider } from '../services/payment/PaymentServiceFactory';
 import { usePayment } from './usePayment';
 import { useLogger } from '../hooks/useLogger';
 
@@ -156,7 +156,7 @@ export const usePaymentSettings = () => {
           await keyValueRepository.setItem('stripe_nfc_enableNfc', String(paymentSettings.stripe_nfc.enableNfc || false));
 
           // Import and use the StripeNfcService
-          const { StripeNfcService } = await import('../services/payment/stripeNfcService');
+          const { StripeNfcService } = await import('../services/payment/StripeNfcService');
           const stripeService = StripeNfcService.getInstance();
 
           // Test the connection

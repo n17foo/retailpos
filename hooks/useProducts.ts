@@ -264,5 +264,3 @@ export const useProductsForDisplay = (platform?: ECommercePlatform, categoryId?:
     refresh,
   };
 };
-
-export default useUnifiedProducts;

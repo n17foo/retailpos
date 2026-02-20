@@ -8,7 +8,7 @@ import { WixGiftCardService } from './platforms/WixGiftCardService';
 import { PrestaShopGiftCardService } from './platforms/PrestaShopGiftCardService';
 import { SquarespaceGiftCardService } from './platforms/SquarespaceGiftCardService';
 import { ECommercePlatform, isOnlinePlatform } from '../../utils/platforms';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 /**
  * Factory for creating platform-specific gift card service instances.

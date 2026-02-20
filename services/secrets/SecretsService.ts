@@ -2,7 +2,7 @@ import { SecretsServiceInterface } from './SecretsServiceInterface';
 import { KeychainSecretsService } from './KeychainSecretsService';
 import { MemorySecretsService } from './mock/MemorySecretsService';
 import { USE_MOCK_SECRETS } from '@env';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 /**
  * Factory for creating and managing secrets service instances

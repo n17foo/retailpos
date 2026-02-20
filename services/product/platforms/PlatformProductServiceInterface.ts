@@ -38,7 +38,7 @@ export interface PlatformProductConfig {
   mockFailure?: boolean;
 
   // Any other platform-specific options can be added via indexing
-  [key: string]: any;
+  [key: string]: string | number | boolean | undefined;
 }
 
 /**

@@ -18,7 +18,7 @@ export interface SyncEvent {
   type: SyncEventType;
   registerId: string;
   registerName: string;
-  payload: any;
+  payload: unknown;
   timestamp: number;
 }
 

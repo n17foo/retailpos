@@ -8,7 +8,7 @@ import { WixCustomerService } from './platforms/WixCustomerService';
 import { PrestaShopCustomerService } from './platforms/PrestaShopCustomerService';
 import { SquarespaceCustomerService } from './platforms/SquarespaceCustomerService';
 import { ECommercePlatform, isOnlinePlatform } from '../../utils/platforms';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 /**
  * Factory for creating platform-specific customer service instances.

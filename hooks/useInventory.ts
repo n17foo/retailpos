@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { PlatformServiceRegistry } from '../services/platform/PlatformServiceRegistry';
 import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../services/inventory/InventoryServiceInterface';
 import { ECommercePlatform } from '../utils/platforms';
+import { useLogger } from './useLogger';
 
 /**
  * Hook for inventory operations
@@ -11,6 +12,7 @@ export const useInventory = (platform?: ECommercePlatform) => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [inventory, setInventory] = useState<InventoryResult | null>(null);
+  const logger = useLogger('useInventory');
 
   const registry = PlatformServiceRegistry.getInstance();
 
@@ -30,7 +32,7 @@ export const useInventory = (platform?: ECommercePlatform) => {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to fetch inventory';
         setError(errorMessage);
-        console.error('Error fetching inventory:', err);
+        logger.error({ message: 'Error fetching inventory' }, err instanceof Error ? err : new Error(String(err)));
         return null;
       } finally {
         setIsLoading(false);
@@ -59,7 +61,7 @@ export const useInventory = (platform?: ECommercePlatform) => {
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to update inventory';
         setError(errorMessage);
-        console.error('Error updating inventory:', err);
+        logger.error({ message: 'Error updating inventory' }, err instanceof Error ? err : new Error(String(err)));
         return null;
       } finally {
         setIsLoading(false);

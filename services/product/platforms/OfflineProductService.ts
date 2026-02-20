@@ -1,6 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
 import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../ProductServiceInterface';
 import { PlatformProductServiceInterface, PlatformConfigRequirements, PlatformProductConfig } from './PlatformProductServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { keyValueRepository } from '../../../repositories/KeyValueRepository';
 
 const PRODUCTS_STORAGE_KEY = 'offline_local_products';
@@ -20,7 +21,7 @@ export class OfflineProductService implements PlatformProductServiceInterface {
 
   constructor(config: PlatformProductConfig = {}) {
     if (config.menuUrl) {
-      this.menuUrl = config.menuUrl;
+      this.menuUrl = String(config.menuUrl);
     }
   }
 
@@ -93,7 +94,7 @@ export class OfflineProductService implements PlatformProductServiceInterface {
    *   "categories": [...]
    * }
    */
-  async downloadMenu(): Promise<{ products: Product[]; categories: any[] }> {
+  async downloadMenu(): Promise<{ products: Product[]; categories: Record<string, unknown>[] }> {
     if (!this.menuUrl) {
       throw new Error('Menu URL not configured. Please set the menu download URL first.');
     }

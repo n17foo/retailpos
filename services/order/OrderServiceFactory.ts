@@ -8,7 +8,7 @@ import { WixOrderService } from './platforms/WixOrderService';
 import { PrestaShopOrderService } from './platforms/PrestaShopOrderService';
 import { SquarespaceOrderService } from './platforms/SquarespaceOrderService';
 import { OfflineOrderService } from './platforms/OfflineOrderService';
-import { PlatformOrderConfig } from './platforms/PlatformOrderServiceInterface';
+import { PlatformOrderConfig, PlatformOrderServiceInterface } from './platforms/PlatformOrderServiceInterface';
 import { CompositeOrderService } from './platforms/CompositeOrderService';
 import { ECommercePlatform } from '../../utils/platforms';
 
@@ -173,7 +173,7 @@ export class OrderServiceFactory {
 
       // Add the service to the composite
       if (this.compositeService) {
-        this.compositeService.addService(service as any);
+        this.compositeService.addService(service as unknown as PlatformOrderServiceInterface);
       }
     });
 

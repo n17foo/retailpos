@@ -1,5 +1,5 @@
 import { SecretsServiceInterface } from '../SecretsServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 
 /**
  * Mock implementation of SecretsServiceInterface using in-memory storage

@@ -89,5 +89,3 @@ export const getSidebarWidths = (width: number) => {
   }
   return { category: 0, basket: 0 };
 };
-
-export default useResponsive;

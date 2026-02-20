@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, AlertButton } from 'react-native';
 import { lightColors, spacing, typography, borderRadius } from '../../utils/theme';
 import { SwipeablePanel } from '../../components/SwipeablePanel';
 import { useBasketContext, CartItem } from '../../contexts/BasketProvider';
@@ -102,7 +102,7 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
             text: 'Cancel',
             style: 'cancel' as const,
           },
-        ].filter(Boolean) as any[]
+        ].filter(Boolean) as AlertButton[]
       );
     } catch (error) {
       Alert.alert('Error', (error as Error).message);

@@ -1,5 +1,5 @@
 // Mock logger to avoid transitive expo-sqlite dependency
-jest.mock('../logger/loggerFactory', () => ({
+jest.mock('../logger/LoggerFactory', () => ({
   LoggerFactory: {
     getInstance: jest.fn(() => ({
       createLogger: jest.fn(() => ({

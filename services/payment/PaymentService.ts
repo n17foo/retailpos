@@ -1,5 +1,5 @@
-import { PaymentServiceInterface, PaymentRequest, PaymentResponse } from './paymentServiceInterface';
-import { PaymentProvider, PaymentServiceFactory } from './paymentServiceFactory';
+import { PaymentServiceInterface, PaymentRequest, PaymentResponse } from './PaymentServiceInterface';
+import { PaymentProvider, PaymentServiceFactory } from './PaymentServiceFactory';
 
 /**
  * Unified payment service that combines service functionality with provider switching
@@ -52,23 +52,23 @@ class PaymentService implements PaymentServiceInterface {
   }
 
   // Optional methods - check if they exist on the active service first
-  async getTransactionStatus(transactionId: string): Promise<any> {
-    if ('getTransactionStatus' in this.activeService) {
-      return (this.activeService as any).getTransactionStatus(transactionId);
+  async getTransactionStatus(transactionId: string): Promise<PaymentResponse> {
+    if (this.activeService.getTransactionStatus) {
+      return this.activeService.getTransactionStatus(transactionId);
     }
     throw new Error('getTransactionStatus not supported by the current payment provider');
   }
 
   async voidTransaction(transactionId: string): Promise<PaymentResponse> {
-    if ('voidTransaction' in this.activeService) {
-      return (this.activeService as any).voidTransaction(transactionId);
+    if (this.activeService.voidTransaction) {
+      return this.activeService.voidTransaction(transactionId);
     }
     throw new Error('voidTransaction not supported by the current payment provider');
   }
 
   async refundTransaction(transactionId: string, amount: number): Promise<PaymentResponse> {
-    if ('refundTransaction' in this.activeService) {
-      return (this.activeService as any).refundTransaction(transactionId, amount);
+    if (this.activeService.refundTransaction) {
+      return this.activeService.refundTransaction(transactionId, amount);
     }
     throw new Error('refundTransaction not supported by the current payment provider');
   }

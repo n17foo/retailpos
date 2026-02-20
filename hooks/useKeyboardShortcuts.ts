@@ -44,5 +44,3 @@ export const useKeyboardShortcuts = (shortcuts: KeyboardShortcut[], enabled: boo
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 };
-
-export default useKeyboardShortcuts;

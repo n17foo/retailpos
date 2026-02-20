@@ -5,8 +5,8 @@ interface PlatformConfigurationStepProps {
   platformId: string;
   onBack: () => void;
   onComplete: () => void;
-  config: any;
-  setConfig: (config: any) => void;
+  config: Record<string, string>;
+  setConfig: (config: Record<string, string>) => void;
 }
 
 // Platform display names

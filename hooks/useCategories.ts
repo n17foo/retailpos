@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { CategoryServiceFactory } from '../services/category/categoryServiceFactory';
+import { CategoryServiceFactory } from '../services/category/CategoryServiceFactory';
 import { ECommercePlatform } from '../utils/platforms';
 import {
   buildCategoryTree,
@@ -262,5 +262,3 @@ export const useCategoryNavigation = (platform?: ECommercePlatform) => {
     refresh,
   };
 };
-
-export default useUnifiedCategories;

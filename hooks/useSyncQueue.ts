@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { LocalOrder } from '../services/order/order';
 import { orderRepository, OrderRow } from '../repositories/OrderRepository';
-import { getServiceContainer } from '../services/basket/basketServiceFactory';
+import { getServiceContainer } from '../services/basket/BasketServiceFactory';
 
 export interface SyncQueueOrder {
   id: string;

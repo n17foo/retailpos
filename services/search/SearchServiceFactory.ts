@@ -1,4 +1,4 @@
-import { SearchServiceInterface } from './searchServiceInterface';
+import { SearchServiceInterface } from './SearchServiceInterface';
 import { CompositeSearchService } from './platforms/CompositeSearchService';
 import { ShopifySearchService } from './platforms/ShopifySearchService';
 import { BigCommerceSearchService } from './platforms/BigCommerceSearchService';

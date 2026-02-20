@@ -1,13 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
 import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../ProductServiceInterface';
 import { PlatformProductConfig, PlatformConfigRequirements } from './PlatformProductServiceInterface';
 import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { TokenInitializer } from '../../../services/token/tokenInitializer';
-import { getPlatformToken } from '../../../services/token/tokenUtils';
-import { TokenType } from '../../../services/token/tokenServiceInterface';
-import { withTokenRefresh } from '../../../services/token/tokenIntegration';
+import { TokenInitializer } from '../../../services/token/TokenInitializer';
+import { getPlatformToken } from '../../../services/token/TokenUtils';
+import { TokenType } from '../../../services/token/TokenServiceInterface';
+import { withTokenRefresh } from '../../../services/token/TokenIntegration';
 import { BIGCOMMERCE_API_VERSION } from '../../config/apiVersions';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 
 /**
  * BigCommerce-specific implementation of the product service
@@ -395,7 +396,7 @@ export class BigCommerceProductService extends BaseProductService {
         Accept: 'application/json',
         'Content-Type': 'application/json',
         'X-Auth-Token': accessToken || '',
-        'X-Auth-Client': clientId,
+        'X-Auth-Client': String(clientId),
       };
     } catch (error) {
       this.logger.error({ message: 'Error getting BigCommerce auth headers' }, error instanceof Error ? error : new Error(String(error)));
@@ -405,7 +406,7 @@ export class BigCommerceProductService extends BaseProductService {
         Accept: 'application/json',
         'Content-Type': 'application/json',
         'X-Auth-Token': this.config.accessToken || '',
-        'X-Auth-Client': this.config.clientId || '',
+        'X-Auth-Client': String(this.config.clientId) || '',
       };
     }
   }

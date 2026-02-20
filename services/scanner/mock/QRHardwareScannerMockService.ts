@@ -1,5 +1,5 @@
 import { ScannerServiceInterface } from '../ScannerServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 
 /**
  * Mock implementation of the QR Hardware Scanner Service

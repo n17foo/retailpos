@@ -1,5 +1,10 @@
 import { localApiConfig } from './LocalApiConfig';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
+import { OrderRow } from '../../repositories/OrderRepository';
+import { OrderItemRow } from '../../repositories/OrderItemRepository';
+import { Product } from '../../repositories/ProductRepository';
+import { TaxProfileRow } from '../../repositories/TaxProfileRepository';
+import { ReturnRow } from '../../repositories/ReturnRepository';
 
 /**
  * HTTP client for connecting to a Local API Server on the LAN.
@@ -41,34 +46,34 @@ export class LocalApiClient {
 
   // ── Orders ────────────────────────────────────────────────────────
 
-  async getOrders(status?: string): Promise<any[]> {
-    const result = await this.get<{ orders: any[] }>('/api/orders', status ? { status } : undefined);
+  async getOrders(status?: string): Promise<OrderRow[]> {
+    const result = await this.get<{ orders: OrderRow[] }>('/api/orders', status ? { status } : undefined);
     return result.orders;
   }
 
-  async getOrder(orderId: string): Promise<{ order: any; items: any[] } | null> {
+  async getOrder(orderId: string): Promise<{ order: OrderRow; items: OrderItemRow[] } | null> {
     try {
-      return await this.get<{ order: any; items: any[] }>(`/api/orders/${orderId}`);
+      return await this.get<{ order: OrderRow; items: OrderItemRow[] }>(`/api/orders/${orderId}`);
     } catch {
       return null;
     }
   }
 
-  async getUnsyncedOrders(): Promise<any[]> {
-    const result = await this.get<{ orders: any[] }>('/api/orders/unsynced');
+  async getUnsyncedOrders(): Promise<OrderRow[]> {
+    const result = await this.get<{ orders: OrderRow[] }>('/api/orders/unsynced');
     return result.orders;
   }
 
   // ── Products ──────────────────────────────────────────────────────
 
-  async getProducts(): Promise<any[]> {
-    const result = await this.get<{ products: any[] }>('/api/products');
+  async getProducts(): Promise<Product[]> {
+    const result = await this.get<{ products: Product[] }>('/api/products');
     return result.products;
   }
 
-  async getProduct(productId: string): Promise<any | null> {
+  async getProduct(productId: string): Promise<Product | null> {
     try {
-      const result = await this.get<{ product: any }>(`/api/products/${productId}`);
+      const result = await this.get<{ product: Product }>(`/api/products/${productId}`);
       return result.product;
     } catch {
       return null;
@@ -77,20 +82,20 @@ export class LocalApiClient {
 
   // ── Tax Profiles ──────────────────────────────────────────────────
 
-  async getTaxProfiles(): Promise<any[]> {
-    const result = await this.get<{ taxProfiles: any[] }>('/api/tax-profiles');
+  async getTaxProfiles(): Promise<TaxProfileRow[]> {
+    const result = await this.get<{ taxProfiles: TaxProfileRow[] }>('/api/tax-profiles');
     return result.taxProfiles;
   }
 
   // ── Returns ───────────────────────────────────────────────────────
 
-  async getReturns(status?: string): Promise<any[]> {
-    const result = await this.get<{ returns: any[] }>('/api/returns', status ? { status } : undefined);
+  async getReturns(status?: string): Promise<ReturnRow[]> {
+    const result = await this.get<{ returns: ReturnRow[] }>('/api/returns', status ? { status } : undefined);
     return result.returns;
   }
 
-  async getReturnsByOrder(orderId: string): Promise<any[]> {
-    const result = await this.get<{ returns: any[] }>(`/api/returns/order/${orderId}`);
+  async getReturnsByOrder(orderId: string): Promise<ReturnRow[]> {
+    const result = await this.get<{ returns: ReturnRow[] }>(`/api/returns/order/${orderId}`);
     return result.returns;
   }
 
@@ -132,7 +137,7 @@ export class LocalApiClient {
     return response.json();
   }
 
-  private async post<T>(path: string, body: any): Promise<T> {
+  private async post<T>(path: string, body: unknown): Promise<T> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
       headers: this.headers,
@@ -147,7 +152,7 @@ export class LocalApiClient {
     return response.json();
   }
 
-  private async put<T>(path: string, body: any): Promise<T> {
+  private async put<T>(path: string, body: unknown): Promise<T> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: 'PUT',
       headers: this.headers,

@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { SecretsServiceInterface } from './SecretsServiceInterface';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 // Define an interface for the keychain module to avoid using 'any'
 interface ReactNativeKeychain {

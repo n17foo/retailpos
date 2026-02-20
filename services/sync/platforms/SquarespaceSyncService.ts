@@ -1,5 +1,5 @@
 import { SyncServiceInterface, SyncOptions, SyncStatus, SyncOperationResult, SyncEntityType, SyncDirection } from '../SyncServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 
 /**
  * Squarespace-specific sync service for offline-first POS operation

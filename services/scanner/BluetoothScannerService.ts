@@ -1,6 +1,6 @@
 import { ScannerServiceInterface } from './ScannerServiceInterface';
 import { BleManager, Device } from 'react-native-ble-plx';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 /**
  * Bluetooth scanner service implementation using BLE

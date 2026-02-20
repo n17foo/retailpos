@@ -1,6 +1,6 @@
-import { PlatformRefundServiceInterface } from './platformRefundServiceInterface';
-import { RefundData, RefundResult, RefundRecord } from '../refundServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { PlatformRefundServiceInterface } from './PlatformRefundServiceInterface';
+import { RefundData, RefundResult, RefundRecord } from '../RefundServiceInterface';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { keyValueRepository } from '../../../repositories/KeyValueRepository';
 
 const REFUNDS_STORAGE_KEY = 'offline_local_refunds';

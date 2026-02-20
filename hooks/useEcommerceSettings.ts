@@ -327,7 +327,7 @@ export const useEcommerceSettings = () => {
       await saveSettings();
       return true;
     } catch (error) {
-      console.error('Failed to save changes:', error);
+      logger.error({ message: 'Failed to save changes' }, error instanceof Error ? error : new Error(String(error)));
       Alert.alert('Error', 'Failed to save changes');
       return false;
     } finally {
@@ -366,5 +366,3 @@ export const useEcommerceSettings = () => {
     cancelChanges,
   };
 };
-
-export default useEcommerceSettings;

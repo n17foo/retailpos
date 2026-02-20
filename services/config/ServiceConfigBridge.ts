@@ -1,5 +1,5 @@
 import { ECommercePlatform } from '../../utils/platforms';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 import { keyValueRepository } from '../../repositories/KeyValueRepository';
 import { SHOPIFY_API_VERSION } from './apiVersions';
 
@@ -161,7 +161,7 @@ export class ServiceConfigBridge {
   /**
    * Build platform-specific configuration from stored settings
    */
-  private buildPlatformConfig(settings: StoredECommerceSettings, platform: ECommercePlatform): Record<string, any> {
+  private buildPlatformConfig(settings: StoredECommerceSettings, platform: ECommercePlatform): Record<string, unknown> {
     switch (platform) {
       case ECommercePlatform.SHOPIFY:
         return {
@@ -235,8 +235,8 @@ export class ServiceConfigBridge {
   /**
    * Configure ProductServiceFactory with platform settings
    */
-  private configureProductService(platform: ECommercePlatform, config: Record<string, any>): void {
-    const { ProductServiceFactory } = require('../product/productServiceFactory');
+  private configureProductService(platform: ECommercePlatform, config: Record<string, unknown>): void {
+    const { ProductServiceFactory } = require('../product/ProductServiceFactory');
     const factory = ProductServiceFactory.getInstance();
     factory.configureService(platform, config as PlatformProductConfig);
     this.logger.info(`ProductService configured for ${platform}`);
@@ -245,8 +245,8 @@ export class ServiceConfigBridge {
   /**
    * Configure OrderServiceFactory with platform settings
    */
-  private configureOrderService(platform: ECommercePlatform, config: Record<string, any>): void {
-    const { OrderServiceFactory } = require('../order/orderServiceFactory');
+  private configureOrderService(platform: ECommercePlatform, config: Record<string, unknown>): void {
+    const { OrderServiceFactory } = require('../order/OrderServiceFactory');
     const factory = OrderServiceFactory.getInstance();
     factory.configureService(platform, config as PlatformOrderConfig);
     this.logger.info(`OrderService configured for ${platform}`);
@@ -255,8 +255,8 @@ export class ServiceConfigBridge {
   /**
    * Configure SearchServiceFactory with platform settings
    */
-  private configureSearchService(platform: ECommercePlatform, config: Record<string, any>): void {
-    const { SearchServiceFactory } = require('../search/searchServiceFactory');
+  private configureSearchService(platform: ECommercePlatform, config: Record<string, unknown>): void {
+    const { SearchServiceFactory } = require('../search/SearchServiceFactory');
     const factory = SearchServiceFactory.getInstance();
 
     // Build platform-specific search config
@@ -270,8 +270,8 @@ export class ServiceConfigBridge {
   /**
    * Configure InventoryServiceFactory with platform settings
    */
-  private configureInventoryService(platform: ECommercePlatform, config: Record<string, any>): void {
-    const { InventoryServiceFactory } = require('../inventory/inventoryServiceFactory');
+  private configureInventoryService(platform: ECommercePlatform, config: Record<string, unknown>): void {
+    const { InventoryServiceFactory } = require('../inventory/InventoryServiceFactory');
     const factory = InventoryServiceFactory.getInstance();
     factory.configureService(platform, config);
     this.logger.info(`InventoryService configured for ${platform}`);
@@ -280,8 +280,8 @@ export class ServiceConfigBridge {
   /**
    * Configure SyncServiceFactory with platform settings
    */
-  private configureSyncService(platform: ECommercePlatform, config: Record<string, any>): void {
-    const { SyncServiceFactory } = require('../sync/syncServiceFactory');
+  private configureSyncService(platform: ECommercePlatform, config: Record<string, unknown>): void {
+    const { SyncServiceFactory } = require('../sync/SyncServiceFactory');
     const factory = SyncServiceFactory.getInstance();
     factory.configureService(platform, config);
     this.logger.info(`SyncService configured for ${platform}`);
@@ -290,8 +290,8 @@ export class ServiceConfigBridge {
   /**
    * Configure RefundServiceFactory with platform settings
    */
-  private configureRefundService(platform: ECommercePlatform, config: Record<string, any>): void {
-    const { RefundServiceFactory } = require('../refund/refundServiceFactory');
+  private configureRefundService(platform: ECommercePlatform, config: Record<string, unknown>): void {
+    const { RefundServiceFactory } = require('../refund/RefundServiceFactory');
     const factory = RefundServiceFactory.getInstance();
     factory.configureService(platform, config);
     this.logger.info(`RefundService configured for ${platform}`);
@@ -343,7 +343,7 @@ export class ServiceConfigBridge {
 
     try {
       // Use the product service to test connection (it has testConnection in the base)
-      const { ProductServiceFactory } = require('../product/productServiceFactory');
+      const { ProductServiceFactory } = require('../product/ProductServiceFactory');
       const productFactory = ProductServiceFactory.getInstance();
       const service = productFactory.getService(platform);
 

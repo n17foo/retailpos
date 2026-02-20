@@ -61,9 +61,9 @@ export class CompositeSyncService extends BaseSyncService {
       successful: number;
       failed: number;
       skipped: number;
-      errors: { entityId: string; platform?: string; message: string; details?: any }[];
+      errors: { entityId: string; platform?: string; message: string; details?: unknown }[];
       warnings: string[];
-      platformResults: Map<string, any>;
+      platformResults: Map<string, SyncOperationResult>;
     } = {
       successful: 0,
       failed: 0,
@@ -77,89 +77,83 @@ export class CompositeSyncService extends BaseSyncService {
     let totalItemCount = 0;
     let processedCount = 0;
 
-    try {
-      // Start individual sync operations on each platform
-      const platformSyncPromises = servicesToUse.map(async (service, index) => {
-        try {
-          // Start the sync on the individual platform
-          const platformSyncId = await service.startSync(options);
+    // Start individual sync operations on each platform
+    const platformSyncPromises = servicesToUse.map(async (service, index) => {
+      try {
+        // Start the sync on the individual platform
+        const platformSyncId = await service.startSync(options);
 
-          // Wait for completion and monitor progress
-          return this.monitorPlatformSync(service, platformSyncId, index, results);
-        } catch (error) {
-          console.error(`Error starting sync on platform ${index}:`, error);
-          results.failed++;
-          results.errors.push({
-            entityId: 'system',
-            platform: `platform_${index}`,
-            message: `Failed to start sync: ${error.message || 'Unknown error'}`,
-            details: error,
-          });
-          return null;
-        }
-      });
+        // Wait for completion and monitor progress
+        return this.monitorPlatformSync(service, platformSyncId, index, results);
+      } catch (error) {
+        results.failed++;
+        results.errors.push({
+          entityId: 'system',
+          platform: `platform_${index}`,
+          message: `Failed to start sync: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          details: error,
+        });
+        return null;
+      }
+    });
 
-      // Regular progress updates
-      const progressMonitor = setInterval(() => {
-        this.updateSyncProgress(syncId, processedCount, Math.max(totalItemCount, 1));
-      }, 1000);
+    // Regular progress updates
+    const progressMonitor = setInterval(() => {
+      this.updateSyncProgress(syncId, processedCount, Math.max(totalItemCount, 1));
+    }, 1000);
 
-      // Wait for all platform syncs to complete
-      const platformResults = await Promise.all(platformSyncPromises);
-      clearInterval(progressMonitor);
+    // Wait for all platform syncs to complete
+    const platformResults = await Promise.all(platformSyncPromises);
+    clearInterval(progressMonitor);
 
-      // Aggregate results
-      platformResults.forEach((result, index) => {
-        if (result) {
-          totalItemCount += result.total || 0;
-          processedCount += result.progress || 0;
+    // Aggregate results
+    platformResults.forEach((result, index) => {
+      if (result) {
+        totalItemCount += result.total || 0;
+        processedCount += result.progress || 0;
 
-          if (result.result) {
-            results.successful += result.result.successful || 0;
-            results.failed += result.result.failed || 0;
-            results.skipped += result.result.skipped || 0;
+        if (result.result) {
+          results.successful += result.result.successful || 0;
+          results.failed += result.result.failed || 0;
+          results.skipped += result.result.skipped || 0;
 
-            // Add platform-specific errors
-            if (result.result.errors && result.result.errors.length > 0) {
-              result.result.errors.forEach((error: any) => {
-                results.errors.push({
-                  ...error,
-                  platform: `platform_${index}`,
-                });
+          // Add platform-specific errors
+          if (result.result.errors && result.result.errors.length > 0) {
+            result.result.errors.forEach(syncError => {
+              results.errors.push({
+                ...syncError,
+                platform: `platform_${index}`,
               });
-            }
-
-            // Add platform-specific warnings
-            if (result.result.warnings && result.result.warnings.length > 0) {
-              result.result.warnings.forEach((warning: string) => {
-                results.warnings.push(`Platform ${index}: ${warning}`);
-              });
-            }
-
-            // Store platform-specific results
-            results.platformResults.set(`platform_${index}`, result.result);
+            });
           }
+
+          // Add platform-specific warnings
+          if (result.result.warnings && result.result.warnings.length > 0) {
+            result.result.warnings.forEach((warning: string) => {
+              results.warnings.push(`Platform ${index}: ${warning}`);
+            });
+          }
+
+          // Store platform-specific results
+          results.platformResults.set(`platform_${index}`, result.result);
         }
-      });
+      }
+    });
 
-      // Complete the sync operation
-      const endTime = new Date();
-      const finalResult: SyncOperationResult = {
-        entityType: options.entityType,
-        successful: results.successful,
-        failed: results.failed,
-        skipped: results.skipped,
-        errors: results.errors,
-        warnings: results.warnings,
-        completedAt: endTime,
-        durationMs: endTime.getTime() - startTime.getTime(),
-      };
+    // Complete the sync operation
+    const endTime = new Date();
+    const finalResult: SyncOperationResult = {
+      entityType: options.entityType,
+      successful: results.successful,
+      failed: results.failed,
+      skipped: results.skipped,
+      errors: results.errors,
+      warnings: results.warnings,
+      completedAt: endTime,
+      durationMs: endTime.getTime() - startTime.getTime(),
+    };
 
-      this.completeSyncOperation(syncId, finalResult);
-    } catch (error) {
-      console.error(`Error in composite sync operation ${syncId}:`, error);
-      throw error;
-    }
+    this.completeSyncOperation(syncId, finalResult);
   }
 
   /**
@@ -178,9 +172,9 @@ export class CompositeSyncService extends BaseSyncService {
       successful: number;
       failed: number;
       skipped: number;
-      errors: { entityId: string; platform?: string; message: string; details?: any }[];
+      errors: { entityId: string; platform?: string; message: string; details?: unknown }[];
       warnings: string[];
-      platformResults: Map<string, any>;
+      platformResults: Map<string, SyncOperationResult>;
     }
   ): Promise<SyncStatus> {
     // Initial delay
@@ -198,11 +192,10 @@ export class CompositeSyncService extends BaseSyncService {
       try {
         status = await service.getSyncStatus(platformSyncId);
       } catch (error) {
-        console.error(`Error getting status for platform ${platformIndex} sync ${platformSyncId}:`, error);
         results.errors.push({
           entityId: 'system',
           platform: `platform_${platformIndex}`,
-          message: `Failed to get sync status: ${error.message || 'Unknown error'}`,
+          message: `Failed to get sync status: ${error instanceof Error ? error.message : 'Unknown error'}`,
           details: error,
         });
         break;

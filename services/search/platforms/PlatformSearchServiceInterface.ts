@@ -1,4 +1,4 @@
-import { SearchOptions, SearchProduct } from '../searchServiceInterface';
+import { SearchOptions, SearchProduct } from '../SearchServiceInterface';
 import { ProductResult } from '../../product/ProductServiceInterface';
 import { ProductQueryOptions } from '../../product/ProductServiceInterface';
 
@@ -64,5 +64,5 @@ export interface PlatformSearchConfig {
   apiKey?: string;
   apiUrl?: string;
   storeUrl?: string;
-  [key: string]: any; // Allow additional platform-specific fields
+  [key: string]: string | number | boolean | undefined; // Allow additional platform-specific fields
 }

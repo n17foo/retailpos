@@ -22,7 +22,7 @@ const ScannerSetupStep: React.FC<ScannerSetupStepProps> = ({ onBack, onComplete 
   }, [loadSettings]);
 
   const handleInputChange = useCallback(
-    (field: keyof ScannerSettings, value: any) => {
+    (field: keyof ScannerSettings, value: ScannerSettings[keyof ScannerSettings]) => {
       handleScannerSettingsChange({ ...scannerSettings, [field]: value });
     },
     [scannerSettings, handleScannerSettingsChange]

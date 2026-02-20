@@ -1,5 +1,5 @@
-import { getServiceContainer } from '../basket/basketServiceFactory';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { getServiceContainer } from '../basket/BasketServiceFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 import { AppState, AppStateStatus } from 'react-native';
 import { notificationService } from '../notifications/NotificationService';
 

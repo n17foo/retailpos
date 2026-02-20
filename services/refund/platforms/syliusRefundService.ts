@@ -1,11 +1,11 @@
-import { PlatformRefundServiceInterface } from './platformRefundServiceInterface';
-import { RefundData, RefundResult, RefundRecord } from '../refundServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { PlatformRefundServiceInterface, PlatformCredentials, RefundApiClient } from './PlatformRefundServiceInterface';
+import { RefundData, RefundResult, RefundRecord } from '../RefundServiceInterface';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { SecretsServiceFactory } from '../../secrets/secretsService';
+import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { getPlatformToken } from '../../token/tokenUtils';
-import { TokenType } from '../../token/tokenServiceInterface';
+import { getPlatformToken } from '../../token/TokenUtils';
+import { TokenType } from '../../token/TokenServiceInterface';
 
 /**
  * Sylius-specific implementation of the refund service
@@ -50,7 +50,7 @@ export class SyliusRefundService implements PlatformRefundServiceInterface {
    * Get Sylius API credentials from secrets service
    * @returns Sylius API credentials or null if not found
    */
-  private async getSyliusCredentials(): Promise<any> {
+  private async getSyliusCredentials(): Promise<PlatformCredentials | null> {
     try {
       const credentials = await this.secretsService.getSecret('sylius_api_credentials');
       if (!credentials) {
@@ -70,7 +70,7 @@ export class SyliusRefundService implements PlatformRefundServiceInterface {
    * @param credentials Sylius API credentials
    * @returns HTTP client object
    */
-  private async createSyliusApiClient(credentials: any): Promise<any> {
+  private async createSyliusApiClient(_credentials: PlatformCredentials): Promise<RefundApiClient> {
     // Get the access token from the token management system
     const accessToken = await getPlatformToken(ECommercePlatform.SYLIUS, TokenType.ACCESS);
 
@@ -79,7 +79,7 @@ export class SyliusRefundService implements PlatformRefundServiceInterface {
       throw new Error('Failed to get Sylius access token');
     }
     return {
-      post: async (endpoint: string, data: any) => {
+      post: async (endpoint: string, data: unknown) => {
         this.logger.info(`Making API call to Sylius ${endpoint}`);
 
         // In a real implementation, this would make an authenticated API call
@@ -96,7 +96,7 @@ export class SyliusRefundService implements PlatformRefundServiceInterface {
         return {
           data: {
             id: `sylius-refund-${Date.now()}`,
-            order_number: data.orderNumber,
+            order_number: (data as Record<string, unknown>).orderNumber,
             status: 'completed',
           },
         };
@@ -138,7 +138,7 @@ export class SyliusRefundService implements PlatformRefundServiceInterface {
       const response = await apiClient.post('/api/v1/orders/refunds', requestData);
 
       // Process response
-      const refundId = response.data.id;
+      const refundId = String(response.data.id);
 
       return {
         success: true,

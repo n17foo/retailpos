@@ -7,7 +7,7 @@ import { BluetoothScannerService } from './BluetoothScannerService';
 import { USBScannerService } from './USBScannerService';
 import { QRHardwareScannerService } from './QRHardwareScannerService';
 import { QRHardwareScannerMockService } from './mock/QRHardwareScannerMockService';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 import { USE_MOCK_SCANNER } from '@env';
 
 /**

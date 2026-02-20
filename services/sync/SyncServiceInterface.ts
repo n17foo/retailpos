@@ -54,7 +54,7 @@ export interface SyncError {
   entityId: string;
   platform?: string;
   message: string;
-  details?: any;
+  details?: unknown;
 }
 
 /**

@@ -1,9 +1,10 @@
+// eslint-disable @typescript-eslint/no-explicit-any -- test file requires any for private method access and mocking
 // Mock dependencies - paths must match what BackgroundSyncService.ts imports
-jest.mock('../basket/basketServiceFactory', () => ({
+jest.mock('../basket/BasketServiceFactory', () => ({
   getServiceContainer: jest.fn(),
 }));
 
-jest.mock('../logger/loggerFactory', () => ({
+jest.mock('../logger/LoggerFactory', () => ({
   LoggerFactory: {
     getInstance: jest.fn(() => ({
       createLogger: jest.fn(() => ({
@@ -31,7 +32,7 @@ jest.mock('../notifications/NotificationService', () => ({
 
 import { BackgroundSyncService } from './BackgroundSyncService';
 import { notificationService } from '../notifications/NotificationService';
-import { getServiceContainer } from '../basket/basketServiceFactory';
+import { getServiceContainer } from '../basket/BasketServiceFactory';
 
 describe('BackgroundSyncService - Notification Integration', () => {
   let service: BackgroundSyncService;

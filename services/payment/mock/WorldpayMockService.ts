@@ -1,4 +1,4 @@
-import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from '../paymentServiceInterface';
+import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from '../PaymentServiceInterface';
 
 /**
  * Mock implementation of Worldpay service for development in Expo Go
@@ -8,7 +8,7 @@ export class WorldpayMockService implements PaymentServiceInterface {
   private static instance: WorldpayMockService;
   private isConnected: boolean = false;
   private deviceId: string | null = null;
-  private connectedDevice: any = null;
+  private connectedDevice: unknown = null;
 
   // Mock readers for testing
   private mockReaders = [
@@ -119,18 +119,17 @@ export class WorldpayMockService implements PaymentServiceInterface {
   /**
    * Get transaction status from mock system
    */
-  public async getTransactionStatus(transactionId: string): Promise<any> {
+  public async getTransactionStatus(transactionId: string): Promise<PaymentResponse> {
     console.log(`[MOCK] Getting status for Worldpay transaction: ${transactionId}`);
 
     // Simulate delay
     await new Promise(resolve => setTimeout(resolve, 900));
 
     return {
-      id: transactionId,
-      status: 'AUTHORISED',
+      success: true,
+      transactionId,
       amount: 1000, // $10.00
-      currency: 'GBP',
-      created: new Date().getTime() / 1000,
+      timestamp: new Date(),
     };
   }
 

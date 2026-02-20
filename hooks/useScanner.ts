@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
-import { ScannerServiceFactory, ScannerType as ScannerTypeEnum } from '../services/scanner/scannerServiceFactory';
+import { ScannerServiceFactory, ScannerType as ScannerTypeEnum } from '../services/scanner/ScannerServiceFactory';
 import { ScannerServiceInterface } from '../services/scanner/ScannerServiceInterface';
 import { useLogger } from '../hooks/useLogger';
 

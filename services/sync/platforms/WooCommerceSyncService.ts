@@ -1,10 +1,10 @@
 import { SyncDirection, SyncEntityType, SyncError, SyncOperationResult, SyncOptions } from '../SyncServiceInterface';
 import { BasePlatformSyncService } from './BasePlatformSyncService';
-import { PlatformSyncConfigRequirements } from './PlatformSyncServiceInterface';
-import { ProductServiceFactory } from '../../product/productServiceFactory';
-import { InventoryServiceFactory } from '../../inventory/inventoryServiceFactory';
-import { CategoryServiceFactory } from '../../category/categoryServiceFactory';
-import { OrderServiceFactory } from '../../order/orderServiceFactory';
+import { PlatformSyncConfig, PlatformSyncConfigRequirements } from './PlatformSyncServiceInterface';
+import { ProductServiceFactory } from '../../product/ProductServiceFactory';
+import { InventoryServiceFactory } from '../../inventory/InventoryServiceFactory';
+import { CategoryServiceFactory } from '../../category/CategoryServiceFactory';
+import { OrderServiceFactory } from '../../order/OrderServiceFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { Buffer } from 'buffer';
 
@@ -35,7 +35,7 @@ export class WooCommerceSyncService extends BasePlatformSyncService {
   /**
    * Initialize the WooCommerce sync service
    */
-  async initialize(config: Record<string, any>): Promise<boolean> {
+  async initialize(config: PlatformSyncConfig): Promise<boolean> {
     if (!config.storeUrl || !config.apiKey || !config.apiSecret) {
       console.error('WooCommerce storeUrl, apiKey, and apiSecret are required');
       return false;
@@ -43,7 +43,7 @@ export class WooCommerceSyncService extends BasePlatformSyncService {
     this.storeUrl = config.storeUrl;
     this.apiKey = config.apiKey;
     this.apiSecret = config.apiSecret;
-    this.version = config.version || this.version;
+    this.version = (config.version as string) || this.version;
 
     // Call base class initialization
     const baseInitialized = await super.initialize(config);

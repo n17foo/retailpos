@@ -1,5 +1,6 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
 import { Category, CategoryServiceInterface } from '../CategoryServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { KeyValueRepository } from '../../../repositories/KeyValueRepository';
 
 const CATEGORIES_STORAGE_KEY = 'offline_local_categories';

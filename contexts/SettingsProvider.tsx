@@ -1,9 +1,9 @@
 import React, { createContext, useContext, ReactNode } from 'react';
-import useSettings from '../hooks/useSettings';
+import { useSettings } from '../hooks/useSettings';
 
 interface SettingsContextType {
-  settings: { [key: string]: any };
-  loading: boolean;
+  settings: string[];
+  isLoading: boolean;
   error: Error | null;
   getSetting: <T>(key: string, defaultValue: T) => T;
   updateSetting: <T>(key: string, value: T) => Promise<void>;
@@ -12,11 +12,11 @@ interface SettingsContextType {
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
 export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { settings, loading, error, getSetting, updateSetting } = useSettings();
+  const { settings, isLoading, error, getSetting, updateSetting } = useSettings();
 
   const value = {
     settings,
-    loading,
+    isLoading,
     error,
     getSetting,
     updateSetting,

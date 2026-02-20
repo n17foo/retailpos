@@ -1,6 +1,6 @@
 import { DiscountServiceInterface, CouponValidationResult } from '../DiscountServiceInterface';
 import { BasketItem } from '../../basket/basket';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 
 /**
  * Base abstract class for platform-specific discount service implementations.

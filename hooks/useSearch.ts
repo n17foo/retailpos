@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect } from 'react';
 import { PlatformServiceRegistry } from '../services/platform/PlatformServiceRegistry';
-import { SearchOptions, SearchResult } from '../services/search/searchServiceInterface';
+import { SearchOptions, SearchResult } from '../services/search/SearchServiceInterface';
+import { useLogger } from './useLogger';
 
 /**
  * Hook to interact with the SearchService
  */
 export const useSearch = () => {
   const searchService = PlatformServiceRegistry.getInstance().getSearchService();
+  const logger = useLogger('useSearch');
 
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -38,7 +40,7 @@ export const useSearch = () => {
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to initialize search service');
-        console.error('Error initializing search service:', err);
+        logger.error({ message: 'Error initializing search service' }, err instanceof Error ? err : new Error(String(err)));
       } finally {
         setIsLoading(false);
       }

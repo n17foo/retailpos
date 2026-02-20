@@ -1,4 +1,5 @@
-import { SearchOptions, SearchProduct } from '../searchServiceInterface';
+/* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
+import { SearchOptions, SearchProduct } from '../SearchServiceInterface';
 import { ProductQueryOptions, Product, ProductResult } from '../../product/ProductServiceInterface';
 import { PlatformConfigRequirements, PlatformSearchConfig } from './PlatformSearchServiceInterface';
 import { BaseSearchService } from './BaseSearchService';

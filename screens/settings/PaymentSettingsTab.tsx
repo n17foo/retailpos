@@ -1,6 +1,6 @@
 import React, { useCallback, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityIndicator, ScrollView } from 'react-native';
-import { PaymentProvider } from '../../services/payment/paymentServiceFactory';
+import { PaymentProvider } from '../../services/payment/PaymentServiceFactory';
 import { usePaymentSettings, PaymentSettings } from '../../hooks/usePaymentSettings';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../../utils/theme';
 

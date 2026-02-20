@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { PlatformCustomer } from '../services/customer/CustomerServiceInterface';
-import { customerServiceFactory } from '../services/customer/customerServiceFactory';
+import { customerServiceFactory } from '../services/customer/CustomerServiceFactory';
 import { ECommercePlatform } from '../utils/platforms';
 
 interface UseCustomerSearchResult {

@@ -12,7 +12,7 @@ export class QueuedApiService {
   static async queuedRequest(
     url: string,
     method: 'POST' | 'PUT' | 'DELETE',
-    body?: any,
+    body?: unknown,
     headers?: Record<string, string>,
     requestId?: string
   ): Promise<void> {
@@ -40,7 +40,7 @@ export class QueuedApiService {
   static async directRequestWithBody(
     url: string,
     method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
-    body?: any,
+    body?: unknown,
     headers?: Record<string, string>
   ): Promise<Response> {
     return fetch(url, {

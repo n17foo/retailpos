@@ -10,7 +10,7 @@ interface DataContextType {
   productLoading: boolean;
   productError: string | null;
   loadProducts: () => Promise<void>;
-  createProduct: (productData: any) => Promise<Product>;
+  createProduct: (productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Product>;
   updateProduct: (id: string, productData: Partial<Product>) => Promise<Product>;
   deleteProduct: (id: string) => Promise<boolean>;
 
@@ -18,7 +18,7 @@ interface DataContextType {
   categoryLoading: boolean;
   categoryError: string | null;
   loadCategories: () => Promise<void>;
-  createCategory: (categoryData: any) => Promise<Category>;
+  createCategory: (categoryData: Omit<Category, 'id'>) => Promise<Category>;
   updateCategory: (id: string, categoryData: Partial<Category>) => Promise<Category>;
   deleteCategory: (id: string) => Promise<boolean>;
 
@@ -52,7 +52,7 @@ export const DataProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     deleteCategory,
   } = useOfflineCategories();
 
-  const { orders, loading: orderLoading, error: orderError, fetchOrders, deleteOrder } = useOrders();
+  const { orders, isLoading: orderLoading, error: orderError, fetchOrders, deleteOrder } = useOrders();
 
   const value: DataContextType = {
     products,

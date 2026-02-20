@@ -1,5 +1,5 @@
 import { taxProfileRepository, TaxProfileRow, CreateTaxProfileInput, UpdateTaxProfileInput } from '../../repositories/TaxProfileRepository';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 export interface TaxProfile {
   id: string;

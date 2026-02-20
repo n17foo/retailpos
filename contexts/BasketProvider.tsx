@@ -2,7 +2,7 @@ import { Dispatch, ReactNode, SetStateAction, createContext, useContext, useMemo
 import { ImageSourcePropType } from 'react-native';
 import { Basket } from '../services/basket/basket';
 import { LocalOrder, LocalOrderStatus, CheckoutResult, SyncResult } from '../services/order/order';
-import { getServiceContainer, ServiceContainer } from '../services/basket/basketServiceFactory';
+import { getServiceContainer, ServiceContainer } from '../services/basket/BasketServiceFactory';
 import { ECommercePlatform } from '../utils/platforms';
 import { useAuthContext } from './AuthProvider';
 import { queueManager } from '../services/queue/QueueManager';

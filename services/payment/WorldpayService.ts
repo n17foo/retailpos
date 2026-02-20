@@ -1,17 +1,16 @@
 // Import Worldpay SDK
 import '@worldpay/access-worldpay-checkout-react-native-sdk';
-import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from './paymentServiceInterface';
+import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from './PaymentServiceInterface';
 
 // Since we're having issues with the types, we'll use dynamic imports with proper types
 // This allows us to use the SDK while maintaining type safety in our own code
-declare global {
-  interface Window {
-    Worldpay: any;
-  }
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party SDK with no type definitions
+type WorldpaySDKType = any;
+
+declare const global: { Worldpay?: WorldpaySDKType };
 
 // Access the SDK through the global namespace as it might be exposed
-const WorldpaySDK = global.Worldpay || (global as any).Worldpay || require('@worldpay/access-worldpay-checkout-react-native-sdk');
+const WorldpaySDK: WorldpaySDKType = global.Worldpay || require('@worldpay/access-worldpay-checkout-react-native-sdk');
 
 // Define payment device interface since it's not exported by the SDK
 interface PaymentDevice {
@@ -102,7 +101,7 @@ const worldpayConfig: DeviceConfig = {
  */
 export class WorldpayService implements PaymentServiceInterface {
   private static instance: WorldpayService;
-  private checkout: any;
+  private checkout: WorldpaySDKType;
   private isConnected: boolean = false;
   private deviceId: string | null = null;
   private connectedDevice: PaymentDevice | null = null;
@@ -331,16 +330,34 @@ export class WorldpayService implements PaymentServiceInterface {
    * Get the transaction status
    * Used to check the status of a previous transaction
    */
-  public async getTransactionStatus(transactionId: string): Promise<TransactionStatus | null> {
+  public async getTransactionStatus(transactionId: string): Promise<PaymentResponse> {
     if (!this.isConnected) {
       throw new Error('Not connected to payment terminal');
     }
 
     try {
-      return await this.checkout.getTransactionStatus(transactionId);
+      const status = await this.checkout.getTransactionStatus(transactionId);
+      return {
+        success: status?.approved === true,
+        transactionId,
+        timestamp: new Date(),
+        amount: status?.amount || 0,
+        paymentMethod: 'worldpay',
+        cardBrand: status?.cardBrand || 'unknown',
+        last4: status?.last4 || 'xxxx',
+      };
     } catch (error) {
       console.error('Failed to get transaction status:', error);
-      return null;
+      return {
+        success: false,
+        transactionId,
+        timestamp: new Date(),
+        amount: 0,
+        paymentMethod: 'worldpay',
+        cardBrand: 'unknown',
+        last4: 'xxxx',
+        errorMessage: error instanceof Error ? error.message : 'Failed to get transaction status',
+      };
     }
   }
 

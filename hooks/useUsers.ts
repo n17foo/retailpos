@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { userRepository, User, UserRole, CreateUserInput } from '../repositories/UserRepository';
+import { useLogger } from './useLogger';
 
 interface UseUsersReturn {
   users: User[];
@@ -21,6 +22,7 @@ export const useUsers = (): UseUsersReturn => {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const logger = useLogger('useUsers');
 
   const loadUsers = useCallback(async () => {
     setIsLoading(true);
@@ -30,7 +32,7 @@ export const useUsers = (): UseUsersReturn => {
       setUsers(allUsers);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load users');
-      console.error('Error loading users:', err);
+      logger.error({ message: 'Error loading users' }, err instanceof Error ? err : new Error(String(err)));
     } finally {
       setIsLoading(false);
     }
@@ -162,7 +164,7 @@ export const useUsers = (): UseUsersReturn => {
     try {
       return await userRepository.findByPin(pin);
     } catch (err) {
-      console.error('Error validating PIN:', err);
+      logger.error({ message: 'Error validating PIN' }, err instanceof Error ? err : new Error(String(err)));
       return null;
     }
   }, []);
@@ -171,7 +173,7 @@ export const useUsers = (): UseUsersReturn => {
     try {
       return await userRepository.isPinUnique(pin, excludeUserId);
     } catch (err) {
-      console.error('Error checking PIN uniqueness:', err);
+      logger.error({ message: 'Error checking PIN uniqueness' }, err instanceof Error ? err : new Error(String(err)));
       return false;
     }
   }, []);
@@ -180,7 +182,7 @@ export const useUsers = (): UseUsersReturn => {
     try {
       return await userRepository.hasAdminUser();
     } catch (err) {
-      console.error('Error checking for admin user:', err);
+      logger.error({ message: 'Error checking for admin user' }, err instanceof Error ? err : new Error(String(err)));
       return false;
     }
   }, []);

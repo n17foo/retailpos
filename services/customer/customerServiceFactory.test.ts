@@ -1,4 +1,4 @@
-import { customerServiceFactory } from './customerServiceFactory';
+import { customerServiceFactory } from './CustomerServiceFactory';
 import { BigCommerceCustomerService } from './platforms/BigCommerceCustomerService';
 import { MagentoCustomerService } from './platforms/MagentoCustomerService';
 import { SyliusCustomerService } from './platforms/SyliusCustomerService';
@@ -8,7 +8,7 @@ import { SquarespaceCustomerService } from './platforms/SquarespaceCustomerServi
 import { ECommercePlatform } from '../../utils/platforms';
 
 // Mock logger to avoid transitive expo-sqlite dependency
-jest.mock('../logger/loggerFactory', () => ({
+jest.mock('../logger/LoggerFactory', () => ({
   LoggerFactory: {
     getInstance: jest.fn(() => ({
       createLogger: jest.fn(() => ({

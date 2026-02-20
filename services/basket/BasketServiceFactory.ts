@@ -7,8 +7,8 @@ import { OrderSyncServiceInterface } from '../sync/OrderSyncServiceInterface';
 import { BasketRepository } from '../../repositories/BasketRepository';
 import { OrderRepository } from '../../repositories/OrderRepository';
 import { OrderItemRepository } from '../../repositories/OrderItemRepository';
-import { OrderServiceFactory } from '../order/orderServiceFactory';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { OrderServiceFactory } from '../order/OrderServiceFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 /**
  * Container holding the three split services.

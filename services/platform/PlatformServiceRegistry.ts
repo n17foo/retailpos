@@ -14,27 +14,27 @@
  */
 
 import { ECommercePlatform } from '../../utils/platforms';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 // Domain service interfaces
 import { ProductServiceInterface } from '../product/ProductServiceInterface';
 import { CategoryServiceInterface } from '../category/CategoryServiceInterface';
 import { OrderServiceInterface } from '../order/OrderServiceInterface';
 import { InventoryServiceInterface } from '../inventory/InventoryServiceInterface';
-import { SearchServiceInterface } from '../search/searchServiceInterface';
-import { RefundServiceInterface } from '../refund/refundServiceInterface';
+import { SearchServiceInterface } from '../search/SearchServiceInterface';
+import { RefundServiceInterface } from '../refund/RefundServiceInterface';
 import { BasketServiceInterface } from '../basket/BasketServiceInterface';
-import { TokenServiceInterface } from '../token/tokenServiceInterface';
+import { TokenServiceInterface } from '../token/TokenServiceInterface';
 
 // Domain service factories
-import { ProductServiceFactory } from '../product/productServiceFactory';
-import { CategoryServiceFactory } from '../category/categoryServiceFactory';
-import { OrderServiceFactory } from '../order/orderServiceFactory';
-import { InventoryServiceFactory } from '../inventory/inventoryServiceFactory';
-import { SearchServiceFactory } from '../search/searchServiceFactory';
-import { RefundServiceFactory } from '../refund/refundServiceFactory';
-import { BasketServiceFactory } from '../basket/basketServiceFactory';
-import { TokenServiceFactory } from '../token/tokenServiceFactory';
+import { ProductServiceFactory } from '../product/ProductServiceFactory';
+import { CategoryServiceFactory } from '../category/CategoryServiceFactory';
+import { OrderServiceFactory } from '../order/OrderServiceFactory';
+import { InventoryServiceFactory } from '../inventory/InventoryServiceFactory';
+import { SearchServiceFactory } from '../search/SearchServiceFactory';
+import { RefundServiceFactory } from '../refund/RefundServiceFactory';
+import { BasketServiceFactory } from '../basket/BasketServiceFactory';
+import { TokenServiceFactory } from '../token/TokenServiceFactory';
 
 // ---------------------------------------------------------------------------
 // Public types

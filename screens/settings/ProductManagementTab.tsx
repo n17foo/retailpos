@@ -99,7 +99,7 @@ const ProductManagementTab: React.FC = () => {
   const handleSaveProduct = async () => {
     if (!validateForm()) return;
 
-    const productData: any = {
+    const productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'> = {
       title: formData.title.trim(),
       description: formData.description.trim(),
       productType: formData.categoryId || undefined,

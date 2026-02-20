@@ -1,4 +1,4 @@
-import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from '../paymentServiceInterface';
+import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from '../PaymentServiceInterface';
 
 /**
  * Mock implementation of Stripe NFC Tap to Pay service for development in Expo Go
@@ -126,7 +126,7 @@ export class StripeNfcMockService implements PaymentServiceInterface {
   /**
    * Get transaction status from mock system
    */
-  public async getTransactionStatus(transactionId: string): Promise<any> {
+  public async getTransactionStatus(transactionId: string): Promise<PaymentResponse> {
     console.log(`[MOCK] Getting status for NFC transaction: ${transactionId}`);
 
     // Simulate delay
@@ -135,12 +135,11 @@ export class StripeNfcMockService implements PaymentServiceInterface {
     const isValid = transactionId.startsWith('pi_nfc_mock_');
 
     return {
-      id: transactionId,
-      status: isValid ? 'succeeded' : 'not_found',
+      success: isValid,
+      transactionId,
       amount: 1000, // $10.00
-      currency: 'usd',
-      payment_method_types: ['card_present'],
-      created: new Date().getTime() / 1000,
+      timestamp: new Date(),
+      paymentMethod: 'contactless',
     };
   }
 

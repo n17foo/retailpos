@@ -1,12 +1,13 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
 import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../ProductServiceInterface';
 import { PlatformProductConfig, PlatformConfigRequirements } from './PlatformProductServiceInterface';
 import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/tokenUtils';
-import { TokenType } from '../../token/tokenServiceInterface';
-import { TokenInitializer } from '../../token/tokenInitializer';
-import { withTokenRefresh } from '../../token/tokenIntegration';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { getPlatformToken } from '../../token/TokenUtils';
+import { TokenType } from '../../token/TokenServiceInterface';
+import { TokenInitializer } from '../../token/TokenInitializer';
+import { withTokenRefresh } from '../../token/TokenIntegration';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 
 /**
@@ -137,6 +138,7 @@ export class ShopifyProductService extends BaseProductService {
         const data = await response.json();
 
         // Map Shopify products to our format
+
         const products: Product[] = data.products.map((shopifyProduct: any) => this.mapToProduct(shopifyProduct));
 
         // Parse cursor-based pagination from Link header
@@ -392,6 +394,7 @@ export class ShopifyProductService extends BaseProductService {
   /**
    * Map a Shopify product to our standard format
    */
+
   protected mapToProduct(shopifyProduct: any): Product {
     const variants =
       shopifyProduct.variants?.map((variant: any) => ({
@@ -440,7 +443,7 @@ export class ShopifyProductService extends BaseProductService {
   /**
    * Map our product format to Shopify's format
    */
-  private mapToShopifyProduct(product: Product): any {
+  private mapToShopifyProduct(product: Product): Record<string, unknown> {
     return {
       title: product.title,
       body_html: product.description,

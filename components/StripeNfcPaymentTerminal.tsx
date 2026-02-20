@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, Ani
 import { lightColors, spacing, typography, borderRadius, elevation } from '../utils/theme';
 import { formatMoney } from '../utils/money';
 import { usePayment } from '../hooks/usePayment';
-import { PaymentResponse } from '../services/payment/paymentServiceInterface';
-import { PaymentProvider } from '../services/payment/paymentServiceFactory';
+import { PaymentResponse } from '../services/payment/PaymentServiceInterface';
+import { PaymentProvider } from '../services/payment/PaymentServiceFactory';
 import { useCurrency } from '../hooks/useCurrency';
 
 interface StripeNfcPaymentTerminalProps {

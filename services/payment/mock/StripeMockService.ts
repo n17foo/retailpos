@@ -1,4 +1,4 @@
-import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from '../paymentServiceInterface';
+import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from '../PaymentServiceInterface';
 
 /**
  * Mock implementation of Stripe Terminal service for development in Expo Go
@@ -8,7 +8,7 @@ export class StripeMockService implements PaymentServiceInterface {
   private static instance: StripeMockService;
   private isConnected: boolean = false;
   private deviceId: string | null = null;
-  private connectedDevice: any = null;
+  private connectedDevice: unknown = null;
 
   // Mock readers for testing
   private mockReaders = [
@@ -119,18 +119,17 @@ export class StripeMockService implements PaymentServiceInterface {
   /**
    * Get transaction status from mock system
    */
-  public async getTransactionStatus(transactionId: string): Promise<any> {
+  public async getTransactionStatus(transactionId: string): Promise<PaymentResponse> {
     console.log(`[MOCK] Getting status for transaction: ${transactionId}`);
 
     // Simulate delay
     await new Promise(resolve => setTimeout(resolve, 800));
 
     return {
-      id: transactionId,
-      status: 'succeeded',
+      success: true,
+      transactionId,
       amount: 1000, // $10.00
-      currency: 'usd',
-      created: new Date().getTime() / 1000,
+      timestamp: new Date(),
     };
   }
 

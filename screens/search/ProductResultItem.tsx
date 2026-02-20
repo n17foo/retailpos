@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, ImageSourcePropType, StyleSheet } from 'react-native';
-import { SearchProduct } from '../../services/search/searchServiceInterface';
+import { SearchProduct } from '../../services/search/SearchServiceInterface';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../utils/theme';
 import { formatMoney } from '../../utils/money';
 import { useCurrency } from '../../hooks/useCurrency';

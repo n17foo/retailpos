@@ -238,5 +238,3 @@ export const usePrinterSettings = () => {
     saveStatus,
   };
 };
-
-export default usePrinterSettings;

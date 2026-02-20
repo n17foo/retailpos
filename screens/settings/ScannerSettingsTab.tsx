@@ -33,7 +33,7 @@ const ScannerSettingsTab: React.FC = () => {
   }, [scannerSettings]);
 
   // Handle input changes
-  const handleInputChange = useCallback((field: keyof ScannerSettings, value: any) => {
+  const handleInputChange = useCallback((field: keyof ScannerSettings, value: ScannerSettings[keyof ScannerSettings]) => {
     setFormValues(prev => ({
       ...prev,
       [field]: value,

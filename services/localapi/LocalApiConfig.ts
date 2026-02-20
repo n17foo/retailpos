@@ -1,5 +1,5 @@
 import { keyValueRepository } from '../../repositories/KeyValueRepository';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 export type LocalApiMode = 'standalone' | 'server' | 'client';
 

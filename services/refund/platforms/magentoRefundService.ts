@@ -1,11 +1,11 @@
-import { PlatformRefundServiceInterface } from './platformRefundServiceInterface';
-import { RefundData, RefundResult, RefundRecord } from '../refundServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { PlatformRefundServiceInterface, PlatformCredentials, RefundApiClient } from './PlatformRefundServiceInterface';
+import { RefundData, RefundResult, RefundRecord } from '../RefundServiceInterface';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { SecretsServiceFactory } from '../../secrets/secretsService';
+import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { getPlatformToken } from '../../token/tokenUtils';
-import { TokenType } from '../../token/tokenServiceInterface';
+import { getPlatformToken } from '../../token/TokenUtils';
+import { TokenType } from '../../token/TokenServiceInterface';
 
 /**
  * Magento-specific implementation of the refund service
@@ -52,7 +52,7 @@ export class MagentoRefundService implements PlatformRefundServiceInterface {
    * Retrieve Magento API credentials from the secure store
    * @returns Credentials object containing API key and other required authentication details
    */
-  private async getMagentoCredentials(): Promise<any> {
+  private async getMagentoCredentials(): Promise<PlatformCredentials | null> {
     try {
       // Get credentials from secrets service - keep for compatibility with endpoint URLs
       const credentials = await this.secretsService.getSecret('magento_api_credentials');
@@ -73,7 +73,7 @@ export class MagentoRefundService implements PlatformRefundServiceInterface {
    * @param credentials Magento API credentials
    * @returns HTTP client object
    */
-  private async createMagentoApiClient(credentials: any): Promise<any> {
+  private async createMagentoApiClient(_credentials: PlatformCredentials): Promise<RefundApiClient> {
     // Get the access token from the token management system
     const accessToken = await getPlatformToken(ECommercePlatform.MAGENTO, TokenType.ACCESS);
 
@@ -85,7 +85,7 @@ export class MagentoRefundService implements PlatformRefundServiceInterface {
     // In a real implementation, this would create an Axios client or similar
     // with proper authentication headers and base URL config
     return {
-      post: async (endpoint: string, data: any) => {
+      post: async (endpoint: string, data: unknown) => {
         this.logger.info(`Making API call to Magento ${endpoint}`);
 
         // Here you would actually make the API call with proper auth headers
@@ -100,7 +100,7 @@ export class MagentoRefundService implements PlatformRefundServiceInterface {
         return {
           data: {
             id: `magento-refund-${Date.now()}`,
-            order_number: data.order_number,
+            order_number: (data as Record<string, unknown>).order_number,
             status: 'complete',
           },
         };
@@ -114,7 +114,7 @@ export class MagentoRefundService implements PlatformRefundServiceInterface {
    * @param refundData Refund data from our app
    * @returns Formatted refund request for Magento API
    */
-  private prepareRefundRequest(orderId: string, refundData: RefundData): any {
+  private prepareRefundRequest(orderId: string, refundData: RefundData): Record<string, unknown> {
     // Transform our internal refund data to Magento's expected format
     return {
       items:
@@ -165,7 +165,7 @@ export class MagentoRefundService implements PlatformRefundServiceInterface {
         throw new Error('Invalid response from Magento API');
       }
 
-      const refundId = response.data.refund_id;
+      const refundId = String(response.data.refund_id);
 
       return {
         success: true,

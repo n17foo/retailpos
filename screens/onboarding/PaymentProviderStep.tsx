@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Button, ActivityIndicator, Alert } from 'react-native';
 import { usePaymentSettings, PaymentSettings } from '../../hooks/usePaymentSettings';
-import { PaymentProvider } from '../../services/payment/paymentServiceFactory';
+import { PaymentProvider } from '../../services/payment/PaymentServiceFactory';
 
 interface PaymentProviderStepProps {
   onBack: () => void;

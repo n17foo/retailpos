@@ -1,4 +1,4 @@
-import { giftCardServiceFactory } from './giftCardServiceFactory';
+import { giftCardServiceFactory } from './GiftCardServiceFactory';
 import { WooCommerceGiftCardService } from './platforms/WooCommerceGiftCardService';
 import { BigCommerceGiftCardService } from './platforms/BigCommerceGiftCardService';
 import { MagentoGiftCardService } from './platforms/MagentoGiftCardService';
@@ -9,7 +9,7 @@ import { SquarespaceGiftCardService } from './platforms/SquarespaceGiftCardServi
 import { ECommercePlatform } from '../../utils/platforms';
 
 // Mock logger to avoid transitive expo-sqlite dependency
-jest.mock('../logger/loggerFactory', () => ({
+jest.mock('../logger/LoggerFactory', () => ({
   LoggerFactory: {
     getInstance: jest.fn(() => ({
       createLogger: jest.fn(() => ({

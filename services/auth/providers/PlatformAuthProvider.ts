@@ -1,8 +1,8 @@
 import { keyValueRepository } from '../../../repositories/KeyValueRepository';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
 import { ECommercePlatform, isOnlinePlatform } from '../../../utils/platforms';
-import { TokenService } from '../../token/tokenService';
-import { TokenType } from '../../token/tokenServiceInterface';
+import { TokenService } from '../../token/TokenService';
+import { TokenType } from '../../token/TokenServiceInterface';
 
 const PLATFORM_AUTH_USER_KEY = 'auth.platform.userId';
 

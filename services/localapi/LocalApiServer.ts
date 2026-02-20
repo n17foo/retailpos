@@ -1,10 +1,10 @@
 import { localApiConfig } from './LocalApiConfig';
-import { LoggerFactory } from '../logger/loggerFactory';
-import { orderRepository, OrderRow } from '../../repositories/OrderRepository';
-import { OrderItemRepository, OrderItemRow } from '../../repositories/OrderItemRepository';
-import { ProductRepository, Product } from '../../repositories/ProductRepository';
-import { taxProfileRepository, TaxProfileRow } from '../../repositories/TaxProfileRepository';
-import { returnRepository, ReturnRow } from '../../repositories/ReturnRepository';
+import { LoggerFactory } from '../logger/LoggerFactory';
+import { orderRepository } from '../../repositories/OrderRepository';
+import { OrderItemRepository } from '../../repositories/OrderItemRepository';
+import { ProductRepository } from '../../repositories/ProductRepository';
+import { taxProfileRepository } from '../../repositories/TaxProfileRepository';
+import { returnRepository } from '../../repositories/ReturnRepository';
 import { syncEventBus } from './sync/SyncEventBus';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
@@ -12,7 +12,7 @@ type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 interface RouteHandler {
   method: HttpMethod;
   path: string;
-  handler: (params: Record<string, string>, body: any) => Promise<{ status: number; body: any }>;
+  handler: (params: Record<string, string>, body: unknown) => Promise<{ status: number; body: unknown }>;
 }
 
 /**
@@ -69,9 +69,9 @@ export class LocalApiServer {
   async handleRequest(
     method: HttpMethod,
     path: string,
-    body?: any,
+    body?: unknown,
     headers?: Record<string, string>
-  ): Promise<{ status: number; body: any }> {
+  ): Promise<{ status: number; body: unknown }> {
     if (!this.running) {
       return { status: 503, body: { error: 'Server not running' } };
     }
@@ -115,7 +115,8 @@ export class LocalApiServer {
 
     // ── Orders ────────────────────────────────────────────────────────
     this.route('GET', '/api/orders', async (_params, body) => {
-      const status = body?.status as string | undefined;
+      const b = body as Record<string, unknown> | undefined;
+      const status = b?.status as string | undefined;
       const rows = await orderRepository.findAll(status);
       return { status: 200, body: { orders: rows } };
     });
@@ -152,7 +153,8 @@ export class LocalApiServer {
 
     // ── Returns ───────────────────────────────────────────────────────
     this.route('GET', '/api/returns', async (_params, body) => {
-      const status = body?.status as string | undefined;
+      const b = body as Record<string, unknown> | undefined;
+      const status = b?.status as string | undefined;
       const rows = await returnRepository.findAll(status);
       return { status: 200, body: { returns: rows } };
     });
@@ -164,7 +166,8 @@ export class LocalApiServer {
 
     // ── Sync Events (polling endpoint for client registers) ───────────
     this.route('GET', '/api/sync/events', async (_params, body) => {
-      const since = parseInt(body?.since || '0', 10) || 0;
+      const b = body as Record<string, unknown> | undefined;
+      const since = parseInt(String(b?.since || '0'), 10) || 0;
       const events = syncEventBus.getEventsSince(since);
       return { status: 200, body: { events } };
     });

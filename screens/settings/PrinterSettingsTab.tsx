@@ -8,7 +8,7 @@ import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 
 // Helper function to create a deep copy of the settings object
-const deepCopy = (obj: any) => JSON.parse(JSON.stringify(obj));
+const deepCopy = <T,>(obj: T): T => JSON.parse(JSON.stringify(obj));
 
 const PrinterSettingsTab: React.FC = () => {
   const { t } = useTranslate();

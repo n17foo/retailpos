@@ -3,9 +3,11 @@ import { PrinterStatus, ReceiptData } from './PrinterTypes';
 
 // We'll use dynamic imports for these native modules to avoid initialization issues
 // These variables will hold the imported modules when needed
-let USBPrinter: any = null;
-let BLEPrinter: any = null;
-let NetPrinter: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party native printer SDK with no type definitions
+type PrinterSDKModule = any;
+let USBPrinter: PrinterSDKModule = null;
+let BLEPrinter: PrinterSDKModule = null;
+let NetPrinter: PrinterSDKModule = null;
 
 /**
  * Printer connection types supported by the unified printer service
@@ -62,7 +64,7 @@ export type PrinterConfig = USBPrinterConfig | BluetoothPrinterConfig | NetworkP
  * using the @tillpos/rn-receipt-printer-utils library
  */
 export class UnifiedPrinterService extends AbstractPrinterService {
-  private printerInstance: any = null;
+  private printerInstance: PrinterSDKModule = null;
   private printerType: PrinterConnectionType | null = null;
 
   /**

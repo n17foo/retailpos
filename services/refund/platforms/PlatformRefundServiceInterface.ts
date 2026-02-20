@@ -1,4 +1,23 @@
-import { RefundData, RefundResult, RefundRecord } from '../refundServiceInterface';
+import { RefundData, RefundResult, RefundRecord } from '../RefundServiceInterface';
+
+/**
+ * Parsed platform API credentials retrieved from the secrets store
+ */
+export interface PlatformCredentials {
+  apiUrl: string;
+  apiKey?: string;
+  apiSecret?: string;
+  accessToken?: string;
+  storeUrl?: string;
+  [key: string]: string | undefined;
+}
+
+/**
+ * Minimal HTTP client returned by createXApiClient methods in refund services
+ */
+export interface RefundApiClient {
+  post(endpoint: string, data: unknown): Promise<{ data: Record<string, unknown> }>;
+}
 
 /**
  * Interface for platform-specific refund services

@@ -1,5 +1,5 @@
 import { Category, CategoryServiceInterface } from '../CategoryServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 
 /**
  * Squarespace-specific category service implementation

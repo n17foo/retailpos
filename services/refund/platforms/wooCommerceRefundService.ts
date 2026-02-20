@@ -1,11 +1,11 @@
-import { PlatformRefundServiceInterface } from './platformRefundServiceInterface';
-import { RefundData, RefundResult, RefundRecord } from '../refundServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { PlatformRefundServiceInterface, PlatformCredentials, RefundApiClient } from './PlatformRefundServiceInterface';
+import { RefundData, RefundResult, RefundRecord } from '../RefundServiceInterface';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { SecretsServiceFactory } from '../../secrets/secretsService';
+import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { getPlatformToken } from '../../token/tokenUtils';
-import { TokenType } from '../../token/tokenServiceInterface';
+import { getPlatformToken } from '../../token/TokenUtils';
+import { TokenType } from '../../token/TokenServiceInterface';
 
 /**
  * WooCommerce-specific implementation of the refund service
@@ -53,7 +53,7 @@ export class WooCommerceRefundService implements PlatformRefundServiceInterface 
    * Get WooCommerce API credentials from secrets service
    * @returns WooCommerce API credentials or null if not found
    */
-  private async getWooCommerceCredentials(): Promise<any> {
+  private async getWooCommerceCredentials(): Promise<PlatformCredentials | null> {
     try {
       const credentials = await this.secretsService.getSecret('woocommerce_api_credentials');
       if (!credentials) {
@@ -73,7 +73,7 @@ export class WooCommerceRefundService implements PlatformRefundServiceInterface 
    * @param credentials WooCommerce API credentials
    * @returns HTTP client object
    */
-  private async createWooCommerceApiClient(credentials: any): Promise<any> {
+  private async createWooCommerceApiClient(_credentials: PlatformCredentials): Promise<RefundApiClient> {
     // Get the access token from the token management system
     const accessToken = await getPlatformToken(ECommercePlatform.WOOCOMMERCE, TokenType.ACCESS);
 
@@ -82,7 +82,7 @@ export class WooCommerceRefundService implements PlatformRefundServiceInterface 
       throw new Error('Failed to get WooCommerce access token');
     }
     return {
-      post: async (endpoint: string, data: any) => {
+      post: async (endpoint: string, data: unknown) => {
         this.logger.info(`Making API call to WooCommerce ${endpoint}`);
 
         // In a real implementation, this would make an authenticated API call
@@ -99,7 +99,7 @@ export class WooCommerceRefundService implements PlatformRefundServiceInterface 
         return {
           data: {
             id: `wc-refund-${Date.now()}`,
-            order_id: data.order_id,
+            order_id: (data as Record<string, unknown>).order_id,
             status: 'completed',
           },
         };
@@ -141,7 +141,7 @@ export class WooCommerceRefundService implements PlatformRefundServiceInterface 
       const response = await apiClient.post(`/wp-json/wc/v3/orders/${orderId}/refunds`, requestData);
 
       // Process response
-      const refundId = response.data.id;
+      const refundId = String(response.data.id);
 
       return {
         success: true,

@@ -1,5 +1,5 @@
 import { orderRepository, OrderRow } from '../../repositories/OrderRepository';
-import { LoggerFactory } from '../logger/loggerFactory';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 export interface SalesSummary {
   totalOrders: number;

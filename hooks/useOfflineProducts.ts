@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Product } from '../services/product/ProductServiceInterface';
 import { OfflineProductService, offlineProductService } from '../services/product/platforms/OfflineProductService';
+import { useLogger } from './useLogger';
 
 interface UseOfflineProductsReturn {
   products: Product[];
@@ -18,6 +19,7 @@ export const useOfflineProducts = (): UseOfflineProductsReturn => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const logger = useLogger('useOfflineProducts');
 
   const loadProducts = useCallback(async () => {
     setIsLoading(true);
@@ -27,7 +29,7 @@ export const useOfflineProducts = (): UseOfflineProductsReturn => {
       setProducts(result.products);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load products');
-      console.error('Error loading products:', err);
+      logger.error({ message: 'Error loading products' }, err instanceof Error ? err : new Error(String(err)));
     } finally {
       setIsLoading(false);
     }
@@ -93,7 +95,7 @@ export const useOfflineProducts = (): UseOfflineProductsReturn => {
     try {
       return await offlineProductService.getProductById(id);
     } catch (err) {
-      console.error('Error getting product:', err);
+      logger.error({ message: 'Error getting product' }, err instanceof Error ? err : new Error(String(err)));
       return null;
     }
   }, []);

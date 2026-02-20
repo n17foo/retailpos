@@ -76,5 +76,5 @@ export interface SearchProduct {
   quantity?: number;
   sku?: string;
   barcode?: string;
-  originalProduct: any; // The original product object from its source
+  originalProduct: unknown; // The original product object from its source
 }

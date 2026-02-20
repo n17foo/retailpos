@@ -1,5 +1,5 @@
 import { CustomerServiceInterface, CustomerSearchOptions, CustomerSearchResult, PlatformCustomer } from '../CustomerServiceInterface';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 
 /**
  * Base abstract class for platform-specific customer service implementations.

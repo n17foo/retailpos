@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from 'react';
-import { PaymentRequest, PaymentResponse } from '../services/payment/paymentServiceInterface';
-import { PaymentProvider } from '../services/payment/paymentServiceFactory';
-import paymentService from '../services/payment/paymentService';
+import { PaymentRequest, PaymentResponse } from '../services/payment/PaymentServiceInterface';
+import { PaymentProvider } from '../services/payment/PaymentServiceFactory';
+import paymentService from '../services/payment/PaymentService';
 
 /**
  * Custom hook for payment processing functionality

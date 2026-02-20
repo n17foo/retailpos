@@ -1,18 +1,18 @@
 import { SquarespaceDiscountService } from './SquarespaceDiscountService';
 
 // Mock the dependencies
-jest.mock('../../secrets/secretsService', () => ({
+jest.mock('../../secrets/SecretsService', () => ({
   __esModule: true,
   default: {
     getSecret: jest.fn(),
   },
 }));
 
-jest.mock('../../token/tokenUtils', () => ({
+jest.mock('../../token/TokenUtils', () => ({
   getPlatformToken: jest.fn(),
 }));
 
-jest.mock('../../token/tokenInitializer', () => ({
+jest.mock('../../token/TokenInitializer', () => ({
   TokenInitializer: {
     getInstance: jest.fn(() => ({
       initializePlatformToken: jest.fn().mockResolvedValue(true),
@@ -20,11 +20,11 @@ jest.mock('../../token/tokenInitializer', () => ({
   },
 }));
 
-jest.mock('../../token/tokenIntegration', () => ({
+jest.mock('../../token/TokenIntegration', () => ({
   withTokenRefresh: jest.fn(),
 }));
 
-jest.mock('../../logger/loggerFactory', () => ({
+jest.mock('../../logger/LoggerFactory', () => ({
   LoggerFactory: {
     getInstance: jest.fn(() => ({
       createLogger: jest.fn(() => ({
@@ -37,8 +37,8 @@ jest.mock('../../logger/loggerFactory', () => ({
   },
 }));
 
-import { getPlatformToken } from '../../token/tokenUtils';
-import { withTokenRefresh } from '../../token/tokenIntegration';
+import { getPlatformToken } from '../../token/TokenUtils';
+import { withTokenRefresh } from '../../token/TokenIntegration';
 
 describe('SquarespaceDiscountService', () => {
   let service: SquarespaceDiscountService;

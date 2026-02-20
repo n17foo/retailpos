@@ -74,7 +74,7 @@ export class TaxProfileRepository {
     }
 
     const sets: string[] = [];
-    const values: any[] = [];
+    const values: (string | number | boolean)[] = [];
 
     if (input.name !== undefined) {
       sets.push('name = ?');

@@ -1,18 +1,18 @@
 import { BigCommerceCustomerService } from './BigCommerceCustomerService';
 
 // Mock the dependencies
-jest.mock('../../secrets/secretsService', () => ({
+jest.mock('../../secrets/SecretsService', () => ({
   __esModule: true,
   default: {
     getSecret: jest.fn(),
   },
 }));
 
-jest.mock('../../token/tokenUtils', () => ({
+jest.mock('../../token/TokenUtils', () => ({
   getPlatformToken: jest.fn(),
 }));
 
-jest.mock('../../token/tokenInitializer', () => ({
+jest.mock('../../token/TokenInitializer', () => ({
   TokenInitializer: {
     getInstance: jest.fn(() => ({
       initializePlatformToken: jest.fn().mockResolvedValue(true),
@@ -20,11 +20,11 @@ jest.mock('../../token/tokenInitializer', () => ({
   },
 }));
 
-jest.mock('../../token/tokenIntegration', () => ({
+jest.mock('../../token/TokenIntegration', () => ({
   withTokenRefresh: jest.fn(),
 }));
 
-jest.mock('../../logger/loggerFactory', () => ({
+jest.mock('../../logger/LoggerFactory', () => ({
   LoggerFactory: {
     getInstance: jest.fn(() => ({
       createLogger: jest.fn(() => ({
@@ -37,12 +37,12 @@ jest.mock('../../logger/loggerFactory', () => ({
   },
 }));
 
-import { getPlatformToken } from '../../token/tokenUtils';
-import { TokenInitializer } from '../../token/tokenInitializer';
-import { withTokenRefresh } from '../../token/tokenIntegration';
-import { LoggerFactory } from '../../logger/loggerFactory';
+import { getPlatformToken } from '../../token/TokenUtils';
+import { TokenInitializer } from '../../token/TokenInitializer';
+import { withTokenRefresh } from '../../token/TokenIntegration';
+import { LoggerFactory } from '../../logger/LoggerFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
-import secretsService from '../../secrets/secretsService';
+import secretsService from '../../secrets/SecretsService';
 
 describe('BigCommerceCustomerService', () => {
   let service: BigCommerceCustomerService;

@@ -51,7 +51,7 @@ export interface PaymentServiceInterface {
   getAvailableTerminals(): Promise<Array<{ id: string; name: string }>>;
 
   // Transaction operations
-  getTransactionStatus?(transactionId: string): Promise<any>;
+  getTransactionStatus?(transactionId: string): Promise<PaymentResponse>;
   voidTransaction?(transactionId: string): Promise<PaymentResponse>;
   refundTransaction?(transactionId: string, amount: number): Promise<PaymentResponse>;
 }
