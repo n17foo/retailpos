@@ -27,6 +27,7 @@ Website: [retailpos.org](https://retailpos.org)
 - **Error Boundary**: Crash recovery with retry UI and basket persistence
 - **Accessibility**: Full screen reader support with a11y labels and hints
 - **Hardware Integration**: Receipt printers, barcode scanners, payment terminals, cash drawers
+- **Payment Providers**: Worldpay, Stripe, Square (4 total)
 - **Cross-Platform**: iOS, Android, Web, Desktop (Electron)
 - **Multi-Language**: English, Spanish, French, German
 - **Role-Based Access**: Admin, Manager, Cashier permissions
