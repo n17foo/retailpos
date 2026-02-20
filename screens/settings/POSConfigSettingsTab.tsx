@@ -3,8 +3,10 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Switch
 import { posConfig } from '../../services/config/POSConfigService';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../utils/theme';
 import { getCurrencyOptions } from '../../utils/currency';
+import { useTranslate } from '../../hooks/useTranslate';
 
 const POSConfigSettingsTab: React.FC = () => {
+  const { t } = useTranslate();
   const [storeName, setStoreName] = useState('');
   const [storeAddress, setStoreAddress] = useState('');
   const [storePhone, setStorePhone] = useState('');
@@ -35,12 +37,12 @@ const POSConfigSettingsTab: React.FC = () => {
 
   const handleSave = async () => {
     if (!storeName.trim()) {
-      Alert.alert('Required', 'Store name cannot be empty.');
+      Alert.alert(t('common.required'), t('settings.posConfig.storeNameRequired'));
       return;
     }
     const rate = parseFloat(taxRate);
     if (isNaN(rate) || rate < 0 || rate > 100) {
-      Alert.alert('Invalid', 'Tax rate must be between 0 and 100.');
+      Alert.alert(t('common.invalid'), t('settings.posConfig.taxRateInvalid'));
       return;
     }
 
@@ -56,9 +58,9 @@ const POSConfigSettingsTab: React.FC = () => {
         drawerOpenOnCash,
       });
       setDirty(false);
-      Alert.alert('Saved', 'POS configuration updated.');
+      Alert.alert(t('common.saved'), t('settings.posConfig.saved'));
     } catch (err) {
-      Alert.alert('Error', 'Failed to save configuration.');
+      Alert.alert(t('common.error'), t('settings.posConfig.saveError'));
     } finally {
       setSaving(false);
     }
@@ -68,32 +70,32 @@ const POSConfigSettingsTab: React.FC = () => {
     <ScrollView style={styles.container}>
       {/* Store Information */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Store Information</Text>
+        <Text style={styles.sectionTitle}>{t('settings.posConfig.storeInfo')}</Text>
 
-        <Text style={styles.label}>Store Name</Text>
+        <Text style={styles.label}>{t('settings.posConfig.storeName')}</Text>
         <TextInput
           style={styles.input}
           value={storeName}
           onChangeText={markDirty(setStoreName)}
-          placeholder="Store name"
+          placeholder={t('settings.posConfig.storeNamePlaceholder')}
           placeholderTextColor={lightColors.textSecondary}
         />
 
-        <Text style={styles.label}>Address</Text>
+        <Text style={styles.label}>{t('settings.posConfig.address')}</Text>
         <TextInput
           style={styles.input}
           value={storeAddress}
           onChangeText={markDirty(setStoreAddress)}
-          placeholder="Address"
+          placeholder={t('settings.posConfig.addressPlaceholder')}
           placeholderTextColor={lightColors.textSecondary}
         />
 
-        <Text style={styles.label}>Phone</Text>
+        <Text style={styles.label}>{t('settings.posConfig.phone')}</Text>
         <TextInput
           style={styles.input}
           value={storePhone}
           onChangeText={markDirty(setStorePhone)}
-          placeholder="Phone number"
+          placeholder={t('settings.posConfig.phonePlaceholder')}
           placeholderTextColor={lightColors.textSecondary}
           keyboardType="phone-pad"
         />
@@ -101,19 +103,19 @@ const POSConfigSettingsTab: React.FC = () => {
 
       {/* Tax & Currency */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Tax &amp; Currency</Text>
+        <Text style={styles.sectionTitle}>{t('settings.posConfig.taxCurrency')}</Text>
 
-        <Text style={styles.label}>Tax Rate (%)</Text>
+        <Text style={styles.label}>{t('settings.posConfig.taxRate')}</Text>
         <TextInput
           style={styles.input}
           value={taxRate}
           onChangeText={markDirty(setTaxRate)}
-          placeholder="e.g. 20"
+          placeholder={t('settings.posConfig.taxRatePlaceholder')}
           placeholderTextColor={lightColors.textSecondary}
           keyboardType="decimal-pad"
         />
 
-        <Text style={styles.label}>Currency</Text>
+        <Text style={styles.label}>{t('settings.posConfig.currency')}</Text>
         <View style={styles.currencyGrid}>
           {getCurrencyOptions().map(opt => (
             <TouchableOpacity
@@ -132,9 +134,9 @@ const POSConfigSettingsTab: React.FC = () => {
 
       {/* Advanced */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Advanced</Text>
+        <Text style={styles.sectionTitle}>{t('settings.posConfig.advanced')}</Text>
 
-        <Text style={styles.label}>Max Sync Retries</Text>
+        <Text style={styles.label}>{t('settings.posConfig.maxSyncRetries')}</Text>
         <TextInput
           style={styles.input}
           value={maxSyncRetries}
@@ -146,7 +148,7 @@ const POSConfigSettingsTab: React.FC = () => {
 
         <View style={styles.switchRow}>
           <View style={styles.switchLabel}>
-            <Text style={styles.label}>Open drawer on cash payment</Text>
+            <Text style={styles.label}>{t('settings.posConfig.drawerOpenOnCash')}</Text>
           </View>
           <Switch
             value={drawerOpenOnCash}
@@ -163,7 +165,11 @@ const POSConfigSettingsTab: React.FC = () => {
       {/* Save */}
       {dirty && (
         <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveButtonText}>Save Changes</Text>}
+          {saving ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.saveButtonText}>{t('settings.scanner.saveChanges')}</Text>
+          )}
         </TouchableOpacity>
       )}
     </ScrollView>

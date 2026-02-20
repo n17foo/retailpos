@@ -1,17 +1,20 @@
 import React from 'react';
 import { View, Text, StyleSheet, Button } from 'react-native';
+import { useTranslate } from '../../hooks/useTranslate';
 
 interface WelcomeStepProps {
   onNext: () => void;
 }
 
 const WelcomeStep: React.FC<WelcomeStepProps> = ({ onNext }) => {
+  const { t } = useTranslate();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Welcome to RetailPOS</Text>
-      <Text style={styles.subtitle}>The last POS system you'll ever need.</Text>
-      <Text style={styles.description}>We'll guide you through a quick setup process to get your store up and running.</Text>
-      <Button title="Get Started" onPress={onNext} />
+      <Text style={styles.title}>{t('welcome.title')}</Text>
+      <Text style={styles.subtitle}>{t('welcome.subtitle')}</Text>
+      <Text style={styles.description}>{t('welcome.description')}</Text>
+      <Button title={t('common.getStarted')} onPress={onNext} />
     </View>
   );
 };

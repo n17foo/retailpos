@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { I18nextProvider } from 'react-i18next';
 import * as Localization from 'expo-localization';
-import i18n from './locales/i18n';
+import i18n, { SUPPORTED_LANGUAGE_CODES, LanguageCode } from './locales/i18n';
 import { CategoryProvider } from './contexts/CategoryProvider';
 import { BasketProvider } from './contexts/BasketProvider';
 import { AuthProvider } from './contexts/AuthProvider';
@@ -66,7 +66,7 @@ const AppContent = () => {
           I18nManager.forceRTL(!!isRTL);
 
           // Change language if supported
-          if (['en', 'fr', 'de'].includes(locale)) {
+          if (SUPPORTED_LANGUAGE_CODES.includes(locale as LanguageCode)) {
             await changeLanguage(locale);
           }
         }

@@ -4,8 +4,10 @@ import { lightColors, spacing, typography, borderRadius, elevation } from '../..
 import { AuthMethodType, AUTH_METHOD_INFO, getAuthMethodsForMode } from '../../services/auth/AuthMethodInterface';
 import { authService } from '../../services/auth/AuthService';
 import { authConfig } from '../../services/auth/AuthConfigService';
+import { useTranslate } from '../../hooks/useTranslate';
 
 const AuthMethodSettingsTab: React.FC = () => {
+  const { t } = useTranslate();
   const [primaryMethod, setPrimaryMethod] = useState<AuthMethodType>('pin');
   const [enabledMethods, setEnabledMethods] = useState<Set<AuthMethodType>>(new Set(['pin']));
   const [availability, setAvailability] = useState<Partial<Record<AuthMethodType, boolean>>>({});
@@ -69,7 +71,7 @@ const AuthMethodSettingsTab: React.FC = () => {
 
   const selectPrimary = (method: AuthMethodType) => {
     if (!enabledMethods.has(method)) {
-      Alert.alert('Enable First', `Please enable ${AUTH_METHOD_INFO[method].label} before setting it as the default.`);
+      Alert.alert(t('settings.auth.enableFirst'), t('settings.auth.enableFirstMessage', { method: AUTH_METHOD_INFO[method].label }));
       return;
     }
     setPrimaryMethod(method);
@@ -97,9 +99,9 @@ const AuthMethodSettingsTab: React.FC = () => {
       }
 
       setDirty(false);
-      Alert.alert('Saved', 'Authentication settings have been updated.');
+      Alert.alert(t('common.saved'), t('settings.auth.saved'));
     } catch {
-      Alert.alert('Error', 'Failed to save authentication settings.');
+      Alert.alert(t('common.error'), t('settings.auth.saveError'));
     } finally {
       setSaving(false);
     }
@@ -115,8 +117,8 @@ const AuthMethodSettingsTab: React.FC = () => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.sectionTitle}>Login Methods</Text>
-      <Text style={styles.sectionDescription}>Configure how staff log in to the POS. PIN is always available as a fallback.</Text>
+      <Text style={styles.sectionTitle}>{t('settings.auth.title')}</Text>
+      <Text style={styles.sectionDescription}>{t('settings.auth.description')}</Text>
 
       {applicableMethods.map(method => {
         const info = AUTH_METHOD_INFO[method];
@@ -134,12 +136,12 @@ const AuthMethodSettingsTab: React.FC = () => {
               <View style={styles.methodInfo}>
                 <View style={styles.methodTitleRow}>
                   <Text style={[styles.methodLabel, !isAvailable && styles.methodLabelDisabled]}>{info.label}</Text>
-                  {isPrimary && <Text style={styles.primaryBadge}>DEFAULT</Text>}
-                  {isAlwaysOn && <Text style={styles.alwaysOnBadge}>ALWAYS ON</Text>}
+                  {isPrimary && <Text style={styles.primaryBadge}>{t('settings.auth.defaultBadge')}</Text>}
+                  {isAlwaysOn && <Text style={styles.alwaysOnBadge}>{t('settings.auth.alwaysOnBadge')}</Text>}
                 </View>
                 <Text style={styles.methodDescription}>{info.description}</Text>
-                {info.requiresHardware && <Text style={styles.hardwareNote}>Requires external hardware</Text>}
-                {info.requiresPlatformSupport && !isAvailable && <Text style={styles.hardwareNote}>Not available on this device</Text>}
+                {info.requiresHardware && <Text style={styles.hardwareNote}>{t('settings.auth.requiresHardware')}</Text>}
+                {info.requiresPlatformSupport && !isAvailable && <Text style={styles.hardwareNote}>{t('settings.auth.notAvailable')}</Text>}
               </View>
               <Switch
                 value={isEnabled}
@@ -152,7 +154,7 @@ const AuthMethodSettingsTab: React.FC = () => {
 
             {isEnabled && !isPrimary && isAvailable && (
               <TouchableOpacity style={styles.setDefaultButton} onPress={() => selectPrimary(method)}>
-                <Text style={styles.setDefaultText}>Set as default login method</Text>
+                <Text style={styles.setDefaultText}>{t('settings.auth.setAsDefault')}</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -162,11 +164,11 @@ const AuthMethodSettingsTab: React.FC = () => {
       {/* Summary */}
       <View style={styles.summarySection}>
         <Text style={styles.summaryText}>
-          <Text style={styles.summaryBold}>Default: </Text>
+          <Text style={styles.summaryBold}>{t('settings.auth.summaryDefault')}</Text>
           {AUTH_METHOD_INFO[primaryMethod].icon} {AUTH_METHOD_INFO[primaryMethod].label}
         </Text>
         <Text style={styles.summaryText}>
-          <Text style={styles.summaryBold}>Enabled: </Text>
+          <Text style={styles.summaryBold}>{t('settings.auth.summaryEnabled')}</Text>
           {Array.from(enabledMethods)
             .map(m => AUTH_METHOD_INFO[m].label)
             .join(', ')}
@@ -176,7 +178,11 @@ const AuthMethodSettingsTab: React.FC = () => {
       {/* Save */}
       {dirty && (
         <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
-          {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveButtonText}>Save Changes</Text>}
+          {saving ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <Text style={styles.saveButtonText}>{t('settings.scanner.saveChanges')}</Text>
+          )}
         </TouchableOpacity>
       )}
     </ScrollView>

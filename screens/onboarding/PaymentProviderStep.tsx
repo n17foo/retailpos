@@ -2,6 +2,7 @@ import React, { useCallback, useEffect } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, ScrollView, Button, ActivityIndicator, Alert } from 'react-native';
 import { usePaymentSettings, PaymentSettings } from '../../hooks/usePaymentSettings';
 import { PaymentProvider } from '../../services/payment/PaymentServiceFactory';
+import { useTranslate } from '../../hooks/useTranslate';
 
 interface PaymentProviderStepProps {
   onBack: () => void;
@@ -11,6 +12,7 @@ interface PaymentProviderStepProps {
 type ProviderSettingKey<T extends keyof PaymentSettings> = keyof PaymentSettings[T];
 
 const PaymentProviderStep: React.FC<PaymentProviderStepProps> = ({ onBack, onNext }) => {
+  const { t } = useTranslate();
   const { paymentSettings, handlePaymentSettingsChange, saveSettings, isLoading, loadSettings, testConnection } = usePaymentSettings();
 
   useEffect(() => {
@@ -46,25 +48,25 @@ const PaymentProviderStep: React.FC<PaymentProviderStepProps> = ({ onBack, onNex
     switch (provider) {
       case PaymentProvider.WORLDPAY:
         if (!worldpay?.merchantId) {
-          Alert.alert('Validation Error', 'Please enter a Worldpay Merchant ID.');
+          Alert.alert(t('common.validationError'), t('payment.worldpay.merchantIdRequired'));
           return false;
         }
         break;
       case PaymentProvider.STRIPE:
         if (!stripe?.apiKey || !stripe?.locationId) {
-          Alert.alert('Validation Error', 'Please enter both Stripe API Key and Location ID.');
+          Alert.alert(t('common.validationError'), t('payment.stripe.required'));
           return false;
         }
         break;
       case PaymentProvider.STRIPE_NFC:
         if (!stripe_nfc?.apiKey || !stripe_nfc?.publishableKey) {
-          Alert.alert('Validation Error', 'Please enter both Stripe API Key and Publishable Key for Tap to Pay.');
+          Alert.alert(t('common.validationError'), t('payment.stripeNfc.required'));
           return false;
         }
         break;
       case PaymentProvider.SQUARE:
         if (!square?.applicationId) {
-          Alert.alert('Validation Error', 'Please enter a Square Application ID.');
+          Alert.alert(t('common.validationError'), t('payment.square.applicationIdRequired'));
           return false;
         }
         break;
@@ -83,12 +85,15 @@ const PaymentProviderStep: React.FC<PaymentProviderStepProps> = ({ onBack, onNex
 
   const handleTestConnection = async () => {
     const success = await testConnection(paymentSettings.provider);
-    Alert.alert(success ? 'Success' : 'Failure', `Connection test ${success ? 'succeeded' : 'failed'}.`);
+    Alert.alert(
+      success ? t('common.success') : t('common.failure'),
+      success ? t('payment.connectionSuccess') : t('payment.connectionFailed')
+    );
   };
 
   const renderProviderSelection = () => (
     <View style={styles.settingGroup}>
-      <Text style={styles.settingLabel}>Payment Provider</Text>
+      <Text style={styles.settingLabel}>{t('payment.provider')}</Text>
       <View style={styles.radioGroup}>
         {Object.values(PaymentProvider).map(provider => (
           <TouchableOpacity
@@ -107,12 +112,12 @@ const PaymentProviderStep: React.FC<PaymentProviderStepProps> = ({ onBack, onNex
     if (paymentSettings.provider !== PaymentProvider.WORLDPAY) return null;
     return (
       <View style={styles.settingGroup}>
-        <Text style={styles.settingLabel}>Worldpay Settings</Text>
+        <Text style={styles.settingLabel}>{t('payment.worldpay.title')}</Text>
         <TextInput
           style={styles.input}
           value={paymentSettings.worldpay?.merchantId || ''}
           onChangeText={value => handleProviderSettingChange('worldpay', 'merchantId', value)}
-          placeholder="Merchant ID"
+          placeholder={t('payment.worldpay.merchantId')}
         />
       </View>
     );
@@ -122,17 +127,17 @@ const PaymentProviderStep: React.FC<PaymentProviderStepProps> = ({ onBack, onNex
     if (paymentSettings.provider !== PaymentProvider.STRIPE) return null;
     return (
       <View style={styles.settingGroup}>
-        <Text style={styles.settingLabel}>Stripe Terminal (PED) Settings</Text>
+        <Text style={styles.settingLabel}>{t('payment.stripe.title')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="API Key"
+          placeholder={t('payment.stripe.apiKey')}
           value={paymentSettings.stripe?.apiKey || ''}
           onChangeText={value => handleProviderSettingChange('stripe', 'apiKey', value)}
           secureTextEntry
         />
         <TextInput
           style={styles.input}
-          placeholder="Location ID"
+          placeholder={t('payment.stripe.locationId')}
           value={paymentSettings.stripe?.locationId || ''}
           onChangeText={value => handleProviderSettingChange('stripe', 'locationId', value)}
         />
@@ -144,10 +149,10 @@ const PaymentProviderStep: React.FC<PaymentProviderStepProps> = ({ onBack, onNex
     if (paymentSettings.provider !== PaymentProvider.STRIPE_NFC) return null;
     return (
       <View style={styles.settingGroup}>
-        <Text style={styles.settingLabel}>Stripe NFC Tap to Pay Settings</Text>
+        <Text style={styles.settingLabel}>{t('payment.stripeNfc.title')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="API Key (sk_test_...)"
+          placeholder={t('payment.stripeNfc.apiKey')}
           value={paymentSettings.stripe_nfc?.apiKey || ''}
           onChangeText={value => handleProviderSettingChange('stripe_nfc', 'apiKey', value)}
           secureTextEntry
@@ -155,14 +160,14 @@ const PaymentProviderStep: React.FC<PaymentProviderStepProps> = ({ onBack, onNex
         />
         <TextInput
           style={styles.input}
-          placeholder="Publishable Key (pk_test_...)"
+          placeholder={t('payment.stripeNfc.publishableKey')}
           value={paymentSettings.stripe_nfc?.publishableKey || ''}
           onChangeText={value => handleProviderSettingChange('stripe_nfc', 'publishableKey', value)}
           autoCapitalize="none"
         />
         <TextInput
           style={styles.input}
-          placeholder="Location ID"
+          placeholder={t('payment.stripeNfc.locationId')}
           value={paymentSettings.stripe_nfc?.merchantId || ''}
           onChangeText={value => handleProviderSettingChange('stripe_nfc', 'merchantId', value)}
           autoCapitalize="none"
@@ -175,22 +180,22 @@ const PaymentProviderStep: React.FC<PaymentProviderStepProps> = ({ onBack, onNex
     if (paymentSettings.provider !== PaymentProvider.SQUARE) return null;
     return (
       <View style={styles.settingGroup}>
-        <Text style={styles.settingLabel}>Square Settings</Text>
+        <Text style={styles.settingLabel}>{t('payment.square.title')}</Text>
         <TextInput
           style={styles.input}
-          placeholder="Application ID"
+          placeholder={t('payment.square.applicationId')}
           value={paymentSettings.square?.applicationId || ''}
           onChangeText={value => handleProviderSettingChange('square', 'applicationId', value)}
         />
         <TextInput
           style={styles.input}
-          placeholder="Location ID"
+          placeholder={t('payment.square.locationId')}
           value={paymentSettings.square?.locationId || ''}
           onChangeText={value => handleProviderSettingChange('square', 'locationId', value)}
         />
         <TextInput
           style={styles.input}
-          placeholder="Access Token"
+          placeholder={t('payment.square.accessToken')}
           value={paymentSettings.square?.accessToken || ''}
           onChangeText={value => handleProviderSettingChange('square', 'accessToken', value)}
           secureTextEntry
@@ -201,8 +206,8 @@ const PaymentProviderStep: React.FC<PaymentProviderStepProps> = ({ onBack, onNex
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Configure Payment Provider</Text>
-      <Text style={styles.subtitle}>Select and set up your payment terminal.</Text>
+      <Text style={styles.title}>{t('payment.title')}</Text>
+      <Text style={styles.subtitle}>{t('payment.subtitle')}</Text>
 
       {isLoading && <ActivityIndicator size="large" />}
 
@@ -213,13 +218,13 @@ const PaymentProviderStep: React.FC<PaymentProviderStepProps> = ({ onBack, onNex
           {renderStripeForm()}
           {renderStripeNfcForm()}
           {renderSquareForm()}
-          <Button title="Test Connection" onPress={handleTestConnection} />
+          <Button title={t('payment.testConnection')} onPress={handleTestConnection} />
         </>
       )}
 
       <View style={styles.buttonContainer}>
-        <Button title="Back" onPress={onBack} />
-        <Button title="Next" onPress={handleNextPress} disabled={isLoading} />
+        <Button title={t('common.back')} onPress={onBack} />
+        <Button title={t('common.next')} onPress={handleNextPress} disabled={isLoading} />
       </View>
     </ScrollView>
   );

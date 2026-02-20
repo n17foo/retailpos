@@ -3,52 +3,49 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-nati
 import ProductManagementTab from './ProductManagementTab';
 import CategoryManagementTab from './CategoryManagementTab';
 import UsersSettingsTab from './UsersSettingsTab';
+import { useTranslate } from '../../hooks/useTranslate';
 
 type OfflineSection = 'overview' | 'products' | 'categories' | 'users';
 
 const OfflineManagementTab: React.FC = () => {
+  const { t } = useTranslate();
   const [activeSection, setActiveSection] = useState<OfflineSection>('overview');
 
   const renderOverview = () => (
     <ScrollView style={styles.overviewContainer}>
-      <Text style={styles.overviewTitle}>Offline Mode Management</Text>
-      <Text style={styles.overviewDescription}>
-        Manage your local products, categories, and users for offline POS operation. All data is stored locally on this device using SQLite.
-      </Text>
+      <Text style={styles.overviewTitle}>{t('settings.offline.title')}</Text>
+      <Text style={styles.overviewDescription}>{t('settings.offline.description')}</Text>
 
       <View style={styles.menuGrid}>
         <TouchableOpacity style={styles.menuCard} onPress={() => setActiveSection('products')}>
           <Text style={styles.menuIcon}>📦</Text>
-          <Text style={styles.menuTitle}>Products</Text>
-          <Text style={styles.menuDescription}>Create, edit, and manage your product catalog</Text>
+          <Text style={styles.menuTitle}>{t('settings.offline.products')}</Text>
+          <Text style={styles.menuDescription}>{t('settings.offline.productsDescription')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuCard} onPress={() => setActiveSection('categories')}>
           <Text style={styles.menuIcon}>📁</Text>
-          <Text style={styles.menuTitle}>Categories</Text>
-          <Text style={styles.menuDescription}>Organize products into categories</Text>
+          <Text style={styles.menuTitle}>{t('settings.offline.categories')}</Text>
+          <Text style={styles.menuDescription}>{t('settings.offline.categoriesDescription')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuCard} onPress={() => setActiveSection('users')}>
           <Text style={styles.menuIcon}>👥</Text>
-          <Text style={styles.menuTitle}>Users</Text>
-          <Text style={styles.menuDescription}>Manage staff accounts and roles</Text>
+          <Text style={styles.menuTitle}>{t('settings.offline.users')}</Text>
+          <Text style={styles.menuDescription}>{t('settings.offline.usersDescription')}</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.infoBox}>
-        <Text style={styles.infoTitle}>About Offline Mode</Text>
-        <Text style={styles.infoText}>
-          • All data is stored locally on this device{'\n'}• No internet connection required for operation{'\n'}• Products can be added to
-          basket and orders completed{'\n'}• User roles: Admin, Manager, Cashier, Service Staff{'\n'}• Data persists across app restarts
-        </Text>
+        <Text style={styles.infoTitle}>{t('settings.offline.aboutTitle')}</Text>
+        <Text style={styles.infoText}>{t('settings.offline.aboutText')}</Text>
       </View>
     </ScrollView>
   );
 
   const renderBackButton = () => (
     <TouchableOpacity style={styles.backButton} onPress={() => setActiveSection('overview')}>
-      <Text style={styles.backButtonText}>← Back to Overview</Text>
+      <Text style={styles.backButtonText}>{t('settings.offline.backToOverview')}</Text>
     </TouchableOpacity>
   );
 

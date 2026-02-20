@@ -3,15 +3,17 @@ import { View, Text, TouchableOpacity, Alert, StyleSheet, TextInput, ScrollView,
 import { useScannerSettings, ScannerSettings } from '../../hooks/useScannerSettings';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../../utils/theme';
 import { Button } from '../../components/Button';
+import { useTranslate } from '../../hooks/useTranslate';
 
-const SCANNER_TYPE_OPTIONS = [
-  { value: 'camera', label: 'Camera' },
-  { value: 'bluetooth', label: 'Bluetooth' },
-  { value: 'usb', label: 'USB' },
-  { value: 'qr_hardware', label: 'QR Hardware' },
+const SCANNER_TYPE_KEYS = [
+  { value: 'camera', labelKey: 'settings.scanner.camera' },
+  { value: 'bluetooth', labelKey: 'settings.scanner.bluetooth' },
+  { value: 'usb', labelKey: 'settings.scanner.usb' },
+  { value: 'qr_hardware', labelKey: 'settings.scanner.qrHardware' },
 ] as const;
 
 const ScannerSettingsTab: React.FC = () => {
+  const { t } = useTranslate();
   const { scannerSettings, handleScannerSettingsChange, saveSettings, testConnection, isLoading, error, saveStatus, loadSettings } =
     useScannerSettings();
 
@@ -48,7 +50,7 @@ const ScannerSettingsTab: React.FC = () => {
       setHasUnsavedChanges(false);
     } catch (err) {
       console.error('Failed to save scanner settings:', err);
-      Alert.alert('Error', 'Failed to save scanner settings');
+      Alert.alert(t('common.error'), t('settings.scanner.saveError'));
     }
   }, [formValues, saveSettings]);
 
@@ -57,13 +59,13 @@ const ScannerSettingsTab: React.FC = () => {
     try {
       const success = await testConnection(formValues);
       if (success) {
-        Alert.alert('Success', 'Scanner connection test successful!');
+        Alert.alert(t('common.success'), t('settings.scanner.connectionSuccess'));
       } else {
-        Alert.alert('Error', 'Failed to connect to scanner. Please check your settings.');
+        Alert.alert(t('common.error'), t('settings.scanner.connectionError'));
       }
     } catch (err) {
       console.error('Scanner connection test failed:', err);
-      Alert.alert('Error', 'An error occurred while testing the scanner connection');
+      Alert.alert(t('common.error'), t('settings.scanner.connectionTestError'));
     }
   }, [testConnection, formValues]);
 
@@ -76,7 +78,7 @@ const ScannerSettingsTab: React.FC = () => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0a84ff" />
-        <Text style={styles.loadingText}>Loading scanner settings...</Text>
+        <Text style={styles.loadingText}>{t('settings.scanner.loadingScanner')}</Text>
       </View>
     );
   }
@@ -85,23 +87,23 @@ const ScannerSettingsTab: React.FC = () => {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.settingsSection}>
-          <Text style={styles.sectionTitle}>Scanner Settings</Text>
+          <Text style={styles.sectionTitle}>{t('settings.scanner.title')}</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Scanner Device ID</Text>
+            <Text style={styles.label}>{t('settings.scanner.deviceId')}</Text>
             <TextInput
               style={styles.input}
               value={formValues.deviceId}
               onChangeText={value => handleInputChange('deviceId', value)}
-              placeholder="Enter device ID"
+              placeholder={t('settings.scanner.deviceIdPlaceholder')}
               editable={!isLoading}
             />
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Scanner Type</Text>
+            <Text style={styles.label}>{t('settings.scanner.scannerType')}</Text>
             <View style={styles.typeSelector}>
-              {SCANNER_TYPE_OPTIONS.map(option => (
+              {SCANNER_TYPE_KEYS.map(option => (
                 <TouchableOpacity
                   key={option.value}
                   style={[styles.typeOption, formValues.type === option.value && styles.typeOptionActive, isLoading && styles.disabled]}
@@ -109,23 +111,17 @@ const ScannerSettingsTab: React.FC = () => {
                   disabled={isLoading}
                 >
                   <Text style={[styles.typeOptionText, formValues.type === option.value && styles.typeOptionTextActive]}>
-                    {option.label}
+                    {t(option.labelKey)}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
-            {formValues.type === 'qr_hardware' && (
-              <Text style={styles.typeHint}>
-                Dedicated QR code reader for desktop apps (USB or Bluetooth). Required when camera is not available.
-              </Text>
-            )}
-            {formValues.type === 'camera' && (
-              <Text style={styles.typeHint}>Uses device camera for barcode and QR scanning. Available on mobile and tablet only.</Text>
-            )}
+            {formValues.type === 'qr_hardware' && <Text style={styles.typeHint}>{t('settings.scanner.qrHardwareHint')}</Text>}
+            {formValues.type === 'camera' && <Text style={styles.typeHint}>{t('settings.scanner.cameraHint')}</Text>}
           </View>
 
           <View style={styles.optionRow}>
-            <Text style={styles.label}>Enable Scanner</Text>
+            <Text style={styles.label}>{t('settings.scanner.enableScanner')}</Text>
             <TouchableOpacity
               style={[styles.toggleButton, formValues.enabled ? styles.toggleActive : styles.toggleInactive, isLoading && styles.disabled]}
               onPress={() => handleInputChange('enabled', !formValues.enabled)}
@@ -143,7 +139,7 @@ const ScannerSettingsTab: React.FC = () => {
 
           <View style={styles.buttonGroup}>
             <Button
-              title="Test Connection"
+              title={t('settings.payment.testConnection')}
               variant="secondary"
               loading={isLoading}
               disabled={isLoading}
@@ -153,10 +149,10 @@ const ScannerSettingsTab: React.FC = () => {
 
             {hasUnsavedChanges && (
               <View style={styles.saveButtonsContainer}>
-                <Button title="Cancel" variant="outline" disabled={isLoading} onPress={handleCancel} style={styles.button} />
+                <Button title={t('common.cancel')} variant="outline" disabled={isLoading} onPress={handleCancel} style={styles.button} />
 
                 <Button
-                  title="Save Changes"
+                  title={t('settings.scanner.saveChanges')}
                   variant="success"
                   loading={isLoading}
                   disabled={isLoading || !hasUnsavedChanges}
@@ -168,7 +164,7 @@ const ScannerSettingsTab: React.FC = () => {
 
             {saveStatus === 'saved' && (
               <View style={styles.statusContainer}>
-                <Text style={styles.successText}>Settings saved successfully!</Text>
+                <Text style={styles.successText}>{t('settings.payment.settingsSaved')}</Text>
               </View>
             )}
           </View>

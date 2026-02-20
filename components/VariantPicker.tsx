@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../utils/theme';
 import { formatMoney } from '../utils/money';
 import { UnifiedProductVariant, UnifiedProductOption } from '../services/product/types';
+import { useTranslate } from '../hooks/useTranslate';
 
 interface VariantPickerProps {
   variants: UnifiedProductVariant[];
@@ -16,6 +17,7 @@ interface VariantPickerProps {
 }
 
 const VariantPicker: React.FC<VariantPickerProps> = ({ variants, options, currencyCode, onSelect, onClose, visible, productTitle }) => {
+  const { t } = useTranslate();
   // Track selected option value per option name
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
 
@@ -58,17 +60,17 @@ const VariantPicker: React.FC<VariantPickerProps> = ({ variants, options, curren
         style={[styles.variantItem, isOutOfStock && styles.variantItemDisabled]}
         onPress={() => !isOutOfStock && handleVariantSelect(item)}
         disabled={isOutOfStock}
-        accessibilityLabel={`${item.title}, ${formatMoney(item.price, currencyCode)}${isOutOfStock ? ', out of stock' : ''}`}
+        accessibilityLabel={`${item.title}, ${formatMoney(item.price, currencyCode)}${isOutOfStock ? `, ${t('variantPicker.outOfStock')}` : ''}`}
         accessibilityRole="button"
         accessibilityState={{ disabled: isOutOfStock }}
-        accessibilityHint={isOutOfStock ? 'This variant is out of stock' : 'Double tap to add to cart'}
+        accessibilityHint={isOutOfStock ? t('variantPicker.outOfStockHint') : t('variantPicker.addToCart')}
       >
         <View style={styles.variantInfo}>
           <Text style={[styles.variantTitle, isOutOfStock && styles.variantTitleDisabled]}>{item.title}</Text>
-          {item.sku && <Text style={styles.variantSku}>SKU: {item.sku}</Text>}
+          {item.sku && <Text style={styles.variantSku}>{t('basket.sku', { sku: item.sku })}</Text>}
           {item.trackInventory && (
             <Text style={[styles.variantStock, isOutOfStock && styles.variantStockOut]}>
-              {isOutOfStock ? 'Out of stock' : `${item.inventoryQuantity} in stock`}
+              {isOutOfStock ? t('variantPicker.outOfStock') : t('variantPicker.inStock', { count: item.inventoryQuantity })}
             </Text>
           )}
         </View>
@@ -96,14 +98,16 @@ const VariantPicker: React.FC<VariantPickerProps> = ({ variants, options, curren
               <TouchableOpacity
                 onPress={handleClose}
                 style={styles.closeButton}
-                accessibilityLabel="Close variant picker"
+                accessibilityLabel={t('variantPicker.closeLabel')}
                 accessibilityRole="button"
               >
                 <MaterialIcons name="close" size={22} color={lightColors.textSecondary} />
               </TouchableOpacity>
             </View>
             <Text style={styles.subtitle}>
-              {filteredVariants.length} variant{filteredVariants.length !== 1 ? 's' : ''}
+              {filteredVariants.length === 1
+                ? t('variantPicker.variantCount', { count: 1 })
+                : t('variantPicker.variantCount_plural', { count: filteredVariants.length })}
             </Text>
           </View>
 
@@ -143,7 +147,7 @@ const VariantPicker: React.FC<VariantPickerProps> = ({ variants, options, curren
             style={styles.list}
             ListEmptyComponent={
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No variants match the selected options.</Text>
+                <Text style={styles.emptyText}>{t('variantPicker.noMatchingVariants')}</Text>
               </View>
             }
           />

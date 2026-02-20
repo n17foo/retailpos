@@ -4,6 +4,7 @@ import { useEcommerceSettings } from '../../hooks/useEcommerceSettings';
 import { usePaymentSettings } from '../../hooks/usePaymentSettings';
 import { usePrinterSettings } from '../../hooks/usePrinterSettings';
 import { useScannerSettings } from '../../hooks/useScannerSettings';
+import { useTranslate } from '../../hooks/useTranslate';
 
 interface SummaryStepProps {
   onBack: () => void;
@@ -11,6 +12,7 @@ interface SummaryStepProps {
 }
 
 const SummaryStep: React.FC<SummaryStepProps> = ({ onBack, onConfirm }) => {
+  const { t } = useTranslate();
   const { ecommerceSettings } = useEcommerceSettings();
   const { paymentSettings } = usePaymentSettings();
   const { printerSettings } = usePrinterSettings();
@@ -19,58 +21,58 @@ const SummaryStep: React.FC<SummaryStepProps> = ({ onBack, onConfirm }) => {
   const renderSetting = (label: string, value: string | undefined | null) => (
     <View style={styles.settingRow}>
       <Text style={styles.label}>{label}</Text>
-      <Text style={styles.value}>{value || 'Not set'}</Text>
+      <Text style={styles.value}>{value || t('common.notSet')}</Text>
     </View>
   );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Onboarding Summary</Text>
-      <Text style={styles.subtitle}>Please review your settings before completing the setup.</Text>
+      <Text style={styles.title}>{t('summary.title')}</Text>
+      <Text style={styles.subtitle}>{t('summary.subtitle')}</Text>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>E-Commerce</Text>
-        {renderSetting('Platform', ecommerceSettings.platform)}
-        {ecommerceSettings.platform === 'shopify' && renderSetting('Store URL', ecommerceSettings.shopify?.storeUrl)}
-        {ecommerceSettings.platform === 'woocommerce' && renderSetting('Store URL', ecommerceSettings.woocommerce?.storeUrl)}
-        {ecommerceSettings.platform === 'bigcommerce' && renderSetting('Store Hash', ecommerceSettings.bigcommerce?.storeHash)}
-        {ecommerceSettings.platform === 'magento' && renderSetting('Store URL', ecommerceSettings.magento?.storeUrl)}
-        {ecommerceSettings.platform === 'sylius' && renderSetting('API URL', ecommerceSettings.sylius?.storeUrl)}
-        {ecommerceSettings.platform === 'wix' && renderSetting('Site ID', ecommerceSettings.wix?.siteId)}
-        {ecommerceSettings.platform === 'prestashop' && renderSetting('Store URL', ecommerceSettings.prestashop?.storeUrl)}
-        {ecommerceSettings.platform === 'squarespace' && renderSetting('Site ID', ecommerceSettings.squarespace?.siteId)}
-        {ecommerceSettings.platform === 'offline' && renderSetting('Store Name', ecommerceSettings.offline?.storeName)}
-        {ecommerceSettings.platform === 'offline' && renderSetting('Currency', ecommerceSettings.offline?.currency)}
+        <Text style={styles.sectionTitle}>{t('summary.ecommerce')}</Text>
+        {renderSetting(t('summary.platform'), ecommerceSettings.platform)}
+        {ecommerceSettings.platform === 'shopify' && renderSetting(t('summary.storeUrl'), ecommerceSettings.shopify?.storeUrl)}
+        {ecommerceSettings.platform === 'woocommerce' && renderSetting(t('summary.storeUrl'), ecommerceSettings.woocommerce?.storeUrl)}
+        {ecommerceSettings.platform === 'bigcommerce' && renderSetting(t('summary.storeHash'), ecommerceSettings.bigcommerce?.storeHash)}
+        {ecommerceSettings.platform === 'magento' && renderSetting(t('summary.storeUrl'), ecommerceSettings.magento?.storeUrl)}
+        {ecommerceSettings.platform === 'sylius' && renderSetting(t('summary.apiUrl'), ecommerceSettings.sylius?.storeUrl)}
+        {ecommerceSettings.platform === 'wix' && renderSetting(t('summary.siteId'), ecommerceSettings.wix?.siteId)}
+        {ecommerceSettings.platform === 'prestashop' && renderSetting(t('summary.storeUrl'), ecommerceSettings.prestashop?.storeUrl)}
+        {ecommerceSettings.platform === 'squarespace' && renderSetting(t('summary.siteId'), ecommerceSettings.squarespace?.siteId)}
+        {ecommerceSettings.platform === 'offline' && renderSetting(t('summary.storeName'), ecommerceSettings.offline?.storeName)}
+        {ecommerceSettings.platform === 'offline' && renderSetting(t('summary.currency'), ecommerceSettings.offline?.currency)}
         {ecommerceSettings.platform === 'offline' &&
-          renderSetting('Categories', String(ecommerceSettings.offline?.categories?.length || 0))}
+          renderSetting(t('summary.categories'), String(ecommerceSettings.offline?.categories?.length || 0))}
         {ecommerceSettings.platform === 'offline' &&
           renderSetting(
-            'Products',
+            t('summary.products'),
             String(ecommerceSettings.offline?.categories?.reduce((sum, c) => sum + (c.products?.length || 0), 0) || 0)
           )}
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Payment Provider</Text>
-        {renderSetting('Provider', paymentSettings.provider)}
+        <Text style={styles.sectionTitle}>{t('summary.paymentProvider')}</Text>
+        {renderSetting(t('summary.providerLabel'), paymentSettings.provider)}
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Printer</Text>
-        {renderSetting('Enabled', printerSettings.enabled ? 'Yes' : 'No')}
-        {printerSettings.enabled && renderSetting('Name', printerSettings.printerName)}
-        {printerSettings.enabled && renderSetting('Connection', printerSettings.connectionType)}
+        <Text style={styles.sectionTitle}>{t('summary.printer')}</Text>
+        {renderSetting(t('common.enabled'), printerSettings.enabled ? t('common.yes') : t('common.no'))}
+        {printerSettings.enabled && renderSetting(t('summary.name'), printerSettings.printerName)}
+        {printerSettings.enabled && renderSetting(t('summary.connection'), printerSettings.connectionType)}
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Scanner</Text>
-        {renderSetting('Enabled', scannerSettings.enabled ? 'Yes' : 'No')}
-        {scannerSettings.enabled && renderSetting('Type', scannerSettings.type)}
+        <Text style={styles.sectionTitle}>{t('summary.scanner')}</Text>
+        {renderSetting(t('common.enabled'), scannerSettings.enabled ? t('common.yes') : t('common.no'))}
+        {scannerSettings.enabled && renderSetting(t('summary.type'), scannerSettings.type)}
       </View>
 
       <View style={styles.buttonContainer}>
-        <Button title="Back" onPress={onBack} />
-        <Button title="Confirm & Finish" onPress={onConfirm} />
+        <Button title={t('common.back')} onPress={onBack} />
+        <Button title={t('summary.confirmFinish')} onPress={onConfirm} />
       </View>
     </ScrollView>
   );

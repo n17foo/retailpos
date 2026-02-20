@@ -4,6 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../utils/theme';
 import { useResponsive } from '../hooks/useResponsive';
 import { FloatingSaveBar } from '../components/FloatingSaveBar';
+import { useTranslate } from '../hooks/useTranslate';
 import PaymentSettingsTab from './settings/PaymentSettingsTab';
 import PrinterSettingsTab from './settings/PrinterSettingsTab';
 import ScannerSettingsTab from './settings/ScannerSettingsTab';
@@ -18,17 +19,43 @@ import LocalApiSettingsTab from './settings/LocalApiSettingsTab';
 type SettingsTab = 'generic' | 'pos' | 'auth' | 'payment' | 'printer' | 'scanner' | 'ecommerce' | 'offline' | 'receipt' | 'multiregister';
 type SaveStatus = 'unsaved' | 'saving' | 'saved';
 
-const TAB_CONFIG: { id: SettingsTab; label: string; icon: string }[] = [
-  { id: 'generic', label: 'General', icon: '⚙️' },
-  { id: 'pos', label: 'POS Config', icon: '🏪' },
-  { id: 'auth', label: 'Authentication', icon: '🔐' },
-  { id: 'payment', label: 'Payment', icon: '💳' },
-  { id: 'printer', label: 'Printer', icon: '🖨' },
-  { id: 'scanner', label: 'Scanner', icon: '📷' },
-  { id: 'ecommerce', label: 'E-Commerce', icon: '🛒' },
-  { id: 'offline', label: 'Offline', icon: '📴' },
-  { id: 'receipt', label: 'Receipt', icon: '🧾' },
-  { id: 'multiregister', label: 'Multi-Register', icon: '🔗' },
+const TAB_ICONS: Record<SettingsTab, string> = {
+  generic: '⚙️',
+  pos: '🏪',
+  auth: '🔐',
+  payment: '💳',
+  printer: '🖨',
+  scanner: '📷',
+  ecommerce: '🛒',
+  offline: '📴',
+  receipt: '🧾',
+  multiregister: '🔗',
+};
+
+const TAB_TRANSLATION_KEYS: Record<SettingsTab, string> = {
+  generic: 'settings.tabs.general',
+  pos: 'settings.tabs.posConfig',
+  auth: 'settings.tabs.authentication',
+  payment: 'settings.tabs.payment',
+  printer: 'settings.tabs.printer',
+  scanner: 'settings.tabs.scanner',
+  ecommerce: 'settings.tabs.ecommerce',
+  offline: 'settings.tabs.offline',
+  receipt: 'settings.tabs.receipt',
+  multiregister: 'settings.tabs.multiRegister',
+};
+
+const TAB_ORDER: SettingsTab[] = [
+  'generic',
+  'pos',
+  'auth',
+  'payment',
+  'printer',
+  'scanner',
+  'ecommerce',
+  'offline',
+  'receipt',
+  'multiregister',
 ];
 
 interface SettingsScreenProps {
@@ -38,6 +65,7 @@ interface SettingsScreenProps {
 const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
   const navigation = useNavigation();
   const { isMobile, isDesktop } = useResponsive();
+  const { t } = useTranslate();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('generic');
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('saved');
@@ -51,7 +79,8 @@ const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
     }
   };
 
-  const activeTabConfig = TAB_CONFIG.find(t => t.id === activeTab)!;
+  const activeTabLabel = t(TAB_TRANSLATION_KEYS[activeTab]);
+  const activeTabIcon = TAB_ICONS[activeTab];
 
   const handleSelectTab = (tabId: SettingsTab) => {
     setActiveTab(tabId);
@@ -90,23 +119,25 @@ const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
         <View style={styles.header}>
           {onGoBack && (
             <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
-              <Text style={styles.backButtonText}>← Back</Text>
+              <Text style={styles.backButtonText}>{t('settings.backButton')}</Text>
             </TouchableOpacity>
           )}
-          <Text style={styles.headerTitle}>Settings</Text>
+          <Text style={styles.headerTitle}>{t('settings.title')}</Text>
         </View>
 
         <View style={styles.desktopLayout}>
           {/* Left nav */}
           <View style={styles.sideNav}>
-            {TAB_CONFIG.map(tab => (
+            {TAB_ORDER.map(tabId => (
               <TouchableOpacity
-                key={tab.id}
-                style={[styles.sideNavItem, activeTab === tab.id && styles.sideNavItemActive]}
-                onPress={() => setActiveTab(tab.id)}
+                key={tabId}
+                style={[styles.sideNavItem, activeTab === tabId && styles.sideNavItemActive]}
+                onPress={() => setActiveTab(tabId)}
               >
-                <Text style={styles.sideNavIcon}>{tab.icon}</Text>
-                <Text style={[styles.sideNavLabel, activeTab === tab.id && styles.sideNavLabelActive]}>{tab.label}</Text>
+                <Text style={styles.sideNavIcon}>{TAB_ICONS[tabId]}</Text>
+                <Text style={[styles.sideNavLabel, activeTab === tabId && styles.sideNavLabelActive]}>
+                  {t(TAB_TRANSLATION_KEYS[tabId])}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -131,33 +162,35 @@ const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
       <View style={styles.header}>
         {onGoBack && (
           <TouchableOpacity style={styles.backButton} onPress={handleGoBack}>
-            <Text style={styles.backButtonText}>← Back</Text>
+            <Text style={styles.backButtonText}>{t('settings.backButton')}</Text>
           </TouchableOpacity>
         )}
-        <Text style={styles.headerTitle}>Settings</Text>
+        <Text style={styles.headerTitle}>{t('settings.title')}</Text>
       </View>
 
       {/* Mobile: Dropdown selector instead of cramped tab bar */}
       {isMobile ? (
         <View>
           <TouchableOpacity style={styles.dropdown} onPress={() => setDropdownVisible(true)}>
-            <Text style={styles.dropdownIcon}>{activeTabConfig.icon}</Text>
-            <Text style={styles.dropdownLabel}>{activeTabConfig.label}</Text>
+            <Text style={styles.dropdownIcon}>{activeTabIcon}</Text>
+            <Text style={styles.dropdownLabel}>{activeTabLabel}</Text>
             <Text style={styles.dropdownArrow}>▾</Text>
           </TouchableOpacity>
 
           <Modal visible={dropdownVisible} transparent animationType="fade" onRequestClose={() => setDropdownVisible(false)}>
             <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setDropdownVisible(false)}>
               <View style={styles.dropdownMenu}>
-                {TAB_CONFIG.map(tab => (
+                {TAB_ORDER.map(tabId => (
                   <TouchableOpacity
-                    key={tab.id}
-                    style={[styles.dropdownItem, activeTab === tab.id && styles.dropdownItemActive]}
-                    onPress={() => handleSelectTab(tab.id)}
+                    key={tabId}
+                    style={[styles.dropdownItem, activeTab === tabId && styles.dropdownItemActive]}
+                    onPress={() => handleSelectTab(tabId)}
                   >
-                    <Text style={styles.dropdownItemIcon}>{tab.icon}</Text>
-                    <Text style={[styles.dropdownItemText, activeTab === tab.id && styles.dropdownItemTextActive]}>{tab.label}</Text>
-                    {activeTab === tab.id && <Text style={styles.dropdownCheck}>✓</Text>}
+                    <Text style={styles.dropdownItemIcon}>{TAB_ICONS[tabId]}</Text>
+                    <Text style={[styles.dropdownItemText, activeTab === tabId && styles.dropdownItemTextActive]}>
+                      {t(TAB_TRANSLATION_KEYS[tabId])}
+                    </Text>
+                    {activeTab === tabId && <Text style={styles.dropdownCheck}>✓</Text>}
                   </TouchableOpacity>
                 ))}
               </View>
@@ -172,13 +205,9 @@ const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
           style={styles.tabBarScroll}
           contentContainerStyle={styles.tabBarContent}
         >
-          {TAB_CONFIG.map(tab => (
-            <TouchableOpacity
-              key={tab.id}
-              style={[styles.tab, activeTab === tab.id && styles.activeTab]}
-              onPress={() => setActiveTab(tab.id)}
-            >
-              <Text style={[styles.tabText, activeTab === tab.id && styles.activeTabText]}>{tab.label}</Text>
+          {TAB_ORDER.map(tabId => (
+            <TouchableOpacity key={tabId} style={[styles.tab, activeTab === tabId && styles.activeTab]} onPress={() => setActiveTab(tabId)}>
+              <Text style={[styles.tabText, activeTab === tabId && styles.activeTabText]}>{t(TAB_TRANSLATION_KEYS[tabId])}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>

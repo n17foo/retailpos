@@ -6,6 +6,7 @@ import { useBasketContext, CartItem } from '../../contexts/BasketProvider';
 import { formatMoney } from '../../utils/money';
 import { ECommercePlatform } from '../../utils/platforms';
 import { useCurrency } from '../../hooks/useCurrency';
+import { useTranslate } from '../../hooks/useTranslate';
 
 interface BasketProps {
   onCheckout?: () => void;
@@ -16,6 +17,7 @@ interface BasketProps {
 
 export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, onPrintReceipt, platform }) => {
   const currency = useCurrency();
+  const { t } = useTranslate();
   const {
     isRightPanelOpen,
     setIsRightPanelOpen,
@@ -42,9 +44,9 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
   const handleDecrement = async (itemId: string, currentQuantity: number) => {
     if (currentQuantity <= 1) {
       // Confirm removal
-      Alert.alert('Remove Item', 'Are you sure you want to remove this item?', [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () => removeFromCart(itemId) },
+      Alert.alert(t('basket.removeItem'), t('basket.removeItemConfirm'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.remove'), style: 'destructive', onPress: () => removeFromCart(itemId) },
       ]);
     } else {
       await decrementQuantity(itemId);
@@ -60,17 +62,17 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
       // Start checkout - creates local order
       const order = await startCheckout(platform);
       if (!order) {
-        Alert.alert('Error', 'Failed to create order');
+        Alert.alert(t('common.error'), t('basket.failedToCreateOrder'));
         return;
       }
 
       // Show payment options
       Alert.alert(
-        'Complete Order',
-        `Order #${order.id.slice(-8)}\nTotal: ${formatMoney(total, currency.code)}`,
+        t('basket.completeOrderTitle'),
+        `${t('checkout.orderRef', { ref: order.id.slice(-8) })}\n${t('checkout.total')}: ${formatMoney(total, currency.code)}`,
         [
           {
-            text: 'Process Payment',
+            text: t('basket.processPayment'),
             onPress: async () => {
               if (onCheckout) {
                 onCheckout();
@@ -80,32 +82,32 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
               // For demo, complete with cash payment
               const result = await completePayment(order.id, 'cash');
               if (result.success) {
-                Alert.alert('Success', 'Payment completed successfully!');
+                Alert.alert(t('common.success'), t('basket.paymentSuccess'));
                 setIsRightPanelOpen(false);
               } else {
-                Alert.alert('Error', result.error || 'Payment failed');
+                Alert.alert(t('common.error'), result.error || t('basket.paymentFailed'));
               }
             },
           },
           onPaymentTerminal && {
-            text: 'Pay with Terminal',
+            text: t('basket.payWithTerminal'),
             onPress: async () => {
               await markPaymentProcessing(order.id);
               onPaymentTerminal(order.id, total);
             },
           },
           onPrintReceipt && {
-            text: 'Print Receipt',
+            text: t('basket.printReceipt'),
             onPress: () => onPrintReceipt(order.id),
           },
           {
-            text: 'Cancel',
+            text: t('common.cancel'),
             style: 'cancel' as const,
           },
         ].filter(Boolean) as AlertButton[]
       );
     } catch (error) {
-      Alert.alert('Error', (error as Error).message);
+      Alert.alert(t('common.error'), (error as Error).message);
     } finally {
       setIsProcessing(false);
     }
@@ -117,14 +119,14 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
     try {
       const result = await syncAllPendingOrders();
       if (result.synced > 0) {
-        Alert.alert('Sync Complete', `${result.synced} order(s) synced successfully`);
+        Alert.alert(t('basket.syncCompleteTitle'), t('basket.syncComplete', { count: result.synced }));
       } else if (result.failed > 0) {
-        Alert.alert('Sync Failed', `${result.failed} order(s) failed to sync`);
+        Alert.alert(t('basket.syncFailedTitle'), t('basket.syncFailed', { count: result.failed }));
       } else {
-        Alert.alert('No Orders', 'No pending orders to sync');
+        Alert.alert(t('basket.noOrdersTitle'), t('basket.noOrdersToSync'));
       }
     } catch (error) {
-      Alert.alert('Error', (error as Error).message);
+      Alert.alert(t('common.error'), (error as Error).message);
     } finally {
       setIsSyncing(false);
     }
@@ -138,7 +140,7 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
           {item.name}
         </Text>
         <Text style={styles.itemPrice}>{formatMoney(item.price, currency.code)}</Text>
-        {item.sku && <Text style={styles.itemSku}>SKU: {item.sku}</Text>}
+        {item.sku && <Text style={styles.itemSku}>{t('basket.sku', { sku: item.sku })}</Text>}
       </View>
       <View style={styles.quantityContainer}>
         <TouchableOpacity
@@ -169,7 +171,7 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
     <SwipeablePanel
       isOpen={isRightPanelOpen}
       onClose={() => setIsRightPanelOpen(false)}
-      title="Shopping Cart"
+      title={t('basket.title')}
       position="right"
       backgroundColor={lightColors.surface}
     >
@@ -178,11 +180,11 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
           {isLoading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={lightColors.primary} />
-              <Text style={styles.loadingText}>Loading basket...</Text>
+              <Text style={styles.loadingText}>{t('basket.loadingBasket')}</Text>
             </View>
           ) : cartItems.length === 0 ? (
             <View style={styles.emptyCart}>
-              <Text style={styles.emptyCartText}>Your cart is empty</Text>
+              <Text style={styles.emptyCartText}>{t('basket.empty')}</Text>
             </View>
           ) : (
             <FlatList
@@ -198,21 +200,23 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
             {/* Unsynced orders indicator */}
             {unsyncedOrdersCount > 0 && (
               <TouchableOpacity style={styles.syncBanner} onPress={handleSyncOrders} disabled={isSyncing}>
-                <Text style={styles.syncBannerText}>{isSyncing ? 'Syncing...' : `${unsyncedOrdersCount} order(s) pending sync`}</Text>
+                <Text style={styles.syncBannerText}>
+                  {isSyncing ? t('common.syncing') : t('basket.pendingSync', { count: unsyncedOrdersCount })}
+                </Text>
                 {isSyncing && <ActivityIndicator size="small" color={lightColors.textOnPrimary} />}
               </TouchableOpacity>
             )}
 
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Subtotal:</Text>
+              <Text style={styles.summaryLabel}>{t('basket.subtotal')}</Text>
               <Text style={styles.summaryValue}>{formatMoney(subtotal, currency.code)}</Text>
             </View>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Tax (8%):</Text>
+              <Text style={styles.summaryLabel}>{t('basket.tax', { rate: '8' })}</Text>
               <Text style={styles.summaryValue}>{formatMoney(tax, currency.code)}</Text>
             </View>
             <View style={[styles.summaryRow, styles.totalRow]}>
-              <Text style={styles.totalLabel}>Total:</Text>
+              <Text style={styles.totalLabel}>{t('basket.total')}</Text>
               <Text style={styles.totalValue}>{formatMoney(total, currency.code)}</Text>
             </View>
 
@@ -228,7 +232,7 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
                 {isProcessing ? (
                   <ActivityIndicator size="small" color={lightColors.textOnPrimary} />
                 ) : (
-                  <Text style={styles.checkoutButtonText}>COMPLETE ORDER</Text>
+                  <Text style={styles.checkoutButtonText}>{t('basket.completeOrder')}</Text>
                 )}
               </TouchableOpacity>
             </View>

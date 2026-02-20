@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { useReceiptConfig, ReceiptConfig } from '../../hooks/useReceiptConfig';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../../utils/theme';
+import { useTranslate } from '../../hooks/useTranslate';
 
 type PrinterModelType = 'snbc_orient' | 'epson' | 'star' | 'citizen' | 'generic';
 
@@ -19,6 +20,7 @@ const PAPER_WIDTHS: { value: 58 | 80; label: string }[] = [
 ];
 
 const ReceiptSettingsTab: React.FC = () => {
+  const { t } = useTranslate();
   const { config, isLoading, error, updateHeader, updateFooter, updateOptions, setPrinterModel, reload } = useReceiptConfig();
 
   const [localHeader, setLocalHeader] = useState(config.header);
@@ -40,9 +42,9 @@ const ReceiptSettingsTab: React.FC = () => {
       await updateFooter(localFooter);
       await updateOptions(localOptions);
       setHasChanges(false);
-      Alert.alert('Success', 'Receipt settings saved successfully');
+      Alert.alert(t('common.success'), t('settings.receipt.saveSuccess'));
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save settings');
+      Alert.alert(t('common.error'), err instanceof Error ? err.message : t('settings.receipt.saveError'));
     } finally {
       setIsSaving(false);
     }
@@ -52,9 +54,12 @@ const ReceiptSettingsTab: React.FC = () => {
     async (model: PrinterModelType) => {
       try {
         await setPrinterModel(model);
-        Alert.alert('Success', `Printer model set to ${PRINTER_MODELS.find(m => m.value === model)?.label}`);
+        Alert.alert(
+          t('common.success'),
+          t('settings.receipt.printerModelSet', { model: PRINTER_MODELS.find(m => m.value === model)?.label })
+        );
       } catch (err) {
-        Alert.alert('Error', err instanceof Error ? err.message : 'Failed to set printer model');
+        Alert.alert(t('common.error'), err instanceof Error ? err.message : t('settings.receipt.saveError'));
       }
     },
     [setPrinterModel]
@@ -79,7 +84,7 @@ const ReceiptSettingsTab: React.FC = () => {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={lightColors.primary} />
-        <Text style={styles.loadingText}>Loading...</Text>
+        <Text style={styles.loadingText}>{t('common.loading')}</Text>
       </View>
     );
   }
@@ -88,8 +93,8 @@ const ReceiptSettingsTab: React.FC = () => {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       {/* Printer Model Selection */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Printer Model</Text>
-        <Text style={styles.sectionDescription}>Select your thermal printer model for optimal compatibility</Text>
+        <Text style={styles.sectionTitle}>{t('settings.receipt.printerModel')}</Text>
+        <Text style={styles.sectionDescription}>{t('settings.receipt.printerModelDescription')}</Text>
         <View style={styles.modelGrid}>
           {PRINTER_MODELS.map(model => (
             <TouchableOpacity
@@ -105,7 +110,7 @@ const ReceiptSettingsTab: React.FC = () => {
 
       {/* Paper Width */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Paper Width</Text>
+        <Text style={styles.sectionTitle}>{t('settings.receipt.paperWidth')}</Text>
         <View style={styles.radioGroup}>
           {PAPER_WIDTHS.map(width => (
             <TouchableOpacity key={width.value} style={styles.radioOption} onPress={() => updateLocalOptions({ paperWidth: width.value })}>
@@ -120,106 +125,106 @@ const ReceiptSettingsTab: React.FC = () => {
 
       {/* Header Configuration */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Receipt Header</Text>
-        <Text style={styles.sectionDescription}>This information appears at the top of every receipt</Text>
+        <Text style={styles.sectionTitle}>{t('settings.receipt.headerTitle')}</Text>
+        <Text style={styles.sectionDescription}>{t('settings.receipt.headerDescription')}</Text>
 
-        <Text style={styles.inputLabel}>Business Name *</Text>
+        <Text style={styles.inputLabel}>{t('settings.receipt.businessName')}</Text>
         <TextInput
           style={styles.input}
           value={localHeader.businessName}
           onChangeText={text => updateLocalHeader({ businessName: text })}
-          placeholder="Your Business Name"
+          placeholder={t('settings.receipt.businessNamePlaceholder')}
         />
 
-        <Text style={styles.inputLabel}>Address Line 1</Text>
+        <Text style={styles.inputLabel}>{t('settings.receipt.addressLine1')}</Text>
         <TextInput
           style={styles.input}
           value={localHeader.addressLine1}
           onChangeText={text => updateLocalHeader({ addressLine1: text })}
-          placeholder="123 Main Street"
+          placeholder={t('settings.receipt.addressLine1Placeholder')}
         />
 
-        <Text style={styles.inputLabel}>Address Line 2</Text>
+        <Text style={styles.inputLabel}>{t('settings.receipt.addressLine2')}</Text>
         <TextInput
           style={styles.input}
           value={localHeader.addressLine2}
           onChangeText={text => updateLocalHeader({ addressLine2: text })}
-          placeholder="City, State ZIP"
+          placeholder={t('settings.receipt.addressLine2Placeholder')}
         />
 
-        <Text style={styles.inputLabel}>Phone</Text>
+        <Text style={styles.inputLabel}>{t('settings.receipt.phone')}</Text>
         <TextInput
           style={styles.input}
           value={localHeader.phone}
           onChangeText={text => updateLocalHeader({ phone: text })}
-          placeholder="(555) 123-4567"
+          placeholder={t('settings.receipt.phonePlaceholder')}
           keyboardType="phone-pad"
         />
 
-        <Text style={styles.inputLabel}>Email</Text>
+        <Text style={styles.inputLabel}>{t('settings.receipt.email')}</Text>
         <TextInput
           style={styles.input}
           value={localHeader.email}
           onChangeText={text => updateLocalHeader({ email: text })}
-          placeholder="info@business.com"
+          placeholder={t('settings.receipt.emailPlaceholder')}
           keyboardType="email-address"
           autoCapitalize="none"
         />
 
-        <Text style={styles.inputLabel}>Website</Text>
+        <Text style={styles.inputLabel}>{t('settings.receipt.website')}</Text>
         <TextInput
           style={styles.input}
           value={localHeader.website}
           onChangeText={text => updateLocalHeader({ website: text })}
-          placeholder="www.business.com"
+          placeholder={t('settings.receipt.websitePlaceholder')}
           autoCapitalize="none"
         />
 
-        <Text style={styles.inputLabel}>Tax ID / VAT Number</Text>
+        <Text style={styles.inputLabel}>{t('settings.receipt.taxId')}</Text>
         <TextInput
           style={styles.input}
           value={localHeader.taxId}
           onChangeText={text => updateLocalHeader({ taxId: text })}
-          placeholder="Tax ID"
+          placeholder={t('settings.receipt.taxIdPlaceholder')}
         />
       </View>
 
       {/* Footer Configuration */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Receipt Footer</Text>
-        <Text style={styles.sectionDescription}>Custom messages that appear at the bottom of receipts</Text>
+        <Text style={styles.sectionTitle}>{t('settings.receipt.footerTitle')}</Text>
+        <Text style={styles.sectionDescription}>{t('settings.receipt.footerDescription')}</Text>
 
-        <Text style={styles.inputLabel}>Footer Line 1</Text>
+        <Text style={styles.inputLabel}>{t('settings.receipt.footerLine1')}</Text>
         <TextInput
           style={styles.input}
           value={localFooter.line1}
           onChangeText={text => updateLocalFooter({ line1: text })}
-          placeholder="Thank you for your purchase!"
+          placeholder={t('settings.receipt.footerLine1Placeholder')}
         />
 
-        <Text style={styles.inputLabel}>Footer Line 2</Text>
+        <Text style={styles.inputLabel}>{t('settings.receipt.footerLine2')}</Text>
         <TextInput
           style={styles.input}
           value={localFooter.line2}
           onChangeText={text => updateLocalFooter({ line2: text })}
-          placeholder="Please come again"
+          placeholder={t('settings.receipt.footerLine2Placeholder')}
         />
 
-        <Text style={styles.inputLabel}>Footer Line 3</Text>
+        <Text style={styles.inputLabel}>{t('settings.receipt.footerLine3')}</Text>
         <TextInput
           style={styles.input}
           value={localFooter.line3}
           onChangeText={text => updateLocalFooter({ line3: text })}
-          placeholder="www.yourwebsite.com"
+          placeholder={t('settings.receipt.footerLine3Placeholder')}
         />
       </View>
 
       {/* Print Options */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Print Options</Text>
+        <Text style={styles.sectionTitle}>{t('settings.receipt.printOptions')}</Text>
 
         <View style={styles.optionRow}>
-          <Text style={styles.optionLabel}>Print Barcode</Text>
+          <Text style={styles.optionLabel}>{t('settings.receipt.printBarcode')}</Text>
           <TouchableOpacity
             style={[styles.toggle, localOptions.printBarcode && styles.toggleActive]}
             onPress={() => updateLocalOptions({ printBarcode: !localOptions.printBarcode })}
@@ -229,7 +234,7 @@ const ReceiptSettingsTab: React.FC = () => {
         </View>
 
         <View style={styles.optionRow}>
-          <Text style={styles.optionLabel}>Print QR Code</Text>
+          <Text style={styles.optionLabel}>{t('settings.receipt.printQRCode')}</Text>
           <TouchableOpacity
             style={[styles.toggle, localOptions.printQRCode && styles.toggleActive]}
             onPress={() => updateLocalOptions({ printQRCode: !localOptions.printQRCode })}
@@ -239,7 +244,7 @@ const ReceiptSettingsTab: React.FC = () => {
         </View>
 
         <View style={styles.optionRow}>
-          <Text style={styles.optionLabel}>Auto Cut Paper</Text>
+          <Text style={styles.optionLabel}>{t('settings.receipt.autoCutPaper')}</Text>
           <TouchableOpacity
             style={[styles.toggle, localOptions.cutPaper && styles.toggleActive]}
             onPress={() => updateLocalOptions({ cutPaper: !localOptions.cutPaper })}
@@ -249,7 +254,7 @@ const ReceiptSettingsTab: React.FC = () => {
         </View>
 
         <View style={styles.optionRow}>
-          <Text style={styles.optionLabel}>Open Cash Drawer</Text>
+          <Text style={styles.optionLabel}>{t('settings.receipt.openCashDrawer')}</Text>
           <TouchableOpacity
             style={[styles.toggle, localOptions.openCashDrawer && styles.toggleActive]}
             onPress={() => updateLocalOptions({ openCashDrawer: !localOptions.openCashDrawer })}
@@ -258,7 +263,7 @@ const ReceiptSettingsTab: React.FC = () => {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.inputLabel}>Number of Copies</Text>
+        <Text style={styles.inputLabel}>{t('settings.receipt.numberOfCopies')}</Text>
         <View style={styles.copiesContainer}>
           <TouchableOpacity
             style={styles.copiesButton}
@@ -282,7 +287,7 @@ const ReceiptSettingsTab: React.FC = () => {
         onPress={handleSave}
         disabled={!hasChanges || isSaving}
       >
-        <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save Changes'}</Text>
+        <Text style={styles.saveButtonText}>{isSaving ? t('settings.receipt.saving') : t('settings.scanner.saveChanges')}</Text>
       </TouchableOpacity>
 
       {error && (

@@ -8,6 +8,7 @@ import { User } from '../repositories/UserRepository';
 import { authService } from '../services/auth/AuthService';
 import { authConfig } from '../services/auth/AuthConfigService';
 import { AuthMethodProvider, AuthMethodType } from '../services/auth/AuthMethodInterface';
+import { useTranslate } from '../hooks/useTranslate';
 
 interface LoginScreenProps {
   onLogin: (credential: string, user?: User) => void;
@@ -16,6 +17,7 @@ interface LoginScreenProps {
 const PIN_LENGTH = 6;
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
+  const { t } = useTranslate();
   const [activeMethod, setActiveMethod] = useState<AuthMethodType>(authConfig.primaryMethod);
   const [availableMethods, setAvailableMethods] = useState<AuthMethodProvider[]>([]);
   const [pin, setPin] = useState('');
@@ -47,7 +49,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       if (result.success) {
         onLogin(credential, result.user);
       } else {
-        setError(result.error ?? 'Authentication failed.');
+        setError(result.error ?? t('login.authFailed'));
         startShake();
       }
     },
@@ -100,7 +102,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
   const handlePasswordSubmit = useCallback(() => {
     if (!password.trim()) {
-      setError('Please enter your password.');
+      setError(t('login.passwordRequired'));
       return;
     }
     setIsLoading(true);
@@ -154,7 +156,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       case 'pin':
         return (
           <>
-            <Text style={styles.authTitle}>Enter PIN</Text>
+            <Text style={styles.authTitle}>{t('login.enterPin')}</Text>
             <PinDisplay pinLength={PIN_LENGTH} filledCount={pin.length} />
             <PinKeypad
               onKeyPress={handlePinKeyPress}
@@ -167,11 +169,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       case 'biometric':
         return (
           <>
-            <Text style={styles.authTitle}>Biometric Login</Text>
-            <Text style={styles.authDescription}>Use your fingerprint or face to log in.</Text>
+            <Text style={styles.authTitle}>{t('login.biometricLogin')}</Text>
+            <Text style={styles.authDescription}>{t('login.biometricDescription')}</Text>
             <TouchableOpacity style={styles.biometricButton} onPress={handleBiometricAuth}>
               <Text style={styles.biometricIcon}>👆</Text>
-              <Text style={styles.biometricButtonText}>Tap to Authenticate</Text>
+              <Text style={styles.biometricButtonText}>{t('login.tapToAuthenticate')}</Text>
             </TouchableOpacity>
           </>
         );
@@ -179,12 +181,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       case 'password':
         return (
           <>
-            <Text style={styles.authTitle}>Enter Password</Text>
+            <Text style={styles.authTitle}>{t('login.enterPassword')}</Text>
             <TextInput
               style={styles.passwordInput}
               value={password}
               onChangeText={setPassword}
-              placeholder="Enter your password"
+              placeholder={t('login.passwordPlaceholder')}
               placeholderTextColor={lightColors.textSecondary}
               secureTextEntry
               autoCapitalize="none"
@@ -193,7 +195,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               returnKeyType="go"
             />
             <TouchableOpacity style={styles.submitButton} onPress={handlePasswordSubmit}>
-              <Text style={styles.submitButtonText}>Log In</Text>
+              <Text style={styles.submitButtonText}>{t('common.logIn')}</Text>
             </TouchableOpacity>
           </>
         );
@@ -201,32 +203,32 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       case 'magstripe':
         return (
           <>
-            <Text style={styles.authTitle}>Swipe Employee Card</Text>
-            <Text style={styles.authDescription}>Swipe your employee ID card through the card reader.</Text>
+            <Text style={styles.authTitle}>{t('login.swipeCard')}</Text>
+            <Text style={styles.authDescription}>{t('login.swipeCardDescription')}</Text>
             <Text style={styles.waitingIcon}>💳</Text>
             <TextInput style={styles.hiddenInput} autoFocus onChangeText={handleCardInput} value="" blurOnSubmit={false} />
-            <Text style={styles.waitingText}>{waitingForSwipe ? 'Waiting for card swipe…' : 'Ready'}</Text>
+            <Text style={styles.waitingText}>{waitingForSwipe ? t('login.waitingForSwipe') : t('common.ready')}</Text>
           </>
         );
 
       case 'rfid_nfc':
         return (
           <>
-            <Text style={styles.authTitle}>Tap Employee Badge</Text>
-            <Text style={styles.authDescription}>Hold your badge near the NFC/RFID reader.</Text>
+            <Text style={styles.authTitle}>{t('login.tapBadge')}</Text>
+            <Text style={styles.authDescription}>{t('login.tapBadgeDescription')}</Text>
             <Text style={styles.waitingIcon}>📡</Text>
             <TextInput style={styles.hiddenInput} autoFocus onChangeText={handleCardInput} value="" blurOnSubmit={false} />
-            <Text style={styles.waitingText}>{waitingForSwipe ? 'Waiting for badge tap…' : 'Ready'}</Text>
+            <Text style={styles.waitingText}>{waitingForSwipe ? t('login.waitingForTap') : t('common.ready')}</Text>
           </>
         );
 
       case 'platform_auth':
         return (
           <>
-            <Text style={styles.authTitle}>Platform Login</Text>
-            <Text style={styles.authDescription}>Authenticate using your e-commerce platform credentials.</Text>
+            <Text style={styles.authTitle}>{t('login.platformLogin')}</Text>
+            <Text style={styles.authDescription}>{t('login.platformLoginDescription')}</Text>
             <TouchableOpacity style={styles.submitButton} onPress={handlePlatformAuth}>
-              <Text style={styles.submitButtonText}>Log In via Platform</Text>
+              <Text style={styles.submitButtonText}>{t('login.logInViaPlatform')}</Text>
             </TouchableOpacity>
           </>
         );
@@ -241,20 +243,20 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.logoContainer}>
-        <Text style={styles.logoText}>RetailPOS</Text>
-        <Text style={styles.tagline}>Point of Sale System</Text>
+        <Text style={styles.logoText}>{t('login.appName')}</Text>
+        <Text style={styles.tagline}>{t('login.tagline')}</Text>
       </View>
 
       <Animated.View style={[styles.authContainer, { transform: [{ translateX: shake }] }]}>
         {error && <Text style={styles.errorText}>{error}</Text>}
         {renderAuthUI()}
-        {isLoading && <Text style={styles.loadingText}>Logging in...</Text>}
+        {isLoading && <Text style={styles.loadingText}>{t('common.loggingIn')}</Text>}
       </Animated.View>
 
       {/* Method switcher */}
       {showMethodSwitcher && (
         <View style={styles.methodSwitcher}>
-          <Text style={styles.switcherLabel}>Log in with:</Text>
+          <Text style={styles.switcherLabel}>{t('login.logInWith')}</Text>
           <View style={styles.switcherRow}>
             {availableMethods.map(provider => (
               <TouchableOpacity
@@ -273,7 +275,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       )}
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>© 2025 RetailPOS Inc.</Text>
+        <Text style={styles.footerText}>{t('login.copyright')}</Text>
       </View>
     </SafeAreaView>
   );

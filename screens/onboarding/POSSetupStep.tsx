@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Switch, Alert } from 'react-native';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../utils/theme';
 import { getCurrencyOptions } from '../../utils/currency';
+import { useTranslate } from '../../hooks/useTranslate';
 
 export interface POSSetupValues {
   storeName: string;
@@ -19,6 +20,7 @@ interface POSSetupStepProps {
 }
 
 const POSSetupStep: React.FC<POSSetupStepProps> = ({ onBack, onComplete }) => {
+  const { t } = useTranslate();
   const [values, setValues] = useState<POSSetupValues>({
     storeName: '',
     storeAddress: '',
@@ -35,20 +37,20 @@ const POSSetupStep: React.FC<POSSetupStepProps> = ({ onBack, onComplete }) => {
 
   const validate = (): boolean => {
     if (!values.storeName.trim()) {
-      Alert.alert('Required', 'Please enter your store name.');
+      Alert.alert(t('common.required'), t('posSetup.storeNameRequired'));
       return false;
     }
     if (!values.taxRate.trim()) {
-      Alert.alert('Required', 'Please enter your tax rate.');
+      Alert.alert(t('common.required'), t('posSetup.taxRateRequired'));
       return false;
     }
     const rate = parseFloat(values.taxRate);
     if (isNaN(rate) || rate < 0 || rate > 100) {
-      Alert.alert('Invalid', 'Tax rate must be a number between 0 and 100.');
+      Alert.alert(t('common.invalid'), t('posSetup.taxRateInvalid'));
       return false;
     }
     if (!values.currencySymbol) {
-      Alert.alert('Required', 'Please select a currency.');
+      Alert.alert(t('common.required'), t('posSetup.currencyRequired'));
       return false;
     }
     return true;
@@ -62,41 +64,39 @@ const POSSetupStep: React.FC<POSSetupStepProps> = ({ onBack, onComplete }) => {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Store Setup</Text>
-      <Text style={styles.subtitle}>
-        Configure your store details and tax settings. These values are used for receipts, tax calculations, and order sync.
-      </Text>
+      <Text style={styles.title}>{t('posSetup.title')}</Text>
+      <Text style={styles.subtitle}>{t('posSetup.subtitle')}</Text>
 
       {/* Store Name */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Store Information</Text>
+        <Text style={styles.sectionTitle}>{t('posSetup.storeInfo')}</Text>
 
         <Text style={styles.label}>
-          Store Name <Text style={styles.required}>*</Text>
+          {t('posSetup.storeName')} <Text style={styles.required}>*</Text>
         </Text>
         <TextInput
           style={styles.input}
           value={values.storeName}
           onChangeText={v => updateField('storeName', v)}
-          placeholder="e.g. My Retail Shop"
+          placeholder={t('posSetup.storeNamePlaceholder')}
           placeholderTextColor={lightColors.textSecondary}
         />
 
-        <Text style={styles.label}>Address</Text>
+        <Text style={styles.label}>{t('posSetup.address')}</Text>
         <TextInput
           style={styles.input}
           value={values.storeAddress}
           onChangeText={v => updateField('storeAddress', v)}
-          placeholder="123 High Street, London"
+          placeholder={t('posSetup.addressPlaceholder')}
           placeholderTextColor={lightColors.textSecondary}
         />
 
-        <Text style={styles.label}>Phone</Text>
+        <Text style={styles.label}>{t('posSetup.phone')}</Text>
         <TextInput
           style={styles.input}
           value={values.storePhone}
           onChangeText={v => updateField('storePhone', v)}
-          placeholder="+44 20 1234 5678"
+          placeholder={t('posSetup.phonePlaceholder')}
           placeholderTextColor={lightColors.textSecondary}
           keyboardType="phone-pad"
         />
@@ -104,23 +104,23 @@ const POSSetupStep: React.FC<POSSetupStepProps> = ({ onBack, onComplete }) => {
 
       {/* Tax & Currency */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Tax &amp; Currency</Text>
+        <Text style={styles.sectionTitle}>{t('posSetup.taxCurrency')}</Text>
 
         <Text style={styles.label}>
-          Tax Rate (%) <Text style={styles.required}>*</Text>
+          {t('posSetup.taxRate')} <Text style={styles.required}>*</Text>
         </Text>
         <TextInput
           style={styles.input}
           value={values.taxRate}
           onChangeText={v => updateField('taxRate', v)}
-          placeholder="e.g. 8 for 8%"
+          placeholder={t('posSetup.taxRatePlaceholder')}
           placeholderTextColor={lightColors.textSecondary}
           keyboardType="decimal-pad"
         />
-        <Text style={styles.hint}>Enter as a percentage (e.g. 20 for 20% VAT)</Text>
+        <Text style={styles.hint}>{t('posSetup.taxRateHint')}</Text>
 
         <Text style={styles.label}>
-          Currency <Text style={styles.required}>*</Text>
+          {t('posSetup.currency')} <Text style={styles.required}>*</Text>
         </Text>
         <View style={styles.currencyGrid}>
           {getCurrencyOptions().map(opt => (
@@ -137,9 +137,9 @@ const POSSetupStep: React.FC<POSSetupStepProps> = ({ onBack, onComplete }) => {
 
       {/* Advanced */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Advanced</Text>
+        <Text style={styles.sectionTitle}>{t('posSetup.advanced')}</Text>
 
-        <Text style={styles.label}>Max Sync Retries</Text>
+        <Text style={styles.label}>{t('posSetup.maxSyncRetries')}</Text>
         <TextInput
           style={styles.input}
           value={values.maxSyncRetries}
@@ -148,12 +148,12 @@ const POSSetupStep: React.FC<POSSetupStepProps> = ({ onBack, onComplete }) => {
           placeholderTextColor={lightColors.textSecondary}
           keyboardType="number-pad"
         />
-        <Text style={styles.hint}>How many times to retry syncing a failed order before giving up</Text>
+        <Text style={styles.hint}>{t('posSetup.maxSyncRetriesHint')}</Text>
 
         <View style={styles.switchRow}>
           <View style={styles.switchLabel}>
-            <Text style={styles.label}>Open drawer on cash payment</Text>
-            <Text style={styles.hint}>Automatically open the cash drawer when a cash payment completes</Text>
+            <Text style={styles.label}>{t('posSetup.drawerOpenOnCash')}</Text>
+            <Text style={styles.hint}>{t('posSetup.drawerOpenOnCashHint')}</Text>
           </View>
           <Switch
             value={values.drawerOpenOnCash}
@@ -167,10 +167,10 @@ const POSSetupStep: React.FC<POSSetupStepProps> = ({ onBack, onComplete }) => {
       {/* Buttons */}
       <View style={styles.buttons}>
         <TouchableOpacity style={styles.backButton} onPress={onBack}>
-          <Text style={styles.backButtonText}>Back</Text>
+          <Text style={styles.backButtonText}>{t('common.back')}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
-          <Text style={styles.nextButtonText}>Continue</Text>
+          <Text style={styles.nextButtonText}>{t('common.continue')}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

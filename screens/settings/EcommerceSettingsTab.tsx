@@ -3,17 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert, TextInput } from 'reac
 import { useEcommerceSettings } from '../../hooks/useEcommerceSettings';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../../utils/theme';
 import { Button } from '../../components/Button';
-
-type ECommercePlatform =
-  | 'shopify'
-  | 'woocommerce'
-  | 'bigcommerce'
-  | 'magento'
-  | 'sylius'
-  | 'wix'
-  | 'prestashop'
-  | 'squarespace'
-  | 'offline';
+import { useTranslate } from '../../hooks/useTranslate';
+import { ECommercePlatform } from '../../utils/platforms';
 
 // Platform display names
 const PLATFORM_NAMES: Record<string, string> = {
@@ -29,6 +20,7 @@ const PLATFORM_NAMES: Record<string, string> = {
 };
 
 const EcommerceSettingsTab: React.FC = () => {
+  const { t } = useTranslate();
   // Use the e-commerce settings hook
   const {
     ecommerceSettings,
@@ -99,7 +91,7 @@ const EcommerceSettingsTab: React.FC = () => {
   const handleSave = useCallback(async () => {
     const success = await saveChanges();
     if (success) {
-      Alert.alert('Success', 'E-commerce settings saved successfully');
+      Alert.alert(t('common.success'), t('settings.ecommerce.saveSuccess'));
     }
   }, [saveChanges]);
 
@@ -116,10 +108,10 @@ const EcommerceSettingsTab: React.FC = () => {
 
   return (
     <View style={styles.settingsSection}>
-      <Text style={styles.sectionTitle}>E-Commerce Settings</Text>
+      <Text style={styles.sectionTitle}>{t('settings.ecommerce.title')}</Text>
 
       <View style={styles.optionRow}>
-        <Text style={styles.label}>Enable E-Commerce</Text>
+        <Text style={styles.label}>{t('settings.ecommerce.enableEcommerce')}</Text>
         <TouchableOpacity
           style={[styles.toggleButton, ecommerceSettings.enabled ? styles.toggleActive : styles.toggleInactive]}
           onPress={() => {
@@ -138,7 +130,7 @@ const EcommerceSettingsTab: React.FC = () => {
         <>
           {/* Platform Selection */}
           <View style={styles.optionRow}>
-            <Text style={styles.label}>E-commerce Platform</Text>
+            <Text style={styles.label}>{t('settings.ecommerce.platform')}</Text>
             <View style={styles.radioContainer}>
               {Object.keys(PLATFORM_NAMES).map(platform => (
                 <View key={platform} style={styles.radioWrapper}>
@@ -157,10 +149,10 @@ const EcommerceSettingsTab: React.FC = () => {
           <View style={styles.optionRow}>
             <Text style={styles.label}>
               {ecommerceSettings.platform === 'shopify'
-                ? 'Shopify Store URL'
+                ? t('settings.ecommerce.shopifyStoreUrl')
                 : ecommerceSettings.platform === 'woocommerce'
-                  ? 'WooCommerce Store URL'
-                  : 'Store URL'}
+                  ? t('settings.ecommerce.woocommerceStoreUrl')
+                  : t('settings.ecommerce.storeUrl')}
             </Text>
             <TextInput
               style={styles.input}
@@ -174,10 +166,10 @@ const EcommerceSettingsTab: React.FC = () => {
               onChangeText={handleStoreUrlChange}
               placeholder={
                 ecommerceSettings.platform === 'shopify'
-                  ? 'https://your-store.myshopify.com'
+                  ? t('settings.ecommerce.shopifyUrlPlaceholder')
                   : ecommerceSettings.platform === 'woocommerce'
-                    ? 'https://your-wordpress-site.com'
-                    : 'https://your-store.com/api'
+                    ? t('settings.ecommerce.woocommerceUrlPlaceholder')
+                    : t('settings.ecommerce.defaultUrlPlaceholder')
               }
               autoCapitalize="none"
               autoCorrect={false}
@@ -187,12 +179,18 @@ const EcommerceSettingsTab: React.FC = () => {
 
           {/* API Key */}
           <View style={styles.optionRow}>
-            <Text style={styles.label}>{ecommerceSettings.platform === 'shopify' ? 'Admin API Access Token' : 'API Key'}</Text>
+            <Text style={styles.label}>
+              {ecommerceSettings.platform === 'shopify' ? t('settings.ecommerce.adminApiToken') : t('settings.payment.apiKey')}
+            </Text>
             <TextInput
               style={styles.input}
               value={ecommerceSettings.apiKey}
               onChangeText={handleApiKeyChange}
-              placeholder={ecommerceSettings.platform === 'shopify' ? 'shpat_...' : 'Enter API key'}
+              placeholder={
+                ecommerceSettings.platform === 'shopify'
+                  ? t('settings.ecommerce.shopifyApiPlaceholder')
+                  : t('settings.ecommerce.apiKeyPlaceholder')
+              }
               secureTextEntry
               autoCapitalize="none"
               autoCorrect={false}
@@ -203,7 +201,7 @@ const EcommerceSettingsTab: React.FC = () => {
           {/* Platform-specific settings */}
           {ecommerceSettings.platform === 'woocommerce' && (
             <View style={styles.optionRow}>
-              <Text style={styles.label}>Consumer Secret</Text>
+              <Text style={styles.label}>{t('settings.ecommerce.consumerSecret')}</Text>
               <TextInput
                 style={styles.input}
                 value={ecommerceSettings.woocommerce?.apiSecret || ''}
@@ -215,7 +213,7 @@ const EcommerceSettingsTab: React.FC = () => {
                     },
                   })
                 }
-                placeholder="cs_..."
+                placeholder={t('settings.ecommerce.consumerSecretPlaceholder')}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -227,7 +225,7 @@ const EcommerceSettingsTab: React.FC = () => {
           {ecommerceSettings.platform === 'bigcommerce' && (
             <>
               <View style={styles.optionRow}>
-                <Text style={styles.label}>Store Hash</Text>
+                <Text style={styles.label}>{t('settings.ecommerce.storeHash')}</Text>
                 <TextInput
                   style={styles.input}
                   value={ecommerceSettings.bigcommerce?.storeHash || ''}
@@ -236,14 +234,14 @@ const EcommerceSettingsTab: React.FC = () => {
                       bigcommerce: { ...ecommerceSettings.bigcommerce, storeHash: value },
                     })
                   }
-                  placeholder="stores/xxxxx"
+                  placeholder={t('settings.ecommerce.storeHashPlaceholder')}
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={ecommerceSettings.enabled}
                 />
               </View>
               <View style={styles.optionRow}>
-                <Text style={styles.label}>Client ID</Text>
+                <Text style={styles.label}>{t('settings.ecommerce.clientId')}</Text>
                 <TextInput
                   style={styles.input}
                   value={ecommerceSettings.bigcommerce?.clientId || ''}
@@ -252,7 +250,7 @@ const EcommerceSettingsTab: React.FC = () => {
                       bigcommerce: { ...ecommerceSettings.bigcommerce, clientId: value },
                     })
                   }
-                  placeholder="Enter Client ID"
+                  placeholder={t('settings.ecommerce.clientIdPlaceholder')}
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={ecommerceSettings.enabled}
@@ -263,7 +261,7 @@ const EcommerceSettingsTab: React.FC = () => {
 
           {ecommerceSettings.platform === 'magento' && (
             <View style={styles.optionRow}>
-              <Text style={styles.label}>Store URL</Text>
+              <Text style={styles.label}>{t('settings.ecommerce.storeUrl')}</Text>
               <TextInput
                 style={styles.input}
                 value={ecommerceSettings.magento?.storeUrl || ''}
@@ -272,7 +270,7 @@ const EcommerceSettingsTab: React.FC = () => {
                     magento: { ...ecommerceSettings.magento, storeUrl: value },
                   })
                 }
-                placeholder="https://your-magento-store.com"
+                placeholder={t('settings.ecommerce.magentoUrlPlaceholder')}
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={ecommerceSettings.enabled}
@@ -282,7 +280,7 @@ const EcommerceSettingsTab: React.FC = () => {
 
           {ecommerceSettings.platform === 'sylius' && (
             <View style={styles.optionRow}>
-              <Text style={styles.label}>API URL</Text>
+              <Text style={styles.label}>{t('settings.ecommerce.apiUrl')}</Text>
               <TextInput
                 style={styles.input}
                 value={ecommerceSettings.sylius?.storeUrl || ''}
@@ -291,7 +289,7 @@ const EcommerceSettingsTab: React.FC = () => {
                     sylius: { ...ecommerceSettings.sylius, storeUrl: value },
                   })
                 }
-                placeholder="https://your-sylius-store.com/api"
+                placeholder={t('settings.ecommerce.syliusUrlPlaceholder')}
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={ecommerceSettings.enabled}
@@ -301,7 +299,7 @@ const EcommerceSettingsTab: React.FC = () => {
 
           {ecommerceSettings.platform === 'wix' && (
             <View style={styles.optionRow}>
-              <Text style={styles.label}>Site ID</Text>
+              <Text style={styles.label}>{t('settings.ecommerce.siteId')}</Text>
               <TextInput
                 style={styles.input}
                 value={ecommerceSettings.wix?.siteId || ''}
@@ -310,7 +308,7 @@ const EcommerceSettingsTab: React.FC = () => {
                     wix: { ...ecommerceSettings.wix, siteId: value },
                   })
                 }
-                placeholder="Enter Wix Site ID"
+                placeholder={t('settings.ecommerce.wixSiteIdPlaceholder')}
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={ecommerceSettings.enabled}
@@ -320,7 +318,7 @@ const EcommerceSettingsTab: React.FC = () => {
 
           {ecommerceSettings.platform === 'prestashop' && (
             <View style={styles.optionRow}>
-              <Text style={styles.label}>Store URL</Text>
+              <Text style={styles.label}>{t('settings.ecommerce.storeUrl')}</Text>
               <TextInput
                 style={styles.input}
                 value={ecommerceSettings.prestashop?.storeUrl || ''}
@@ -329,7 +327,7 @@ const EcommerceSettingsTab: React.FC = () => {
                     prestashop: { ...ecommerceSettings.prestashop, storeUrl: value },
                   })
                 }
-                placeholder="https://your-prestashop-store.com"
+                placeholder={t('settings.ecommerce.prestashopUrlPlaceholder')}
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={ecommerceSettings.enabled}
@@ -339,7 +337,7 @@ const EcommerceSettingsTab: React.FC = () => {
 
           {ecommerceSettings.platform === 'squarespace' && (
             <View style={styles.optionRow}>
-              <Text style={styles.label}>Site ID (optional)</Text>
+              <Text style={styles.label}>{t('settings.ecommerce.squarespaceSiteIdLabel')}</Text>
               <TextInput
                 style={styles.input}
                 value={ecommerceSettings.squarespace?.siteId || ''}
@@ -348,7 +346,7 @@ const EcommerceSettingsTab: React.FC = () => {
                     squarespace: { ...ecommerceSettings.squarespace, siteId: value },
                   })
                 }
-                placeholder="Enter Squarespace Site ID"
+                placeholder={t('settings.ecommerce.squarespaceSiteIdPlaceholder')}
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={ecommerceSettings.enabled}
@@ -359,11 +357,11 @@ const EcommerceSettingsTab: React.FC = () => {
           {ecommerceSettings.platform === 'offline' && (
             <>
               <View style={styles.infoBox}>
-                <Text style={styles.infoTitle}>Local-Only Mode</Text>
-                <Text style={styles.infoText}>Works offline. Downloads menu from a public URL. Orders are stored locally only.</Text>
+                <Text style={styles.infoTitle}>{t('settings.ecommerce.localOnlyMode')}</Text>
+                <Text style={styles.infoText}>{t('settings.ecommerce.localOnlyDescription')}</Text>
               </View>
               <View style={styles.optionRow}>
-                <Text style={styles.label}>Menu URL</Text>
+                <Text style={styles.label}>{t('settings.ecommerce.menuUrl')}</Text>
                 <TextInput
                   style={styles.input}
                   value={ecommerceSettings.offline?.menuUrl || ''}
@@ -372,7 +370,7 @@ const EcommerceSettingsTab: React.FC = () => {
                       offline: { ...ecommerceSettings.offline, menuUrl: value },
                     })
                   }
-                  placeholder="https://example.com/menu.json"
+                  placeholder={t('settings.ecommerce.menuUrlPlaceholder')}
                   autoCapitalize="none"
                   autoCorrect={false}
                   editable={ecommerceSettings.enabled}
@@ -380,7 +378,7 @@ const EcommerceSettingsTab: React.FC = () => {
                 />
               </View>
               <View style={styles.optionRow}>
-                <Text style={styles.label}>Store Name</Text>
+                <Text style={styles.label}>{t('settings.ecommerce.storeName')}</Text>
                 <TextInput
                   style={styles.input}
                   value={ecommerceSettings.offline?.storeName || ''}
@@ -389,28 +387,31 @@ const EcommerceSettingsTab: React.FC = () => {
                       offline: { ...ecommerceSettings.offline, storeName: value },
                     })
                   }
-                  placeholder="My Local Store"
+                  placeholder={t('settings.ecommerce.storeNamePlaceholder')}
                   editable={ecommerceSettings.enabled}
                 />
               </View>
               <Button
-                title="Download Menu"
+                title={t('settings.ecommerce.downloadMenu')}
                 variant="secondary"
                 onPress={async () => {
                   const menuUrl = ecommerceSettings.offline?.menuUrl;
                   if (!menuUrl) {
-                    Alert.alert('Error', 'Please enter a Menu URL first.');
+                    Alert.alert(t('common.error'), t('settings.ecommerce.menuUrlRequired'));
                     return;
                   }
                   try {
-                    Alert.alert('Downloading', 'Downloading menu from URL...');
+                    Alert.alert(t('settings.ecommerce.downloading'), t('settings.ecommerce.downloadingMenu'));
                     const response = await fetch(menuUrl);
                     const data = await response.json();
                     const productCount = data.products?.length || data.items?.length || data.menu?.length || 0;
                     const categoryCount = data.categories?.length || 0;
-                    Alert.alert('Success', `Downloaded ${productCount} products and ${categoryCount} categories.`);
+                    Alert.alert(
+                      t('common.success'),
+                      t('settings.ecommerce.downloadSuccess', { products: productCount, categories: categoryCount })
+                    );
                   } catch (error) {
-                    Alert.alert('Error', 'Failed to download menu. Please check the URL.');
+                    Alert.alert(t('common.error'), t('settings.ecommerce.downloadError'));
                   }
                 }}
                 disabled={!ecommerceSettings.enabled}
@@ -421,7 +422,7 @@ const EcommerceSettingsTab: React.FC = () => {
 
           {/* Sync Inventory Toggle */}
           <View style={styles.optionRow}>
-            <Text style={styles.label}>Sync Inventory</Text>
+            <Text style={styles.label}>{t('settings.ecommerce.syncInventory')}</Text>
             <TouchableOpacity
               style={[
                 styles.toggleButton,
@@ -443,17 +444,17 @@ const EcommerceSettingsTab: React.FC = () => {
           {/* Action Buttons */}
           <View style={styles.actionButtons}>
             <Button
-              title="Test Connection"
+              title={t('settings.payment.testConnection')}
               variant="secondary"
               onPress={handleConnectionTest}
               disabled={!ecommerceSettings.enabled}
               style={styles.actionButton}
             />
 
-            {hasUnsavedChanges && <Button title="Cancel" variant="danger" onPress={handleCancel} style={styles.actionButton} />}
+            {hasUnsavedChanges && <Button title={t('common.cancel')} variant="danger" onPress={handleCancel} style={styles.actionButton} />}
 
             <Button
-              title={hasUnsavedChanges ? 'Save Changes' : 'Saved'}
+              title={hasUnsavedChanges ? t('settings.scanner.saveChanges') : t('settings.ecommerce.saved')}
               variant="success"
               onPress={handleSave}
               disabled={!hasUnsavedChanges || !ecommerceSettings.enabled}

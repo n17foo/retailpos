@@ -4,6 +4,7 @@ import { lightColors, spacing, typography, borderRadius, elevation } from '../ut
 import { PlatformCustomer } from '../services/customer/CustomerServiceInterface';
 import { useCustomerSearch } from '../hooks/useCustomerSearch';
 import { ECommercePlatform } from '../utils/platforms';
+import { useTranslate } from '../hooks/useTranslate';
 
 interface CustomerSearchModalProps {
   visible: boolean;
@@ -13,6 +14,7 @@ interface CustomerSearchModalProps {
 }
 
 const CustomerSearchModal: React.FC<CustomerSearchModalProps> = ({ visible, platform, onSelect, onClose }) => {
+  const { t } = useTranslate();
   const { customers, isSearching, error, hasMore, search, loadMore, clear, isAvailable } = useCustomerSearch(platform);
   const [query, setQuery] = useState('');
 
@@ -42,9 +44,9 @@ const CustomerSearchModal: React.FC<CustomerSearchModalProps> = ({ visible, plat
     <TouchableOpacity
       style={styles.customerItem}
       onPress={() => handleSelect(item)}
-      accessibilityLabel={`Select ${displayName(item)}, ${item.email}`}
+      accessibilityLabel={`${displayName(item)}, ${item.email}`}
       accessibilityRole="button"
-      accessibilityHint="Double tap to attach this customer to the order"
+      accessibilityHint={t('customerSearch.selectHint')}
     >
       <View style={styles.customerAvatar}>
         <Text style={styles.avatarText}>{(item.firstName?.[0] || item.email[0] || '?').toUpperCase()}</Text>
@@ -57,7 +59,7 @@ const CustomerSearchModal: React.FC<CustomerSearchModalProps> = ({ visible, plat
       {item.orderCount !== undefined && (
         <View style={styles.customerStats}>
           <Text style={styles.statValue}>{item.orderCount}</Text>
-          <Text style={styles.statLabel}>orders</Text>
+          <Text style={styles.statLabel}>{t('customerSearch.orders')}</Text>
         </View>
       )}
     </TouchableOpacity>
@@ -69,11 +71,11 @@ const CustomerSearchModal: React.FC<CustomerSearchModalProps> = ({ visible, plat
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Find Customer</Text>
+            <Text style={styles.title}>{t('customerSearch.title')}</Text>
             <TouchableOpacity
               onPress={handleClose}
               style={styles.closeButton}
-              accessibilityLabel="Close customer search"
+              accessibilityLabel={t('customerSearch.closeLabel')}
               accessibilityRole="button"
             >
               <Text style={styles.closeText}>✕</Text>
@@ -83,8 +85,8 @@ const CustomerSearchModal: React.FC<CustomerSearchModalProps> = ({ visible, plat
           {!isAvailable ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>👤</Text>
-              <Text style={styles.emptyTitle}>Customer search unavailable</Text>
-              <Text style={styles.emptyDescription}>Customer lookup requires an online e-commerce platform connection.</Text>
+              <Text style={styles.emptyTitle}>{t('customerSearch.unavailableTitle')}</Text>
+              <Text style={styles.emptyDescription}>{t('customerSearch.unavailableDescription')}</Text>
             </View>
           ) : (
             <>
@@ -94,13 +96,13 @@ const CustomerSearchModal: React.FC<CustomerSearchModalProps> = ({ visible, plat
                   style={styles.searchInput}
                   value={query}
                   onChangeText={handleChangeText}
-                  placeholder="Search by name, email, or phone…"
+                  placeholder={t('customerSearch.searchPlaceholder')}
                   placeholderTextColor={lightColors.textSecondary}
                   autoCapitalize="none"
                   autoCorrect={false}
                   autoFocus
-                  accessibilityLabel="Search customers"
-                  accessibilityHint="Type a name, email, or phone number to search"
+                  accessibilityLabel={t('customerSearch.searchLabel')}
+                  accessibilityHint={t('customerSearch.searchHint')}
                 />
                 {isSearching && <ActivityIndicator size="small" color={lightColors.primary} style={styles.searchSpinner} />}
               </View>
@@ -123,16 +125,14 @@ const CustomerSearchModal: React.FC<CustomerSearchModalProps> = ({ visible, plat
                   !isSearching && query.length > 0 ? (
                     <View style={styles.emptyState}>
                       <Text style={styles.emptyIcon}>🔍</Text>
-                      <Text style={styles.emptyTitle}>No customers found</Text>
-                      <Text style={styles.emptyDescription}>Try a different search term.</Text>
+                      <Text style={styles.emptyTitle}>{t('customerSearch.noResults')}</Text>
+                      <Text style={styles.emptyDescription}>{t('customerSearch.noResultsHint')}</Text>
                     </View>
                   ) : !isSearching && query.length === 0 ? (
                     <View style={styles.emptyState}>
                       <Text style={styles.emptyIcon}>👤</Text>
-                      <Text style={styles.emptyTitle}>Search for a customer</Text>
-                      <Text style={styles.emptyDescription}>
-                        Type a name, email, or phone number to find a customer from your platform.
-                      </Text>
+                      <Text style={styles.emptyTitle}>{t('customerSearch.searchPrompt')}</Text>
+                      <Text style={styles.emptyDescription}>{t('customerSearch.searchPromptDescription')}</Text>
                     </View>
                   ) : null
                 }

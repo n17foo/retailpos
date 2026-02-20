@@ -3,21 +3,23 @@ import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography } from '../utils/theme';
 import { useNotifications } from '../contexts/NotificationProvider';
+import { useTranslate } from '../hooks/useTranslate';
 
 interface NotificationBellProps {
   onPress: () => void;
 }
 
 const NotificationBell: React.FC<NotificationBellProps> = ({ onPress }) => {
+  const { t } = useTranslate();
   const { unreadCount } = useNotifications();
 
   return (
     <TouchableOpacity
       onPress={onPress}
       style={styles.container}
-      accessibilityLabel={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+      accessibilityLabel={unreadCount > 0 ? t('notifications.unreadLabel', { count: unreadCount }) : t('notifications.label')}
       accessibilityRole="button"
-      accessibilityHint="Opens the notification drawer"
+      accessibilityHint={t('notifications.openHint')}
     >
       <MaterialIcons name="notifications" size={24} color={lightColors.textPrimary} />
       {unreadCount > 0 && (

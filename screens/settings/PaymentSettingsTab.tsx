@@ -3,10 +3,12 @@ import { View, Text, TouchableOpacity, TextInput, StyleSheet, Alert, ActivityInd
 import { PaymentProvider } from '../../services/payment/PaymentServiceFactory';
 import { usePaymentSettings, PaymentSettings } from '../../hooks/usePaymentSettings';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../../utils/theme';
+import { useTranslate } from '../../hooks/useTranslate';
 
 type ProviderSettingKey<T extends keyof PaymentSettings> = keyof PaymentSettings[T];
 
 const PaymentSettingsTab = () => {
+  const { t } = useTranslate();
   const { paymentSettings, handlePaymentSettingsChange, saveSettings, testConnection, error, saveStatus, isLoading, loadSettings } =
     usePaymentSettings();
 
@@ -74,20 +76,20 @@ const PaymentSettingsTab = () => {
     try {
       const success = await testConnection(paymentSettings.provider);
       if (success) {
-        Alert.alert('Success', 'Connection test successful!');
+        Alert.alert(t('common.success'), t('settings.payment.connectionSuccess'));
       } else {
-        Alert.alert('Error', 'Failed to connect to payment provider');
+        Alert.alert(t('common.error'), t('settings.payment.connectionError'));
       }
     } catch (err) {
       console.error('Connection test failed:', err);
-      Alert.alert('Error', 'Connection test failed. Please check your settings.');
+      Alert.alert(t('common.error'), t('settings.payment.connectionTestFailed'));
     }
   }, [testConnection, paymentSettings.provider]);
 
   // Render provider selection radio buttons
   const renderProviderSelection = () => (
     <View style={styles.settingGroup}>
-      <Text style={styles.settingLabel}>Payment Provider</Text>
+      <Text style={styles.settingLabel}>{t('settings.payment.provider')}</Text>
       <View style={styles.radioGroup}>
         {Object.values(PaymentProvider).map(provider => (
           <TouchableOpacity
@@ -112,13 +114,13 @@ const PaymentSettingsTab = () => {
 
     return (
       <View style={styles.settingGroup}>
-        <Text style={styles.settingLabel}>Worldpay Settings</Text>
+        <Text style={styles.settingLabel}>{t('settings.payment.worldpaySettings')}</Text>
         <View style={styles.inputGroup}>
           <TextInput
             style={styles.input}
             value={paymentSettings.worldpay?.merchantId || ''}
             onChangeText={value => handleProviderSettingChange('worldpay', 'merchantId', value)}
-            placeholder="Merchant ID"
+            placeholder={t('settings.payment.merchantId')}
             editable={!isLoading}
           />
         </View>
@@ -127,7 +129,7 @@ const PaymentSettingsTab = () => {
             style={styles.input}
             value={paymentSettings.worldpay?.siteReference || ''}
             onChangeText={value => handleProviderSettingChange('worldpay', 'siteReference', value)}
-            placeholder="Site Reference"
+            placeholder={t('settings.payment.siteReference')}
             editable={!isLoading}
           />
         </View>
@@ -141,12 +143,12 @@ const PaymentSettingsTab = () => {
 
     return (
       <View style={styles.settingGroup}>
-        <Text style={styles.settingLabel}>Stripe Terminal (PED) Settings</Text>
+        <Text style={styles.settingLabel}>{t('settings.payment.stripeSettings')}</Text>
         <View style={styles.inputGroup}>
-          <Text>API Key</Text>
+          <Text>{t('settings.payment.apiKey')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Stripe API Key"
+            placeholder={t('settings.payment.stripeApiKeyPlaceholder')}
             value={paymentSettings.stripe?.apiKey || ''}
             onChangeText={value => handleProviderSettingChange('stripe', 'apiKey', value)}
             editable={!isLoading}
@@ -154,10 +156,10 @@ const PaymentSettingsTab = () => {
           />
         </View>
         <View style={styles.inputGroup}>
-          <Text>Location ID</Text>
+          <Text>{t('settings.payment.locationId')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="Stripe Location ID"
+            placeholder={t('settings.payment.stripeLocationPlaceholder')}
             value={paymentSettings.stripe?.locationId || ''}
             onChangeText={value => handleProviderSettingChange('stripe', 'locationId', value)}
             editable={!isLoading}
@@ -173,16 +175,16 @@ const PaymentSettingsTab = () => {
 
     return (
       <View style={styles.settingGroup}>
-        <Text style={styles.settingLabel}>Stripe NFC Tap to Pay Settings</Text>
+        <Text style={styles.settingLabel}>{t('settings.payment.stripeNfcSettings')}</Text>
 
         {/* API Credentials Section */}
         <View style={[styles.settingGroup, { marginBottom: 20 }]}>
-          <Text style={styles.settingLabel}>API Credentials</Text>
+          <Text style={styles.settingLabel}>{t('settings.payment.apiCredentials')}</Text>
           <View style={styles.inputGroup}>
-            <Text>API Key</Text>
+            <Text>{t('settings.payment.apiKey')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Stripe API Key (sk_test_...)"
+              placeholder={t('settings.payment.stripeApiKeyNfcPlaceholder')}
               value={paymentSettings.stripe_nfc?.apiKey || ''}
               onChangeText={value => handleProviderSettingChange('stripe_nfc', 'apiKey', value)}
               editable={!isLoading}
@@ -193,10 +195,10 @@ const PaymentSettingsTab = () => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text>Publishable Key</Text>
+            <Text>{t('settings.payment.publishableKey')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Stripe Publishable Key (pk_test_...)"
+              placeholder={t('settings.payment.publishableKeyPlaceholder')}
               value={paymentSettings.stripe_nfc?.publishableKey || ''}
               onChangeText={value => handleProviderSettingChange('stripe_nfc', 'publishableKey', value)}
               editable={!isLoading}
@@ -206,10 +208,10 @@ const PaymentSettingsTab = () => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text>Location ID</Text>
+            <Text>{t('settings.payment.locationId')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Stripe Location ID"
+              placeholder={t('settings.payment.stripeLocationPlaceholder')}
               value={paymentSettings.stripe_nfc?.merchantId || ''}
               onChangeText={value => handleProviderSettingChange('stripe_nfc', 'merchantId', value)}
               editable={!isLoading}
@@ -221,12 +223,12 @@ const PaymentSettingsTab = () => {
 
         {/* Backend Configuration Section */}
         <View style={[styles.settingGroup, { marginBottom: 20 }]}>
-          <Text style={styles.settingLabel}>Backend Configuration</Text>
+          <Text style={styles.settingLabel}>{t('settings.payment.backendConfig')}</Text>
           <View style={styles.inputGroup}>
-            <Text>Backend URL</Text>
+            <Text>{t('settings.payment.backendUrl')}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Stripe Backend URL (https://...)"
+              placeholder={t('settings.payment.backendUrlPlaceholder')}
               value={paymentSettings.stripe_nfc?.backendUrl || ''}
               onChangeText={value => handleProviderSettingChange('stripe_nfc', 'backendUrl', value)}
               editable={!isLoading}
@@ -236,7 +238,7 @@ const PaymentSettingsTab = () => {
           </View>
 
           <View style={styles.optionRow}>
-            <Text style={styles.label}>Use Direct API (no backend)</Text>
+            <Text style={styles.label}>{t('settings.payment.useDirectApi')}</Text>
             <TouchableOpacity
               style={[
                 styles.toggleButton,
@@ -246,16 +248,18 @@ const PaymentSettingsTab = () => {
               onPress={() => handleProviderSettingChange('stripe_nfc', 'useDirectApi', !paymentSettings.stripe_nfc?.useDirectApi)}
               disabled={isLoading}
             >
-              <Text style={styles.toggleText}>{paymentSettings.stripe_nfc?.useDirectApi ? 'On' : 'Off'}</Text>
+              <Text style={styles.toggleText}>
+                {paymentSettings.stripe_nfc?.useDirectApi ? t('settings.payment.on') : t('settings.payment.off')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Reader Configuration Section */}
         <View style={[styles.settingGroup, { marginBottom: 20 }]}>
-          <Text style={styles.settingLabel}>Reader Configuration</Text>
+          <Text style={styles.settingLabel}>{t('settings.payment.readerConfig')}</Text>
           <View style={styles.optionRow}>
-            <Text style={styles.label}>Enable NFC Reader</Text>
+            <Text style={styles.label}>{t('settings.payment.enableNfcReader')}</Text>
             <TouchableOpacity
               style={[
                 styles.toggleButton,
@@ -265,12 +269,14 @@ const PaymentSettingsTab = () => {
               onPress={() => handleProviderSettingChange('stripe_nfc', 'enableNfc', !paymentSettings.stripe_nfc?.enableNfc)}
               disabled={isLoading}
             >
-              <Text style={styles.toggleText}>{paymentSettings.stripe_nfc?.enableNfc ? 'On' : 'Off'}</Text>
+              <Text style={styles.toggleText}>
+                {paymentSettings.stripe_nfc?.enableNfc ? t('settings.payment.on') : t('settings.payment.off')}
+              </Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.optionRow}>
-            <Text style={styles.label}>Use Simulated Reader</Text>
+            <Text style={styles.label}>{t('settings.payment.useSimulatedReader')}</Text>
             <TouchableOpacity
               style={[
                 styles.toggleButton,
@@ -282,12 +288,14 @@ const PaymentSettingsTab = () => {
               }
               disabled={isLoading}
             >
-              <Text style={styles.toggleText}>{paymentSettings.stripe_nfc?.useSimulatedReader ? 'On' : 'Off'}</Text>
+              <Text style={styles.toggleText}>
+                {paymentSettings.stripe_nfc?.useSimulatedReader ? t('settings.payment.on') : t('settings.payment.off')}
+              </Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.inputGroup}>
-            <Text>Connection Timeout (seconds)</Text>
+            <Text>{t('settings.payment.connectionTimeout')}</Text>
             <TextInput
               style={styles.input}
               placeholder="30"
@@ -309,12 +317,12 @@ const PaymentSettingsTab = () => {
               // Then test connection
               await testPaymentConnection();
             } catch (err) {
-              Alert.alert('Error', 'Failed to test connection. Please check your settings.');
+              Alert.alert(t('common.error'), t('settings.payment.connectionTestFailed'));
             }
           }}
           disabled={isLoading}
         >
-          <Text style={styles.buttonText}>Test Terminal Connection</Text>
+          <Text style={styles.buttonText}>{t('settings.payment.testTerminalConnection')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -326,13 +334,13 @@ const PaymentSettingsTab = () => {
 
     return (
       <View style={styles.settingGroup}>
-        <Text style={styles.settingLabel}>Square Settings</Text>
+        <Text style={styles.settingLabel}>{t('settings.payment.squareSettings')}</Text>
         <View style={styles.inputGroup}>
           <TextInput
             style={styles.input}
             value={paymentSettings.square?.applicationId || ''}
             onChangeText={value => handleProviderSettingChange('square', 'applicationId', value)}
-            placeholder="Application ID"
+            placeholder={t('settings.payment.applicationId')}
             editable={!isLoading}
           />
         </View>
@@ -341,7 +349,7 @@ const PaymentSettingsTab = () => {
             style={styles.input}
             value={paymentSettings.square?.locationId || ''}
             onChangeText={value => handleProviderSettingChange('square', 'locationId', value)}
-            placeholder="Location ID"
+            placeholder={t('settings.payment.locationId')}
             editable={!isLoading}
           />
         </View>
@@ -350,7 +358,7 @@ const PaymentSettingsTab = () => {
             style={styles.input}
             value={paymentSettings.square?.accessToken || ''}
             onChangeText={value => handleProviderSettingChange('square', 'accessToken', value)}
-            placeholder="Access Token"
+            placeholder={t('settings.payment.accessToken')}
             secureTextEntry
             editable={!isLoading}
           />
@@ -364,14 +372,14 @@ const PaymentSettingsTab = () => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0a84ff" />
-        <Text style={styles.loadingText}>Loading payment settings...</Text>
+        <Text style={styles.loadingText}>{t('settings.payment.loadingPayment')}</Text>
       </View>
     );
   }
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.sectionTitle}>Payment Settings</Text>
+      <Text style={styles.sectionTitle}>{t('settings.payment.title')}</Text>
 
       {/* Provider Selection */}
       {renderProviderSelection()}
@@ -384,7 +392,7 @@ const PaymentSettingsTab = () => {
 
       {/* Sync Inventory Toggle */}
       <View style={styles.optionRow}>
-        <Text style={styles.label}>Sync Inventory</Text>
+        <Text style={styles.label}>{t('settings.payment.syncInventory')}</Text>
         <TouchableOpacity
           style={[
             styles.toggleButton,
@@ -410,7 +418,11 @@ const PaymentSettingsTab = () => {
           onPress={testPaymentConnection}
           disabled={isLoading}
         >
-          {isLoading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.buttonText}>Test Connection</Text>}
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>{t('settings.payment.testConnection')}</Text>
+          )}
         </TouchableOpacity>
 
         <View style={styles.horizontalButtonGroup}>
@@ -419,7 +431,7 @@ const PaymentSettingsTab = () => {
             onPress={handleCancel}
             disabled={!hasUnsavedChanges || isLoading}
           >
-            <Text style={styles.buttonText}>Cancel</Text>
+            <Text style={styles.buttonText}>{t('common.cancel')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -427,7 +439,7 @@ const PaymentSettingsTab = () => {
             onPress={handleSave}
             disabled={!hasUnsavedChanges || isLoading}
           >
-            {isLoading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.buttonText}>Save</Text>}
+            {isLoading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.buttonText}>{t('common.save')}</Text>}
           </TouchableOpacity>
         </View>
       </View>
@@ -438,7 +450,7 @@ const PaymentSettingsTab = () => {
           {error ? (
             <Text style={styles.errorText}>{error}</Text>
           ) : saveStatus === 'saved' ? (
-            <Text style={styles.successText}>Settings saved successfully!</Text>
+            <Text style={styles.successText}>{t('settings.payment.settingsSaved')}</Text>
           ) : null}
         </View>
       )}

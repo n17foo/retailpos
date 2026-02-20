@@ -7,14 +7,16 @@ import { localApiClient } from '../../services/localapi/LocalApiClient';
 import { localApiServer } from '../../services/localapi/LocalApiServer';
 import { localApiDiscovery, DiscoveredServer } from '../../services/localapi/LocalApiDiscovery';
 import { generateUUID } from '../../utils/uuid';
+import { useTranslate } from '../../hooks/useTranslate';
 
-const MODE_OPTIONS: { value: LocalApiMode; label: string; description: string }[] = [
-  { value: 'standalone', label: 'Standalone', description: 'Single register, no networking' },
-  { value: 'server', label: 'Server', description: 'This device hosts the shared database' },
-  { value: 'client', label: 'Client', description: 'Connect to another register running as server' },
+const MODE_OPTION_KEYS: { value: LocalApiMode; labelKey: string; descKey: string }[] = [
+  { value: 'standalone', labelKey: 'settings.localApi.standalone', descKey: 'settings.localApi.standaloneDesc' },
+  { value: 'server', labelKey: 'settings.localApi.server', descKey: 'settings.localApi.serverDesc' },
+  { value: 'client', labelKey: 'settings.localApi.client', descKey: 'settings.localApi.clientDesc' },
 ];
 
 const LocalApiSettingsTab: React.FC = () => {
+  const { t } = useTranslate();
   const [mode, setMode] = useState<LocalApiMode>('standalone');
   const [port, setPort] = useState('8787');
   const [sharedSecret, setSharedSecret] = useState('');
@@ -49,13 +51,13 @@ const LocalApiSettingsTab: React.FC = () => {
 
     if (mode === 'server') {
       localApiServer.start();
-      Alert.alert('Saved', `Server mode enabled on port ${port}.`);
+      Alert.alert(t('common.saved'), t('settings.localApi.savedServer', { port }));
     } else if (mode === 'client') {
       localApiServer.stop();
-      Alert.alert('Saved', 'Client mode enabled. Test the connection below.');
+      Alert.alert(t('common.saved'), t('settings.localApi.savedClient'));
     } else {
       localApiServer.stop();
-      Alert.alert('Saved', 'Standalone mode — no networking.');
+      Alert.alert(t('common.saved'), t('settings.localApi.savedStandalone'));
     }
   }, [mode, port, sharedSecret, registerName, serverAddress]);
 
@@ -64,7 +66,7 @@ const LocalApiSettingsTab: React.FC = () => {
     const result = await localApiClient.testConnection();
     setConnectionStatus(result.ok ? 'connected' : 'failed');
     if (!result.ok) {
-      Alert.alert('Connection Failed', result.error || 'Could not reach the server.');
+      Alert.alert(t('settings.localApi.connectionFailed'), result.error || t('settings.localApi.connectionFailedMessage'));
     }
   }, []);
 
@@ -81,7 +83,7 @@ const LocalApiSettingsTab: React.FC = () => {
     setScanning(false);
 
     if (servers.length === 0) {
-      Alert.alert('No Servers Found', 'Make sure the server register is running and on the same network.');
+      Alert.alert(t('settings.localApi.noServersFound'), t('settings.localApi.noServersFoundMessage'));
     }
   }, []);
 
@@ -101,16 +103,14 @@ const LocalApiSettingsTab: React.FC = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Multi-Register Setup</Text>
-      <Text style={styles.subtitle}>
-        Configure this device as a standalone register, a server (central database), or a client that connects to a server.
-      </Text>
+      <Text style={styles.title}>{t('settings.localApi.title')}</Text>
+      <Text style={styles.subtitle}>{t('settings.localApi.description')}</Text>
 
       {/* Mode selector */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Mode</Text>
+        <Text style={styles.sectionTitle}>{t('settings.localApi.mode')}</Text>
         <View style={styles.modeRow}>
-          {MODE_OPTIONS.map(opt => (
+          {MODE_OPTION_KEYS.map(opt => (
             <TouchableOpacity
               key={opt.value}
               style={[styles.modeCard, mode === opt.value && styles.modeCardActive]}
@@ -121,8 +121,8 @@ const LocalApiSettingsTab: React.FC = () => {
                 size={24}
                 color={mode === opt.value ? lightColors.primary : lightColors.textSecondary}
               />
-              <Text style={[styles.modeLabel, mode === opt.value && styles.modeLabelActive]}>{opt.label}</Text>
-              <Text style={styles.modeDesc}>{opt.description}</Text>
+              <Text style={[styles.modeLabel, mode === opt.value && styles.modeLabelActive]}>{t(opt.labelKey)}</Text>
+              <Text style={styles.modeDesc}>{t(opt.descKey)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -131,18 +131,18 @@ const LocalApiSettingsTab: React.FC = () => {
       {/* Common fields */}
       {mode !== 'standalone' && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Configuration</Text>
+          <Text style={styles.sectionTitle}>{t('settings.localApi.configuration')}</Text>
 
-          <Text style={styles.fieldLabel}>Register Name</Text>
+          <Text style={styles.fieldLabel}>{t('settings.localApi.registerName')}</Text>
           <TextInput
             style={styles.input}
             value={registerName}
             onChangeText={setRegisterName}
-            placeholder="e.g. Register 1"
+            placeholder={t('settings.localApi.registerNamePlaceholder')}
             placeholderTextColor={lightColors.textSecondary}
           />
 
-          <Text style={styles.fieldLabel}>Port</Text>
+          <Text style={styles.fieldLabel}>{t('settings.localApi.port')}</Text>
           <TextInput
             style={styles.input}
             value={port}
@@ -152,12 +152,12 @@ const LocalApiSettingsTab: React.FC = () => {
             placeholderTextColor={lightColors.textSecondary}
           />
 
-          <Text style={styles.fieldLabel}>Shared Secret (optional)</Text>
+          <Text style={styles.fieldLabel}>{t('settings.localApi.sharedSecret')}</Text>
           <TextInput
             style={styles.input}
             value={sharedSecret}
             onChangeText={setSharedSecret}
-            placeholder="Leave empty for open access"
+            placeholder={t('settings.localApi.sharedSecretPlaceholder')}
             placeholderTextColor={lightColors.textSecondary}
             secureTextEntry
           />
@@ -167,14 +167,14 @@ const LocalApiSettingsTab: React.FC = () => {
       {/* Client-specific: server address + discovery */}
       {mode === 'client' && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Server Connection</Text>
+          <Text style={styles.sectionTitle}>{t('settings.localApi.serverConnection')}</Text>
 
-          <Text style={styles.fieldLabel}>Server Address</Text>
+          <Text style={styles.fieldLabel}>{t('settings.localApi.serverAddress')}</Text>
           <TextInput
             style={styles.input}
             value={serverAddress}
             onChangeText={setServerAddress}
-            placeholder="e.g. 192.168.1.100"
+            placeholder={t('settings.localApi.serverAddressPlaceholder')}
             placeholderTextColor={lightColors.textSecondary}
             keyboardType="numbers-and-punctuation"
           />
@@ -186,7 +186,7 @@ const LocalApiSettingsTab: React.FC = () => {
               ) : (
                 <>
                   <MaterialIcons name="wifi-tethering" size={16} color={lightColors.textOnPrimary} />
-                  <Text style={styles.primaryButtonText}>Test Connection</Text>
+                  <Text style={styles.primaryButtonText}>{t('settings.payment.testConnection')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -200,7 +200,7 @@ const LocalApiSettingsTab: React.FC = () => {
               ) : (
                 <>
                   <MaterialIcons name="search" size={16} color={lightColors.primary} />
-                  <Text style={styles.secondaryButtonText}>Scan Network</Text>
+                  <Text style={styles.secondaryButtonText}>{t('settings.localApi.scanNetwork')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -209,20 +209,20 @@ const LocalApiSettingsTab: React.FC = () => {
           {connectionStatus === 'connected' && (
             <View style={styles.statusBox}>
               <MaterialIcons name="check-circle" size={16} color={lightColors.success} />
-              <Text style={[styles.statusText, { color: lightColors.success }]}>Connected to server</Text>
+              <Text style={[styles.statusText, { color: lightColors.success }]}>{t('settings.localApi.connectedToServer')}</Text>
             </View>
           )}
           {connectionStatus === 'failed' && (
             <View style={styles.statusBox}>
               <MaterialIcons name="error" size={16} color={lightColors.error} />
-              <Text style={[styles.statusText, { color: lightColors.error }]}>Connection failed</Text>
+              <Text style={[styles.statusText, { color: lightColors.error }]}>{t('settings.localApi.connectionFailed')}</Text>
             </View>
           )}
 
           {/* Discovered servers */}
           {discoveredServers.length > 0 && (
             <View style={styles.discoveredList}>
-              <Text style={styles.fieldLabel}>Discovered Servers</Text>
+              <Text style={styles.fieldLabel}>{t('settings.localApi.discoveredServers')}</Text>
               {discoveredServers.map((server, i) => (
                 <TouchableOpacity key={i} style={styles.discoveredItem} onPress={() => handleSelectServer(server)}>
                   <MaterialIcons name="dns" size={20} color={lightColors.primary} />
@@ -242,7 +242,7 @@ const LocalApiSettingsTab: React.FC = () => {
 
       {/* Save button */}
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>Save Configuration</Text>
+        <Text style={styles.saveButtonText}>{t('settings.localApi.saveConfig')}</Text>
       </TouchableOpacity>
     </View>
   );

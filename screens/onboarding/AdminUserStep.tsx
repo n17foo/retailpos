@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TextInput, Button, Alert, ScrollView } from 're
 import PinKeypad from '../../components/PinKeypad';
 import PinDisplay from '../../components/PinDisplay';
 import { useUsers } from '../../hooks/useUsers';
+import { useTranslate } from '../../hooks/useTranslate';
 
 interface AdminUserStepProps {
   onBack: () => void;
@@ -13,6 +14,7 @@ const PIN_LENGTH = 6;
 
 const AdminUserStep: React.FC<AdminUserStepProps> = ({ onBack, onComplete }) => {
   const { createUser, isPinUnique, isLoading } = useUsers();
+  const { t } = useTranslate();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -55,11 +57,11 @@ const AdminUserStep: React.FC<AdminUserStepProps> = ({ onBack, onComplete }) => 
 
   const validateInfo = () => {
     if (!name.trim()) {
-      Alert.alert('Validation Error', 'Please enter your name.');
+      Alert.alert(t('common.validationError'), t('adminUser.validationNameRequired'));
       return false;
     }
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      Alert.alert('Validation Error', 'Please enter a valid email address.');
+      Alert.alert(t('common.validationError'), t('adminUser.validationEmailInvalid'));
       return false;
     }
     return true;
@@ -75,7 +77,7 @@ const AdminUserStep: React.FC<AdminUserStepProps> = ({ onBack, onComplete }) => 
     setError(null);
 
     if (pin !== confirmedPin) {
-      setError('PINs do not match. Please try again.');
+      setError(t('adminUser.pinMismatch'));
       setPin('');
       setConfirmPin('');
       setStep('pin');
@@ -86,7 +88,7 @@ const AdminUserStep: React.FC<AdminUserStepProps> = ({ onBack, onComplete }) => 
       // Check if PIN is unique
       const isUnique = await isPinUnique(pin);
       if (!isUnique) {
-        setError('This PIN is already in use. Please choose a different one.');
+        setError(t('adminUser.pinInUse'));
         setPin('');
         setConfirmPin('');
         setStep('pin');
@@ -101,11 +103,11 @@ const AdminUserStep: React.FC<AdminUserStepProps> = ({ onBack, onComplete }) => 
         role: 'admin',
       });
 
-      Alert.alert('Admin User Created', `Welcome, ${name}! Your admin account has been created. Use your 6-digit PIN to log in.`, [
-        { text: 'Continue', onPress: onComplete },
+      Alert.alert(t('adminUser.adminCreatedTitle'), t('adminUser.adminCreatedMessage', { name }), [
+        { text: t('common.continue'), onPress: onComplete },
       ]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create admin user');
+      setError(err instanceof Error ? err.message : t('adminUser.failedToCreate'));
       setPin('');
       setConfirmPin('');
       setStep('pin');
@@ -114,34 +116,38 @@ const AdminUserStep: React.FC<AdminUserStepProps> = ({ onBack, onComplete }) => 
 
   const renderInfoStep = () => (
     <View style={styles.formContainer}>
-      <Text style={styles.description}>
-        Create your administrator account. This will be the primary user with full access to all settings.
-      </Text>
+      <Text style={styles.description}>{t('adminUser.description')}</Text>
 
-      <Text style={styles.inputLabel}>Name *</Text>
-      <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Enter your name" autoCapitalize="words" />
+      <Text style={styles.inputLabel}>{t('adminUser.nameLabel')}</Text>
+      <TextInput
+        style={styles.input}
+        value={name}
+        onChangeText={setName}
+        placeholder={t('adminUser.namePlaceholder')}
+        autoCapitalize="words"
+      />
 
-      <Text style={styles.inputLabel}>Email (Optional)</Text>
+      <Text style={styles.inputLabel}>{t('adminUser.emailLabel')}</Text>
       <TextInput
         style={styles.input}
         value={email}
         onChangeText={setEmail}
-        placeholder="Enter your email"
+        placeholder={t('adminUser.emailPlaceholder')}
         keyboardType="email-address"
         autoCapitalize="none"
       />
 
       <View style={styles.buttonContainer}>
-        <Button title="Back" onPress={onBack} />
-        <Button title="Set PIN" onPress={handleContinueToPin} />
+        <Button title={t('common.back')} onPress={onBack} />
+        <Button title={t('adminUser.setPin')} onPress={handleContinueToPin} />
       </View>
     </View>
   );
 
   const renderPinStep = () => (
     <View style={styles.pinContainer}>
-      <Text style={styles.pinTitle}>Create Your PIN</Text>
-      <Text style={styles.pinDescription}>Enter a 6-digit PIN. You'll use this to log in to the POS system.</Text>
+      <Text style={styles.pinTitle}>{t('adminUser.createPin')}</Text>
+      <Text style={styles.pinDescription}>{t('adminUser.createPinDescription')}</Text>
 
       {error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -149,15 +155,15 @@ const AdminUserStep: React.FC<AdminUserStepProps> = ({ onBack, onComplete }) => 
       <PinKeypad onKeyPress={handleKeyPress} onDeletePress={handleDelete} disableBiometric />
 
       <View style={styles.buttonContainer}>
-        <Button title="Back" onPress={() => setStep('info')} />
+        <Button title={t('common.back')} onPress={() => setStep('info')} />
       </View>
     </View>
   );
 
   const renderConfirmStep = () => (
     <View style={styles.pinContainer}>
-      <Text style={styles.pinTitle}>Confirm Your PIN</Text>
-      <Text style={styles.pinDescription}>Re-enter your 6-digit PIN to confirm.</Text>
+      <Text style={styles.pinTitle}>{t('adminUser.confirmPin')}</Text>
+      <Text style={styles.pinDescription}>{t('adminUser.confirmPinDescription')}</Text>
 
       {error && <Text style={styles.errorText}>{error}</Text>}
 
@@ -166,7 +172,7 @@ const AdminUserStep: React.FC<AdminUserStepProps> = ({ onBack, onComplete }) => 
 
       <View style={styles.buttonContainer}>
         <Button
-          title="Back"
+          title={t('common.back')}
           onPress={() => {
             setConfirmPin('');
             setStep('pin');
@@ -174,13 +180,13 @@ const AdminUserStep: React.FC<AdminUserStepProps> = ({ onBack, onComplete }) => 
         />
       </View>
 
-      {isLoading && <Text style={styles.loadingText}>Creating account...</Text>}
+      {isLoading && <Text style={styles.loadingText}>{t('adminUser.creatingAccount')}</Text>}
     </View>
   );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Create Admin User</Text>
+      <Text style={styles.title}>{t('adminUser.title')}</Text>
 
       {step === 'info' && renderInfoStep()}
       {step === 'pin' && renderPinStep()}

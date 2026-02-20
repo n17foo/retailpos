@@ -4,6 +4,7 @@ import { lightColors, spacing, borderRadius, typography, elevation } from '../ut
 import { formatMoney } from '../utils/money';
 import { Button } from './Button';
 import { useCurrency } from '../hooks/useCurrency';
+import { useTranslate } from '../hooks/useTranslate';
 
 export type PaymentMethod = 'cash' | 'card' | 'terminal';
 
@@ -21,14 +22,15 @@ interface CheckoutModalProps {
   terminalConnected?: boolean;
 }
 
-const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: string; description: string }[] = [
-  { id: 'cash', label: 'Cash', icon: '💵', description: 'Accept cash payment' },
-  { id: 'card', label: 'Card', icon: '💳', description: 'Manual card entry' },
-  { id: 'terminal', label: 'Terminal', icon: '📱', description: 'NFC / Tap to pay' },
+const PAYMENT_METHOD_KEYS: { id: PaymentMethod; labelKey: string; icon: string; descriptionKey: string }[] = [
+  { id: 'cash', labelKey: 'checkout.cash', icon: '💵', descriptionKey: 'checkout.cashDescription' },
+  { id: 'card', labelKey: 'checkout.card', icon: '💳', descriptionKey: 'checkout.cardDescription' },
+  { id: 'terminal', labelKey: 'checkout.terminal', icon: '📱', descriptionKey: 'checkout.terminalDescription' },
 ];
 
 export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
   const currency = useCurrency();
+  const { t } = useTranslate();
   const {
     visible,
     orderId,
@@ -54,12 +56,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
         <View style={styles.modal}>
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Complete Order</Text>
+            <Text style={styles.headerTitle}>{t('checkout.completeOrder')}</Text>
             <TouchableOpacity
               onPress={onCancel}
               style={styles.closeButton}
               disabled={isProcessing}
-              accessibilityLabel="Cancel checkout"
+              accessibilityLabel={t('checkout.cancelCheckout')}
               accessibilityRole="button"
             >
               <Text style={styles.closeText}>✕</Text>
@@ -69,31 +71,33 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             {/* Order Summary */}
             <View style={styles.summaryCard}>
-              <Text style={styles.orderRef}>Order #{orderId.slice(-8)}</Text>
+              <Text style={styles.orderRef}>{t('checkout.orderRef', { ref: orderId.slice(-8) })}</Text>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Items</Text>
+                <Text style={styles.summaryLabel}>{t('checkout.items')}</Text>
                 <Text style={styles.summaryValue}>{itemCount}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Subtotal</Text>
+                <Text style={styles.summaryLabel}>{t('checkout.subtotal')}</Text>
                 <Text style={styles.summaryValue}>{formatMoney(orderSubtotal, currency.code)}</Text>
               </View>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Tax</Text>
+                <Text style={styles.summaryLabel}>{t('checkout.tax')}</Text>
                 <Text style={styles.summaryValue}>{formatMoney(orderTax, currency.code)}</Text>
               </View>
               <View style={[styles.summaryRow, styles.totalRow]}>
-                <Text style={styles.totalLabel}>Total</Text>
+                <Text style={styles.totalLabel}>{t('checkout.total')}</Text>
                 <Text style={styles.totalValue}>{formatMoney(orderTotal, currency.code)}</Text>
               </View>
             </View>
 
             {/* Payment Method Selection */}
-            <Text style={styles.sectionTitle}>Payment Method</Text>
+            <Text style={styles.sectionTitle}>{t('checkout.paymentMethod')}</Text>
             <View style={styles.paymentMethods}>
-              {PAYMENT_METHODS.map(method => {
+              {PAYMENT_METHOD_KEYS.map(method => {
                 const isSelected = selectedMethod === method.id;
                 const isDisabled = method.id === 'terminal' && !terminalConnected;
+                const label = t(method.labelKey);
+                const description = t(method.descriptionKey);
 
                 return (
                   <TouchableOpacity
@@ -102,15 +106,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
                     onPress={() => !isDisabled && setSelectedMethod(method.id)}
                     disabled={isDisabled}
                     activeOpacity={0.7}
-                    accessibilityLabel={`Pay with ${method.label}`}
+                    accessibilityLabel={t('checkout.payWith', { method: label })}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: isSelected, disabled: isDisabled }}
-                    accessibilityHint={isDisabled ? 'Terminal not connected' : method.description}
+                    accessibilityHint={isDisabled ? t('checkout.terminalNotConnected') : description}
                   >
                     <Text style={styles.paymentIcon}>{method.icon}</Text>
                     <View style={styles.paymentInfo}>
-                      <Text style={[styles.paymentLabel, isSelected && styles.paymentLabelSelected]}>{method.label}</Text>
-                      <Text style={styles.paymentDescription}>{isDisabled ? 'Terminal not connected' : method.description}</Text>
+                      <Text style={[styles.paymentLabel, isSelected && styles.paymentLabelSelected]}>{label}</Text>
+                      <Text style={styles.paymentDescription}>{isDisabled ? t('checkout.terminalNotConnected') : description}</Text>
                     </View>
                     {isSelected && <Text style={styles.checkIcon}>✓</Text>}
                   </TouchableOpacity>
@@ -122,10 +126,16 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
           {/* Actions */}
           <View style={styles.actions}>
             {onPrintReceipt && (
-              <Button title="Print Receipt" variant="outline" onPress={onPrintReceipt} disabled={isProcessing} style={styles.printButton} />
+              <Button
+                title={t('checkout.printReceipt')}
+                variant="outline"
+                onPress={onPrintReceipt}
+                disabled={isProcessing}
+                style={styles.printButton}
+              />
             )}
             <Button
-              title={isProcessing ? 'Processing...' : `Pay ${formatMoney(orderTotal, currency.code)}`}
+              title={isProcessing ? t('common.processing') : t('checkout.pay', { amount: formatMoney(orderTotal, currency.code) })}
               variant="success"
               size="lg"
               fullWidth

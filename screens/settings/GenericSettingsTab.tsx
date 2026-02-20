@@ -1,22 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useTranslate } from '../../hooks/useTranslate';
+import { availableLanguages } from '../../locales/i18n';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../../utils/theme';
 
-// Define available languages for the app
-const AVAILABLE_LANGUAGES = [
-  { code: 'en', name: 'English', nativeName: 'English' },
-  { code: 'es', name: 'Spanish', nativeName: 'Español' },
-  { code: 'fr', name: 'French', nativeName: 'Français' },
-  { code: 'de', name: 'German', nativeName: 'Deutsch' },
-  { code: 'it', name: 'Italian', nativeName: 'Italiano' },
-  { code: 'pt', name: 'Portuguese', nativeName: 'Português' },
-  { code: 'ar', name: 'Arabic', nativeName: 'العربية' },
-  { code: 'zh', name: 'Chinese', nativeName: '中文' },
-];
-
 const GenericSettingsTab = () => {
-  const { getCurrentLanguage, changeLanguage } = useTranslate();
+  const { t, getCurrentLanguage, changeLanguage } = useTranslate();
   const [selectedLanguage, setSelectedLanguage] = useState(getCurrentLanguage());
 
   // Update the selected language when the current language changes
@@ -33,19 +22,17 @@ const GenericSettingsTab = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Language Settings</Text>
-        <Text style={styles.sectionDescription}>Change the display language for the RetailPOS application</Text>
+        <Text style={styles.sectionTitle}>{t('settings.general.languageTitle')}</Text>
+        <Text style={styles.sectionDescription}>{t('settings.general.languageDescription')}</Text>
 
         <View style={styles.languageOptions}>
-          {AVAILABLE_LANGUAGES.map(lang => (
+          {availableLanguages.map(lang => (
             <TouchableOpacity
               key={lang.code}
               style={[styles.languageOption, selectedLanguage === lang.code && styles.selectedLanguageOption]}
               onPress={() => handleLanguageChange(lang.code)}
             >
-              <Text style={[styles.languageName, selectedLanguage === lang.code && styles.selectedLanguageText]}>
-                {lang.name} {lang.nativeName && `(${lang.nativeName})`}
-              </Text>
+              <Text style={[styles.languageName, selectedLanguage === lang.code && styles.selectedLanguageText]}>{lang.name}</Text>
               {selectedLanguage === lang.code && <Text style={styles.checkmark}>✓</Text>}
             </TouchableOpacity>
           ))}
@@ -53,12 +40,12 @@ const GenericSettingsTab = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Date & Time Format</Text>
-        <Text style={styles.sectionDescription}>Configure date and time display formats</Text>
+        <Text style={styles.sectionTitle}>{t('settings.general.dateTimeTitle')}</Text>
+        <Text style={styles.sectionDescription}>{t('settings.general.dateTimeDescription')}</Text>
 
         {/* Date format options would go here in a future implementation */}
         <View style={styles.comingSoon}>
-          <Text style={styles.comingSoonText}>Coming Soon</Text>
+          <Text style={styles.comingSoonText}>{t('common.comingSoon')}</Text>
         </View>
       </View>
     </ScrollView>

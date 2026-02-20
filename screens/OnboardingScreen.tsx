@@ -5,6 +5,7 @@ import { useOnboardingContext } from '../contexts/OnboardingProvider';
 import { useEcommerceSettings } from '../hooks/useEcommerceSettings';
 import { ProgressIndicator } from '../components/ProgressIndicator';
 import { spacing } from '../utils/theme';
+import { useTranslate } from '../hooks/useTranslate';
 
 import WelcomeStep from './onboarding/WelcomeStep';
 import PlatformSelectionStep from './onboarding/PlatformSelectionStep';
@@ -36,6 +37,7 @@ type OnboardingStep =
   | 'summary';
 
 const OnboardingScreen: React.FC = () => {
+  const { t } = useTranslate();
   const { setIsOnboarded } = useOnboardingContext();
   const { saveSettings, updateSettings: updateEcommerceSettings } = useEcommerceSettings();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>('welcome');
@@ -241,8 +243,31 @@ const OnboardingScreen: React.FC = () => {
   };
 
   const STEP_LABELS = isOffline
-    ? ['Welcome', 'Platform', 'Store Setup', 'Admin', 'Staff', 'Payment', 'Printer', 'Scanner', 'POS Config', 'Auth', 'Summary']
-    : ['Welcome', 'Platform', 'Configure', 'Payment', 'Printer', 'Scanner', 'POS Config', 'Auth', 'Admin', 'Summary'];
+    ? [
+        t('onboarding.steps.welcome'),
+        t('onboarding.steps.platform'),
+        t('onboarding.steps.storeSetup'),
+        t('onboarding.steps.admin'),
+        t('onboarding.steps.staff'),
+        t('onboarding.steps.payment'),
+        t('onboarding.steps.printer'),
+        t('onboarding.steps.scanner'),
+        t('onboarding.steps.posConfig'),
+        t('onboarding.steps.auth'),
+        t('onboarding.steps.summary'),
+      ]
+    : [
+        t('onboarding.steps.welcome'),
+        t('onboarding.steps.platform'),
+        t('onboarding.steps.configure'),
+        t('onboarding.steps.payment'),
+        t('onboarding.steps.printer'),
+        t('onboarding.steps.scanner'),
+        t('onboarding.steps.posConfig'),
+        t('onboarding.steps.auth'),
+        t('onboarding.steps.admin'),
+        t('onboarding.steps.summary'),
+      ];
   const STEP_ORDER: OnboardingStep[] = isOffline
     ? [
         'welcome',
