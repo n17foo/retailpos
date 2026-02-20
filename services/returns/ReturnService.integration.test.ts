@@ -96,9 +96,12 @@ describe('ReturnService - Integration Tests', () => {
       expect(result.refundId).toBe('refund-123');
 
       // Verify audit logging
-      expect(auditLogService.log).toHaveBeenCalledWith('return:created', expect.objectContaining({
-        userId: undefined,
-      }));
+      expect(auditLogService.log).toHaveBeenCalledWith(
+        'return:created',
+        expect.objectContaining({
+          userId: undefined,
+        })
+      );
 
       // Verify notification
       expect(notificationService.notify).toHaveBeenCalledWith(
@@ -159,9 +162,12 @@ describe('ReturnService - Integration Tests', () => {
         processedBy: 'cashier-1',
       });
 
-      expect(auditLogService.log).toHaveBeenCalledWith('return:created', expect.objectContaining({
-        userId: 'cashier-1',
-      }));
+      expect(auditLogService.log).toHaveBeenCalledWith(
+        'return:created',
+        expect.objectContaining({
+          userId: 'cashier-1',
+        })
+      );
     });
   });
 });

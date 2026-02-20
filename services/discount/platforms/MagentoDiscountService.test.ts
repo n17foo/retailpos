@@ -99,15 +99,20 @@ describe('MagentoDiscountService', () => {
       };
 
       let callCount = 0;
-      global.fetch = jest.fn()
-        .mockImplementationOnce(() => Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockSearchResponse),
-        }))
-        .mockImplementationOnce(() => Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockRuleResponse),
-        }));
+      global.fetch = jest
+        .fn()
+        .mockImplementationOnce(() =>
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(mockSearchResponse),
+          })
+        )
+        .mockImplementationOnce(() =>
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(mockRuleResponse),
+          })
+        );
 
       const result = await service.validateCoupon('TEST20', 100, []);
 
@@ -143,15 +148,20 @@ describe('MagentoDiscountService', () => {
       };
 
       let callCount = 0;
-      global.fetch = jest.fn()
-        .mockImplementationOnce(() => Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockSearchResponse),
-        }))
-        .mockImplementationOnce(() => Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockRuleResponse),
-        }));
+      global.fetch = jest
+        .fn()
+        .mockImplementationOnce(() =>
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(mockSearchResponse),
+          })
+        )
+        .mockImplementationOnce(() =>
+          Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve(mockRuleResponse),
+          })
+        );
 
       const result = await service.validateCoupon('FIXED10', 100, []);
       expect(result).toEqual({

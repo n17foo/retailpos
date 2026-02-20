@@ -59,11 +59,7 @@ describe('BackgroundSyncService - Notification Integration', () => {
       // Access private performSync via prototype
       await (service as any).performSync();
 
-      expect(notificationService.notify).toHaveBeenCalledWith(
-        'Orders Synced',
-        '2 order(s) synced successfully.',
-        'success'
-      );
+      expect(notificationService.notify).toHaveBeenCalledWith('Orders Synced', '2 order(s) synced successfully.', 'success');
     });
 
     it('should notify error when orders fail to sync', async () => {
@@ -90,11 +86,7 @@ describe('BackgroundSyncService - Notification Integration', () => {
 
       await (service as any).performSync();
 
-      expect(notificationService.notify).toHaveBeenCalledWith(
-        'Sync Error',
-        'Background sync encountered an error. Retrying…',
-        'warning'
-      );
+      expect(notificationService.notify).toHaveBeenCalledWith('Sync Error', 'Background sync encountered an error. Retrying…', 'warning');
     });
   });
 });

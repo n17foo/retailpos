@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { CameraView } from 'expo-camera';
 import { useProductsForDisplay } from '../hooks/useProducts';
-import { useBarcodeScannerService } from '../hooks/useBarcodeScannerService';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../utils/theme';
 
 interface BarcodeScannerScreenProps {
@@ -23,7 +23,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({ onSc
 
   // Use our custom hook for barcode scanner functionality
   const { hasPermission, scanned, connected, connecting, setScanned, connectScanner, disconnectScanner, handleBarCodeScanned } =
-    useBarcodeScannerService({
+    useBarcodeScanner({
       scannerSettings,
       products,
       onScanSuccess,

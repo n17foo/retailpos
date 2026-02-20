@@ -98,7 +98,7 @@ describe('SquarespaceCustomerService', () => {
         firstName: 'John',
         lastName: 'Doe',
         orderCount: 3,
-        totalSpent: 150.00,
+        totalSpent: 150.0,
         createdAt: new Date('2024-01-01T00:00:00Z'),
       });
       expect(result.hasMore).toBe(false);
@@ -165,7 +165,7 @@ describe('SquarespaceCustomerService', () => {
         firstName: 'Jane',
         lastName: 'Smith',
         orderCount: 5,
-        totalSpent: 250.00,
+        totalSpent: 250.0,
         createdAt: new Date('2024-01-01T00:00:00Z'),
       });
     });

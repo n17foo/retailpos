@@ -4,6 +4,13 @@ import { useScannerSettings, ScannerSettings } from '../../hooks/useScannerSetti
 import { lightColors, spacing, borderRadius, typography, elevation } from '../../utils/theme';
 import { Button } from '../../components/Button';
 
+const SCANNER_TYPE_OPTIONS = [
+  { value: 'camera', label: 'Camera' },
+  { value: 'bluetooth', label: 'Bluetooth' },
+  { value: 'usb', label: 'USB' },
+  { value: 'qr_hardware', label: 'QR Hardware' },
+] as const;
+
 const ScannerSettingsTab: React.FC = () => {
   const { scannerSettings, handleScannerSettingsChange, saveSettings, testConnection, isLoading, error, saveStatus, loadSettings } =
     useScannerSettings();
@@ -91,15 +98,30 @@ const ScannerSettingsTab: React.FC = () => {
             />
           </View>
 
-          <View style={styles.optionRow}>
+          <View style={styles.inputGroup}>
             <Text style={styles.label}>Scanner Type</Text>
-            <TextInput
-              style={styles.input}
-              value={formValues.type}
-              onChangeText={value => handleInputChange('type', value)}
-              placeholder="e.g., bluetooth, usb"
-              editable={!isLoading}
-            />
+            <View style={styles.typeSelector}>
+              {SCANNER_TYPE_OPTIONS.map(option => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[styles.typeOption, formValues.type === option.value && styles.typeOptionActive, isLoading && styles.disabled]}
+                  onPress={() => handleInputChange('type', option.value)}
+                  disabled={isLoading}
+                >
+                  <Text style={[styles.typeOptionText, formValues.type === option.value && styles.typeOptionTextActive]}>
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {formValues.type === 'qr_hardware' && (
+              <Text style={styles.typeHint}>
+                Dedicated QR code reader for desktop apps (USB or Bluetooth). Required when camera is not available.
+              </Text>
+            )}
+            {formValues.type === 'camera' && (
+              <Text style={styles.typeHint}>Uses device camera for barcode and QR scanning. Available on mobile and tablet only.</Text>
+            )}
           </View>
 
           <View style={styles.optionRow}>
@@ -302,6 +324,39 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     backgroundColor: `${lightColors.success}15`,
     borderRadius: borderRadius.sm,
+  },
+
+  // Type Selector
+  typeSelector: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: spacing.xs,
+  },
+  typeOption: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: lightColors.border,
+    backgroundColor: lightColors.background,
+  },
+  typeOptionActive: {
+    backgroundColor: lightColors.primary,
+    borderColor: lightColors.primary,
+  },
+  typeOptionText: {
+    fontSize: typography.fontSize.sm,
+    color: lightColors.textSecondary,
+  },
+  typeOptionTextActive: {
+    color: lightColors.textOnPrimary,
+    fontWeight: typography.fontWeight.medium as '500',
+  },
+  typeHint: {
+    fontSize: typography.fontSize.xs,
+    color: lightColors.textSecondary,
+    marginTop: spacing.xs,
+    fontStyle: 'italic' as const,
   },
 });
 

@@ -7,6 +7,13 @@ interface ScannerSetupStepProps {
   onComplete: () => void;
 }
 
+const SCANNER_TYPE_OPTIONS = [
+  { value: 'camera', label: 'Camera' },
+  { value: 'bluetooth', label: 'Bluetooth' },
+  { value: 'usb', label: 'USB' },
+  { value: 'qr_hardware', label: 'QR Hardware' },
+] as const;
+
 const ScannerSetupStep: React.FC<ScannerSetupStepProps> = ({ onBack, onComplete }) => {
   const { scannerSettings, handleScannerSettingsChange, saveSettings, testConnection, isLoading, loadSettings } = useScannerSettings();
 
@@ -50,8 +57,8 @@ const ScannerSetupStep: React.FC<ScannerSetupStepProps> = ({ onBack, onComplete 
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Configure Barcode Scanner</Text>
-      <Text style={styles.subtitle}>Set up your device for scanning products.</Text>
+      <Text style={styles.title}>Configure Scanner</Text>
+      <Text style={styles.subtitle}>Set up your device for scanning barcodes and QR codes.</Text>
 
       {isLoading ? (
         <ActivityIndicator size="large" />
@@ -63,22 +70,45 @@ const ScannerSetupStep: React.FC<ScannerSetupStepProps> = ({ onBack, onComplete 
           </View>
 
           <Text style={styles.label}>Scanner Type</Text>
-          <TextInput
-            style={styles.input}
-            value={scannerSettings.type}
-            onChangeText={value => handleInputChange('type', value)}
-            placeholder="e.g., bluetooth, usb"
-            editable={scannerSettings.enabled}
-          />
+          <View style={styles.typeSelector}>
+            {SCANNER_TYPE_OPTIONS.map(option => (
+              <TouchableOpacity
+                key={option.value}
+                style={[
+                  styles.typeOption,
+                  scannerSettings.type === option.value && styles.typeOptionActive,
+                  !scannerSettings.enabled && styles.typeOptionDisabled,
+                ]}
+                onPress={() => handleInputChange('type', option.value)}
+                disabled={!scannerSettings.enabled}
+              >
+                <Text style={[styles.typeOptionText, scannerSettings.type === option.value && styles.typeOptionTextActive]}>
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {scannerSettings.type === 'qr_hardware' && (
+            <Text style={styles.typeHint}>
+              Dedicated QR code reader (USB/Bluetooth). Required for desktop apps where camera is unavailable.
+            </Text>
+          )}
+          {scannerSettings.type === 'camera' && (
+            <Text style={styles.typeHint}>Uses device camera. Available on mobile and tablet only.</Text>
+          )}
 
-          <Text style={styles.label}>Device ID</Text>
-          <TextInput
-            style={styles.input}
-            value={scannerSettings.deviceId}
-            onChangeText={value => handleInputChange('deviceId', value)}
-            placeholder="Enter device ID"
-            editable={scannerSettings.enabled}
-          />
+          {scannerSettings.type !== 'camera' && (
+            <>
+              <Text style={styles.label}>Device ID</Text>
+              <TextInput
+                style={styles.input}
+                value={scannerSettings.deviceId}
+                onChangeText={value => handleInputChange('deviceId', value)}
+                placeholder="Enter device ID"
+                editable={scannerSettings.enabled}
+              />
+            </>
+          )}
           <Button title="Test Connection" onPress={handleTestConnection} disabled={!scannerSettings.enabled} />
         </View>
       )}
@@ -136,6 +166,41 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     width: '100%',
     marginTop: 20,
+  },
+  typeSelector: {
+    flexDirection: 'row' as const,
+    flexWrap: 'wrap' as const,
+    gap: 8,
+    marginBottom: 20,
+  },
+  typeOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    backgroundColor: '#f9f9f9',
+  },
+  typeOptionActive: {
+    backgroundColor: '#0a84ff',
+    borderColor: '#0a84ff',
+  },
+  typeOptionDisabled: {
+    opacity: 0.5,
+  },
+  typeOptionText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  typeOptionTextActive: {
+    color: '#fff',
+    fontWeight: '500' as const,
+  },
+  typeHint: {
+    fontSize: 12,
+    color: '#888',
+    marginBottom: 16,
+    fontStyle: 'italic' as const,
   },
 });
 

@@ -17,8 +17,12 @@ jest.mock('../../repositories/KeyValueRepository', () => {
   return {
     keyValueRepository: {
       get: jest.fn(async (key: string) => store[key] ?? null),
-      set: jest.fn(async (key: string, value: string) => { store[key] = value; }),
-      delete: jest.fn(async (key: string) => { delete store[key]; }),
+      set: jest.fn(async (key: string, value: string) => {
+        store[key] = value;
+      }),
+      delete: jest.fn(async (key: string) => {
+        delete store[key];
+      }),
     },
   };
 });

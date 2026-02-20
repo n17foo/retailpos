@@ -4,7 +4,25 @@ import { ScannerServiceFactory, ScannerType as ScannerTypeEnum } from '../servic
 import { ScannerServiceInterface } from '../services/scanner/ScannerServiceInterface';
 import { useLogger } from '../hooks/useLogger';
 
-export type ScannerType = 'camera' | 'bluetooth' | 'usb';
+export type ScannerType = 'camera' | 'bluetooth' | 'usb' | 'qr_hardware';
+
+/**
+ * Map hook-level scanner type string to the factory enum value.
+ */
+function toFactoryType(type: ScannerType): ScannerTypeEnum | null {
+  switch (type) {
+    case 'bluetooth':
+      return ScannerTypeEnum.BLUETOOTH;
+    case 'usb':
+      return ScannerTypeEnum.USB;
+    case 'qr_hardware':
+      return ScannerTypeEnum.QR_HARDWARE;
+    case 'camera':
+      return null; // camera handled separately
+    default:
+      return null;
+  }
+}
 
 export interface ScannerSettings {
   enabled: boolean;
@@ -75,7 +93,11 @@ export const useScanner = () => {
 
         try {
           // Get the appropriate scanner service based on the scanner type
-          const scannerType = scannerSettings.type === 'bluetooth' ? ScannerTypeEnum.BLUETOOTH : ScannerTypeEnum.USB;
+          const scannerType = toFactoryType(scannerSettings.type);
+          if (!scannerType) {
+            logger.error(`Unsupported external scanner type: ${scannerSettings.type}`);
+            return false;
+          }
 
           const service = scannerFactory.getService(scannerType);
           if (!service) {
@@ -92,7 +114,7 @@ export const useScanner = () => {
             return false;
           }
 
-          // Start listening for barcode scans
+          // Start listening for scans (barcode or QR)
           const listenerId = service.startScanListener((data: string) => {
             callback(data);
           });
@@ -143,7 +165,10 @@ export const useScanner = () => {
       return [];
     }
 
-    const scannerType = scannerSettings.type === 'bluetooth' ? ScannerTypeEnum.BLUETOOTH : ScannerTypeEnum.USB;
+    const scannerType = toFactoryType(scannerSettings.type);
+    if (!scannerType) {
+      return [];
+    }
 
     const service = scannerFactory.getService(scannerType);
     if (!service) {
@@ -160,7 +185,10 @@ export const useScanner = () => {
       return true; // Camera is always available if permissions are granted
     }
 
-    const scannerType = scannerSettings.type === 'bluetooth' ? ScannerTypeEnum.BLUETOOTH : ScannerTypeEnum.USB;
+    const scannerType = toFactoryType(scannerSettings.type);
+    if (!scannerType) {
+      return false;
+    }
 
     const service = scannerFactory.getService(scannerType);
     if (!service) {

@@ -5,6 +5,8 @@ import { USBScannerMockService } from './mock/USBScannerMockService';
 import { CameraScannerService } from './CameraScannerService';
 import { BluetoothScannerService } from './BluetoothScannerService';
 import { USBScannerService } from './USBScannerService';
+import { QRHardwareScannerService } from './QRHardwareScannerService';
+import { QRHardwareScannerMockService } from './mock/QRHardwareScannerMockService';
 import { LoggerFactory } from '../logger/loggerFactory';
 import { USE_MOCK_SCANNER } from '@env';
 
@@ -15,6 +17,7 @@ export enum ScannerType {
   CAMERA = 'camera',
   BLUETOOTH = 'bluetooth',
   USB = 'usb',
+  QR_HARDWARE = 'qr_hardware',
 }
 
 /**
@@ -41,6 +44,7 @@ export class ScannerServiceFactory {
     this.services.set(ScannerType.CAMERA, useMock ? CameraScannerMockService.getInstance() : new CameraScannerService());
     this.services.set(ScannerType.BLUETOOTH, useMock ? BluetoothScannerMockService.getInstance() : new BluetoothScannerService());
     this.services.set(ScannerType.USB, useMock ? USBScannerMockService.getInstance() : new USBScannerService());
+    this.services.set(ScannerType.QR_HARDWARE, useMock ? QRHardwareScannerMockService.getInstance() : new QRHardwareScannerService());
   }
 
   /**

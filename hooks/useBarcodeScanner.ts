@@ -7,7 +7,7 @@ import { formatMoney } from '../utils/money';
 import { useCurrency } from './useCurrency';
 
 interface ScannerSettings {
-  type: 'camera' | 'bluetooth' | 'usb';
+  type: 'camera' | 'bluetooth' | 'usb' | 'qr_hardware';
   deviceId?: string;
 }
 
@@ -25,7 +25,7 @@ interface UseBarcodeScannerServiceProps {
   onScanSuccess: (productId: string) => void;
 }
 
-export const useBarcodeScannerService = ({ scannerSettings, products, onScanSuccess }: UseBarcodeScannerServiceProps) => {
+export const useBarcodeScanner = ({ scannerSettings, products, onScanSuccess }: UseBarcodeScannerServiceProps) => {
   const currency = useCurrency();
   // Scanner state
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -131,12 +131,21 @@ export const useBarcodeScannerService = ({ scannerSettings, products, onScanSucc
 
       await executeScannerOperation('initializing scanner', async () => {
         // Get the appropriate scanner type
-        const scannerType =
-          scannerSettings.type === 'camera'
-            ? ScannerType.CAMERA
-            : scannerSettings.type === 'bluetooth'
-              ? ScannerType.BLUETOOTH
-              : ScannerType.USB;
+        let scannerType: ScannerType;
+        switch (scannerSettings.type) {
+          case 'camera':
+            scannerType = ScannerType.CAMERA;
+            break;
+          case 'bluetooth':
+            scannerType = ScannerType.BLUETOOTH;
+            break;
+          case 'qr_hardware':
+            scannerType = ScannerType.QR_HARDWARE;
+            break;
+          default:
+            scannerType = ScannerType.USB;
+            break;
+        }
 
         // Get the scanner service from the factory
         const scannerService = scannerFactory.getService(scannerType);
