@@ -40,7 +40,7 @@ export type MoreStackParamList = {
   Refund: undefined;
   Printer: undefined;
   PaymentTerminal: { amount?: number; items?: { id: string; name: string; price: number; quantity: number }[] };
-  DailyOrders: undefined;
+  OrderHistory: undefined;
   SyncQueue: undefined;
   Reports: undefined;
 };

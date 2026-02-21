@@ -66,25 +66,29 @@ const ProductCardInner: React.FC<ProductCardProps> = ({
     <TouchableOpacity
       style={[styles.card, { width: cardWidth }, isInCart && styles.cardInCart, isOutOfStock && styles.cardOutOfStock]}
       onPress={handleCardPress}
-      activeOpacity={0.7}
+      activeOpacity={0.75}
       disabled={isOutOfStock}
+      accessibilityLabel={`${name}, ${formatMoney(priceProp, currency.code)}${isOutOfStock ? ', out of stock' : ''}`}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isOutOfStock }}
     >
       <View style={styles.imageContainer}>
         <Image source={image} style={styles.image} resizeMode="cover" />
 
+        {/* Quantity badge — top-right corner */}
         {isInCart && (
           <View style={styles.quantityBadge}>
             <Text style={styles.quantityBadgeText}>{quantity}</Text>
           </View>
         )}
 
-        {/* Stock indicator */}
+        {/* Stock indicators */}
         {isOutOfStock && (
           <View style={styles.outOfStockOverlay}>
             <Text style={styles.outOfStockText}>Out of Stock</Text>
           </View>
         )}
-        {isLowStock && !isInCart && (
+        {isLowStock && !isOutOfStock && (
           <View style={styles.lowStockBadge}>
             <Text style={styles.lowStockText}>{stock} left</Text>
           </View>
@@ -98,13 +102,26 @@ const ProductCardInner: React.FC<ProductCardProps> = ({
         <Text style={styles.price}>{formatMoney(priceProp, currency.code)}</Text>
       </View>
 
+      {/* Quantity controls — always below info, never overlapping */}
       {isInCart && (
-        <View style={styles.quantityOverlay}>
-          <TouchableOpacity style={styles.quantityButton} onPress={handleDecrement} activeOpacity={0.8}>
+        <View style={styles.quantityBar}>
+          <TouchableOpacity
+            style={styles.quantityButton}
+            onPress={handleDecrement}
+            activeOpacity={0.8}
+            accessibilityLabel={`Decrease quantity of ${name}`}
+            accessibilityRole="button"
+          >
             <Text style={styles.quantityButtonText}>−</Text>
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quantityButton} onPress={handleIncrement} activeOpacity={0.8}>
+          <Text style={styles.quantityCount}>{quantity}</Text>
+          <TouchableOpacity
+            style={styles.quantityButton}
+            onPress={handleIncrement}
+            activeOpacity={0.8}
+            accessibilityLabel={`Increase quantity of ${name}`}
+            accessibilityRole="button"
+          >
             <Text style={styles.quantityButtonText}>+</Text>
           </TouchableOpacity>
         </View>
@@ -129,11 +146,11 @@ const styles = StyleSheet.create({
     borderColor: lightColors.primary,
   },
   cardOutOfStock: {
-    opacity: 0.6,
+    opacity: 0.55,
   },
   imageContainer: {
     width: '100%',
-    height: 120,
+    height: 130,
     position: 'relative',
   },
   image: {
@@ -146,8 +163,8 @@ const styles = StyleSheet.create({
     right: spacing.xs,
     backgroundColor: lightColors.primary,
     borderRadius: borderRadius.round,
-    minWidth: 28,
-    height: 28,
+    minWidth: 26,
+    height: 26,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.xs,
@@ -159,7 +176,7 @@ const styles = StyleSheet.create({
   },
   outOfStockOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -167,6 +184,7 @@ const styles = StyleSheet.create({
     color: lightColors.textOnPrimary,
     fontSize: typography.fontSize.sm,
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
   lowStockBadge: {
     position: 'absolute',
@@ -184,6 +202,7 @@ const styles = StyleSheet.create({
   },
   infoContainer: {
     padding: spacing.sm,
+    paddingBottom: spacing.xs,
     alignItems: 'center',
   },
   name: {
@@ -192,27 +211,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: spacing.xs,
     color: lightColors.textPrimary,
-    height: 36,
+    minHeight: 34,
   },
   price: {
     fontSize: typography.fontSize.md,
     fontWeight: '700',
     color: lightColors.primary,
   },
-  quantityOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  /* Quantity controls — a dedicated bar below the info section */
+  quantityBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: lightColors.primary + '12',
+    borderTopWidth: 1,
+    borderTopColor: lightColors.primary + '30',
     paddingHorizontal: spacing.xs,
-    paddingBottom: spacing.xs,
+    paddingVertical: spacing.xs,
   },
   quantityButton: {
     backgroundColor: lightColors.primary,
-    width: 32,
-    height: 32,
+    width: 34,
+    height: 34,
     borderRadius: borderRadius.sm,
     alignItems: 'center',
     justifyContent: 'center',
@@ -221,5 +241,13 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.lg,
     fontWeight: '700',
     color: lightColors.textOnPrimary,
+    lineHeight: 22,
+  },
+  quantityCount: {
+    fontSize: typography.fontSize.md,
+    fontWeight: '700',
+    color: lightColors.primary,
+    minWidth: 28,
+    textAlign: 'center',
   },
 });

@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
-import { lightColors, spacing, typography } from '../utils/theme';
+import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { lightColors, spacing, typography, borderRadius } from '../utils/theme';
 import { Basket } from './order/Basket';
 import { ProductGrid } from './order/ProductGrid';
 import { Header } from './order/Header';
@@ -21,7 +22,7 @@ interface OrderScreenProps {
 }
 
 const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
-  const { selectedCategory, selectedCategoryName } = useCategoryContext();
+  const { selectedCategory, selectedCategoryName, setSelectedCategory, setSelectedCategoryName } = useCategoryContext();
   const { cartItems, cartItemsMap, addToCart, updateQuantity, itemCount } = useBasketContext();
   const { isMobile, isTabletOrDesktop, width } = useResponsive();
   const [searchQuery, setSearchQuery] = useState('');
@@ -86,10 +87,29 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
 
   const renderProductArea = () => (
     <View style={styles.productArea}>
-      {/* Inline search bar for tablet/desktop */}
-      {isTabletOrDesktop && (
-        <View style={styles.searchContainer}>
-          <SearchBar placeholder="Search products..." onSearch={setSearchQuery} />
+      {/* Search bar — shown on all screen sizes */}
+      <View style={styles.searchContainer}>
+        <SearchBar placeholder="Search products..." onSearch={setSearchQuery} value={searchQuery} />
+      </View>
+
+      {/* Active category chip */}
+      {selectedCategoryName && (
+        <View style={styles.activeCategoryBar}>
+          <MaterialIcons name="folder" size={14} color={lightColors.primary} />
+          <Text style={styles.activeCategoryText} numberOfLines={1}>
+            {selectedCategoryName}
+          </Text>
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedCategory(null);
+              setSelectedCategoryName(null);
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Clear category filter"
+            accessibilityRole="button"
+          >
+            <MaterialIcons name="close" size={14} color={lightColors.textSecondary} />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -97,6 +117,30 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={lightColors.primary} />
           <Text style={styles.loadingText}>Loading products...</Text>
+        </View>
+      ) : filteredProducts.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <MaterialIcons name="search-off" size={56} color={lightColors.textSecondary} />
+          <Text style={styles.emptyTitle}>{searchQuery ? 'No results found' : 'No products'}</Text>
+          <Text style={styles.emptySubtitle}>
+            {searchQuery
+              ? `No products match "${searchQuery}"`
+              : selectedCategoryName
+                ? `No products in "${selectedCategoryName}"`
+                : 'Add products to your catalogue to get started'}
+          </Text>
+          {(searchQuery || selectedCategoryName) && (
+            <TouchableOpacity
+              style={styles.clearFilterButton}
+              onPress={() => {
+                setSearchQuery('');
+                setSelectedCategory(null);
+                setSelectedCategoryName(null);
+              }}
+            >
+              <Text style={styles.clearFilterText}>Clear filters</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <ProductGrid products={filteredProducts} onAddToCart={handleAddToCart} cartItems={cartItemsMap} numColumns={numColumns} />
@@ -122,7 +166,14 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
 
           {/* Right sidebar: Basket (always visible) */}
           <View style={[styles.sidebar, styles.basketSidebar, { width: sidebarWidths.basket }]}>
-            <Text style={styles.sidebarTitle}>Cart {itemCount > 0 ? `(${itemCount})` : ''}</Text>
+            <View style={styles.sidebarTitleRow}>
+              <Text style={styles.sidebarTitle}>Cart</Text>
+              {itemCount > 0 && (
+                <View style={styles.sidebarBadge}>
+                  <Text style={styles.sidebarBadgeText}>{itemCount}</Text>
+                </View>
+              )}
+            </View>
             <BasketContent platform={currentPlatform ?? undefined} />
           </View>
         </View>
@@ -164,13 +215,32 @@ const styles = StyleSheet.create({
   basketSidebar: {
     borderLeftWidth: 1,
   },
+  sidebarTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: lightColors.border,
+    gap: spacing.xs,
+  },
   sidebarTitle: {
     fontSize: typography.fontSize.md,
     fontWeight: '700',
     color: lightColors.textPrimary,
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: lightColors.border,
+  },
+  sidebarBadge: {
+    backgroundColor: lightColors.primary,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  sidebarBadgeText: {
+    color: lightColors.textOnPrimary,
+    fontSize: 11,
+    fontWeight: '700',
   },
   mainContent: {
     flex: 1,
@@ -185,7 +255,23 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     padding: spacing.sm,
-    paddingBottom: 0,
+    paddingBottom: spacing.xs,
+  },
+  activeCategoryBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: lightColors.primary + '12',
+    borderBottomWidth: 1,
+    borderBottomColor: lightColors.primary + '25',
+  },
+  activeCategoryText: {
+    flex: 1,
+    fontSize: typography.fontSize.sm,
+    fontWeight: '600',
+    color: lightColors.primary,
   },
   loadingContainer: {
     flex: 1,
@@ -197,6 +283,38 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     fontSize: typography.fontSize.md,
     color: lightColors.textSecondary,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+    backgroundColor: lightColors.background,
+  },
+  emptyTitle: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: '600',
+    color: lightColors.textPrimary,
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+  },
+  emptySubtitle: {
+    fontSize: typography.fontSize.md,
+    color: lightColors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  clearFilterButton: {
+    marginTop: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: lightColors.primary,
+    borderRadius: borderRadius.md,
+  },
+  clearFilterText: {
+    color: lightColors.textOnPrimary,
+    fontWeight: '600',
+    fontSize: typography.fontSize.md,
   },
 });
 

@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useSearch } from '../hooks/useSearch';
 import { SearchOptions, SearchProduct } from '../services/search/SearchServiceInterface';
-import { lightColors, spacing, typography } from '../utils/theme';
-import { Button } from '../components/Button';
+import { lightColors, spacing, typography, borderRadius } from '../utils/theme';
 import SearchHeader from './search/SearchHeader';
 import FilterPanel from './search/FilterPanel';
 import ProductResultItem from './search/ProductResultItem';
@@ -111,10 +110,12 @@ const SearchScreen: React.FC<SearchScreenProps> = ({ onGoBack, onSelectProduct }
 
   return (
     <View style={styles.container}>
-      {/* Back button in header */}
+      {/* Back button row */}
       {onGoBack && (
-        <View style={styles.backButton}>
-          <Button title="← Back" variant="ghost" size="sm" onPress={onGoBack} />
+        <View style={styles.backRow}>
+          <TouchableOpacity onPress={onGoBack} style={styles.backButton} accessibilityLabel="Go back" accessibilityRole="button">
+            <MaterialIcons name="arrow-back" size={24} color={lightColors.primary} />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -138,12 +139,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: lightColors.background,
   },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingTop: spacing.sm,
+    backgroundColor: lightColors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: lightColors.border,
+  },
   backButton: {
-    position: 'absolute' as 'absolute',
-    top: spacing.md,
-    left: spacing.md,
-    zIndex: 10,
-    padding: spacing.xs,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.sm,
   },
   centerContainer: {
     flex: 1,

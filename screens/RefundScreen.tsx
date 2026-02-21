@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Alert, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../utils/theme';
 import { formatMoney } from '../utils/money';
 import { useRefund } from '../hooks/useRefund';
@@ -45,31 +46,38 @@ const RefundScreen: React.FC<RefundScreenProps> = ({ onGoBack }) => {
     fetchRefundHistory();
   }, [orderId, transactionId, refundType, getRefundHistory]);
 
+  const [formError, setFormError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
   const handleProcessRefund = async () => {
+    setFormError(null);
+    setSuccessMsg(null);
+
     if (!isInitialized) {
-      Alert.alert('Error', 'Refund service is not initialized');
+      setFormError('Refund service is not initialized.');
       return;
     }
 
     if (refundType === 'payment') {
       if (!transactionId || !amount) {
-        Alert.alert('Error', 'Transaction ID and amount are required');
+        setFormError('Transaction ID and amount are required.');
         return;
       }
 
       const result = await processPaymentRefund(transactionId, parseFloat(amount), reason);
 
       if (result.success) {
-        Alert.alert('Success', `Refund processed successfully for $${amount}`);
-        // Refresh refund history
+        setSuccessMsg(`Refund of ${formatMoney(parseFloat(amount), currency.code)} processed successfully.`);
         const history = await getRefundHistory(transactionId);
         setRefundHistory(history);
+        setAmount('');
+        setReason('');
       } else {
-        Alert.alert('Error', result.error || 'Failed to process refund');
+        setFormError(result.error || 'Failed to process refund.');
       }
     } else {
       if (!orderId || !amount) {
-        Alert.alert('Error', 'Order ID and amount are required');
+        setFormError('Order ID and amount are required.');
         return;
       }
 
@@ -79,37 +87,73 @@ const RefundScreen: React.FC<RefundScreenProps> = ({ onGoBack }) => {
       });
 
       if (result.success) {
-        Alert.alert('Success', `E-commerce refund processed successfully for $${amount}`);
-        // Refresh refund history
+        setSuccessMsg(`E-commerce refund of ${formatMoney(parseFloat(amount), currency.code)} processed successfully.`);
         const history = await getRefundHistory(orderId);
         setRefundHistory(history);
+        setAmount('');
+        setReason('');
       } else {
-        Alert.alert('Error', result.error || 'Failed to process e-commerce refund');
+        setFormError(result.error || 'Failed to process e-commerce refund.');
       }
     }
   };
 
-  const renderRefundHistoryItem = ({ item }: { item: RefundRecord }) => (
-    <View style={styles.historyItem}>
-      <Text style={styles.historyId}>ID: {item.id}</Text>
-      <Text style={styles.historyAmount}>Amount: {formatMoney(item.amount, currency.code)}</Text>
-      <Text style={styles.historyDate}>Date: {item.timestamp.toLocaleString()}</Text>
-      <Text style={styles.historySource}>Source: {item.source}</Text>
-      <Text style={styles.historyStatus}>Status: {item.status}</Text>
-      {item.reason && <Text style={styles.historyReason}>Reason: {item.reason}</Text>}
-    </View>
-  );
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return lightColors.success;
+      case 'failed':
+        return lightColors.error;
+      default:
+        return lightColors.warning;
+    }
+  };
+
+  const renderRefundHistoryItem = ({ item }: { item: RefundRecord }) => {
+    const statusColor = getStatusColor(item.status);
+    return (
+      <View style={styles.historyItem}>
+        <View style={styles.historyHeader}>
+          <Text style={styles.historyId}>#{item.id.slice(-8)}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
+            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <Text style={[styles.statusText, { color: statusColor }]}>{item.status}</Text>
+          </View>
+        </View>
+        <Text style={styles.historyAmount}>{formatMoney(item.amount, currency.code)}</Text>
+        <Text style={styles.historyMeta}>
+          {item.timestamp.toLocaleString()} · {item.source}
+        </Text>
+        {item.reason && <Text style={styles.historyReason}>{item.reason}</Text>}
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        {onGoBack && (
+          <TouchableOpacity onPress={onGoBack} style={styles.backButton} accessibilityLabel="Go back" accessibilityRole="button">
+            <MaterialIcons name="arrow-back" size={24} color={lightColors.primary} />
+          </TouchableOpacity>
+        )}
         <Text style={styles.title}>Process Refund</Text>
-        {onGoBack && <Button title="← Back" variant="ghost" size="sm" onPress={onGoBack} />}
       </View>
 
-      {error && (
+      {(error || formError) && (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
+          <MaterialIcons name="error-outline" size={16} color={lightColors.error} />
+          <Text style={styles.errorText}>{formError || error}</Text>
+          <TouchableOpacity onPress={() => setFormError(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <MaterialIcons name="close" size={16} color={lightColors.error} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {successMsg && (
+        <View style={styles.successContainer}>
+          <MaterialIcons name="check-circle" size={16} color={lightColors.success} />
+          <Text style={styles.successText}>{successMsg}</Text>
         </View>
       )}
 
@@ -180,57 +224,68 @@ const RefundScreen: React.FC<RefundScreenProps> = ({ onGoBack }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: spacing.md,
     backgroundColor: lightColors.background,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    gap: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: lightColors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: lightColors.border,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: typography.fontSize.xl,
     fontWeight: '700',
     color: lightColors.textPrimary,
   },
-  backButton: {
-    padding: spacing.xs,
-  },
-  backButtonText: {
-    color: lightColors.primary,
-    fontSize: typography.fontSize.md,
-  },
   errorContainer: {
-    backgroundColor: lightColors.error + '20', // 20 is the hex for 12% opacity
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    margin: spacing.md,
+    marginBottom: 0,
     padding: spacing.sm,
+    backgroundColor: lightColors.error + '15',
     borderRadius: borderRadius.sm,
-    marginBottom: spacing.md,
   },
   errorText: {
+    flex: 1,
     color: lightColors.error,
+    fontSize: typography.fontSize.sm,
+  },
+  successContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    margin: spacing.md,
+    marginBottom: 0,
+    padding: spacing.sm,
+    backgroundColor: lightColors.success + '15',
+    borderRadius: borderRadius.sm,
+  },
+  successText: {
+    flex: 1,
+    color: lightColors.success,
+    fontSize: typography.fontSize.sm,
+  },
+  scrollContent: {
+    padding: spacing.md,
   },
   refundTypeSelector: {
     flexDirection: 'row',
     marginBottom: spacing.md,
+    gap: spacing.xs,
   },
   typeButton: {
     flex: 1,
-    padding: spacing.sm,
-    alignItems: 'center',
-    backgroundColor: lightColors.border,
-    marginHorizontal: spacing.xs,
-    borderRadius: borderRadius.sm,
-  },
-  selectedType: {
-    backgroundColor: lightColors.primary,
-  },
-  typeButtonText: {
-    fontWeight: '500',
-    color: lightColors.textPrimary,
-  },
-  selectedTypeText: {
-    color: lightColors.textOnPrimary,
   },
   formContainer: {
     backgroundColor: lightColors.surface,
@@ -291,36 +346,50 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xs,
     ...elevation.low,
   },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
   historyId: {
     fontSize: typography.fontSize.sm,
     color: lightColors.textSecondary,
-    marginBottom: spacing.xs,
+    fontWeight: '600',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4,
+  },
+  statusText: {
+    fontSize: typography.fontSize.xs,
+    fontWeight: '600',
+    textTransform: 'capitalize',
   },
   historyAmount: {
-    fontSize: typography.fontSize.md,
-    fontWeight: '500',
+    fontSize: typography.fontSize.lg,
+    fontWeight: '700',
     color: lightColors.error,
     marginBottom: spacing.xs,
   },
-  historyDate: {
-    fontSize: typography.fontSize.sm,
+  historyMeta: {
+    fontSize: typography.fontSize.xs,
     color: lightColors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  historySource: {
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  historyStatus: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: '500',
-    marginBottom: spacing.xs,
   },
   historyReason: {
     fontSize: typography.fontSize.sm,
     color: lightColors.textSecondary,
     fontStyle: 'italic',
+    marginTop: spacing.xs,
   },
 });
 

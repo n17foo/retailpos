@@ -126,18 +126,41 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
           {item.name}
         </Text>
         <Text style={styles.itemPrice}>{formatMoney(item.price, currency.code)}</Text>
-        {item.sku && <Text style={styles.itemSku}>SKU: {item.sku}</Text>}
+        {item.sku && <Text style={styles.itemSku}>{item.sku}</Text>}
       </View>
       <View style={styles.quantityContainer}>
-        <TouchableOpacity style={styles.quantityButton} onPress={() => handleDecrement(item.id, item.quantity)}>
+        <TouchableOpacity
+          style={styles.quantityButton}
+          onPress={() => handleDecrement(item.id, item.quantity)}
+          accessibilityLabel={`Decrease quantity of ${item.name}`}
+          accessibilityRole="button"
+        >
           <Text style={styles.quantityButtonText}>−</Text>
         </TouchableOpacity>
-        <Text style={styles.quantity}>{item.quantity}</Text>
-        <TouchableOpacity style={styles.quantityButton} onPress={() => incrementQuantity(item.id)}>
+        <Text style={styles.quantity} accessibilityLabel={`Quantity: ${item.quantity}`}>
+          {item.quantity}
+        </Text>
+        <TouchableOpacity
+          style={styles.quantityButton}
+          onPress={() => incrementQuantity(item.id)}
+          accessibilityLabel={`Increase quantity of ${item.name}`}
+          accessibilityRole="button"
+        >
           <Text style={styles.quantityButtonText}>+</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.itemTotal}>{formatMoney(item.price * item.quantity, currency.code)}</Text>
+      <View style={styles.itemRight}>
+        <Text style={styles.itemTotal}>{formatMoney(item.price * item.quantity, currency.code)}</Text>
+        <TouchableOpacity
+          style={styles.removeButton}
+          onPress={() => removeFromCart(item.id)}
+          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+          accessibilityLabel={`Remove ${item.name} from cart`}
+          accessibilityRole="button"
+        >
+          <MaterialIcons name="delete-outline" size={18} color={lightColors.error} />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -225,13 +248,16 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
           style={[styles.checkoutButton, (cartItems.length === 0 || isProcessing) && styles.buttonDisabled]}
           onPress={handleStartCheckout}
           disabled={cartItems.length === 0 || isProcessing}
-          accessibilityLabel="Complete order"
+          accessibilityLabel={`Complete order, total ${formatMoney(total, currency.code)}`}
           accessibilityRole="button"
         >
           {isProcessing ? (
             <ActivityIndicator size="small" color={lightColors.textOnPrimary} />
           ) : (
-            <Text style={styles.checkoutButtonText}>COMPLETE ORDER — {formatMoney(total, currency.code)}</Text>
+            <View style={styles.checkoutButtonInner}>
+              <Text style={styles.checkoutButtonLabel}>COMPLETE ORDER</Text>
+              <Text style={styles.checkoutButtonTotal}>{formatMoney(total, currency.code)}</Text>
+            </View>
           )}
         </TouchableOpacity>
       </View>
@@ -319,11 +345,18 @@ const styles = StyleSheet.create({
     color: lightColors.textHint,
     marginTop: 1,
   },
+  itemRight: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
   itemTotal: {
     fontSize: typography.fontSize.sm,
     fontWeight: '600',
     minWidth: 56,
     textAlign: 'right',
+  },
+  removeButton: {
+    padding: 2,
   },
   quantityContainer: {
     flexDirection: 'row',
@@ -391,18 +424,28 @@ const styles = StyleSheet.create({
   },
   checkoutButton: {
     backgroundColor: lightColors.success,
-    padding: spacing.sm,
+    paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
     borderRadius: borderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: spacing.sm,
-    minHeight: 48,
+    minHeight: 56,
   },
-  checkoutButtonText: {
+  checkoutButtonInner: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  checkoutButtonLabel: {
     color: lightColors.textOnPrimary,
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm,
     fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  checkoutButtonTotal: {
+    color: lightColors.textOnPrimary,
+    fontSize: typography.fontSize.xl,
+    fontWeight: '800',
   },
   buttonDisabled: {
     opacity: 0.5,

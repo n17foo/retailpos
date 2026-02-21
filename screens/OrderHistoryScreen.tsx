@@ -9,13 +9,13 @@ import { lightColors, spacing, typography, borderRadius } from '../utils/theme';
 import { LocalOrder } from '../services/basket/BasketServiceInterface';
 import { orderRepository } from '../repositories/OrderRepository';
 import { formatMoney } from '../utils/money';
-import OrderCard from './daily-orders/OrderCard';
-import ShiftModal from './daily-orders/ShiftModal';
-import ReportModal from './daily-orders/ReportModal';
-import ReceiptModal from './daily-orders/ReceiptModal';
+import OrderCard from './order-history/OrderCard';
+import ShiftModal from './order-history/ShiftModal';
+import ReportModal from './order-history/ReportModal';
+import ReceiptModal from './order-history/ReceiptModal';
 import { useCurrency } from '../hooks/useCurrency';
 
-interface DailyOrdersScreenProps extends MoreStackScreenProps<'DailyOrders'> {}
+interface OrderHistoryScreenProps extends MoreStackScreenProps<'OrderHistory'> {}
 
 /** Get start-of-day timestamp for a given date offset (0 = today, -1 = yesterday, etc.) */
 const getDayStart = (daysOffset: number = 0): number => {
@@ -36,7 +36,7 @@ const formatDate = (timestamp: number): string => {
   return new Date(timestamp).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 };
 
-const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => {
+const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = ({ navigation }) => {
   const { getLocalOrders, syncOrderToPlatform, getSyncQueueStatus, unsyncedOrdersCount } = useBasketContext();
   const { user } = useAuthContext();
   const { currentShift, openShift, closeShift, generateReport, getReportLines, getReceiptLines } = useDailyReport();
@@ -266,7 +266,7 @@ const DailyOrdersScreen: React.FC<DailyOrdersScreenProps> = ({ navigation }) => 
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <View>
-            <Text style={styles.title}>Daily Orders</Text>
+            <Text style={styles.title}>Order History</Text>
             <Text style={styles.subtitle}>
               {orders.length} order{orders.length !== 1 ? 's' : ''}{' '}
               {unsyncedOrdersCount > 0 ? `\u2022 ${unsyncedOrdersCount} pending sync` : ''}
@@ -518,4 +518,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default DailyOrdersScreen;
+export default OrderHistoryScreen;

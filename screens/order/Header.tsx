@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { TouchableOpacity, View, Text, StyleSheet } from 'react-native';
-import { lightColors, spacing, typography } from '../../utils/theme';
+import { MaterialIcons } from '@expo/vector-icons';
+import { lightColors, spacing, typography, borderRadius } from '../../utils/theme';
 import { useCategoryContext } from '../../contexts/CategoryProvider';
 import { useBasketContext } from '../../contexts/BasketProvider';
 import { QuickActionsMenu, QuickAction } from '../../components/QuickActionsMenu';
@@ -29,7 +30,7 @@ const HeaderInner: React.FC<HeaderProps> = ({ username, cartItemTotal, onQuickAc
 
   const quickActions: QuickAction[] = [
     { id: 'reprint', label: 'Reprint Last Receipt', icon: '🖨', onPress: () => onQuickAction?.('reprint') },
-    { id: 'report', label: 'Daily Report', icon: '📊', onPress: () => onQuickAction?.('report') },
+    { id: 'report', label: 'Shift Report', icon: '📊', onPress: () => onQuickAction?.('report') },
     {
       id: 'sync',
       label: 'Sync Orders',
@@ -41,27 +42,45 @@ const HeaderInner: React.FC<HeaderProps> = ({ username, cartItemTotal, onQuickAc
 
   return (
     <View style={styles.header}>
-      {/* Left: Category toggle (mobile only) or store name */}
+      {/* Left: Category toggle (mobile) or brand */}
       {isMobile ? (
-        <TouchableOpacity style={styles.headerButton} onPress={toggleLeftPanel}>
-          <Text style={styles.headerButtonText}>☰ Categories</Text>
+        <TouchableOpacity
+          style={styles.iconButton}
+          onPress={toggleLeftPanel}
+          accessibilityLabel="Open categories"
+          accessibilityRole="button"
+        >
+          <MaterialIcons name={isLeftPanelOpen ? 'close' : 'menu'} size={24} color={lightColors.textOnPrimary} />
         </TouchableOpacity>
       ) : (
         <View style={styles.brandContainer}>
+          <MaterialIcons name="point-of-sale" size={20} color={lightColors.textOnPrimary} />
           <Text style={styles.brandText}>RetailPOS</Text>
         </View>
       )}
 
-      {/* Center: Username + status */}
+      {/* Center: Username */}
       <View style={styles.headerTitleContainer}>
-        <Text style={styles.usernameText}>Hi, {username}</Text>
+        <Text style={styles.usernameText} numberOfLines={1}>
+          Hi, {username}
+        </Text>
       </View>
 
-      {/* Right: Cart toggle (mobile) or quick actions (all) */}
+      {/* Right: Cart badge (mobile) + quick actions */}
       <View style={styles.headerRightContainer}>
         {isMobile && (
-          <TouchableOpacity style={styles.headerButton} onPress={toggleRightPanel}>
-            <Text style={styles.headerButtonText}>🛒 {cartItemTotal > 0 ? `(${cartItemTotal})` : ''}</Text>
+          <TouchableOpacity
+            style={styles.cartButton}
+            onPress={toggleRightPanel}
+            accessibilityLabel={cartItemTotal > 0 ? `Cart, ${cartItemTotal} items` : 'Cart, empty'}
+            accessibilityRole="button"
+          >
+            <MaterialIcons name="shopping-cart" size={24} color={lightColors.textOnPrimary} />
+            {cartItemTotal > 0 && (
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>{cartItemTotal > 99 ? '99+' : cartItemTotal}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         )}
         <QuickActionsMenu actions={quickActions} />
@@ -82,14 +101,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     height: 56,
   },
-  headerButton: {
-    padding: spacing.xs,
-  },
-  headerButtonText: {
-    color: lightColors.textOnPrimary,
-    fontWeight: '700',
+  iconButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: borderRadius.sm,
   },
   brandContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     paddingHorizontal: spacing.xs,
   },
   brandText: {
@@ -100,6 +122,7 @@ const styles = StyleSheet.create({
   headerTitleContainer: {
     flex: 1,
     alignItems: 'center',
+    paddingHorizontal: spacing.sm,
   },
   usernameText: {
     color: lightColors.primaryLight,
@@ -110,5 +133,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
+  },
+  cartButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: lightColors.error,
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  cartBadgeText: {
+    color: lightColors.textOnPrimary,
+    fontSize: 10,
+    fontWeight: '700',
   },
 });

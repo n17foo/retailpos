@@ -206,7 +206,12 @@ const OnboardingScreen: React.FC = () => {
           />
         );
       case 'staff_setup':
-        return <StaffSetupStep onBack={handleBackToAdminUser} onComplete={handleNextFromStaffSetup} />;
+        return (
+          <StaffSetupStep
+            onBack={isOffline ? handleBackToPlatformSelection : handleBackToAdminUser}
+            onComplete={handleNextFromStaffSetup}
+          />
+        );
       case 'payment_provider_setup':
         return (
           <PaymentProviderStep
@@ -215,9 +220,9 @@ const OnboardingScreen: React.FC = () => {
           />
         );
       case 'printer_setup':
-        return <PrinterSetupStep onBack={handleBackToPayment} onNext={handleNextFromPrinter} />;
+        return <PrinterSetupStep onBack={handleBackToPayment} onNext={handleNextFromPrinter} onSkip={handleNextFromPrinter} />;
       case 'scanner_setup':
-        return <ScannerSetupStep onBack={handleBackToPrinter} onComplete={handleNextFromScanner} />;
+        return <ScannerSetupStep onBack={handleBackToPrinter} onComplete={handleNextFromScanner} onSkip={handleNextFromScanner} />;
       case 'pos_setup':
         return <POSSetupStep onBack={handleBackToScanner} onComplete={handleNextFromPOSSetup} />;
       case 'auth_method_setup':

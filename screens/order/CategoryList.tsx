@@ -1,6 +1,7 @@
 import { TouchableOpacity, View, Text, StyleSheet, FlatList } from 'react-native';
 import React, { memo, useCallback } from 'react';
-import { lightColors, spacing, typography } from '../../utils/theme';
+import { MaterialIcons } from '@expo/vector-icons';
+import { lightColors, spacing, typography, borderRadius } from '../../utils/theme';
 import { useCategoryContext } from '../../contexts/CategoryProvider';
 import { useCategoryNavigation } from '../../hooks/useCategories';
 import { Breadcrumb, BreadcrumbItem } from '../../components/Breadcrumb';
@@ -76,8 +77,14 @@ const CategoryListInner: React.FC<CategoryListProps> = ({ showBreadcrumb = false
 
         {/* Back button when navigated into a category */}
         {canNavigateUp && (
-          <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back {currentCategory ? `from ${currentCategory.name}` : ''}</Text>
+          <TouchableOpacity
+            onPress={handleGoBack}
+            style={styles.backButton}
+            accessibilityLabel={currentCategory ? `Back from ${currentCategory.name}` : 'Back'}
+            accessibilityRole="button"
+          >
+            <MaterialIcons name="arrow-back" size={16} color={lightColors.primary} />
+            <Text style={styles.backButtonText}>{currentCategory ? currentCategory.name : 'Back'}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -91,14 +98,23 @@ const CategoryListInner: React.FC<CategoryListProps> = ({ showBreadcrumb = false
         ListHeaderComponent={renderHeader}
         renderItem={({ item }) => {
           const categoryHasChildren = hasChildren(item.id);
+          const isSelected = selectedCategory === item.id;
           return (
             <TouchableOpacity
-              style={[styles.categoryItem, selectedCategory === item.id && styles.selectedCategory]}
+              style={[styles.categoryItem, isSelected && styles.selectedCategory]}
               onPress={() => handleCategorySelect(item)}
+              accessibilityLabel={item.name + (categoryHasChildren ? ', has subcategories' : '')}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isSelected }}
             >
+              {isSelected && <View style={styles.selectedAccent} />}
               <View style={styles.categoryRow}>
-                <Text style={[styles.categoryText, selectedCategory === item.id && styles.selectedCategoryText]}>{item.name}</Text>
-                {categoryHasChildren && <Text style={styles.chevron}>›</Text>}
+                <Text style={[styles.categoryText, isSelected && styles.selectedCategoryText]} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                {categoryHasChildren && (
+                  <MaterialIcons name="chevron-right" size={18} color={isSelected ? lightColors.primary : lightColors.textSecondary} />
+                )}
               </View>
             </TouchableOpacity>
           );
@@ -118,39 +134,57 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   categoryItem: {
-    padding: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: lightColors.border,
+    position: 'relative',
+    minHeight: 44,
+    justifyContent: 'center',
+  },
+  selectedCategory: {
+    backgroundColor: lightColors.primary + '10',
+  },
+  selectedAccent: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 3,
+    backgroundColor: lightColors.primary,
+    borderRadius: borderRadius.sm,
   },
   categoryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  selectedCategory: {
-    backgroundColor: lightColors.primaryLight,
+    paddingLeft: spacing.xs,
   },
   categoryText: {
+    flex: 1,
     fontSize: typography.fontSize.md,
+    color: lightColors.textPrimary,
   },
   selectedCategoryText: {
     fontWeight: '700',
     color: lightColors.primary,
   },
-  chevron: {
-    fontSize: typography.fontSize.lg,
-    color: lightColors.textSecondary,
-  },
   backButton: {
-    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: lightColors.border,
-    backgroundColor: lightColors.surface,
+    backgroundColor: lightColors.inputBackground,
+    minHeight: 44,
   },
   backButtonText: {
-    fontSize: typography.fontSize.md,
+    fontSize: typography.fontSize.sm,
     color: lightColors.primary,
-    fontWeight: '700',
+    fontWeight: '600',
+    flex: 1,
   },
 });
 

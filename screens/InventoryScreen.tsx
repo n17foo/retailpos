@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius } from '../utils/theme';
 import { Input } from '../components/Input';
 import { useInventory } from '../hooks/useInventory';
@@ -26,6 +27,7 @@ const InventoryScreen: React.FC<InventoryScreenProps> = ({ onGoBack }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [editingItem, setEditingItem] = useState<string | null>(null);
   const [editQuantity, setEditQuantity] = useState('');
+  const [inlineError, setInlineError] = useState<string | null>(null);
 
   // Load inventory data
   const loadInventory = useCallback(async () => {
@@ -97,6 +99,7 @@ const InventoryScreen: React.FC<InventoryScreenProps> = ({ onGoBack }) => {
 
   // Handle quantity adjustment
   const handleAdjustQuantity = async (productId: string, adjustment: number, variantId?: string) => {
+    setInlineError(null);
     const success = await adjustInventory(productId, adjustment, variantId);
     if (success) {
       setInventoryItems(prev =>
@@ -107,7 +110,7 @@ const InventoryScreen: React.FC<InventoryScreenProps> = ({ onGoBack }) => {
         )
       );
     } else {
-      Alert.alert('Error', 'Failed to update inventory');
+      setInlineError('Failed to update inventory. Please try again.');
     }
   };
 
@@ -115,7 +118,7 @@ const InventoryScreen: React.FC<InventoryScreenProps> = ({ onGoBack }) => {
   const handleSetQuantity = async (productId: string, variantId?: string) => {
     const quantity = parseInt(editQuantity, 10);
     if (isNaN(quantity) || quantity < 0) {
-      Alert.alert('Error', 'Please enter a valid quantity');
+      setInlineError('Please enter a valid quantity.');
       return;
     }
 
@@ -126,8 +129,9 @@ const InventoryScreen: React.FC<InventoryScreenProps> = ({ onGoBack }) => {
       );
       setEditingItem(null);
       setEditQuantity('');
+      setInlineError(null);
     } else {
-      Alert.alert('Error', 'Failed to update inventory');
+      setInlineError('Failed to update inventory. Please try again.');
     }
   };
 
@@ -177,11 +181,14 @@ const InventoryScreen: React.FC<InventoryScreenProps> = ({ onGoBack }) => {
       {/* Header */}
       <View style={styles.header}>
         {onGoBack && (
-          <TouchableOpacity onPress={onGoBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>← Back</Text>
+          <TouchableOpacity onPress={onGoBack} style={styles.backButton} accessibilityLabel="Go back" accessibilityRole="button">
+            <MaterialIcons name="arrow-back" size={24} color={lightColors.primary} />
           </TouchableOpacity>
         )}
-        <Text style={styles.title}>Inventory Management</Text>
+        <View style={styles.headerTitleGroup}>
+          <Text style={styles.title}>Inventory</Text>
+          {inventoryItems.length > 0 && <Text style={styles.headerSubtitle}>{inventoryItems.length} items</Text>}
+        </View>
       </View>
 
       {/* Search and Filter */}
@@ -199,9 +206,13 @@ const InventoryScreen: React.FC<InventoryScreenProps> = ({ onGoBack }) => {
       <InventoryFilterTabs filter={filter} items={inventoryItems} onFilterChange={setFilter} />
 
       {/* Error Display */}
-      {error && (
+      {(error || inlineError) && (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
+          <MaterialIcons name="error-outline" size={16} color={lightColors.error} />
+          <Text style={styles.errorText}>{inlineError || error}</Text>
+          <TouchableOpacity onPress={() => setInlineError(null)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <MaterialIcons name="close" size={16} color={lightColors.error} />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -240,18 +251,26 @@ const styles = StyleSheet.create({
     backgroundColor: lightColors.surface,
     borderBottomWidth: 1,
     borderBottomColor: lightColors.border,
+    gap: spacing.sm,
   },
   backButton: {
-    marginRight: spacing.md,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  backButtonText: {
-    color: lightColors.primary,
-    fontSize: typography.fontSize.md,
+  headerTitleGroup: {
+    flex: 1,
   },
   title: {
     fontSize: typography.fontSize.xl,
     fontWeight: '700',
     color: lightColors.textPrimary,
+  },
+  headerSubtitle: {
+    fontSize: typography.fontSize.sm,
+    color: lightColors.textSecondary,
+    marginTop: 1,
   },
   searchContainer: {
     padding: spacing.md,
@@ -261,14 +280,18 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     margin: spacing.md,
-    padding: spacing.md,
+    padding: spacing.sm,
     backgroundColor: lightColors.error + '15',
     borderRadius: borderRadius.md,
   },
   errorText: {
+    flex: 1,
     color: lightColors.error,
-    textAlign: 'center',
+    fontSize: typography.fontSize.sm,
   },
   loadingContainer: {
     flex: 1,

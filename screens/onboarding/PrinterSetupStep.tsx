@@ -6,9 +6,10 @@ import { PrinterConnectionType } from '../../services/printer/UnifiedPrinterServ
 interface PrinterSetupStepProps {
   onBack: () => void;
   onNext: () => void;
+  onSkip?: () => void;
 }
 
-const PrinterSetupStep: React.FC<PrinterSetupStepProps> = ({ onBack, onNext }) => {
+const PrinterSetupStep: React.FC<PrinterSetupStepProps> = ({ onBack, onNext, onSkip }) => {
   const { printerSettings, handlePrinterSettingsChange, testConnection, loadSettings, saveSettings, isLoading } = usePrinterSettings();
 
   useEffect(() => {
@@ -154,6 +155,7 @@ const PrinterSetupStep: React.FC<PrinterSetupStepProps> = ({ onBack, onNext }) =
 
       <View style={styles.buttonContainer}>
         <Button title="Back" onPress={onBack} />
+        {onSkip && <Button title="Skip" onPress={onSkip} />}
         <Button title="Next" onPress={handleNextPress} disabled={isLoading} />
       </View>
     </ScrollView>

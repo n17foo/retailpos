@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, TextInput, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, StyleSheet, Animated, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius } from '../utils/theme';
 import PinKeypad from '../components/PinKeypad';
 import PinDisplay from '../components/PinDisplay';
@@ -33,6 +34,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       setAvailableMethods(providers);
     });
   }, []);
+
+  // Auto-trigger biometric when it is the active method
+  useEffect(() => {
+    if (activeMethod === 'biometric') {
+      handleBiometricAuth();
+    }
+  }, [activeMethod]);
 
   const startShake = useCallback(() => {
     Animated.sequence([
@@ -171,8 +179,13 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           <>
             <Text style={styles.authTitle}>{t('login.biometricLogin')}</Text>
             <Text style={styles.authDescription}>{t('login.biometricDescription')}</Text>
-            <TouchableOpacity style={styles.biometricButton} onPress={handleBiometricAuth}>
-              <Text style={styles.biometricIcon}>👆</Text>
+            <TouchableOpacity
+              style={styles.biometricButton}
+              onPress={handleBiometricAuth}
+              accessibilityLabel={t('login.tapToAuthenticate')}
+              accessibilityRole="button"
+            >
+              <MaterialIcons name="fingerprint" size={52} color={lightColors.primary} />
               <Text style={styles.biometricButtonText}>{t('login.tapToAuthenticate')}</Text>
             </TouchableOpacity>
           </>
@@ -205,7 +218,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           <>
             <Text style={styles.authTitle}>{t('login.swipeCard')}</Text>
             <Text style={styles.authDescription}>{t('login.swipeCardDescription')}</Text>
-            <Text style={styles.waitingIcon}>💳</Text>
+            <View style={styles.waitingIconContainer}>
+              <MaterialIcons name="credit-card" size={64} color={lightColors.primary} />
+            </View>
             <TextInput style={styles.hiddenInput} autoFocus onChangeText={handleCardInput} value="" blurOnSubmit={false} />
             <Text style={styles.waitingText}>{waitingForSwipe ? t('login.waitingForSwipe') : t('common.ready')}</Text>
           </>
@@ -216,7 +231,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           <>
             <Text style={styles.authTitle}>{t('login.tapBadge')}</Text>
             <Text style={styles.authDescription}>{t('login.tapBadgeDescription')}</Text>
-            <Text style={styles.waitingIcon}>📡</Text>
+            <View style={styles.waitingIconContainer}>
+              <MaterialIcons name="nfc" size={64} color={lightColors.primary} />
+            </View>
             <TextInput style={styles.hiddenInput} autoFocus onChangeText={handleCardInput} value="" blurOnSubmit={false} />
             <Text style={styles.waitingText}>{waitingForSwipe ? t('login.waitingForTap') : t('common.ready')}</Text>
           </>
@@ -248,9 +265,18 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       </View>
 
       <Animated.View style={[styles.authContainer, { transform: [{ translateX: shake }] }]}>
-        {error && <Text style={styles.errorText}>{error}</Text>}
+        {error && (
+          <View style={styles.errorBanner}>
+            <MaterialIcons name="error-outline" size={16} color={lightColors.error} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
         {renderAuthUI()}
-        {isLoading && <Text style={styles.loadingText}>{t('common.loggingIn')}</Text>}
+        {isLoading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color={lightColors.primary} />
+          </View>
+        )}
       </Animated.View>
 
       {/* Method switcher */}
@@ -263,6 +289,9 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                 key={provider.type}
                 style={[styles.switcherButton, activeMethod === provider.type && styles.switcherButtonActive]}
                 onPress={() => switchMethod(provider.type)}
+                accessibilityLabel={`Sign in with ${provider.info.label}`}
+                accessibilityRole="button"
+                accessibilityState={{ selected: activeMethod === provider.type }}
               >
                 <Text style={styles.switcherIcon}>{provider.info.icon}</Text>
                 <Text style={[styles.switcherText, activeMethod === provider.type && styles.switcherTextActive]}>
@@ -320,17 +349,32 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     paddingHorizontal: spacing.lg,
   },
-  errorText: {
-    fontSize: typography.fontSize.md,
-    color: lightColors.error,
-    marginBottom: spacing.lg,
-    textAlign: 'center',
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: lightColors.error + '15',
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+    alignSelf: 'stretch',
   },
-  loadingText: {
-    fontSize: typography.fontSize.md,
-    color: lightColors.primary,
-    marginTop: spacing.lg,
-    textAlign: 'center',
+  errorText: {
+    flex: 1,
+    fontSize: typography.fontSize.sm,
+    color: lightColors.error,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: lightColors.surface + 'CC',
+    borderRadius: borderRadius.md,
   },
   // ── Password ──────────────────────────────────────────────────────
   passwordInput: {
@@ -354,7 +398,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
   submitButtonText: {
-    color: '#fff',
+    color: lightColors.textOnPrimary,
     fontSize: typography.fontSize.md,
     fontWeight: '600',
   },
@@ -370,9 +414,9 @@ const styles = StyleSheet.create({
     borderColor: lightColors.primary,
     marginBottom: spacing.md,
   },
-  biometricIcon: {
-    fontSize: 40,
-    marginBottom: spacing.xs,
+  waitingIconContainer: {
+    marginBottom: spacing.md,
+    alignItems: 'center',
   },
   biometricButtonText: {
     fontSize: typography.fontSize.xs,
@@ -380,10 +424,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   // ── Card / Badge ──────────────────────────────────────────────────
-  waitingIcon: {
-    fontSize: 60,
-    marginBottom: spacing.md,
-  },
   waitingText: {
     fontSize: typography.fontSize.md,
     color: lightColors.textSecondary,

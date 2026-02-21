@@ -13,7 +13,7 @@ const RefundScreen = lazy(() => import('../screens/RefundScreen'));
 const PrinterScreen = lazy(() => import('../screens/PrinterScreen'));
 const PaymentTerminalScreen = lazy(() => import('../screens/PaymentTerminalScreen'));
 const UsersScreen = lazy(() => import('../screens/UsersScreen'));
-const DailyOrdersScreen = lazy(() => import('../screens/DailyOrdersScreen'));
+const OrderHistoryScreen = lazy(() => import('../screens/OrderHistoryScreen'));
 const SyncQueueScreen = lazy(() => import('../screens/SyncQueueScreen'));
 const ReportingScreen = lazy(() => import('../screens/ReportingScreen'));
 
@@ -38,10 +38,10 @@ const MoreMenuScreen: React.FC<MoreMenuScreenProps> = ({ userRole, onLogout }) =
 
   const allMenuItems = [
     {
-      key: 'DailyOrders' as const,
+      key: 'OrderHistory' as const,
       icon: 'receipt-long' as const,
-      label: 'Daily Orders',
-      onPress: () => navigation.navigate('DailyOrders'),
+      label: 'Order History',
+      onPress: () => navigation.navigate('OrderHistory'),
       color: lightColors.info,
     },
     {
@@ -131,7 +131,7 @@ interface MoreNavigatorProps {
 
 /**
  * More Stack Navigator
- * Contains Daily Orders, Settings, Refund, Printer, and PaymentTerminal screens
+ * Contains Order History, Settings, Refund, Printer, and PaymentTerminal screens
  */
 export const MoreNavigator: React.FC<MoreNavigatorProps> = ({ userRole, onLogout }) => {
   return (
@@ -147,10 +147,10 @@ export const MoreNavigator: React.FC<MoreNavigatorProps> = ({ userRole, onLogout
       <Stack.Screen name="MoreMenu" options={{ headerShown: false }}>
         {props => <MoreMenuScreen {...props} userRole={userRole} onLogout={onLogout} />}
       </Stack.Screen>
-      <Stack.Screen name="DailyOrders" options={{ title: 'Daily Orders' }}>
+      <Stack.Screen name="OrderHistory" options={{ title: 'Order History' }}>
         {props => (
           <Suspense fallback={<LazyFallback />}>
-            <DailyOrdersScreen {...props} />
+            <OrderHistoryScreen {...props} />
           </Suspense>
         )}
       </Stack.Screen>

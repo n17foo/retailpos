@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator, AlertButton } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { lightColors, spacing, typography, borderRadius } from '../../utils/theme';
 import { SwipeablePanel } from '../../components/SwipeablePanel';
 import { useBasketContext, CartItem } from '../../contexts/BasketProvider';
@@ -7,6 +7,7 @@ import { formatMoney } from '../../utils/money';
 import { ECommercePlatform } from '../../utils/platforms';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useTranslate } from '../../hooks/useTranslate';
+import { CheckoutModal, PaymentMethod } from '../../components/CheckoutModal';
 
 interface BasketProps {
   onCheckout?: () => void;
@@ -33,12 +34,15 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
     markPaymentProcessing,
     completePayment,
     currentOrder,
+    itemCount,
     unsyncedOrdersCount,
     syncAllPendingOrders,
   } = useBasketContext();
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [checkoutModalVisible, setCheckoutModalVisible] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
 
   // Handle quantity decrease
   const handleDecrement = async (itemId: string, currentQuantity: number) => {
@@ -53,64 +57,54 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
     }
   };
 
-  // Handle checkout process
+  // Handle checkout process — opens CheckoutModal for payment method selection
   const handleCheckout = async () => {
     if (cartItems.length === 0) return;
 
     setIsProcessing(true);
     try {
-      // Start checkout - creates local order
       const order = await startCheckout(platform);
       if (!order) {
         Alert.alert(t('common.error'), t('basket.failedToCreateOrder'));
         return;
       }
-
-      // Show payment options
-      Alert.alert(
-        t('basket.completeOrderTitle'),
-        `${t('checkout.orderRef', { ref: order.id.slice(-8) })}\n${t('checkout.total')}: ${formatMoney(total, currency.code)}`,
-        [
-          {
-            text: t('basket.processPayment'),
-            onPress: async () => {
-              if (onCheckout) {
-                onCheckout();
-              }
-              // Mark as processing
-              await markPaymentProcessing(order.id);
-              // For demo, complete with cash payment
-              const result = await completePayment(order.id, 'cash');
-              if (result.success) {
-                Alert.alert(t('common.success'), t('basket.paymentSuccess'));
-                setIsRightPanelOpen(false);
-              } else {
-                Alert.alert(t('common.error'), result.error || t('basket.paymentFailed'));
-              }
-            },
-          },
-          onPaymentTerminal && {
-            text: t('basket.payWithTerminal'),
-            onPress: async () => {
-              await markPaymentProcessing(order.id);
-              onPaymentTerminal(order.id, total);
-            },
-          },
-          onPrintReceipt && {
-            text: t('basket.printReceipt'),
-            onPress: () => onPrintReceipt(order.id),
-          },
-          {
-            text: t('common.cancel'),
-            style: 'cancel' as const,
-          },
-        ].filter(Boolean) as AlertButton[]
-      );
+      setCurrentOrderId(order.id);
+      setCheckoutModalVisible(true);
     } catch (error) {
       Alert.alert(t('common.error'), (error as Error).message);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // Handle payment method selection from CheckoutModal
+  const handlePayment = async (method: PaymentMethod) => {
+    if (!currentOrderId) return;
+
+    setIsProcessing(true);
+    try {
+      await markPaymentProcessing(currentOrderId);
+      const paymentMethod = method === 'terminal' ? 'card_terminal' : method;
+      const result = await completePayment(currentOrderId, paymentMethod);
+      if (result.success) {
+        setCheckoutModalVisible(false);
+        setCurrentOrderId(null);
+        setIsRightPanelOpen(false);
+        onCheckout?.();
+        if (onPrintReceipt) onPrintReceipt(currentOrderId);
+      } else {
+        Alert.alert(t('common.error'), result.error || t('basket.paymentFailed'));
+      }
+    } catch (error) {
+      Alert.alert(t('common.error'), (error as Error).message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCancelCheckout = () => {
+    setCheckoutModalVisible(false);
+    setCurrentOrderId(null);
   };
 
   // Handle sync of pending orders
@@ -239,6 +233,18 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPaymentTerminal, o
           </View>
         </View>
       </View>
+
+      <CheckoutModal
+        visible={checkoutModalVisible}
+        orderId={currentOrderId || ''}
+        orderTotal={total}
+        orderSubtotal={subtotal}
+        orderTax={tax}
+        itemCount={itemCount}
+        onSelectPayment={handlePayment}
+        onCancel={handleCancelCheckout}
+        isProcessing={isProcessing}
+      />
     </SwipeablePanel>
   );
 };

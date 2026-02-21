@@ -5,6 +5,7 @@ import { useScannerSettings, ScannerSettings } from '../../hooks/useScannerSetti
 interface ScannerSetupStepProps {
   onBack: () => void;
   onComplete: () => void;
+  onSkip?: () => void;
 }
 
 const SCANNER_TYPE_OPTIONS = [
@@ -14,7 +15,7 @@ const SCANNER_TYPE_OPTIONS = [
   { value: 'qr_hardware', label: 'QR Hardware' },
 ] as const;
 
-const ScannerSetupStep: React.FC<ScannerSetupStepProps> = ({ onBack, onComplete }) => {
+const ScannerSetupStep: React.FC<ScannerSetupStepProps> = ({ onBack, onComplete, onSkip }) => {
   const { scannerSettings, handleScannerSettingsChange, saveSettings, testConnection, isLoading, loadSettings } = useScannerSettings();
 
   useEffect(() => {
@@ -115,7 +116,8 @@ const ScannerSetupStep: React.FC<ScannerSetupStepProps> = ({ onBack, onComplete 
 
       <View style={styles.buttonContainer}>
         <Button title="Back" onPress={onBack} />
-        <Button title="Finish Onboarding" onPress={handleComplete} disabled={isLoading} />
+        {onSkip && <Button title="Skip" onPress={onSkip} />}
+        <Button title="Finish" onPress={handleComplete} disabled={isLoading} />
       </View>
     </ScrollView>
   );
