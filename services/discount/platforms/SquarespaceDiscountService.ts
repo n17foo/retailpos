@@ -3,13 +3,12 @@ import { BaseDiscountService } from './BaseDiscountService';
 import { CouponValidationResult } from '../DiscountServiceInterface';
 import { BasketItem } from '../../basket/basket';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
 
 export class SquarespaceDiscountService extends BaseDiscountService {
+  private apiClient = SquarespaceApiClient.getInstance();
   constructor() {
     super();
     this.logger = LoggerFactory.getInstance().createLogger('SquarespaceDiscountService');
@@ -17,11 +16,10 @@ export class SquarespaceDiscountService extends BaseDiscountService {
 
   async initialize(): Promise<boolean> {
     try {
-      const ok = await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.SQUARESPACE);
-      if (!ok) {
-        this.logger.warn('Failed to initialize Squarespace token');
-        return false;
+      if (!this.apiClient.isInitialized()) {
+        await this.apiClient.initialize();
       }
+
       this.initialized = true;
       return true;
     } catch (error) {
@@ -34,8 +32,7 @@ export class SquarespaceDiscountService extends BaseDiscountService {
   }
 
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    const token = await getPlatformToken(ECommercePlatform.SQUARESPACE, TokenType.ACCESS);
-    return { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` };
+    return this.apiClient['buildHeaders']();
   }
 
   async validateCoupon(code: string, _basketTotal: number, _items: BasketItem[]): Promise<CouponValidationResult> {

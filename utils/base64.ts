@@ -67,14 +67,3 @@ export function decodeBase64(str: string): string {
 
   return output;
 }
-
-/**
- * Create Basic Auth header value from credentials
- * @param username The username or API key
- * @param password The password or API secret
- * @returns The Base64 encoded credentials for Basic Auth
- */
-export function createBasicAuthHeader(username: string, password: string): string {
-  const credentials = `${username}:${password}`;
-  return `Basic ${encodeBase64(credentials)}`;
-}

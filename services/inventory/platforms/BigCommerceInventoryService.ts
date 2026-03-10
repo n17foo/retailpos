@@ -1,12 +1,15 @@
 import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../InventoryServiceInterface';
 import { PlatformConfigRequirements } from './PlatformInventoryServiceInterface';
 import { BaseInventoryService } from './BaseInventoryService';
+import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
 /**
  * BigCommerce-specific inventory service implementation
  * Handles BigCommerce inventory API interactions
  */
 export class BigCommerceInventoryService extends BaseInventoryService {
+  private apiClient = BigCommerceApiClient.getInstance();
+
   /**
    * Configuration requirements for BigCommerce
    */
@@ -186,11 +189,6 @@ export class BigCommerceInventoryService extends BaseInventoryService {
    * Create authorization headers for BigCommerce API
    */
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      'X-Auth-Token': this.config.accessToken || '',
-      'X-Auth-Client': this.config.clientId || '',
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 }

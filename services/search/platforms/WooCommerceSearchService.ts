@@ -3,13 +3,14 @@ import { SearchOptions, SearchProduct } from '../SearchServiceInterface';
 import { ProductQueryOptions, ProductResult } from '../../product/ProductServiceInterface';
 import { PlatformConfigRequirements, PlatformSearchConfig } from './PlatformSearchServiceInterface';
 import { BaseSearchService } from './BaseSearchService';
-import { createBasicAuthHeader } from '../../../utils/base64';
 import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
+import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 /**
  * WooCommerce-specific implementation of the search service
  */
 export class WooCommerceSearchService extends BaseSearchService {
+  private apiClient = WooCommerceApiClient.getInstance();
   // Use declare to tell TypeScript this exists without redefining it
   // The config property is inherited from BaseSearchService
 
@@ -252,11 +253,7 @@ export class WooCommerceSearchService extends BaseSearchService {
    * Uses Basic Auth with consumer key and secret (over HTTPS)
    */
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      Authorization: createBasicAuthHeader(this.config.consumerKey as string, this.config.consumerSecret as string),
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 
   /**

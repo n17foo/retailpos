@@ -3,12 +3,15 @@ import { Category } from '../CategoryServiceInterface';
 import { BaseCategoryService } from './BaseCategoryService';
 import { PlatformConfigRequirements } from './PlatformCategoryServiceInterface';
 import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
+import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
 /**
  * Shopify-specific category service implementation
  * In Shopify, categories are called "collections"
  */
 export class ShopifyCategoryService extends BaseCategoryService {
+  private apiClient = ShopifyApiClient.getInstance();
+
   /**
    * Get configuration requirements for Shopify
    */
@@ -296,9 +299,6 @@ export class ShopifyCategoryService extends BaseCategoryService {
    * Create authorization headers for Shopify API
    */
   private getAuthHeaders(): Record<string, string> {
-    return {
-      'X-Shopify-Access-Token': this.config.accessToken || '',
-      'Content-Type': 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 }

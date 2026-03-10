@@ -1,6 +1,7 @@
 import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../InventoryServiceInterface';
 import { PlatformInventoryConfig, PlatformConfigRequirements } from './PlatformInventoryServiceInterface';
 import { BaseInventoryService } from './BaseInventoryService';
+import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
 
 // Squarespace API version
 const SQUARESPACE_API_VERSION = '1.0';
@@ -9,6 +10,7 @@ const SQUARESPACE_API_VERSION = '1.0';
  * Squarespace Commerce inventory service implementation
  */
 export class SquarespaceInventoryService extends BaseInventoryService {
+  private apiClient = SquarespaceApiClient.getInstance();
   getConfigRequirements(): PlatformConfigRequirements {
     return {
       required: ['apiKey'],
@@ -154,10 +156,6 @@ export class SquarespaceInventoryService extends BaseInventoryService {
   }
 
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      Authorization: `Bearer ${this.config.apiKey}`,
-      'Content-Type': 'application/json',
-      'User-Agent': 'RetailPOS/1.0',
-    };
+    return this.apiClient['buildHeaders']();
   }
 }

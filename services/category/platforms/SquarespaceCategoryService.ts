@@ -1,11 +1,13 @@
 import { Category, CategoryServiceInterface } from '../CategoryServiceInterface';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
 
 /**
  * Squarespace-specific category service implementation
  * Handles Squarespace category API interactions
  */
 export class SquarespaceCategoryService implements CategoryServiceInterface {
+  private apiClient = SquarespaceApiClient.getInstance();
   private initialized: boolean = false;
   private logger = LoggerFactory.getInstance().createLogger('SquarespaceCategoryService');
 

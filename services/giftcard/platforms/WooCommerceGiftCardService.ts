@@ -1,16 +1,15 @@
 import { BaseGiftCardService } from './BaseGiftCardService';
 import { GiftCardInfo, GiftCardRedemptionResult } from '../GiftCardServiceInterface';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
+import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 export class WooCommerceGiftCardService extends BaseGiftCardService {
   private storeUrl = '';
+  private apiClient = WooCommerceApiClient.getInstance();
 
   constructor() {
     super();
@@ -24,11 +23,14 @@ export class WooCommerceGiftCardService extends BaseGiftCardService {
         this.logger.warn('Missing WooCommerce store URL');
         return false;
       }
-      const ok = await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.WOOCOMMERCE);
-      if (!ok) {
-        this.logger.warn('Failed to initialize WooCommerce token');
-        return false;
+
+      // Configure and initialize the shared WooCommerce client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({ storeUrl: this.storeUrl });
+        await this.apiClient.initialize();
       }
+      this.storeUrl = this.apiClient.getBaseUrl();
+
       this.initialized = true;
       return true;
     } catch (error) {
@@ -41,8 +43,7 @@ export class WooCommerceGiftCardService extends BaseGiftCardService {
   }
 
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    const token = await getPlatformToken(ECommercePlatform.WOOCOMMERCE, TokenType.ACCESS);
-    return { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` };
+    return this.apiClient['buildHeaders']();
   }
 
   async checkBalance(code: string): Promise<GiftCardInfo> {

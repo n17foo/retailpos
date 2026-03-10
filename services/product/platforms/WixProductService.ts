@@ -3,16 +3,17 @@ import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../Prod
 import { PlatformProductConfig, PlatformConfigRequirements } from './PlatformProductServiceInterface';
 import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { WIX_API_VERSION } from '../../config/apiVersions';
+import { WixApiClient } from '../../clients/wix/WixApiClient';
 
 /**
  * Wix-specific implementation of the product service
  * Uses Wix Stores API
  */
 export class WixProductService extends BaseProductService {
+  private apiClient = WixApiClient.getInstance();
   constructor(config: PlatformProductConfig = {}) {
     super(config);
     this.logger = LoggerFactory.getInstance().createLogger('WixProductService');
@@ -34,8 +35,15 @@ export class WixProductService extends BaseProductService {
         return false;
       }
 
-      // Initialize token provider
-      await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.WIX);
+      // Configure and initialize the shared Wix client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          apiKey: this.config.apiKey as string,
+          siteId: this.config.siteId as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        await this.apiClient.initialize();
+      }
 
       // Test connection
       try {
@@ -327,12 +335,7 @@ export class WixProductService extends BaseProductService {
    * Get authorization headers
    */
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return {
-      Authorization: this.config.apiKey as string,
-      'wix-site-id': this.config.siteId as string,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 
   /**

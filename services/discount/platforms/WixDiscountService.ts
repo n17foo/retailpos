@@ -2,15 +2,14 @@ import { BaseDiscountService } from './BaseDiscountService';
 import { CouponValidationResult } from '../DiscountServiceInterface';
 import { BasketItem } from '../../basket/basket';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import secretsService from '../../secrets/SecretsService';
+import { WixApiClient } from '../../clients/wix/WixApiClient';
 
 export class WixDiscountService extends BaseDiscountService {
   private siteId = '';
+  private apiClient = WixApiClient.getInstance();
 
   constructor() {
     super();
@@ -24,11 +23,12 @@ export class WixDiscountService extends BaseDiscountService {
         this.logger.warn('Missing Wix site ID');
         return false;
       }
-      const ok = await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.WIX);
-      if (!ok) {
-        this.logger.warn('Failed to initialize Wix token');
-        return false;
+
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({ siteId: this.siteId });
+        await this.apiClient.initialize();
       }
+
       this.initialized = true;
       return true;
     } catch (error) {
@@ -41,8 +41,7 @@ export class WixDiscountService extends BaseDiscountService {
   }
 
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    const token = await getPlatformToken(ECommercePlatform.WIX, TokenType.ACCESS);
-    return { 'Content-Type': 'application/json', Authorization: token || '', 'wix-site-id': this.siteId };
+    return this.apiClient['buildHeaders']();
   }
 
   async validateCoupon(code: string, _basketTotal: number, _items: BasketItem[]): Promise<CouponValidationResult> {

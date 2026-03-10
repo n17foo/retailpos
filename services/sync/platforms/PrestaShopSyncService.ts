@@ -1,5 +1,6 @@
 import { SyncServiceInterface, SyncOptions, SyncStatus, SyncEntityType, SyncDirection } from '../SyncServiceInterface';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { PrestaShopApiClient } from '../../clients/prestashop/PrestaShopApiClient';
 
 /**
  * PrestaShop-specific sync service for offline-first POS operation
@@ -7,6 +8,7 @@ import { LoggerFactory } from '../../logger/LoggerFactory';
  * Currently implements mock behavior - ready for full API integration
  */
 export class PrestaShopSyncService implements SyncServiceInterface {
+  private apiClient = PrestaShopApiClient.getInstance();
   private initialized: boolean = false;
   private logger = LoggerFactory.getInstance().createLogger('PrestaShopSyncService');
 

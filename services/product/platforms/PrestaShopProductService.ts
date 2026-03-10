@@ -3,16 +3,16 @@ import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../Prod
 import { PlatformProductConfig, PlatformConfigRequirements } from './PlatformProductServiceInterface';
 import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { createBasicAuthHeader } from '../../../utils/base64';
+import { PrestaShopApiClient } from '../../clients/prestashop/PrestaShopApiClient';
 
 /**
  * PrestaShop-specific implementation of the product service
  * Supports PrestaShop Web Services API
  */
 export class PrestaShopProductService extends BaseProductService {
+  private apiClient = PrestaShopApiClient.getInstance();
   constructor(config: PlatformProductConfig = {}) {
     super(config);
     this.logger = LoggerFactory.getInstance().createLogger('PrestaShopProductService');
@@ -23,16 +23,20 @@ export class PrestaShopProductService extends BaseProductService {
       this.config.storeUrl = this.config.storeUrl || process.env.PRESTASHOP_STORE_URL || '';
       this.config.apiKey = this.config.apiKey || process.env.PRESTASHOP_API_KEY || '';
 
-      if (this.config.storeUrl) {
-        this.config.storeUrl = this.normalizeUrl(this.config.storeUrl as string);
-      }
-
       if (!this.config.storeUrl || !this.config.apiKey) {
         this.logger.warn('Missing PrestaShop API configuration');
         return false;
       }
 
-      await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.PRESTASHOP);
+      // Configure and initialize the shared PrestaShop client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.storeUrl as string,
+          apiKey: this.config.apiKey as string,
+        });
+        await this.apiClient.initialize();
+      }
+      this.config.storeUrl = this.apiClient.getBaseUrl();
 
       // Test connection
       try {
@@ -306,20 +310,7 @@ export class PrestaShopProductService extends BaseProductService {
   }
 
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    // PrestaShop uses Basic Auth with API key as username and empty password
-    return {
-      Authorization: createBasicAuthHeader(this.config.apiKey as string, ''),
-      Accept: 'application/json',
-    };
-  }
-
-  private normalizeUrl(url: string): string {
-    if (!url) return '';
-    url = url.replace(/\/$/, '');
-    if (!url.startsWith('http')) {
-      url = `https://${url}`;
-    }
-    return url;
+    return this.apiClient['buildHeaders']();
   }
 
   protected mapToProduct(psProduct: any): Product {

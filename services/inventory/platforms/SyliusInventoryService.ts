@@ -2,11 +2,13 @@ import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../Inve
 import { PlatformInventoryConfig, PlatformConfigRequirements } from './PlatformInventoryServiceInterface';
 import { BaseInventoryService } from './BaseInventoryService';
 import { SYLIUS_API_VERSION } from '../../config/apiVersions';
+import { SyliusApiClient } from '../../clients/sylius/SyliusApiClient';
 
 /**
  * Sylius-specific inventory service implementation
  */
 export class SyliusInventoryService extends BaseInventoryService {
+  private apiClient = SyliusApiClient.getInstance();
   private accessToken: string | null = null;
   private tokenExpiration: Date | null = null;
 
@@ -29,13 +31,19 @@ export class SyliusInventoryService extends BaseInventoryService {
       this.config.accessToken = this.config.accessToken || process.env.SYLIUS_ACCESS_TOKEN || '';
       this.config.apiVersion = this.config.apiVersion || process.env.SYLIUS_API_VERSION || SYLIUS_API_VERSION;
 
-      if (this.config.apiUrl) {
-        this.config.apiUrl = this.normalizeUrl(this.config.apiUrl);
-      }
-
       if (!this.config.apiUrl) {
         this.logger.warn({ message: 'Missing Sylius API URL configuration' });
         return false;
+      }
+
+      // Configure and initialize the shared Sylius client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.apiUrl as string,
+          accessToken: this.config.accessToken as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        await this.apiClient.initialize();
       }
 
       // Get OAuth token if needed
@@ -207,19 +215,6 @@ export class SyliusInventoryService extends BaseInventoryService {
   }
 
   protected getAuthHeaders(): Record<string, string> {
-    const token = this.config.accessToken || this.accessToken || '';
-    return {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
-  }
-
-  private normalizeUrl(url: string): string {
-    if (!url) return '';
-    url = url.replace(/\/$/, '');
-    if (!url.startsWith('http')) {
-      url = `https://${url}`;
-    }
-    return url;
+    return this.apiClient['buildHeaders']();
   }
 }

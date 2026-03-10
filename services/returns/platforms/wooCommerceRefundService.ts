@@ -3,14 +3,15 @@ import { RefundData, RefundResult, RefundRecord } from '../ReturnService';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { createBasicAuthHeader } from '../../../utils/base64';
 import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
+import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 /**
  * WooCommerce-specific implementation of the refund service
  * Handles refunds for WooCommerce orders
  */
 export class WooCommerceRefundService implements PlatformRefundServiceInterface {
+  private apiClient = WooCommerceApiClient.getInstance();
   private initialized: boolean = false;
   private refundHistory: Map<string, RefundRecord[]> = new Map();
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
@@ -95,14 +96,11 @@ export class WooCommerceRefundService implements PlatformRefundServiceInterface 
 
       this.logger.info(`Processing WooCommerce refund for order ${orderId} at ${endpoint}`);
 
-      const authHeader = createBasicAuthHeader(credentials.apiKey || '', credentials.apiSecret || '');
+      const headers = this.apiClient['buildHeaders']();
 
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          Authorization: authHeader,
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(requestData),
       });
 

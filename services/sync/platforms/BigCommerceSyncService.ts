@@ -1,12 +1,14 @@
 import { SyncDirection, SyncEntityType, SyncError, SyncOperationResult, SyncOptions } from '../SyncServiceInterface';
 import { BasePlatformSyncService } from './BasePlatformSyncService';
 import { PlatformSyncConfig, PlatformSyncConfigRequirements } from './PlatformSyncServiceInterface';
+import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
 /**
  * BigCommerce-specific sync service implementation
  */
 export class BigCommerceSyncService extends BasePlatformSyncService {
   private webhookIds: string[] = [];
+  private apiClient = BigCommerceApiClient.getInstance();
 
   /**
    * Get configuration requirements for BigCommerce
@@ -45,12 +47,7 @@ export class BigCommerceSyncService extends BasePlatformSyncService {
       const url = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v3/catalog/summary`;
 
       const response = await fetch(url, {
-        headers: {
-          'X-Auth-Token': this.config.accessToken,
-          'X-Auth-Client': this.config.clientId,
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
+        headers: this.apiClient['buildHeaders'](),
       });
 
       if (!response.ok) {
@@ -102,12 +99,7 @@ export class BigCommerceSyncService extends BasePlatformSyncService {
 
             const response = await fetch(url, {
               method: 'POST',
-              headers: {
-                'X-Auth-Token': this.config.accessToken,
-                'X-Auth-Client': this.config.clientId,
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-              },
+              headers: this.apiClient['buildHeaders'](),
               body: JSON.stringify({
                 name,
                 scope,
@@ -163,12 +155,7 @@ export class BigCommerceSyncService extends BasePlatformSyncService {
 
             const response = await fetch(url, {
               method: 'DELETE',
-              headers: {
-                'X-Auth-Token': this.config.accessToken,
-                'X-Auth-Client': this.config.clientId,
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-              },
+              headers: this.apiClient['buildHeaders'](),
             });
 
             return response.ok;

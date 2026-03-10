@@ -4,11 +4,13 @@ import { ProductQueryOptions, ProductResult } from '../../product/ProductService
 import { PlatformConfigRequirements, PlatformSearchConfig } from './PlatformSearchServiceInterface';
 import { BaseSearchService } from './BaseSearchService';
 import { BIGCOMMERCE_API_VERSION } from '../../config/apiVersions';
+import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
 /**
  * BigCommerce-specific implementation of the search service
  */
 export class BigCommerceSearchService extends BaseSearchService {
+  private apiClient = BigCommerceApiClient.getInstance();
   // Use declare to tell TypeScript this exists without redefining it
   // The config property is inherited from BaseSearchService
 
@@ -213,12 +215,7 @@ export class BigCommerceSearchService extends BaseSearchService {
    * Get authorization headers for BigCommerce API
    */
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      'X-Auth-Token': this.config.apiToken as string,
-      'X-Auth-Client': this.config.clientId as string,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 
   /**

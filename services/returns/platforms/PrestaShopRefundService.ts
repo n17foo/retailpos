@@ -3,13 +3,14 @@ import { RefundData, RefundResult, RefundRecord } from '../ReturnService';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { createBasicAuthHeader } from '../../../utils/base64';
+import { PrestaShopApiClient } from '../../clients/prestashop/PrestaShopApiClient';
 
 /**
  * PrestaShop-specific implementation of the refund service
  * Handles refunds for PrestaShop orders
  */
 export class PrestaShopRefundService implements PlatformRefundServiceInterface {
+  private apiClient = PrestaShopApiClient.getInstance();
   private initialized: boolean = false;
   private refundHistory: Map<string, RefundRecord[]> = new Map();
   private logger = LoggerFactory.getInstance().createLogger('PrestaShopRefundService');
@@ -106,7 +107,7 @@ export class PrestaShopRefundService implements PlatformRefundServiceInterface {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          Authorization: createBasicAuthHeader(credentials.apiKey || '', ''),
+          ...this.apiClient['buildHeaders'](),
           'Content-Type': 'application/xml',
         },
         body: xmlPayload,

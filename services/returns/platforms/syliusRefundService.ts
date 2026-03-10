@@ -1,17 +1,16 @@
 import { PlatformRefundServiceInterface, PlatformCredentials } from './PlatformRefundServiceInterface';
 import { RefundData, RefundResult, RefundRecord } from '../ReturnService';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { ECommercePlatform } from '../../../utils/platforms';
 import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
+import { SyliusApiClient } from '../../clients/sylius/SyliusApiClient';
 
 /**
  * Sylius-specific implementation of the refund service
  * Handles refunds for Sylius orders
  */
 export class SyliusRefundService implements PlatformRefundServiceInterface {
+  private apiClient = SyliusApiClient.getInstance();
   private initialized: boolean = false;
   private refundHistory: Map<string, RefundRecord[]> = new Map();
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
@@ -77,10 +76,7 @@ export class SyliusRefundService implements PlatformRefundServiceInterface {
         throw new Error('Failed to retrieve Sylius API credentials');
       }
 
-      const accessToken = await getPlatformToken(ECommercePlatform.SYLIUS, TokenType.ACCESS);
-      if (!accessToken) {
-        throw new Error('Failed to get Sylius access token');
-      }
+      const headers = this.apiClient['buildHeaders']();
 
       // Sylius Refund Plugin endpoint
       const endpoint = `${credentials.apiUrl}/api/v2/shop/orders/${orderId}/refunds`;
@@ -100,8 +96,7 @@ export class SyliusRefundService implements PlatformRefundServiceInterface {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
+          ...headers,
           Accept: 'application/ld+json',
         },
         body: JSON.stringify(requestData),

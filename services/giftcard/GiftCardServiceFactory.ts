@@ -7,6 +7,7 @@ import { SyliusGiftCardService } from './platforms/SyliusGiftCardService';
 import { WixGiftCardService } from './platforms/WixGiftCardService';
 import { PrestaShopGiftCardService } from './platforms/PrestaShopGiftCardService';
 import { SquarespaceGiftCardService } from './platforms/SquarespaceGiftCardService';
+import { CommerceFullGiftCardService } from './platforms/CommerceFullGiftCardService';
 import { ECommercePlatform, isOnlinePlatform } from '../../utils/platforms';
 import { LoggerFactory } from '../logger/LoggerFactory';
 
@@ -65,6 +66,9 @@ export class GiftCardServiceFactory {
         break;
       case ECommercePlatform.SQUARESPACE:
         service = new SquarespaceGiftCardService();
+        break;
+      case ECommercePlatform.COMMERCEFULL:
+        service = new CommerceFullGiftCardService();
         break;
       default:
         return null;

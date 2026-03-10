@@ -2,16 +2,15 @@ import { BaseDiscountService } from './BaseDiscountService';
 import { CouponValidationResult } from '../DiscountServiceInterface';
 import { BasketItem } from '../../basket/basket';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { MAGENTO_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
+import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
 
 export class MagentoDiscountService extends BaseDiscountService {
   private baseUrl = '';
+  private apiClient = MagentoApiClient.getInstance();
 
   constructor() {
     super();
@@ -25,11 +24,13 @@ export class MagentoDiscountService extends BaseDiscountService {
         this.logger.warn('Missing Magento base URL');
         return false;
       }
-      const ok = await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.MAGENTO);
-      if (!ok) {
-        this.logger.warn('Failed to initialize Magento token');
-        return false;
+
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({ storeUrl: this.baseUrl });
+        await this.apiClient.initialize();
       }
+      this.baseUrl = this.apiClient.getBaseUrl();
+
       this.initialized = true;
       return true;
     } catch (error) {
@@ -42,8 +43,7 @@ export class MagentoDiscountService extends BaseDiscountService {
   }
 
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    const token = await getPlatformToken(ECommercePlatform.MAGENTO, TokenType.ACCESS);
-    return { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` };
+    return this.apiClient['buildHeaders']();
   }
 
   async validateCoupon(code: string, _basketTotal: number, _items: BasketItem[]): Promise<CouponValidationResult> {

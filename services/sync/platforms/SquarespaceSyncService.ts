@@ -1,5 +1,6 @@
 import { SyncServiceInterface, SyncOptions, SyncStatus, SyncEntityType, SyncDirection } from '../SyncServiceInterface';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
 
 /**
  * Squarespace-specific sync service for offline-first POS operation
@@ -7,6 +8,7 @@ import { LoggerFactory } from '../../logger/LoggerFactory';
  * Currently implements mock behavior - ready for full API integration
  */
 export class SquarespaceSyncService implements SyncServiceInterface {
+  private apiClient = SquarespaceApiClient.getInstance();
   private initialized: boolean = false;
   private logger = LoggerFactory.getInstance().createLogger('SquarespaceSyncService');
 

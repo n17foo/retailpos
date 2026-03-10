@@ -3,6 +3,7 @@ import { SearchOptions, SearchProduct } from '../SearchServiceInterface';
 import { ProductQueryOptions, ProductResult } from '../../product/ProductServiceInterface';
 import { PlatformConfigRequirements, PlatformSearchConfig } from './PlatformSearchServiceInterface';
 import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
+import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
 // Import directly from the file to work around module resolution issues
 import { BaseSearchService } from './BaseSearchService';
@@ -11,12 +12,8 @@ import { BaseSearchService } from './BaseSearchService';
  * Shopify-specific implementation of the search service
  */
 export class ShopifySearchService extends BaseSearchService {
-  // The config property is inherited from BaseSearchService
+  private apiClient = ShopifyApiClient.getInstance();
 
-  /**
-   * Create a new Shopify search service
-   * @param config Configuration for Shopify API
-   */
   constructor(config: PlatformSearchConfig = {}) {
     super(config);
   }
@@ -36,10 +33,18 @@ export class ShopifySearchService extends BaseSearchService {
         return false;
       }
 
-      // Normalize the store URL
-      if (this.config.storeUrl) {
-        this.config.storeUrl = this.normalizeShopifyUrl(this.config.storeUrl);
+      // Configure and initialize the shared Shopify client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.storeUrl as string,
+          apiKey: this.config.apiKey as string,
+          apiSecret: this.config.apiSecret as string,
+          accessToken: this.config.accessToken as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        await this.apiClient.initialize();
       }
+      this.config.storeUrl = this.apiClient.getBaseUrl();
 
       // Test connection with a simple API call
       try {
@@ -210,24 +215,6 @@ export class ShopifySearchService extends BaseSearchService {
    * Get authorization headers for Shopify API
    */
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      'X-Shopify-Access-Token': this.config.accessToken as string,
-      'Content-Type': 'application/json',
-    };
-  }
-
-  /**
-   * Normalize Shopify store URL to ensure it has the correct format
-   */
-  private normalizeShopifyUrl(url: string): string {
-    // Remove trailing slash if present
-    let normalized = url.endsWith('/') ? url.slice(0, -1) : url;
-
-    // Ensure it has https:// prefix
-    if (!normalized.startsWith('https://') && !normalized.startsWith('http://')) {
-      normalized = 'https://' + normalized;
-    }
-
-    return normalized;
+    return this.apiClient['buildHeaders']();
   }
 }

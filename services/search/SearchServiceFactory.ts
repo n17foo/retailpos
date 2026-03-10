@@ -7,6 +7,7 @@ import { WixSearchService } from './platforms/WixSearchService';
 import { SyliusSearchService } from './platforms/SyliusSearchService';
 import { MagentoSearchService } from './platforms/MagentoSearchService';
 import { OfflineSearchService } from './platforms/OfflineSearchService';
+import { CommerceFullSearchService } from './platforms/CommerceFullSearchService';
 import { PlatformSearchConfig } from './platforms/PlatformSearchServiceInterface';
 
 /**
@@ -100,6 +101,12 @@ export class SearchServiceFactory {
 
     if (platformConfigs.squarespace) {
       platformServices.push(new OfflineSearchService());
+    }
+
+    // Create CommerceFull service if config is provided
+    if (platformConfigs.commercefull) {
+      const commerceFullConfig = platformConfigs.commercefull || {};
+      platformServices.push(new CommerceFullSearchService(commerceFullConfig));
     }
 
     // Create Offline service if config is provided

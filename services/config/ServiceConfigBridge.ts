@@ -1,7 +1,7 @@
 import { ECommercePlatform } from '../../utils/platforms';
 import { LoggerFactory } from '../logger/LoggerFactory';
 import { keyValueRepository } from '../../repositories/KeyValueRepository';
-import { SHOPIFY_API_VERSION } from './apiVersions';
+import { SHOPIFY_API_VERSION, COMMERCEFULL_API_VERSION } from './apiVersions';
 
 // NOTE: Factory imports are lazy-loaded inside methods to break require cycles.
 // The cycle was: ServiceConfigBridge → factory → platform service → ServiceConfigBridge
@@ -55,6 +55,11 @@ export interface StoredECommerceSettings {
   squarespace?: {
     apiKey: string;
     siteId: string;
+  };
+  commercefull?: {
+    apiKey: string;
+    apiSecret: string;
+    storeUrl: string;
   };
   offline?: {
     menuUrl: string;
@@ -152,6 +157,7 @@ export class ServiceConfigBridge {
       wix: ECommercePlatform.WIX,
       prestashop: ECommercePlatform.PRESTASHOP,
       squarespace: ECommercePlatform.SQUARESPACE,
+      commercefull: ECommercePlatform.COMMERCEFULL,
       offline: ECommercePlatform.OFFLINE,
     };
 
@@ -216,6 +222,14 @@ export class ServiceConfigBridge {
         return {
           apiKey: settings.squarespace?.apiKey || settings.apiKey,
           siteId: settings.squarespace?.siteId,
+        };
+
+      case ECommercePlatform.COMMERCEFULL:
+        return {
+          apiKey: settings.commercefull?.apiKey || settings.apiKey,
+          apiSecret: settings.commercefull?.apiSecret,
+          storeUrl: settings.commercefull?.storeUrl || settings.apiUrl,
+          apiVersion: COMMERCEFULL_API_VERSION,
         };
 
       case ECommercePlatform.OFFLINE:

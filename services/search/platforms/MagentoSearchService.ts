@@ -3,17 +3,15 @@ import { SearchOptions, SearchProduct } from '../SearchServiceInterface';
 import { ProductQueryOptions, ProductResult } from '../../product/ProductServiceInterface';
 import { PlatformConfigRequirements, PlatformSearchConfig } from './PlatformSearchServiceInterface';
 import { BaseSearchService } from './BaseSearchService';
+import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
 
 /**
  * Magento-specific implementation of the search service
  */
 export class MagentoSearchService extends BaseSearchService {
+  private apiClient = MagentoApiClient.getInstance();
   // Use declare to tell TypeScript this exists without redefining it
   // The config property is inherited from BaseSearchService
-
-  // Token cache and expiration
-  private accessToken: string | null = null;
-  private tokenExpiration: Date | null = null;
 
   /**
    * Create a new Magento search service
@@ -39,21 +37,11 @@ export class MagentoSearchService extends BaseSearchService {
         return false;
       }
 
-      // Test authentication and get token
+      // Test connection with a simple API call
       try {
-        const token = await this.getAuthToken();
-        if (!token) {
-          this.logger.error({ message: 'Failed to authenticate with Magento API' });
-          return false;
-        }
-
-        // Test a simple API call
         const apiUrl = `${this.config.storeUrl}/rest/V1/products`;
         const response = await fetch(`${apiUrl}?searchCriteria[pageSize]=1`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: this.getAuthHeaders(),
         });
 
         if (response.ok) {
@@ -123,12 +111,6 @@ export class MagentoSearchService extends BaseSearchService {
     }
 
     try {
-      // Get authentication token
-      const token = await this.getAuthToken();
-      if (!token) {
-        throw new Error('Failed to authenticate with Magento API');
-      }
-
       // Build Magento search criteria
       let apiUrl = `${this.config.storeUrl}/rest/V1/products`;
       const searchCriteria = [];
@@ -176,10 +158,7 @@ export class MagentoSearchService extends BaseSearchService {
       // Make API request
       const response = await fetch(apiUrl, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -222,18 +201,10 @@ export class MagentoSearchService extends BaseSearchService {
     }
 
     try {
-      const token = await this.getAuthToken();
-      if (!token) {
-        throw new Error('Failed to authenticate with Magento API');
-      }
-
       const apiUrl = `${this.config.storeUrl}/rest/V1/categories`;
       const response = await fetch(apiUrl, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -271,19 +242,11 @@ export class MagentoSearchService extends BaseSearchService {
     }
 
     try {
-      const token = await this.getAuthToken();
-      if (!token) {
-        throw new Error('Failed to authenticate with Magento API');
-      }
-
       const apiUrl = `${this.config.storeUrl}/rest/V1/categories/list?searchCriteria[filterGroups][0][filters][0][field]=name&searchCriteria[filterGroups][0][filters][0][value]=${categoryName}&searchCriteria[filterGroups][0][filters][0][conditionType]=eq`;
 
       const response = await fetch(apiUrl, {
         method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: this.getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -344,49 +307,9 @@ export class MagentoSearchService extends BaseSearchService {
   }
 
   /**
-   * Get authorization token for Magento API
+   * Get authorization headers for Magento API
    */
-  private async getAuthToken(): Promise<string | null> {
-    try {
-      // Check if we have a valid token already
-      const now = new Date();
-      if (this.accessToken && this.tokenExpiration && this.tokenExpiration > now) {
-        return this.accessToken;
-      }
-
-      // Authenticate and get new token
-      const tokenUrl = `${this.config.storeUrl}/rest/V1/integration/admin/token`;
-      const response = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: this.config.username,
-          password: this.config.password,
-        }),
-      });
-
-      if (!response.ok) {
-        this.logger.error({ message: 'Failed to get Magento authentication token' });
-        return null;
-      }
-
-      // Parse token (comes as a string with quotes)
-      const token = await response.text();
-      this.accessToken = token.replace(/"/g, '');
-
-      // Set token expiration (typically 4 hours for Magento)
-      this.tokenExpiration = new Date();
-      this.tokenExpiration.setHours(this.tokenExpiration.getHours() + 4);
-
-      return this.accessToken;
-    } catch (error) {
-      this.logger.error(
-        { message: 'Error getting Magento authentication token' },
-        error instanceof Error ? error : new Error(String(error))
-      );
-      return null;
-    }
+  protected getAuthHeaders(): Record<string, string> {
+    return this.apiClient['buildHeaders']();
   }
 }

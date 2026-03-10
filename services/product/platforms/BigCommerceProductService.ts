@@ -3,17 +3,16 @@ import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../Prod
 import { PlatformProductConfig, PlatformConfigRequirements } from './PlatformProductServiceInterface';
 import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { TokenInitializer } from '../../../services/token/TokenInitializer';
-import { getPlatformToken } from '../../../services/token/TokenUtils';
-import { TokenType } from '../../../services/token/TokenServiceInterface';
 import { withTokenRefresh } from '../../../services/token/TokenIntegration';
 import { BIGCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
 /**
  * BigCommerce-specific implementation of the product service
  */
 export class BigCommerceProductService extends BaseProductService {
+  private apiClient = BigCommerceApiClient.getInstance();
   // The config property is inherited from BaseProductService
 
   /**
@@ -33,17 +32,20 @@ export class BigCommerceProductService extends BaseProductService {
       // Set up configuration from constructor or environment variables
       this.config.storeHash = this.config.storeHash || process.env.BIGCOMMERCE_STORE_HASH || '';
 
-      // Initialize the token provider for BigCommerce
-      const tokenInitializer = TokenInitializer.getInstance();
-      const initialized = await tokenInitializer.initializePlatformToken(ECommercePlatform.BIGCOMMERCE);
-
-      if (!initialized) {
-        this.logger.warn('Failed to initialize BigCommerce token provider');
-      }
-
       if (!this.config.storeHash) {
         this.logger.warn('Missing BigCommerce store hash configuration');
         return false;
+      }
+
+      // Configure and initialize the shared BigCommerce client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeHash: this.config.storeHash as string,
+          accessToken: this.config.accessToken as string,
+          clientId: this.config.clientId as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        await this.apiClient.initialize();
       }
 
       // Test connection with a simple API call
@@ -387,28 +389,7 @@ export class BigCommerceProductService extends BaseProductService {
    * @returns Promise resolving to headers object with authentication
    */
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    try {
-      // Get the access token from token management system
-      const accessToken = await getPlatformToken(ECommercePlatform.BIGCOMMERCE, TokenType.ACCESS);
-      const clientId = this.config.clientId || (await getPlatformToken(ECommercePlatform.BIGCOMMERCE, TokenType.API_KEY)) || '';
-
-      return {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'X-Auth-Token': accessToken || '',
-        'X-Auth-Client': String(clientId),
-      };
-    } catch (error) {
-      this.logger.error({ message: 'Error getting BigCommerce auth headers' }, error instanceof Error ? error : new Error(String(error)));
-
-      // Fallback to config values if token retrieval fails
-      return {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'X-Auth-Token': this.config.accessToken || '',
-        'X-Auth-Client': String(this.config.clientId) || '',
-      };
-    }
+    return this.apiClient['buildHeaders']();
   }
 
   /**

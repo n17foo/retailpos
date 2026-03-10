@@ -2,12 +2,14 @@
 import { Category } from '../CategoryServiceInterface';
 import { BaseCategoryService } from './BaseCategoryService';
 import { PlatformConfigRequirements } from './PlatformCategoryServiceInterface';
+import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
 /**
  * BigCommerce-specific category service implementation
  * Handles category operations for BigCommerce platform
  */
 export class BigCommerceCategoryService extends BaseCategoryService {
+  private apiClient = BigCommerceApiClient.getInstance();
   /**
    * Get configuration requirements for BigCommerce
    */
@@ -247,11 +249,6 @@ export class BigCommerceCategoryService extends BaseCategoryService {
    * Create authorization headers for BigCommerce API
    */
   private getAuthHeaders(): Record<string, string> {
-    return {
-      'X-Auth-Token': this.config.accessToken || '',
-      'X-Auth-Client': this.config.clientId || '',
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 }

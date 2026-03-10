@@ -1,11 +1,13 @@
 import { Category, CategoryServiceInterface } from '../CategoryServiceInterface';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
 
 /**
  * Magento-specific category service implementation
  * Handles Magento category API interactions
  */
 export class MagentoCategoryService implements CategoryServiceInterface {
+  private apiClient = MagentoApiClient.getInstance();
   private initialized: boolean = false;
   private logger = LoggerFactory.getInstance().createLogger('MagentoCategoryService');
 

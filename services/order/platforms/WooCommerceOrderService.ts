@@ -2,14 +2,16 @@
 import { Order } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
-import { createBasicAuthHeader } from '../../../utils/base64';
 import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import { QueuedApiService } from '../../queue/QueuedApiService';
+import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 /**
  * WooCommerce-specific implementation of the order service
  */
 export class WooCommerceOrderService extends BaseOrderService {
+  private apiClient = WooCommerceApiClient.getInstance();
+
   /**
    * Create a new WooCommerce order service
    * @param config Configuration for WooCommerce API
@@ -33,8 +35,17 @@ export class WooCommerceOrderService extends BaseOrderService {
         return false;
       }
 
-      // Normalize the store URL
-      this.config.storeUrl = this.normalizeStoreUrl(this.config.storeUrl);
+      // Configure and initialize the shared WooCommerce client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.storeUrl,
+          consumerKey: this.config.consumerKey as string,
+          consumerSecret: this.config.consumerSecret as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        await this.apiClient.initialize();
+      }
+      this.config.storeUrl = this.apiClient.getBaseUrl();
 
       // Test connection with a simple API call
       try {
@@ -195,10 +206,7 @@ export class WooCommerceOrderService extends BaseOrderService {
    * Uses basic authentication with consumer key and consumer secret
    */
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      Authorization: createBasicAuthHeader(this.config.consumerKey as string, this.config.consumerSecret as string),
-      'Content-Type': 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 
   /**
@@ -330,22 +338,5 @@ export class WooCommerceOrderService extends BaseOrderService {
       createdAt: wooOrder.date_created ? new Date(wooOrder.date_created) : undefined,
       updatedAt: wooOrder.date_modified ? new Date(wooOrder.date_modified) : undefined,
     };
-  }
-
-  /**
-   * Normalize the store URL to ensure it has the correct format
-   */
-  private normalizeStoreUrl(url: string): string {
-    if (!url) return '';
-
-    // Remove trailing slash
-    url = url.replace(/\/$/, '');
-
-    // Ensure https:// prefix
-    if (!url.startsWith('http')) {
-      url = `https://${url}`;
-    }
-
-    return url;
   }
 }

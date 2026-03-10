@@ -3,11 +3,13 @@ import { SearchOptions, SearchProduct } from '../SearchServiceInterface';
 import { ProductQueryOptions, ProductResult } from '../../product/ProductServiceInterface';
 import { PlatformConfigRequirements, PlatformSearchConfig } from './PlatformSearchServiceInterface';
 import { BaseSearchService } from './BaseSearchService';
+import { SyliusApiClient } from '../../clients/sylius/SyliusApiClient';
 
 /**
  * Sylius-specific implementation of the search service
  */
 export class SyliusSearchService extends BaseSearchService {
+  private apiClient = SyliusApiClient.getInstance();
   // Use declare to tell TypeScript this exists without redefining it
   // The config property is inherited from BaseSearchService
 
@@ -254,24 +256,6 @@ export class SyliusSearchService extends BaseSearchService {
    * Get authorization headers for Sylius API
    */
   protected getAuthHeaders(): Record<string, string> {
-    // For simplicity, using API key auth. In production, should use OAuth or JWT
-    return {
-      Authorization: `Bearer ${this.generateToken()}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    };
-  }
-
-  /**
-   * Generate a token for Sylius API authentication
-   * Note: This is a simplified implementation. In production, use OAuth flow.
-   */
-  private generateToken(): string {
-    const apiKey = this.config.apiKey as string;
-    const apiSecret = this.config.apiSecret as string;
-
-    // In a real implementation, this would make a token request to the Sylius OAuth endpoint
-    // For demonstration purposes, we're returning a mock token
-    return `${apiKey}_${apiSecret}`;
+    return this.apiClient['buildHeaders']();
   }
 }

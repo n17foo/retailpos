@@ -2,18 +2,17 @@
 import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../ProductServiceInterface';
 import { PlatformProductConfig, PlatformConfigRequirements } from './PlatformProductServiceInterface';
 import { BaseProductService } from './BaseProductService';
-import { TokenInitializer } from '../../token/TokenInitializer';
-import { TokenType } from '../../token/TokenServiceInterface';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken, withTokenRefresh } from '../../token/TokenUtils';
+import { withTokenRefresh } from '../../token/TokenUtils';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { createBasicAuthHeader } from '../../../utils/base64';
 import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
+import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 /**
  * WooCommerce-specific implementation of the product service
  */
 export class WooCommerceProductService extends BaseProductService {
+  private apiClient = WooCommerceApiClient.getInstance();
   protected logger = LoggerFactory.getInstance().createLogger('WooCommerceProductService');
 
   /**
@@ -41,11 +40,17 @@ export class WooCommerceProductService extends BaseProductService {
         return false;
       }
 
-      // Initialize token provider
-      if (!(await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.WOOCOMMERCE))) {
-        this.logger.error('Failed to initialize token provider for WooCommerce');
-        return false;
+      // Configure and initialize the shared WooCommerce client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.storeUrl,
+          consumerKey: this.config.consumerKey as string,
+          consumerSecret: this.config.consumerSecret as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        await this.apiClient.initialize();
       }
+      this.config.storeUrl = this.apiClient.getBaseUrl();
 
       // Test connection with a simple API call
       try {
@@ -363,54 +368,16 @@ export class WooCommerceProductService extends BaseProductService {
    * Uses Basic Auth with consumer key and secret
    */
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    try {
-      // Try to get tokens from centralized token management first
-      let apiKey = await getPlatformToken(ECommercePlatform.WOOCOMMERCE, TokenType.API_KEY);
-      let apiSecret = await getPlatformToken(ECommercePlatform.WOOCOMMERCE, TokenType.API_KEY);
-
-      // Fall back to config if tokens not available
-      if (!apiKey) {
-        apiKey = this.config.consumerKey as string;
-      }
-
-      if (!apiSecret) {
-        apiSecret = this.config.consumerSecret as string;
-      }
-
-      // Create basic auth header using React Native compatible utility
-      return {
-        Authorization: createBasicAuthHeader(apiKey, apiSecret),
-        'Content-Type': 'application/json',
-      };
-    } catch (error) {
-      this.logger.error('Error getting WooCommerce auth headers', error instanceof Error ? error : new Error(String(error)));
-      throw error;
-    }
+    return this.apiClient['buildHeaders']();
   }
 
   /**
    * Get the full API URL for a WooCommerce API endpoint
    */
   protected getApiUrl(endpoint: string): string {
-    const baseUrl = this.normalizeStoreUrl(this.config.storeUrl as string);
+    const baseUrl = this.apiClient.getBaseUrl();
     const apiVersion = this.config.apiVersion || WOOCOMMERCE_API_VERSION;
     return `${baseUrl}/wp-json/${apiVersion}${endpoint}`;
-  }
-
-  /**
-   * Normalize store URL by removing trailing slashes
-   */
-  protected normalizeStoreUrl(url: string): string {
-    if (!url) {
-      return '';
-    }
-
-    // Remove trailing slash if present
-    if (url.endsWith('/')) {
-      return url.slice(0, -1);
-    }
-
-    return url;
   }
 
   /**

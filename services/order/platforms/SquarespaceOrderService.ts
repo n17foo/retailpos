@@ -3,6 +3,7 @@ import { Order } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { QueuedApiService } from '../../queue/QueuedApiService';
+import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
 
 // Squarespace API version
 const SQUARESPACE_API_VERSION = '1.0';
@@ -11,6 +12,7 @@ const SQUARESPACE_API_VERSION = '1.0';
  * Squarespace Commerce implementation of the order service
  */
 export class SquarespaceOrderService extends BaseOrderService {
+  private apiClient = SquarespaceApiClient.getInstance();
   constructor(config: PlatformOrderConfig = {}) {
     super(config);
   }
@@ -165,11 +167,7 @@ export class SquarespaceOrderService extends BaseOrderService {
   }
 
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      Authorization: `Bearer ${this.config.apiKey}`,
-      'Content-Type': 'application/json',
-      'User-Agent': 'RetailPOS/1.0',
-    };
+    return this.apiClient['buildHeaders']();
   }
 
   protected mapToOrder(sqOrder: any): Order {

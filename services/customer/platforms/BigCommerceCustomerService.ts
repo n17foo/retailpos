@@ -2,17 +2,16 @@
 import { BaseCustomerService } from './BaseCustomerService';
 import { CustomerSearchOptions, CustomerSearchResult, PlatformCustomer } from '../CustomerServiceInterface';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { BIGCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
+import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
 export class BigCommerceCustomerService extends BaseCustomerService {
   private storeHash = '';
   private apiVersion = BIGCOMMERCE_API_VERSION;
+  private apiClient = BigCommerceApiClient.getInstance();
 
   constructor() {
     super();
@@ -26,11 +25,16 @@ export class BigCommerceCustomerService extends BaseCustomerService {
         this.logger.warn('Missing BigCommerce store hash');
         return false;
       }
-      const tokenInitialized = await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.BIGCOMMERCE);
-      if (!tokenInitialized) {
-        this.logger.warn('Failed to initialize BigCommerce token provider');
-        return false;
+
+      // Configure and initialize the shared BigCommerce client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeHash: this.storeHash,
+          apiVersion: this.apiVersion,
+        });
+        await this.apiClient.initialize();
       }
+
       this.initialized = true;
       return true;
     } catch (error) {
@@ -43,8 +47,7 @@ export class BigCommerceCustomerService extends BaseCustomerService {
   }
 
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    const token = await getPlatformToken(ECommercePlatform.BIGCOMMERCE, TokenType.ACCESS);
-    return { 'Content-Type': 'application/json', 'X-Auth-Token': token || '' };
+    return this.apiClient['buildHeaders']();
   }
 
   async searchCustomers(options: CustomerSearchOptions): Promise<CustomerSearchResult> {

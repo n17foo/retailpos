@@ -3,9 +3,9 @@ import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../Prod
 import { PlatformProductConfig, PlatformConfigRequirements } from './PlatformProductServiceInterface';
 import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
 
 // Squarespace API version
 const SQUARESPACE_API_VERSION = '1.0';
@@ -15,6 +15,7 @@ const SQUARESPACE_API_VERSION = '1.0';
  * Uses Squarespace Commerce APIs
  */
 export class SquarespaceProductService extends BaseProductService {
+  private apiClient = SquarespaceApiClient.getInstance();
   constructor(config: PlatformProductConfig = {}) {
     super(config);
     this.logger = LoggerFactory.getInstance().createLogger('SquarespaceProductService');
@@ -31,7 +32,14 @@ export class SquarespaceProductService extends BaseProductService {
         return false;
       }
 
-      await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.SQUARESPACE);
+      // Configure and initialize the shared Squarespace client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          apiKey: this.config.apiKey as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        await this.apiClient.initialize();
+      }
 
       // Test connection
       try {
@@ -184,11 +192,7 @@ export class SquarespaceProductService extends BaseProductService {
   }
 
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return {
-      Authorization: `Bearer ${this.config.apiKey}`,
-      'Content-Type': 'application/json',
-      'User-Agent': 'RetailPOS/1.0',
-    };
+    return this.apiClient['buildHeaders']();
   }
 
   protected mapToProduct(sqProduct: any): Product {

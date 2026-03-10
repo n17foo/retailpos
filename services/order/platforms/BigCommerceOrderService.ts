@@ -3,11 +3,14 @@ import { Order } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { QueuedApiService } from '../../queue/QueuedApiService';
+import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
 /**
  * BigCommerce-specific implementation of the order service
  */
 export class BigCommerceOrderService extends BaseOrderService {
+  private apiClient = BigCommerceApiClient.getInstance();
+
   /**
    * Create a new BigCommerce order service
    * @param config Configuration for BigCommerce API
@@ -205,10 +208,7 @@ export class BigCommerceOrderService extends BaseOrderService {
    * Create authorization headers for BigCommerce API
    */
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      'X-Auth-Token': this.config.accessToken || '',
-      'Content-Type': 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 
   /**

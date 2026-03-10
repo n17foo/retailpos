@@ -7,6 +7,7 @@ import { SyliusDiscountService } from './platforms/SyliusDiscountService';
 import { WixDiscountService } from './platforms/WixDiscountService';
 import { PrestaShopDiscountService } from './platforms/PrestaShopDiscountService';
 import { SquarespaceDiscountService } from './platforms/SquarespaceDiscountService';
+import { CommerceFullDiscountService } from './platforms/CommerceFullDiscountService';
 import { ECommercePlatform, isOnlinePlatform } from '../../utils/platforms';
 import { LoggerFactory } from '../logger/LoggerFactory';
 
@@ -69,6 +70,9 @@ export class DiscountServiceFactory {
         break;
       case ECommercePlatform.SQUARESPACE:
         service = new SquarespaceDiscountService();
+        break;
+      case ECommercePlatform.COMMERCEFULL:
+        service = new CommerceFullDiscountService();
         break;
       default:
         return null;

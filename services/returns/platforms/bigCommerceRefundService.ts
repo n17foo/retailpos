@@ -4,15 +4,15 @@ import { ECommercePlatform } from '../../../utils/platforms';
 import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
 import { RefundData, RefundResult, RefundRecord } from '../ReturnService';
-import { getPlatformToken, withTokenRefresh } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
-import { TokenInitializer } from '../../token/TokenInitializer';
+import { withTokenRefresh } from '../../token/TokenUtils';
+import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
 /**
  * BigCommerce-specific implementation of the refund service
  * Handles refunds for BigCommerce orders
  */
 export class BigCommerceRefundService implements PlatformRefundServiceInterface {
+  private apiClient = BigCommerceApiClient.getInstance();
   private initialized: boolean = false;
   private refundHistory: Map<string, RefundRecord[]> = new Map();
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
@@ -33,12 +33,8 @@ export class BigCommerceRefundService implements PlatformRefundServiceInterface 
       const credentials = await this.getBigCommerceCredentials();
 
       if (credentials) {
-        // Initialize the token provider for BigCommerce
-        const tokenInitialized = await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.BIGCOMMERCE);
-
-        if (!tokenInitialized) {
-          this.logger.warn('Failed to initialize BigCommerce token provider');
-          return false;
+        if (!this.apiClient.isInitialized()) {
+          await this.apiClient.initialize();
         }
 
         this.initialized = true;
@@ -90,10 +86,7 @@ export class BigCommerceRefundService implements PlatformRefundServiceInterface 
         throw new Error('Failed to retrieve BigCommerce API credentials');
       }
 
-      const accessToken = await getPlatformToken(ECommercePlatform.BIGCOMMERCE, TokenType.ACCESS);
-      if (!accessToken) {
-        throw new Error('Failed to get BigCommerce access token');
-      }
+      const headers = this.apiClient['buildHeaders']();
 
       const endpoint = `${credentials.apiUrl}/stores/${credentials.storeHash || ''}/v3/orders/${orderId}/payment_actions/refunds`;
 
@@ -120,8 +113,7 @@ export class BigCommerceRefundService implements PlatformRefundServiceInterface 
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          'X-Auth-Token': accessToken,
-          'Content-Type': 'application/json',
+          ...headers,
           Accept: 'application/json',
         },
         body: JSON.stringify(requestData),

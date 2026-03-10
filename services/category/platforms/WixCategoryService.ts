@@ -1,11 +1,13 @@
 import { Category, CategoryServiceInterface } from '../CategoryServiceInterface';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { WixApiClient } from '../../clients/wix/WixApiClient';
 
 /**
  * Wix-specific category service implementation
  * Handles Wix category API interactions
  */
 export class WixCategoryService implements CategoryServiceInterface {
+  private apiClient = WixApiClient.getInstance();
   private initialized: boolean = false;
   private logger = LoggerFactory.getInstance().createLogger('WixCategoryService');
 

@@ -2,17 +2,16 @@
 import { BaseCustomerService } from './BaseCustomerService';
 import { CustomerSearchOptions, CustomerSearchResult, PlatformCustomer } from '../CustomerServiceInterface';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
+import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
 export class ShopifyCustomerService extends BaseCustomerService {
   private storeUrl = '';
   private apiVersion = SHOPIFY_API_VERSION;
+  private apiClient = ShopifyApiClient.getInstance();
 
   constructor() {
     super();
@@ -29,17 +28,15 @@ export class ShopifyCustomerService extends BaseCustomerService {
         return false;
       }
 
-      // Normalize URL
-      this.storeUrl = this.storeUrl.replace(/\/+$/, '');
-      if (!this.storeUrl.startsWith('https://')) {
-        this.storeUrl = `https://${this.storeUrl}`;
+      // Configure and initialize the shared Shopify client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.storeUrl,
+          apiVersion: this.apiVersion,
+        });
+        await this.apiClient.initialize();
       }
-
-      const tokenInitialized = await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.SHOPIFY);
-      if (!tokenInitialized) {
-        this.logger.warn('Failed to initialize Shopify token provider');
-        return false;
-      }
+      this.storeUrl = this.apiClient.getBaseUrl();
 
       this.initialized = true;
       return true;
@@ -53,11 +50,7 @@ export class ShopifyCustomerService extends BaseCustomerService {
   }
 
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    const token = await getPlatformToken(ECommercePlatform.SHOPIFY, TokenType.ACCESS);
-    return {
-      'Content-Type': 'application/json',
-      'X-Shopify-Access-Token': token || '',
-    };
+    return this.apiClient['buildHeaders']();
   }
 
   async searchCustomers(options: CustomerSearchOptions): Promise<CustomerSearchResult> {

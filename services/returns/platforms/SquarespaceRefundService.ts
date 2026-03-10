@@ -4,12 +4,14 @@ import { LoggerFactory } from '../../logger/LoggerFactory';
 import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
 import { SQUARESPACE_API_VERSION } from '../../config/apiVersions';
+import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
 
 /**
  * Squarespace-specific implementation of the refund service
  * Handles refunds for Squarespace orders
  */
 export class SquarespaceRefundService implements PlatformRefundServiceInterface {
+  private apiClient = SquarespaceApiClient.getInstance();
   private initialized: boolean = false;
   private refundHistory: Map<string, RefundRecord[]> = new Map();
   private logger = LoggerFactory.getInstance().createLogger('SquarespaceRefundService');
@@ -93,8 +95,7 @@ export class SquarespaceRefundService implements PlatformRefundServiceInterface 
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${credentials.accessToken || ''}`,
-          'Content-Type': 'application/json',
+          ...this.apiClient['buildHeaders'](),
           'User-Agent': 'RetailPOS/1.0',
         },
         body: JSON.stringify(requestData),

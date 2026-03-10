@@ -1,11 +1,13 @@
 import { Category, CategoryServiceInterface } from '../CategoryServiceInterface';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { SyliusApiClient } from '../../clients/sylius/SyliusApiClient';
 
 /**
  * Sylius-specific category service implementation
  * Handles Sylius category API interactions
  */
 export class SyliusCategoryService implements CategoryServiceInterface {
+  private apiClient = SyliusApiClient.getInstance();
   private initialized: boolean = false;
   private logger = LoggerFactory.getInstance().createLogger('SyliusCategoryService');
 

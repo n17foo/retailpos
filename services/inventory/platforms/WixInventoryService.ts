@@ -2,12 +2,14 @@ import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../Inve
 import { PlatformInventoryConfig, PlatformConfigRequirements } from './PlatformInventoryServiceInterface';
 import { BaseInventoryService } from './BaseInventoryService';
 import { WIX_API_VERSION } from '../../config/apiVersions';
+import { WixApiClient } from '../../clients/wix/WixApiClient';
 
 /**
  * Wix-specific inventory service implementation
  * Uses Wix Stores Inventory API
  */
 export class WixInventoryService extends BaseInventoryService {
+  private apiClient = WixApiClient.getInstance();
   getConfigRequirements(): PlatformConfigRequirements {
     return {
       required: ['apiKey', 'siteId'],
@@ -178,10 +180,6 @@ export class WixInventoryService extends BaseInventoryService {
   }
 
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      Authorization: this.config.apiKey as string,
-      'wix-site-id': this.config.siteId as string,
-      'Content-Type': 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 }

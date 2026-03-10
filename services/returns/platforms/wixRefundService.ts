@@ -1,17 +1,16 @@
 import { PlatformRefundServiceInterface, PlatformCredentials } from './PlatformRefundServiceInterface';
 import { RefundData, RefundResult, RefundRecord } from '../ReturnService';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { ECommercePlatform } from '../../../utils/platforms';
 import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
+import { WixApiClient } from '../../clients/wix/WixApiClient';
 
 /**
  * Wix-specific implementation of the refund service
  * Handles refunds for Wix orders
  */
 export class WixRefundService implements PlatformRefundServiceInterface {
+  private apiClient = WixApiClient.getInstance();
   private initialized: boolean = false;
   private refundHistory: Map<string, RefundRecord[]> = new Map();
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
@@ -77,10 +76,7 @@ export class WixRefundService implements PlatformRefundServiceInterface {
         throw new Error('Failed to retrieve Wix API credentials');
       }
 
-      const accessToken = await getPlatformToken(ECommercePlatform.WIX, TokenType.ACCESS);
-      if (!accessToken) {
-        throw new Error('Failed to get Wix access token');
-      }
+      const headers = this.apiClient['buildHeaders']();
 
       // Wix eCommerce Refunds API
       const endpoint = 'https://www.wixapis.com/ecom/v1/refunds/create';
@@ -107,11 +103,7 @@ export class WixRefundService implements PlatformRefundServiceInterface {
 
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          Authorization: accessToken,
-          'Content-Type': 'application/json',
-          'wix-site-id': credentials.siteId || '',
-        },
+        headers,
         body: JSON.stringify(requestData),
       });
 

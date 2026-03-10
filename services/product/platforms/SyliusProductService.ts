@@ -3,16 +3,17 @@ import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../Prod
 import { PlatformProductConfig, PlatformConfigRequirements } from './PlatformProductServiceInterface';
 import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { SYLIUS_API_VERSION } from '../../config/apiVersions';
+import { SyliusApiClient } from '../../clients/sylius/SyliusApiClient';
 
 /**
  * Sylius-specific implementation of the product service
  * Supports Sylius REST API
  */
 export class SyliusProductService extends BaseProductService {
+  private apiClient = SyliusApiClient.getInstance();
   private accessToken: string | null = null;
   private tokenExpiration: Date | null = null;
 
@@ -33,18 +34,22 @@ export class SyliusProductService extends BaseProductService {
       this.config.accessToken = this.config.accessToken || process.env.SYLIUS_ACCESS_TOKEN || '';
       this.config.apiVersion = this.config.apiVersion || process.env.SYLIUS_API_VERSION || SYLIUS_API_VERSION;
 
-      // Normalize API URL
-      if (this.config.apiUrl) {
-        this.config.apiUrl = this.normalizeUrl(this.config.apiUrl as string);
-      }
-
       if (!this.config.apiUrl) {
         this.logger.warn('Missing Sylius API URL configuration');
         return false;
       }
 
-      // Initialize token provider
-      await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.SYLIUS);
+      // Configure and initialize the shared Sylius client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.apiUrl as string,
+          accessToken: this.config.accessToken as string,
+          apiKey: this.config.apiKey as string,
+          apiSecret: this.config.apiSecret as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        await this.apiClient.initialize();
+      }
 
       // Get OAuth token if needed
       if (!this.config.accessToken && this.config.apiKey && this.config.apiSecret) {
@@ -365,17 +370,7 @@ export class SyliusProductService extends BaseProductService {
    * Get authorization headers
    */
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    let token = this.config.accessToken as string;
-
-    if (!token) {
-      token = (await this.getOAuthToken()) || '';
-    }
-
-    return {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 
   /**

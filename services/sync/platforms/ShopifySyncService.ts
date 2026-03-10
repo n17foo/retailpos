@@ -6,6 +6,7 @@ import { ProductServiceFactory } from '../../product/ProductServiceFactory';
 import { CategoryServiceFactory } from '../../category/CategoryServiceFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
+import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
 /**
  * Shopify-specific sync service implementation
@@ -15,6 +16,7 @@ export class ShopifySyncService extends BasePlatformSyncService {
   private storeUrl: string = '';
   private accessToken: string = '';
   private apiVersion: string = SHOPIFY_API_VERSION;
+  private apiClient = ShopifyApiClient.getInstance();
 
   private getShopifyApiUrl(endpoint: string): string {
     return `${this.storeUrl}/admin/api/${this.apiVersion}/${endpoint}`;
@@ -42,6 +44,17 @@ export class ShopifySyncService extends BasePlatformSyncService {
     this.accessToken = config.accessToken;
     this.apiVersion = config.apiVersion || this.apiVersion;
 
+    // Configure and initialize the shared Shopify client
+    if (!this.apiClient.isInitialized()) {
+      this.apiClient.configure({
+        storeUrl: this.storeUrl,
+        accessToken: this.accessToken,
+        apiVersion: this.apiVersion,
+      });
+      await this.apiClient.initialize();
+    }
+    this.storeUrl = this.apiClient.getBaseUrl();
+
     // Call base class initialization
     const baseInitialized = await super.initialize(config);
     if (!baseInitialized) {
@@ -63,12 +76,7 @@ export class ShopifySyncService extends BasePlatformSyncService {
     try {
       // Make a simple API call to test the connection
       const url = this.getShopifyApiUrl('shop.json');
-      const headers = {
-        'Content-Type': 'application/json',
-        'X-Shopify-Access-Token': this.accessToken,
-      };
-
-      const response = await fetch(url, { headers });
+      const response = await fetch(url, { headers: this.apiClient['buildHeaders']() });
 
       if (!response.ok) {
         this.logger.error({ message: `Shopify connection test failed: ${response.statusText}` });
@@ -121,14 +129,9 @@ export class ShopifySyncService extends BasePlatformSyncService {
         webhookTopics.map(async topic => {
           try {
             const url = this.getShopifyApiUrl('webhooks.json');
-            const headers = {
-              'Content-Type': 'application/json',
-              'X-Shopify-Access-Token': this.accessToken,
-            };
-
             const response = await fetch(url, {
               method: 'POST',
-              headers,
+              headers: this.apiClient['buildHeaders'](),
               body: JSON.stringify({
                 webhook: {
                   topic,
@@ -179,14 +182,9 @@ export class ShopifySyncService extends BasePlatformSyncService {
         this.webhookIds.map(async webhookId => {
           try {
             const url = this.getShopifyApiUrl(`webhooks/${webhookId}.json`);
-            const headers = {
-              'Content-Type': 'application/json',
-              'X-Shopify-Access-Token': this.accessToken,
-            };
-
             const response = await fetch(url, {
               method: 'DELETE',
-              headers,
+              headers: this.apiClient['buildHeaders'](),
             });
 
             return response.ok;

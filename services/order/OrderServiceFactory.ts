@@ -7,6 +7,7 @@ import { SyliusOrderService } from './platforms/SyliusOrderService';
 import { WixOrderService } from './platforms/WixOrderService';
 import { PrestaShopOrderService } from './platforms/PrestaShopOrderService';
 import { SquarespaceOrderService } from './platforms/SquarespaceOrderService';
+import { CommerceFullOrderService } from './platforms/CommerceFullOrderService';
 import { OfflineOrderService } from './platforms/OfflineOrderService';
 import { PlatformOrderConfig, PlatformOrderServiceInterface } from './platforms/PlatformOrderServiceInterface';
 import { CompositeOrderService } from './platforms/CompositeOrderService';
@@ -29,6 +30,7 @@ export class OrderServiceFactory {
   private wixService: WixOrderService | null = null;
   private prestaShopService: PrestaShopOrderService | null = null;
   private squarespaceService: SquarespaceOrderService | null = null;
+  private commerceFullService: CommerceFullOrderService | null = null;
   private offlineService: OfflineOrderService | null = null;
   private compositeService: CompositeOrderService | null = null;
 
@@ -148,6 +150,18 @@ export class OrderServiceFactory {
           });
         }
         return this.squarespaceService;
+
+      case ECommercePlatform.COMMERCEFULL:
+        if (!this.commerceFullService) {
+          this.commerceFullService = new CommerceFullOrderService(config);
+          this.commerceFullService.initialize().catch(err => {
+            this.logger.error(
+              { message: 'Failed to initialize CommerceFull order service:' },
+              err instanceof Error ? err : new Error(String(err))
+            );
+          });
+        }
+        return this.commerceFullService;
 
       case ECommercePlatform.OFFLINE:
         if (!this.offlineService) {
@@ -298,6 +312,16 @@ export class OrderServiceFactory {
         this.squarespaceService.initialize().catch(err => {
           this.logger.error(
             { message: 'Failed to initialize Squarespace order service with config:' },
+            err instanceof Error ? err : new Error(String(err))
+          );
+        });
+        break;
+
+      case ECommercePlatform.COMMERCEFULL:
+        this.commerceFullService = new CommerceFullOrderService(config);
+        this.commerceFullService.initialize().catch(err => {
+          this.logger.error(
+            { message: 'Failed to initialize CommerceFull order service with config:' },
             err instanceof Error ? err : new Error(String(err))
           );
         });

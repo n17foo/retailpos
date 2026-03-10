@@ -3,12 +3,15 @@ import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../Inve
 import { PlatformConfigRequirements } from './PlatformInventoryServiceInterface';
 import { BaseInventoryService } from './BaseInventoryService';
 import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
+import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
 /**
  * Shopify-specific inventory service implementation
  * Handles Shopify inventory API interactions
  */
 export class ShopifyInventoryService extends BaseInventoryService {
+  private apiClient = ShopifyApiClient.getInstance();
+
   /**
    * Configuration requirements for Shopify
    */
@@ -182,10 +185,7 @@ export class ShopifyInventoryService extends BaseInventoryService {
    * Create authorization headers for Shopify API
    */
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      'X-Shopify-Access-Token': this.config.accessToken || '',
-      Accept: 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 
   /**

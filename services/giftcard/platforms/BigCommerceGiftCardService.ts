@@ -1,16 +1,15 @@
 import { BaseGiftCardService } from './BaseGiftCardService';
 import { GiftCardInfo, GiftCardRedemptionResult } from '../GiftCardServiceInterface';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { BIGCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
+import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
 export class BigCommerceGiftCardService extends BaseGiftCardService {
   private storeHash = '';
+  private apiClient = BigCommerceApiClient.getInstance();
 
   constructor() {
     super();
@@ -24,11 +23,13 @@ export class BigCommerceGiftCardService extends BaseGiftCardService {
         this.logger.warn('Missing BigCommerce store hash');
         return false;
       }
-      const ok = await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.BIGCOMMERCE);
-      if (!ok) {
-        this.logger.warn('Failed to initialize BigCommerce token');
-        return false;
+
+      // Configure and initialize the shared BigCommerce client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({ storeHash: this.storeHash });
+        await this.apiClient.initialize();
       }
+
       this.initialized = true;
       return true;
     } catch (error) {
@@ -41,8 +42,7 @@ export class BigCommerceGiftCardService extends BaseGiftCardService {
   }
 
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    const token = await getPlatformToken(ECommercePlatform.BIGCOMMERCE, TokenType.ACCESS);
-    return { 'Content-Type': 'application/json', 'X-Auth-Token': token || '' };
+    return this.apiClient['buildHeaders']();
   }
 
   async checkBalance(code: string): Promise<GiftCardInfo> {

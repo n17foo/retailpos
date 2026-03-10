@@ -2,12 +2,13 @@
 import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../InventoryServiceInterface';
 import { PlatformInventoryConfig, PlatformConfigRequirements } from './PlatformInventoryServiceInterface';
 import { BaseInventoryService } from './BaseInventoryService';
-import { createBasicAuthHeader } from '../../../utils/base64';
+import { PrestaShopApiClient } from '../../clients/prestashop/PrestaShopApiClient';
 
 /**
  * PrestaShop-specific inventory service implementation
  */
 export class PrestaShopInventoryService extends BaseInventoryService {
+  private apiClient = PrestaShopApiClient.getInstance();
   getConfigRequirements(): PlatformConfigRequirements {
     return {
       required: ['storeUrl', 'apiKey'],
@@ -24,14 +25,19 @@ export class PrestaShopInventoryService extends BaseInventoryService {
       this.config.storeUrl = this.config.storeUrl || process.env.PRESTASHOP_STORE_URL || '';
       this.config.apiKey = this.config.apiKey || process.env.PRESTASHOP_API_KEY || '';
 
-      if (this.config.storeUrl) {
-        this.config.storeUrl = this.normalizeUrl(this.config.storeUrl);
-      }
-
       if (!this.config.storeUrl || !this.config.apiKey) {
         this.logger.warn({ message: 'Missing PrestaShop API configuration' });
         return false;
       }
+
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.storeUrl as string,
+          apiKey: this.config.apiKey as string,
+        });
+        await this.apiClient.initialize();
+      }
+      this.config.storeUrl = this.apiClient.getBaseUrl();
 
       this.initialized = true;
       return true;
@@ -180,18 +186,6 @@ export class PrestaShopInventoryService extends BaseInventoryService {
   }
 
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      Authorization: createBasicAuthHeader(this.config.apiKey as string, ''),
-      Accept: 'application/json',
-    };
-  }
-
-  private normalizeUrl(url: string): string {
-    if (!url) return '';
-    url = url.replace(/\/$/, '');
-    if (!url.startsWith('http')) {
-      url = `https://${url}`;
-    }
-    return url;
+    return this.apiClient['buildHeaders']();
   }
 }

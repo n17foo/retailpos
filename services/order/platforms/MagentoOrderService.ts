@@ -4,12 +4,14 @@ import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrder
 import { BaseOrderService } from './BaseOrderService';
 import { MAGENTO_API_VERSION } from '../../config/apiVersions';
 import { QueuedApiService } from '../../queue/QueuedApiService';
+import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
 
 /**
  * Magento-specific implementation of the order service
  * Supports Magento 2.x REST API
  */
 export class MagentoOrderService extends BaseOrderService {
+  private apiClient = MagentoApiClient.getInstance();
   private accessToken: string | null = null;
   private tokenExpiration: Date | null = null;
 
@@ -29,8 +31,16 @@ export class MagentoOrderService extends BaseOrderService {
       this.config.accessToken = this.config.accessToken || process.env.MAGENTO_ACCESS_TOKEN || '';
       this.config.apiVersion = this.config.apiVersion || process.env.MAGENTO_API_VERSION || MAGENTO_API_VERSION;
 
-      // Normalize store URL
-      this.config.storeUrl = this.normalizeStoreUrl(this.config.storeUrl);
+      // Configure and initialize the shared Magento client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.storeUrl as string,
+          accessToken: this.config.accessToken as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        await this.apiClient.initialize();
+      }
+      this.config.storeUrl = this.apiClient.getBaseUrl();
 
       if (!this.config.storeUrl) {
         this.logger.warn({ message: 'Missing Magento store URL configuration' });
@@ -296,23 +306,7 @@ export class MagentoOrderService extends BaseOrderService {
    * Get authorization headers
    */
   protected getAuthHeaders(): Record<string, string> {
-    const token = this.config.accessToken || this.accessToken || '';
-    return {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
-  }
-
-  /**
-   * Normalize store URL
-   */
-  private normalizeStoreUrl(url: string): string {
-    if (!url) return '';
-    url = url.replace(/\/$/, '');
-    if (!url.startsWith('http')) {
-      url = `https://${url}`;
-    }
-    return url;
+    return this.apiClient['buildHeaders']();
   }
 
   /**

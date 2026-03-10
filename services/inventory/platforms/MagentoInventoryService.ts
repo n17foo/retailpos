@@ -3,12 +3,14 @@ import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../Inve
 import { PlatformInventoryConfig, PlatformConfigRequirements } from './PlatformInventoryServiceInterface';
 import { BaseInventoryService } from './BaseInventoryService';
 import { MAGENTO_API_VERSION } from '../../config/apiVersions';
+import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
 
 /**
  * Magento-specific inventory service implementation
  * Supports Magento 2.x REST API with MSI (Multi-Source Inventory) support
  */
 export class MagentoInventoryService extends BaseInventoryService {
+  private apiClient = MagentoApiClient.getInstance();
   private accessToken: string | null = null;
   private tokenExpiration: Date | null = null;
 
@@ -39,15 +41,21 @@ export class MagentoInventoryService extends BaseInventoryService {
       this.config.apiVersion = this.config.apiVersion || process.env.MAGENTO_API_VERSION || MAGENTO_API_VERSION;
       this.config.sourceCode = this.config.sourceCode || process.env.MAGENTO_SOURCE_CODE || 'default';
 
-      // Normalize store URL
-      if (this.config.storeUrl) {
-        this.config.storeUrl = this.normalizeStoreUrl(this.config.storeUrl);
-      }
-
       if (!this.config.storeUrl) {
         this.logger.warn({ message: 'Missing Magento store URL configuration' });
         return false;
       }
+
+      // Configure and initialize the shared Magento client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.storeUrl as string,
+          accessToken: this.config.accessToken as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        await this.apiClient.initialize();
+      }
+      this.config.storeUrl = this.apiClient.getBaseUrl();
 
       // Get auth token if needed
       if (!this.config.accessToken && this.config.username && this.config.password) {
@@ -328,22 +336,6 @@ export class MagentoInventoryService extends BaseInventoryService {
    * Get authorization headers
    */
   protected getAuthHeaders(): Record<string, string> {
-    const token = this.config.accessToken || this.accessToken || '';
-    return {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    };
-  }
-
-  /**
-   * Normalize store URL
-   */
-  private normalizeStoreUrl(url: string): string {
-    if (!url) return '';
-    url = url.replace(/\/$/, '');
-    if (!url.startsWith('http')) {
-      url = `https://${url}`;
-    }
-    return url;
+    return this.apiClient['buildHeaders']();
   }
 }

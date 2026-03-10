@@ -1,11 +1,13 @@
 import { Category, CategoryServiceInterface } from '../CategoryServiceInterface';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { PrestaShopApiClient } from '../../clients/prestashop/PrestaShopApiClient';
 
 /**
  * PrestaShop-specific category service implementation
  * Handles PrestaShop category API interactions
  */
 export class PrestaShopCategoryService implements CategoryServiceInterface {
+  private apiClient = PrestaShopApiClient.getInstance();
   private initialized: boolean = false;
   private logger = LoggerFactory.getInstance().createLogger('PrestaShopCategoryService');
 

@@ -4,12 +4,14 @@ import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrder
 import { BaseOrderService } from './BaseOrderService';
 import { WIX_API_VERSION } from '../../config/apiVersions';
 import { QueuedApiService } from '../../queue/QueuedApiService';
+import { WixApiClient } from '../../clients/wix/WixApiClient';
 
 /**
  * Wix-specific implementation of the order service
  * Uses Wix Stores API
  */
 export class WixOrderService extends BaseOrderService {
+  private apiClient = WixApiClient.getInstance();
   constructor(config: PlatformOrderConfig = {}) {
     super(config);
   }
@@ -153,11 +155,7 @@ export class WixOrderService extends BaseOrderService {
   }
 
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      Authorization: this.config.apiKey as string,
-      'wix-site-id': this.config.siteId as string,
-      'Content-Type': 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 
   private mapToWixOrder(order: Order): any {

@@ -2,13 +2,12 @@
 import { BaseCustomerService } from './BaseCustomerService';
 import { CustomerSearchOptions, CustomerSearchResult, PlatformCustomer } from '../CustomerServiceInterface';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
 
 export class SquarespaceCustomerService extends BaseCustomerService {
+  private apiClient = SquarespaceApiClient.getInstance();
   constructor() {
     super();
     this.logger = LoggerFactory.getInstance().createLogger('SquarespaceCustomerService');
@@ -16,11 +15,10 @@ export class SquarespaceCustomerService extends BaseCustomerService {
 
   async initialize(): Promise<boolean> {
     try {
-      const ok = await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.SQUARESPACE);
-      if (!ok) {
-        this.logger.warn('Failed to initialize Squarespace token');
-        return false;
+      if (!this.apiClient.isInitialized()) {
+        await this.apiClient.initialize();
       }
+
       this.initialized = true;
       return true;
     } catch (error) {
@@ -33,8 +31,7 @@ export class SquarespaceCustomerService extends BaseCustomerService {
   }
 
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    const token = await getPlatformToken(ECommercePlatform.SQUARESPACE, TokenType.ACCESS);
-    return { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` };
+    return this.apiClient['buildHeaders']();
   }
 
   async searchCustomers(options: CustomerSearchOptions): Promise<CustomerSearchResult> {

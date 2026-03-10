@@ -4,19 +4,17 @@ import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrder
 import { BaseOrderService } from './BaseOrderService';
 import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 import { QueuedApiService } from '../../queue/QueuedApiService';
+import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
 /**
  * Shopify-specific implementation of the order service
  */
 export class ShopifyOrderService extends BaseOrderService {
-  // The config property is inherited from BaseOrderService
+  private apiClient: ShopifyApiClient;
 
-  /**
-   * Create a new Shopify order service
-   * @param config Configuration for Shopify API
-   */
   constructor(config: PlatformOrderConfig = {}) {
     super(config);
+    this.apiClient = ShopifyApiClient.getInstance();
   }
 
   /**
@@ -35,8 +33,18 @@ export class ShopifyOrderService extends BaseOrderService {
         return false;
       }
 
-      // Normalize the store URL
-      this.config.storeUrl = this.normalizeStoreUrl(this.config.storeUrl);
+      // Configure and initialize the shared Shopify client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.storeUrl,
+          apiKey: this.config.apiKey as string,
+          apiSecret: this.config.apiSecret as string,
+          accessToken: this.config.accessToken as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        await this.apiClient.initialize();
+      }
+      this.config.storeUrl = this.apiClient.getBaseUrl();
 
       // Test connection with a simple API call
       try {
@@ -211,10 +219,7 @@ export class ShopifyOrderService extends BaseOrderService {
    * Create authorization headers for Shopify API
    */
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      'X-Shopify-Access-Token': this.config.accessToken || '',
-      'Content-Type': 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 
   /**
@@ -287,22 +292,5 @@ export class ShopifyOrderService extends BaseOrderService {
     }
 
     return order;
-  }
-
-  /**
-   * Normalize the store URL to ensure it has the correct format
-   */
-  private normalizeStoreUrl(url: string): string {
-    if (!url) return '';
-
-    // Remove trailing slash
-    url = url.replace(/\/$/, '');
-
-    // Ensure https:// prefix
-    if (!url.startsWith('http')) {
-      url = `https://${url}`;
-    }
-
-    return url;
   }
 }

@@ -3,11 +3,13 @@ import { SearchOptions, SearchProduct } from '../SearchServiceInterface';
 import { ProductQueryOptions, ProductResult } from '../../product/ProductServiceInterface';
 import { PlatformConfigRequirements, PlatformSearchConfig } from './PlatformSearchServiceInterface';
 import { BaseSearchService } from './BaseSearchService';
+import { WixApiClient } from '../../clients/wix/WixApiClient';
 
 /**
  * Wix-specific implementation of the search service
  */
 export class WixSearchService extends BaseSearchService {
+  private apiClient = WixApiClient.getInstance();
   // Use declare to tell TypeScript this exists without redefining it
   // The config property is inherited from BaseSearchService
 
@@ -247,12 +249,6 @@ export class WixSearchService extends BaseSearchService {
    * Get authorization headers for Wix API
    */
   protected getAuthHeaders(): Record<string, string> {
-    return {
-      Authorization: `${this.config.apiKey}`,
-      'wix-site-id': `${this.config.siteId}`,
-      'wix-account-id': (this.config.accountId as string) || '',
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 }

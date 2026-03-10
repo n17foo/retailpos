@@ -1,12 +1,10 @@
 import { PlatformRefundServiceInterface, PlatformCredentials } from './PlatformRefundServiceInterface';
 import { RefundData, RefundResult, RefundRecord } from '../ReturnService';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { ECommercePlatform } from '../../../utils/platforms';
 import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
 import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
+import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
 /**
  * Shopify-specific implementation of the refund service
@@ -17,6 +15,7 @@ export class ShopifyRefundService implements PlatformRefundServiceInterface {
   private refundHistory: Map<string, RefundRecord[]> = new Map();
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
   private secretsService: SecretsServiceInterface;
+  private apiClient = ShopifyApiClient.getInstance();
 
   constructor() {
     this.logger = LoggerFactory.getInstance().createLogger('ShopifyRefundService');
@@ -81,11 +80,6 @@ export class ShopifyRefundService implements PlatformRefundServiceInterface {
         throw new Error('Failed to retrieve Shopify API credentials');
       }
 
-      const accessToken = await getPlatformToken(ECommercePlatform.SHOPIFY, TokenType.ACCESS);
-      if (!accessToken) {
-        throw new Error('Failed to get Shopify access token');
-      }
-
       const apiVersion = SHOPIFY_API_VERSION;
       const endpoint = `${credentials.apiUrl}/admin/api/${apiVersion}/orders/${orderId}/refunds.json`;
 
@@ -114,10 +108,7 @@ export class ShopifyRefundService implements PlatformRefundServiceInterface {
 
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          'X-Shopify-Access-Token': accessToken,
-          'Content-Type': 'application/json',
-        },
+        headers: this.apiClient['buildHeaders'](),
         body: JSON.stringify(requestData),
       });
 

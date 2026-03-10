@@ -2,17 +2,16 @@ import { BaseDiscountService } from './BaseDiscountService';
 import { CouponValidationResult } from '../DiscountServiceInterface';
 import { BasketItem } from '../../basket/basket';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
+import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 export class WooCommerceDiscountService extends BaseDiscountService {
   private storeUrl = '';
   private apiVersion = WOOCOMMERCE_API_VERSION;
+  private apiClient = WooCommerceApiClient.getInstance();
 
   constructor() {
     super();
@@ -28,13 +27,15 @@ export class WooCommerceDiscountService extends BaseDiscountService {
         return false;
       }
 
-      this.storeUrl = this.storeUrl.replace(/\/+$/, '');
-
-      const tokenInitialized = await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.WOOCOMMERCE);
-      if (!tokenInitialized) {
-        this.logger.warn('Failed to initialize WooCommerce token provider');
-        return false;
+      // Configure and initialize the shared WooCommerce client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.storeUrl,
+          apiVersion: this.apiVersion,
+        });
+        await this.apiClient.initialize();
       }
+      this.storeUrl = this.apiClient.getBaseUrl();
 
       this.initialized = true;
       return true;
@@ -48,11 +49,7 @@ export class WooCommerceDiscountService extends BaseDiscountService {
   }
 
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    const token = await getPlatformToken(ECommercePlatform.WOOCOMMERCE, TokenType.ACCESS);
-    return {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token || ''}`,
-    };
+    return this.apiClient['buildHeaders']();
   }
 
   async validateCoupon(code: string, basketTotal: number, _items: BasketItem[]): Promise<CouponValidationResult> {

@@ -3,22 +3,21 @@ import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../Prod
 import { PlatformProductConfig, PlatformConfigRequirements } from './PlatformProductServiceInterface';
 import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 
 /**
  * Shopify-specific implementation of the product service
  */
 export class ShopifyProductService extends BaseProductService {
-  // The config property is inherited from BaseProductService
+  private apiClient: ShopifyApiClient;
 
   constructor(config: PlatformProductConfig = {}) {
     super(config);
     this.logger = LoggerFactory.getInstance().createLogger('ShopifyProductService');
+    this.apiClient = ShopifyApiClient.getInstance();
   }
 
   /**
@@ -36,35 +35,30 @@ export class ShopifyProductService extends BaseProductService {
         return false;
       }
 
-      // Normalize the store URL
-      this.config.storeUrl = this.normalizeStoreUrl(this.config.storeUrl);
-
-      // Initialize the token provider for Shopify
-      const tokenInitialized = await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.SHOPIFY);
-      if (!tokenInitialized) {
-        this.logger.warn('Failed to initialize Shopify token provider');
-        return false;
+      // Configure and initialize the shared Shopify client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.storeUrl,
+          apiKey: this.config.apiKey,
+          apiSecret: this.config.apiSecret as string,
+          accessToken: this.config.accessToken as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        const ok = await this.apiClient.initialize();
+        if (!ok) {
+          this.logger.warn({ message: 'Failed to initialize Shopify API client' });
+          return false;
+        }
       }
+
+      // Normalize the store URL from the client
+      this.config.storeUrl = this.apiClient.getBaseUrl();
 
       // Test connection with a simple API call
       try {
-        const apiUrl = `${this.config.storeUrl}/admin/api/${this.config.apiVersion || SHOPIFY_API_VERSION}/shop.json`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, {
-          headers,
-        });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          const responseText = await response.text();
-          this.logger.error(
-            { message: 'Failed to connect to Shopify API' },
-            new Error(`Shopify API responded with status ${response.status}: ${responseText}`)
-          );
-          return false;
-        }
+        await this.apiClient.get('shop.json');
+        this.initialized = true;
+        return true;
       } catch (error) {
         const errorObj = error instanceof Error ? error : new Error(String(error));
         this.logger.error({ message: 'Error connecting to Shopify API' }, errorObj);
@@ -365,33 +359,10 @@ export class ShopifyProductService extends BaseProductService {
   }
 
   /**
-   * Create authorization headers for Shopify API
-   */
-  /**
-   * Get authorization headers for API requests
-   * Override the base class method to provide async token retrieval
+   * Get authorization headers for API requests — delegates to shared ShopifyApiClient.
    */
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    try {
-      const accessToken = await getPlatformToken(ECommercePlatform.SHOPIFY, TokenType.ACCESS);
-
-      if (!accessToken) {
-        throw new Error('Failed to get Shopify access token');
-      }
-
-      return {
-        'X-Shopify-Access-Token': accessToken,
-        'Content-Type': 'application/json',
-      };
-    } catch (error) {
-      this.logger.error({ message: 'Error getting Shopify auth headers' }, error instanceof Error ? error : new Error(String(error)));
-
-      // Fallback to config token if available (for backward compatibility)
-      return {
-        'X-Shopify-Access-Token': this.config.accessToken || '',
-        'Content-Type': 'application/json',
-      };
-    }
+    return this.apiClient['buildHeaders']();
   }
 
   /**
@@ -532,22 +503,5 @@ export class ShopifyProductService extends BaseProductService {
     }
 
     return result;
-  }
-
-  /**
-   * Normalize the store URL to ensure it has the correct format
-   */
-  private normalizeStoreUrl(url: string): string {
-    if (!url) return '';
-
-    // Remove trailing slash
-    url = url.replace(/\/$/, '');
-
-    // Ensure https:// prefix
-    if (!url.startsWith('http')) {
-      url = `https://${url}`;
-    }
-
-    return url;
   }
 }

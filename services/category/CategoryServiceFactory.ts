@@ -11,6 +11,7 @@ import { SquarespaceCategoryService } from './platforms/SquarespaceCategoryServi
 import { MagentoCategoryService } from './platforms/MagentoCategoryService';
 import { SyliusCategoryService } from './platforms/SyliusCategoryService';
 import { WixCategoryService } from './platforms/WixCategoryService';
+import { CommerceFullCategoryService } from './platforms/CommerceFullCategoryService';
 import { LoggerFactory } from '../logger/LoggerFactory';
 
 /**
@@ -32,6 +33,7 @@ export class CategoryServiceFactory {
     [ECommercePlatform.WIX]: null,
     [ECommercePlatform.PRESTASHOP]: null,
     [ECommercePlatform.SQUARESPACE]: null,
+    [ECommercePlatform.COMMERCEFULL]: null,
     [ECommercePlatform.OFFLINE]: null,
   };
 
@@ -103,6 +105,10 @@ export class CategoryServiceFactory {
         service = this.createSquarespaceService();
         break;
 
+      case ECommercePlatform.COMMERCEFULL:
+        service = this.createCommerceFullService();
+        break;
+
       case ECommercePlatform.OFFLINE:
         service = this.createOfflineService();
         break;
@@ -153,6 +159,9 @@ export class CategoryServiceFactory {
             break;
           case ECommercePlatform.SQUARESPACE:
             service = this.createSquarespaceService();
+            break;
+          case ECommercePlatform.COMMERCEFULL:
+            service = this.createCommerceFullService();
             break;
           case ECommercePlatform.OFFLINE:
             service = this.createOfflineService();
@@ -324,6 +333,19 @@ export class CategoryServiceFactory {
   /**
    * Create and initialize an Offline category service
    */
+  private createCommerceFullService(): CategoryServiceInterface {
+    const service = new CommerceFullCategoryService();
+
+    service.initialize().catch(err => {
+      this.logger.error(
+        { message: 'Failed to initialize CommerceFull category service:' },
+        err instanceof Error ? err : new Error(String(err))
+      );
+    });
+
+    return service;
+  }
+
   private createOfflineService(): CategoryServiceInterface {
     const service = offlineCategoryService;
     service.initialize().catch(err => {

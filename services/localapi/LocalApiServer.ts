@@ -6,13 +6,14 @@ import { ProductRepository } from '../../repositories/ProductRepository';
 import { taxProfileRepository } from '../../repositories/TaxProfileRepository';
 import { returnRepository } from '../../repositories/ReturnRepository';
 import { syncEventBus } from './sync/SyncEventBus';
+import { CommerceFullWebhookReceiver } from '../clients/commercefull/CommerceFullWebhookReceiver';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
 interface RouteHandler {
   method: HttpMethod;
   path: string;
-  handler: (params: Record<string, string>, body: unknown) => Promise<{ status: number; body: unknown }>;
+  handler: (params: Record<string, string>, body: unknown, headers?: Record<string, string>) => Promise<{ status: number; body: unknown }>;
 }
 
 /**
@@ -88,7 +89,7 @@ export class LocalApiServer {
       const params = this.matchPath(route.path, path);
       if (params !== null) {
         try {
-          return await route.handler(params, body);
+          return await route.handler(params, body, headers);
         } catch (error) {
           this.logger.error({ message: `Error handling ${method} ${path}` }, error instanceof Error ? error : new Error(String(error)));
           return { status: 500, body: { error: 'Internal server error' } };
@@ -170,6 +171,13 @@ export class LocalApiServer {
       const since = parseInt(String(b?.since || '0'), 10) || 0;
       const events = syncEventBus.getEventsSince(since);
       return { status: 200, body: { events } };
+    });
+
+    // ── Webhook Receiver (CommerceFull real-time push) ────────────────
+    this.route('POST', '/api/webhooks/commercefull', async (_params, body, headers) => {
+      const receiver = CommerceFullWebhookReceiver.getInstance();
+      const rawBody = typeof body === 'string' ? body : JSON.stringify(body);
+      return await receiver.handleRequest(rawBody, headers || {});
     });
   }
 

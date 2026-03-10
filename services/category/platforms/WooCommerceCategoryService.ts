@@ -2,13 +2,14 @@
 import { Category } from '../CategoryServiceInterface';
 import { BaseCategoryService } from './BaseCategoryService';
 import { PlatformConfigRequirements } from './PlatformCategoryServiceInterface';
-import { createBasicAuthHeader } from '../../../utils/base64';
+import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 /**
  * WooCommerce-specific category service implementation
  * In WooCommerce, categories are called "product_cat" taxonomy terms
  */
 export class WooCommerceCategoryService extends BaseCategoryService {
+  private apiClient = WooCommerceApiClient.getInstance();
   /**
    * Get configuration requirements for WooCommerce
    */
@@ -233,9 +234,6 @@ export class WooCommerceCategoryService extends BaseCategoryService {
    * WooCommerce REST API uses Basic Auth
    */
   private getAuthHeaders(): Record<string, string> {
-    return {
-      Authorization: createBasicAuthHeader(this.config.apiKey || '', this.config.apiSecret || ''),
-      'Content-Type': 'application/json',
-    };
+    return this.apiClient['buildHeaders']();
   }
 }

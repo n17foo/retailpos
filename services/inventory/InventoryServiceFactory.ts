@@ -7,6 +7,7 @@ import { SyliusInventoryService } from './platforms/SyliusInventoryService';
 import { WixInventoryService } from './platforms/WixInventoryService';
 import { PrestaShopInventoryService } from './platforms/PrestaShopInventoryService';
 import { SquarespaceInventoryService } from './platforms/SquarespaceInventoryService';
+import { CommerceFullInventoryService } from './platforms/CommerceFullInventoryService';
 import { OfflineInventoryService } from './platforms/OfflineInventoryService';
 import { CompositeInventoryService } from './platforms/CompositeInventoryService';
 import { PlatformInventoryConfig, PlatformInventoryServiceInterface } from './platforms/PlatformInventoryServiceInterface';
@@ -32,6 +33,7 @@ export class InventoryServiceFactory {
     [ECommercePlatform.WIX]: null,
     [ECommercePlatform.PRESTASHOP]: null,
     [ECommercePlatform.SQUARESPACE]: null,
+    [ECommercePlatform.COMMERCEFULL]: null,
     [ECommercePlatform.OFFLINE]: null,
   };
 
@@ -103,6 +105,10 @@ export class InventoryServiceFactory {
         service = this.createSquarespaceService();
         break;
 
+      case ECommercePlatform.COMMERCEFULL:
+        service = this.createCommerceFullService();
+        break;
+
       case ECommercePlatform.OFFLINE:
         service = this.createOfflineService();
         break;
@@ -153,6 +159,9 @@ export class InventoryServiceFactory {
             break;
           case ECommercePlatform.SQUARESPACE:
             service = this.createSquarespaceService();
+            break;
+          case ECommercePlatform.COMMERCEFULL:
+            service = this.createCommerceFullService();
             break;
           case ECommercePlatform.OFFLINE:
             service = this.createOfflineService();
@@ -352,6 +361,25 @@ export class InventoryServiceFactory {
     return service;
   }
 
+  private createCommerceFullService(): InventoryServiceInterface {
+    const service = new CommerceFullInventoryService();
+
+    const config: PlatformInventoryConfig = {
+      storeUrl: process.env.COMMERCEFULL_STORE_URL,
+      apiKey: process.env.COMMERCEFULL_API_KEY,
+      apiSecret: process.env.COMMERCEFULL_API_SECRET,
+    };
+
+    service.initialize(config).catch(err => {
+      this.logger.error(
+        { message: 'Failed to initialize CommerceFull inventory service:' },
+        err instanceof Error ? err : new Error(String(err))
+      );
+    });
+
+    return service;
+  }
+
   private createOfflineService(): InventoryServiceInterface {
     return new OfflineInventoryService();
   }
@@ -396,6 +424,10 @@ export class InventoryServiceFactory {
 
       case ECommercePlatform.SQUARESPACE:
         service = new SquarespaceInventoryService();
+        break;
+
+      case ECommercePlatform.COMMERCEFULL:
+        service = new CommerceFullInventoryService();
         break;
 
       case ECommercePlatform.OFFLINE:

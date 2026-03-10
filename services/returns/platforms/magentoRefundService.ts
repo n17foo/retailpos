@@ -1,18 +1,17 @@
 import { PlatformRefundServiceInterface, PlatformCredentials } from './PlatformRefundServiceInterface';
 import { RefundData, RefundResult, RefundRecord } from '../ReturnService';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { ECommercePlatform } from '../../../utils/platforms';
 import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
 import { MAGENTO_API_VERSION } from '../../config/apiVersions';
+import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
 
 /**
  * Magento-specific implementation of the refund service
  * Handles refunds for Magento orders
  */
 export class MagentoRefundService implements PlatformRefundServiceInterface {
+  private apiClient = MagentoApiClient.getInstance();
   private initialized: boolean = false;
   private refundHistory: Map<string, RefundRecord[]> = new Map();
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
@@ -82,10 +81,7 @@ export class MagentoRefundService implements PlatformRefundServiceInterface {
         throw new Error('Failed to retrieve Magento API credentials');
       }
 
-      const accessToken = await getPlatformToken(ECommercePlatform.MAGENTO, TokenType.ACCESS);
-      if (!accessToken) {
-        throw new Error('Failed to get Magento access token');
-      }
+      const headers = this.apiClient['buildHeaders']();
 
       const endpoint = `${credentials.apiUrl}/rest/${MAGENTO_API_VERSION}/order/${orderId}/refund`;
 
@@ -112,10 +108,7 @@ export class MagentoRefundService implements PlatformRefundServiceInterface {
 
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
         body: JSON.stringify(requestData),
       });
 

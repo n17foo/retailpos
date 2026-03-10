@@ -1,15 +1,14 @@
 import { BaseGiftCardService } from './BaseGiftCardService';
 import { GiftCardInfo, GiftCardRedemptionResult } from '../GiftCardServiceInterface';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { getPlatformToken } from '../../token/TokenUtils';
-import { TokenType } from '../../token/TokenServiceInterface';
-import { TokenInitializer } from '../../token/TokenInitializer';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import secretsService from '../../secrets/SecretsService';
+import { PrestaShopApiClient } from '../../clients/prestashop/PrestaShopApiClient';
 
 export class PrestaShopGiftCardService extends BaseGiftCardService {
   private baseUrl = '';
+  private apiClient = PrestaShopApiClient.getInstance();
 
   constructor() {
     super();
@@ -23,11 +22,13 @@ export class PrestaShopGiftCardService extends BaseGiftCardService {
         this.logger.warn('Missing PrestaShop base URL');
         return false;
       }
-      const ok = await TokenInitializer.getInstance().initializePlatformToken(ECommercePlatform.PRESTASHOP);
-      if (!ok) {
-        this.logger.warn('Failed to initialize PrestaShop token');
-        return false;
+
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({ storeUrl: this.baseUrl });
+        await this.apiClient.initialize();
       }
+      this.baseUrl = this.apiClient.getBaseUrl();
+
       this.initialized = true;
       return true;
     } catch (error) {
@@ -40,8 +41,7 @@ export class PrestaShopGiftCardService extends BaseGiftCardService {
   }
 
   protected async getAuthHeaders(): Promise<Record<string, string>> {
-    const token = await getPlatformToken(ECommercePlatform.PRESTASHOP, TokenType.ACCESS);
-    return { 'Content-Type': 'application/json', Authorization: `Basic ${btoa(token + ':')}`, 'Output-Format': 'JSON' };
+    return this.apiClient['buildHeaders']();
   }
 
   async checkBalance(code: string): Promise<GiftCardInfo> {

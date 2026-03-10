@@ -6,7 +6,7 @@ import { InventoryServiceFactory } from '../../inventory/InventoryServiceFactory
 import { CategoryServiceFactory } from '../../category/CategoryServiceFactory';
 import { OrderServiceFactory } from '../../order/OrderServiceFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { createBasicAuthHeader } from '../../../utils/base64';
+import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 /**
  * WooCommerce-specific sync service implementation
@@ -14,9 +14,8 @@ import { createBasicAuthHeader } from '../../../utils/base64';
 export class WooCommerceSyncService extends BasePlatformSyncService {
   private webhookIds: string[] = [];
   private storeUrl: string = '';
-  private apiKey: string = '';
-  private apiSecret: string = '';
   private version: string = 'wc/v3';
+  private apiClient = WooCommerceApiClient.getInstance();
 
   private getWooCommerceApiUrl(endpoint: string): string {
     return `${this.storeUrl}/wp-json/${this.version}/${endpoint}`;
@@ -41,8 +40,6 @@ export class WooCommerceSyncService extends BasePlatformSyncService {
       return false;
     }
     this.storeUrl = config.storeUrl;
-    this.apiKey = config.apiKey;
-    this.apiSecret = config.apiSecret;
     this.version = (config.version as string) || this.version;
 
     // Call base class initialization
@@ -65,16 +62,11 @@ export class WooCommerceSyncService extends BasePlatformSyncService {
 
     try {
       // Create auth header for WooCommerce
-      const authString = createBasicAuthHeader(this.apiKey, this.apiSecret);
-
       // Make a simple API call to test the connection
       const url = this.getWooCommerceApiUrl('system_status');
 
       const response = await fetch(url, {
-        headers: {
-          Authorization: authString,
-          'Content-Type': 'application/json',
-        },
+        headers: this.apiClient['buildHeaders'](),
       });
 
       if (!response.ok) {
@@ -115,9 +107,6 @@ export class WooCommerceSyncService extends BasePlatformSyncService {
         { topic: 'product_cat.deleted', name: 'Product Category Deleted' },
       ];
 
-      // Create auth header for WooCommerce
-      const authString = createBasicAuthHeader(this.apiKey, this.apiSecret);
-
       // Register each webhook
       const results = await Promise.all(
         webhookTopics.map(async ({ topic, name }) => {
@@ -126,10 +115,7 @@ export class WooCommerceSyncService extends BasePlatformSyncService {
 
             const response = await fetch(url, {
               method: 'POST',
-              headers: {
-                Authorization: authString,
-                'Content-Type': 'application/json',
-              },
+              headers: this.apiClient['buildHeaders'](),
               body: JSON.stringify({
                 name,
                 topic,
@@ -174,9 +160,6 @@ export class WooCommerceSyncService extends BasePlatformSyncService {
     }
 
     try {
-      // Create auth header for WooCommerce
-      const authString = createBasicAuthHeader(this.apiKey, this.apiSecret);
-
       // Delete each registered webhook
       const results = await Promise.all(
         this.webhookIds.map(async webhookId => {
@@ -185,10 +168,7 @@ export class WooCommerceSyncService extends BasePlatformSyncService {
 
             const response = await fetch(url, {
               method: 'DELETE',
-              headers: {
-                Authorization: authString,
-                'Content-Type': 'application/json',
-              },
+              headers: this.apiClient['buildHeaders'](),
               body: JSON.stringify({
                 force: true,
               }),

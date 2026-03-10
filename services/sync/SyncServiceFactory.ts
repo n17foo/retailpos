@@ -7,8 +7,10 @@ import { BigCommerceSyncService } from './platforms/BigCommerceSyncService';
 import { OfflineSyncService } from './platforms/OfflineSyncService';
 import { PrestaShopSyncService } from './platforms/PrestaShopSyncService';
 import { SquarespaceSyncService } from './platforms/SquarespaceSyncService';
+import { CommerceFullSyncService } from './platforms/CommerceFullSyncService';
 import { PlatformSyncConfig } from './platforms/PlatformSyncServiceInterface';
 import { LoggerFactory } from '../logger/LoggerFactory';
+import { CommerceFullWebhookReceiver } from '../clients/commercefull/CommerceFullWebhookReceiver';
 
 /**
  * Factory for creating sync service instances
@@ -127,6 +129,10 @@ export class SyncServiceFactory {
 
       case ECommercePlatform.SQUARESPACE:
         service = this.createSquarespaceSyncService();
+        break;
+
+      case ECommercePlatform.COMMERCEFULL:
+        service = this.createCommerceFullSyncService();
         break;
 
       // These platforms use the offline sync service (no dedicated sync implementation)
@@ -254,6 +260,84 @@ export class SyncServiceFactory {
     return service;
   }
 
+  private createCommerceFullSyncService(): SyncServiceInterface {
+    const service = new CommerceFullSyncService();
+
+    const config: PlatformSyncConfig = {
+      storeUrl: process.env.COMMERCEFULL_STORE_URL,
+      apiKey: process.env.COMMERCEFULL_API_KEY,
+      apiSecret: process.env.COMMERCEFULL_API_SECRET,
+      webhookUrl: process.env.COMMERCEFULL_WEBHOOK_URL,
+    };
+
+    service
+      .initialize(config)
+      .then(ok => {
+        if (ok) {
+          this.wireCommerceFullWebhooks(service, config.webhookUrl);
+        }
+      })
+      .catch(err => {
+        this.logger.error(
+          { message: 'Failed to initialize CommerceFull sync service' },
+          err instanceof Error ? err : new Error(String(err))
+        );
+      });
+
+    return service;
+  }
+
+  /**
+   * Wire the CommerceFull webhook receiver to the sync service,
+   * register default event listeners, and auto-register webhooks
+   * on the CommerceFull platform when a webhookUrl is configured.
+   */
+  private wireCommerceFullWebhooks(service: CommerceFullSyncService, webhookUrl?: string): void {
+    // 1. Wire the webhook receiver singleton to this sync service
+    const receiver = CommerceFullWebhookReceiver.getInstance();
+    receiver.setSyncService(service);
+
+    // 2. Register default event listeners for real-time sync
+    service.onWebhookEvent('product.*', async event => {
+      this.logger.info({ message: `[Webhook] Product event: ${event.event}` });
+      // TODO: update local product cache / DB from event.data
+    });
+
+    service.onWebhookEvent('order.*', async event => {
+      this.logger.info({ message: `[Webhook] Order event: ${event.event}` });
+      // TODO: update local order state from event.data
+    });
+
+    service.onWebhookEvent('inventory.*', async event => {
+      this.logger.info({ message: `[Webhook] Inventory event: ${event.event}` });
+      // TODO: update local stock levels from event.data
+    });
+
+    service.onWebhookEvent('customer.*', async event => {
+      this.logger.info({ message: `[Webhook] Customer event: ${event.event}` });
+      // TODO: update local customer cache from event.data
+    });
+
+    // 3. Auto-register webhooks on CommerceFull if webhookUrl is provided
+    if (webhookUrl) {
+      service
+        .registerSyncWebhooks(webhookUrl)
+        .then(ok => {
+          if (ok) {
+            this.logger.info({ message: `[Webhook] Registered CommerceFull webhooks → ${webhookUrl}` });
+          } else {
+            this.logger.warn({ message: '[Webhook] Failed to register CommerceFull webhooks' });
+          }
+        })
+        .catch(err => {
+          this.logger.error(
+            { message: '[Webhook] Error registering CommerceFull webhooks' },
+            err instanceof Error ? err : new Error(String(err))
+          );
+        });
+    }
+  }
+
   /**
    * Configure a platform service with specific settings from storage
    * This replaces any existing cached service instance
@@ -325,6 +409,25 @@ export class SyncServiceFactory {
           );
         });
         this.serviceInstances[platform] = squarespaceService;
+        break;
+      }
+
+      case ECommercePlatform.COMMERCEFULL: {
+        const cfService = new CommerceFullSyncService();
+        cfService
+          .initialize(config)
+          .then(ok => {
+            if (ok) {
+              this.wireCommerceFullWebhooks(cfService, config.webhookUrl);
+            }
+          })
+          .catch(err => {
+            this.logger.error(
+              { message: 'Failed to initialize CommerceFull sync service with config' },
+              err instanceof Error ? err : new Error(String(err))
+            );
+          });
+        this.serviceInstances[platform] = cfService;
         break;
       }
 
