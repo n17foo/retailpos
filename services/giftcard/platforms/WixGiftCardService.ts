@@ -6,8 +6,27 @@ import { LoggerFactory } from '../../logger/LoggerFactory';
 import secretsService from '../../secrets/SecretsService';
 import { WixApiClient } from '../../clients/wix/WixApiClient';
 
+interface WixGiftCardBalance {
+  amount?: string;
+  currency?: string;
+}
+
+interface WixGiftCardRecord {
+  balance?: WixGiftCardBalance;
+  status?: string;
+  expirationDate?: string;
+}
+
+interface WixGiftCardLookupResponse {
+  giftCard?: WixGiftCardRecord;
+}
+
+interface WixGiftCardRedeemResponse {
+  giftCard?: WixGiftCardRecord;
+  transactionId?: string;
+}
+
 export class WixGiftCardService extends BaseGiftCardService {
-  private siteId = '';
   private apiClient = WixApiClient.getInstance();
 
   constructor() {
@@ -17,14 +36,14 @@ export class WixGiftCardService extends BaseGiftCardService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.siteId = (await secretsService.getSecret('WIX_SITE_ID')) || '';
-      if (!this.siteId) {
+      const siteId = (await secretsService.getSecret('WIX_SITE_ID')) || '';
+      if (!siteId) {
         this.logger.warn('Missing Wix site ID');
         return false;
       }
 
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({ siteId: this.siteId });
+        this.apiClient.configure({ siteId });
         await this.apiClient.initialize();
       }
 
@@ -39,19 +58,18 @@ export class WixGiftCardService extends BaseGiftCardService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async checkBalance(code: string): Promise<GiftCardInfo> {
     if (!this.initialized) return { code, balance: 0, currency: 'USD', status: 'not_found' };
     try {
       return await withTokenRefresh(ECommercePlatform.WIX, async () => {
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(`https://www.wixapis.com/stores/v1/giftCards/${encodeURIComponent(code)}`, { headers });
-        if (!response.ok) return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
-        const data = await response.json();
-        const card = data.giftCard || data;
+        let data: WixGiftCardLookupResponse | WixGiftCardRecord;
+        try {
+          data = await this.apiClient.get<WixGiftCardLookupResponse | WixGiftCardRecord>(`stores/v1/giftCards/${encodeURIComponent(code)}`);
+        } catch {
+          return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
+        }
+        const lookupData = data as WixGiftCardLookupResponse;
+        const card = lookupData.giftCard ?? (data as WixGiftCardRecord);
         return {
           code,
           balance: card.balance?.amount ? parseFloat(card.balance.amount) : 0,
@@ -70,14 +88,9 @@ export class WixGiftCardService extends BaseGiftCardService {
     if (!this.initialized) return { success: false, amountDeducted: 0, remainingBalance: 0, error: 'Service not initialized' };
     try {
       return await withTokenRefresh(ECommercePlatform.WIX, async () => {
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(`https://www.wixapis.com/stores/v1/giftCards/${encodeURIComponent(code)}/redeem`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ amount: { amount: String(amount) } }),
+        const data = await this.apiClient.post<WixGiftCardRedeemResponse>(`stores/v1/giftCards/${encodeURIComponent(code)}/redeem`, {
+          amount: { amount: String(amount) },
         });
-        if (!response.ok) return { success: false, amountDeducted: 0, remainingBalance: 0, error: `Redemption failed: ${response.status}` };
-        const data = await response.json();
         const remaining = data.giftCard?.balance?.amount ? parseFloat(data.giftCard.balance.amount) : 0;
         return { success: true, amountDeducted: amount, remainingBalance: remaining, transactionId: data.transactionId };
       });

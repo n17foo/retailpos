@@ -110,6 +110,48 @@ export class OfflineSearchService implements SearchServiceInterface {
   }
 
   /**
+   * Search local products by exact barcode value.
+   * Filters the local product catalog by matching variant barcode or SKU.
+   */
+  async searchByBarcode(barcode: string): Promise<SearchResult> {
+    try {
+      const productService = ProductServiceFactory.getInstance().getService(ECommercePlatform.OFFLINE);
+      const local = await productService.getProducts({ limit: 1000 });
+
+      const matched: SearchProduct[] = local.products
+        .filter(p => p.variants.some(v => v.barcode === barcode || v.sku === barcode))
+        .map(product => ({
+          id: product.id,
+          name: product.title,
+          description: product.description,
+          price: product.variants[0]?.price || 0,
+          imageUrl: product.images?.[0]?.url,
+          category: product.productType,
+          source: 'local' as const,
+          inStock: (product.variants[0]?.inventoryQuantity || 0) > 0,
+          quantity: product.variants[0]?.inventoryQuantity,
+          sku: product.variants[0]?.sku,
+          barcode: product.variants[0]?.barcode,
+          originalProduct: product,
+        }));
+
+      return {
+        query: barcode,
+        totalResults: matched.length,
+        localResults: matched,
+        ecommerceResults: [],
+        categories: [],
+      };
+    } catch (error) {
+      this.logger.error(
+        { message: `Offline barcode search failed for ${barcode}` },
+        error instanceof Error ? error : new Error(String(error))
+      );
+      return { query: barcode, totalResults: 0, localResults: [], ecommerceResults: [], categories: [] };
+    }
+  }
+
+  /**
    * Get search history
    */
   getSearchHistory(): string[] {

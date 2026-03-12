@@ -5,11 +5,18 @@ import { ScannerServiceInterface } from './ScannerServiceInterface';
  * USB scanner service implementation
  * Note: USB communication in React Native requires platform-specific native modules
  */
+/** Milliseconds between keystrokes — real scanners type at <50 ms; humans can't sustain <80 ms */
+const SCAN_INTERVAL_MS = 80;
+/** Minimum barcode length — filters stray Enter presses */
+const MIN_BARCODE_LENGTH = 3;
+
 export class USBScannerService implements ScannerServiceInterface {
   private connected: boolean = false;
   private deviceId: string | null = null;
   private scanListeners: Map<string, (data: string) => void> = new Map();
-  private keyEventListener: unknown = null;
+  private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
+  private inputBuffer: string = '';
+  private lastKeyTime: number = 0;
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
   constructor() {
     this.logger = LoggerFactory.getInstance().createLogger('USBScannerService');
@@ -46,15 +53,14 @@ export class USBScannerService implements ScannerServiceInterface {
    */
   async disconnect(): Promise<void> {
     try {
-      // Clean up any listeners or connections
-      if (this.keyEventListener) {
-        // Remove keyboard event listeners if any
-        this.keyEventListener = null;
+      if (this.keydownHandler && typeof window !== 'undefined') {
+        window.removeEventListener('keydown', this.keydownHandler, true);
+        this.keydownHandler = null;
       }
-
+      this.scanListeners.clear();
+      this.inputBuffer = '';
       this.connected = false;
       this.deviceId = null;
-
       this.logger.info('Disconnected from USB scanner');
     } catch (error) {
       this.logger.error('Error disconnecting from USB device:', error);
@@ -69,9 +75,9 @@ export class USBScannerService implements ScannerServiceInterface {
   }
 
   /**
-   * Start listening for barcode scans from the connected USB scanner
-   * @param callback Function to call when barcode data is received
-   * @returns Subscription ID
+   * Start listening for barcode scans from the connected USB scanner.
+   * USB HID scanners emulate a keyboard — this listener captures their rapid
+   * keystroke bursts (terminated by Enter) on any web-based platform.
    */
   startScanListener(callback: (data: string) => void): string {
     if (!this.connected) {
@@ -79,36 +85,38 @@ export class USBScannerService implements ScannerServiceInterface {
       return '';
     }
 
-    try {
-      // USB scanners typically send data as keyboard events
-      // For a real implementation, you would need to use a native module
-      // to listen for specific USB device input
+    const subscriptionId = `usb-${this.deviceId}-${Date.now()}`;
+    this.scanListeners.set(subscriptionId, callback);
 
-      // For demonstration purposes, we'll simulate scan events
-      // In a real implementation, you would set up native event listeners
-
-      const subscriptionId = `usb-${this.deviceId}-${Date.now()}`;
-      this.scanListeners.set(subscriptionId, callback);
-
-      // In a real implementation, you would set up native event handlers here
-      // Example with a hypothetical USB module:
-      /*
-      this.keyEventListener = DeviceEventEmitter.addListener(
-        'USBScannerDataReceived',
-        (event) => {
-          if (event.deviceId === this.deviceId) {
-            callback(event.data);
-          }
+    if (!this.keydownHandler && typeof window !== 'undefined') {
+      this.inputBuffer = '';
+      this.lastKeyTime = 0;
+      this.keydownHandler = (e: KeyboardEvent) => {
+        const now = Date.now();
+        if (now - this.lastKeyTime > SCAN_INTERVAL_MS && this.inputBuffer.length > 0) {
+          this.inputBuffer = '';
         }
-      );
-      */
-
-      this.logger.info('Started USB scan listener');
-      return subscriptionId;
-    } catch (error) {
-      this.logger.error('Error starting USB scan listener:', error);
-      return '';
+        this.lastKeyTime = now;
+        if (e.key === 'Enter') {
+          if (this.inputBuffer.length >= MIN_BARCODE_LENGTH) {
+            const barcode = this.inputBuffer.trim();
+            this.inputBuffer = '';
+            this.scanListeners.forEach(cb => cb(barcode));
+            this.logger.info(`USB barcode scanned: ${barcode}`);
+          } else {
+            this.inputBuffer = '';
+          }
+          return;
+        }
+        if (e.key.length === 1) {
+          this.inputBuffer += e.key;
+        }
+      };
+      window.addEventListener('keydown', this.keydownHandler, true);
+      this.logger.info('DOM keydown HID listener attached for USB scanner');
     }
+
+    return subscriptionId;
   }
 
   /**
@@ -116,49 +124,26 @@ export class USBScannerService implements ScannerServiceInterface {
    * @param subscriptionId The subscription ID returned from startScanListener
    */
   stopScanListener(subscriptionId: string): void {
-    if (this.scanListeners.has(subscriptionId)) {
-      this.scanListeners.delete(subscriptionId);
-      this.logger.info('Stopped USB scan listener:', subscriptionId);
+    this.scanListeners.delete(subscriptionId);
+    if (this.scanListeners.size === 0 && this.keydownHandler && typeof window !== 'undefined') {
+      window.removeEventListener('keydown', this.keydownHandler, true);
+      this.keydownHandler = null;
+      this.inputBuffer = '';
+      this.logger.info('DOM keydown HID listener removed for USB scanner');
     }
   }
 
   /**
-   * Discover available USB scanner devices
-   * @returns Promise resolving to array of available devices
+   * Discover available USB scanner devices.
+   * USB HID scanners are identified as keyboards by the OS — no enumeration needed.
    */
   async discoverDevices(): Promise<Array<{ id: string; name: string }>> {
-    // For a real implementation, you would use a native module to discover USB devices
-    // For demonstration purposes, we'll return mock data
-
-    // Example implementation with a hypothetical USB module:
-    /*
-    try {
-      const usbDevices = await USBModule.getConnectedDevices();
-      return usbDevices
-        .filter(device => device.vendorId === 0x05e0) // Example: Symbol/Zebra scanner vendor ID
-        .map(device => ({
-          id: `${device.vendorId}-${device.productId}`,
-          name: device.productName || `USB Scanner (${device.vendorId}:${device.productId})`
-        }));
-    } catch (error) {
-      this.logger.error('Error discovering USB devices:', error);
-      return [];
-    }
-    */
-
-    // Mock data for demonstration
-    return [
-      { id: 'usb-scanner-1', name: 'Symbol DS4308 USB Scanner' },
-      { id: 'usb-scanner-2', name: 'Honeywell Voyager 1250g' },
-    ];
+    return [{ id: 'usb-hid', name: 'USB HID Barcode Scanner' }];
   }
 
-  // Simulate a barcode scan - for testing purposes only
   simulateScan(barcodeData: string): void {
     if (this.connected) {
-      this.scanListeners.forEach(callback => {
-        callback(barcodeData);
-      });
+      this.scanListeners.forEach(callback => callback(barcodeData));
     }
   }
 }

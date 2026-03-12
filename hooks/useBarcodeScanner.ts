@@ -3,8 +3,8 @@ import { Alert } from 'react-native';
 import { type BarcodeScanningResult } from 'expo-camera';
 import { ScannerType, ScannerServiceFactory } from '../services/scanner/ScannerServiceFactory';
 import { ScannerServiceInterface } from '../services/scanner/ScannerServiceInterface';
-import { formatMoney } from '../utils/money';
-import { useCurrency } from './useCurrency';
+import { SearchServiceFactory } from '../services/search/SearchServiceFactory';
+import { productVariantRepository } from '../repositories/ProductVariantRepository';
 import { useLogger } from './useLogger';
 
 interface ScannerSettings {
@@ -26,14 +26,20 @@ interface UseBarcodeScannerServiceProps {
   onScanSuccess: (productId: string) => void;
 }
 
+export interface ScanResult {
+  status: 'found_local' | 'found_variant' | 'found_online' | 'not_found' | 'searching';
+  name?: string;
+  price?: number;
+}
+
 export const useBarcodeScanner = ({ scannerSettings, products, onScanSuccess }: UseBarcodeScannerServiceProps) => {
-  const currency = useCurrency();
   const logger = useLogger('useBarcodeScanner');
   // Scanner state
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
 
   // Refs to avoid stale closures and manage scanner service lifecycle
   const scannerServiceRef = useRef<ScannerServiceInterface | null>(null);
@@ -85,37 +91,76 @@ export const useBarcodeScanner = ({ scannerSettings, products, onScanSuccess }: 
   }, [executeScannerOperation]);
 
   // Process barcode data from any scanner type
+  // UX design: auto-add immediately on any unambiguous local match (no dialog friction).
+  // Only show Alert for 'not found' (so cashier knows to check the item).
+  // Online results call onScanSuccess directly — OrderScreen will auto-add when navigated.
   const processBarcodeData = useCallback(
-    (data: string) => {
-      // Find product with barcode matching scanned data
-      const product = products.find(p => p.id === data || p.barcode === data);
+    async (data: string) => {
+      setScanResult({ status: 'searching' });
 
+      // 1. Exact match in loaded products list (id, barcode, or SKU) — instant, no dialog
+      const product = products.find(p => p.id === data || p.barcode === data || (p as unknown as { sku?: string }).sku === data);
       if (product) {
-        // Product found
-        showScannerAlert('Product Found', `Found: ${product.name} - ${formatMoney(product.price, currency.code)}`, [
-          {
-            text: 'Add to Cart',
-            onPress: () => {
-              onScanSuccess(product.id);
-              setScanned(false);
-            },
-          },
-          {
-            text: 'Scan Again',
-            onPress: () => setScanned(false),
-          },
-        ]);
-      } else {
-        // Product not found
-        showScannerAlert('Product Not Found', `No product found with barcode: ${data}`, [
-          {
-            text: 'Scan Again',
-            onPress: () => setScanned(false),
-          },
-        ]);
+        setScanResult({ status: 'found_local', name: product.name, price: product.price });
+        onScanSuccess(product.id);
+        setTimeout(() => {
+          setScanned(false);
+          setScanResult(null);
+        }, 1500);
+        return;
       }
+
+      // 2. Variant DB lookup (non-default variants not in the products array) — auto-add
+      try {
+        const variant = (await productVariantRepository.findByBarcode(data)) || (await productVariantRepository.findBySku(data));
+        if (variant) {
+          const parentProduct = products.find(p => p.id === variant.product_id);
+          const displayName = parentProduct ? `${parentProduct.name} — ${variant.title}` : variant.title;
+          setScanResult({ status: 'found_variant', name: displayName, price: variant.price });
+          onScanSuccess(variant.product_id);
+          setTimeout(() => {
+            setScanned(false);
+            setScanResult(null);
+          }, 1500);
+          return;
+        }
+      } catch (error) {
+        logger.error({ message: 'Variant barcode lookup failed' }, error instanceof Error ? error : new Error(String(error)));
+      }
+
+      // 3. Online platform search via dedicated barcode endpoint
+      try {
+        const searchService = SearchServiceFactory.getInstance().getService();
+        if (searchService.isInitialized()) {
+          const result = await searchService.searchByBarcode(data);
+          const onlineProduct = result.ecommerceResults[0];
+          if (onlineProduct) {
+            setScanResult({ status: 'found_online', name: onlineProduct.name, price: onlineProduct.price });
+            onScanSuccess(onlineProduct.id);
+            setTimeout(() => {
+              setScanned(false);
+              setScanResult(null);
+            }, 1500);
+            return;
+          }
+        }
+      } catch (error) {
+        logger.error({ message: 'Online barcode search failed' }, error instanceof Error ? error : new Error(String(error)));
+      }
+
+      // 4. Not found anywhere — brief alert so cashier knows to check the item manually
+      setScanResult({ status: 'not_found' });
+      showScannerAlert('Product Not Found', `No product found for barcode: ${data}`, [
+        {
+          text: 'Scan Again',
+          onPress: () => {
+            setScanned(false);
+            setScanResult(null);
+          },
+        },
+      ]);
     },
-    [products, onScanSuccess, showScannerAlert, currency.code]
+    [products, onScanSuccess, showScannerAlert, logger]
   );
 
   // Connect to scanner
@@ -211,6 +256,7 @@ export const useBarcodeScanner = ({ scannerSettings, products, onScanSuccess }: 
     scanned,
     connected,
     connecting,
+    scanResult,
     setScanned,
     connectScanner,
     disconnectScanner,

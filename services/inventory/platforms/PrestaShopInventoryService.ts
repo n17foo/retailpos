@@ -60,32 +60,20 @@ export class PrestaShopInventoryService extends BaseInventoryService {
     try {
       for (const productId of productIds) {
         try {
-          const apiUrl = `${this.config.storeUrl}/api/stock_availables?output_format=JSON&filter[id_product]=${productId}&display=full`;
-          const response = await fetch(apiUrl, {
-            headers: this.getAuthHeaders(),
-          });
+          const data = await this.apiClient.get<any>(`stock_availables?output_format=JSON&filter[id_product]=${productId}&display=full`);
+          const stockItems = data.stock_availables || [];
 
-          if (response.ok) {
-            const data = await response.json();
-            const stockItems = data.stock_availables || [];
+          for (const stockItem of stockItems) {
+            items.push({
+              productId,
+              variantId: stockItem.id_product_attribute ? String(stockItem.id_product_attribute) : productId,
+              sku: stockItem.reference,
+              quantity: parseInt(stockItem.quantity || '0', 10),
+            });
+          }
 
-            for (const stockItem of stockItems) {
-              items.push({
-                productId,
-                variantId: stockItem.id_product_attribute ? String(stockItem.id_product_attribute) : productId,
-                sku: stockItem.reference,
-                quantity: parseInt(stockItem.quantity || '0', 10),
-              });
-            }
-
-            // If no stock items found, add default
-            if (stockItems.length === 0) {
-              items.push({
-                productId,
-                variantId: productId,
-                quantity: 0,
-              });
-            }
+          if (stockItems.length === 0) {
+            items.push({ productId, variantId: productId, quantity: 0 });
           }
         } catch (error) {
           this.logger.error(
@@ -119,16 +107,9 @@ export class PrestaShopInventoryService extends BaseInventoryService {
     for (const update of updates) {
       try {
         // First get the stock_available ID
-        const searchUrl = `${this.config.storeUrl}/api/stock_availables?output_format=JSON&filter[id_product]=${update.productId}&display=full`;
-        const searchResponse = await fetch(searchUrl, {
-          headers: this.getAuthHeaders(),
-        });
-
-        if (!searchResponse.ok) {
-          throw new Error('Failed to find stock record');
-        }
-
-        const searchData = await searchResponse.json();
+        const searchData = await this.apiClient.get<any>(
+          `stock_availables?output_format=JSON&filter[id_product]=${update.productId}&display=full`
+        );
         const stockItems = searchData.stock_availables || [];
 
         // Find the right stock item (by variant or default)
@@ -147,32 +128,15 @@ export class PrestaShopInventoryService extends BaseInventoryService {
         }
 
         // Update the stock
-        const updateUrl = `${this.config.storeUrl}/api/stock_availables/${stockItem.id}?output_format=JSON`;
-        const response = await fetch(updateUrl, {
-          method: 'PUT',
-          headers: {
-            ...this.getAuthHeaders(),
-            'Content-Type': 'application/json',
+        await this.apiClient.put(`stock_availables/${stockItem.id}?output_format=JSON`, {
+          stock_available: {
+            id: stockItem.id,
+            id_product: update.productId,
+            id_product_attribute: update.variantId || 0,
+            quantity: newQuantity,
           },
-          body: JSON.stringify({
-            stock_available: {
-              id: stockItem.id,
-              id_product: update.productId,
-              id_product_attribute: update.variantId || 0,
-              quantity: newQuantity,
-            },
-          }),
         });
-
-        if (response.ok) {
-          result.successful++;
-        } else {
-          result.failed++;
-          result.errors.push({
-            productId: update.productId,
-            error: `Failed to update inventory: ${response.statusText}`,
-          });
-        }
+        result.successful++;
       } catch (error) {
         result.failed++;
         result.errors.push({
@@ -183,9 +147,5 @@ export class PrestaShopInventoryService extends BaseInventoryService {
     }
 
     return result;
-  }
-
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 }

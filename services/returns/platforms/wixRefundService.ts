@@ -71,22 +71,12 @@ export class WixRefundService implements PlatformRefundServiceInterface {
    */
   private async processWixRefundDirectly(orderId: string, refundData: RefundData): Promise<RefundResult> {
     try {
-      const credentials = await this.getWixCredentials();
-      if (!credentials) {
-        throw new Error('Failed to retrieve Wix API credentials');
-      }
+      this.logger.info(`Processing Wix refund for order ${orderId}`);
 
-      const headers = this.apiClient['buildHeaders']();
-
-      // Wix eCommerce Refunds API
-      const endpoint = 'https://www.wixapis.com/ecom/v1/refunds/create';
-
-      const requestData = {
+      const data = await this.apiClient.post<{ refund?: { id?: string } }>('ecom/v1/refunds/create', {
         refund: {
           orderId,
-          amount: {
-            amount: String(refundData.amount || 0),
-          },
+          amount: { amount: String(refundData.amount || 0) },
           reason: refundData.reason || 'Refunded via RetailPOS',
           details: {
             items:
@@ -97,22 +87,7 @@ export class WixRefundService implements PlatformRefundServiceInterface {
               })) || [],
           },
         },
-      };
-
-      this.logger.info(`Processing Wix refund for order ${orderId}`);
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestData),
       });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`Wix refund API returned ${response.status}: ${errorBody}`);
-      }
-
-      const data = await response.json();
       const refundId = String(data.refund?.id || `wix-refund-${Date.now()}`);
 
       return {

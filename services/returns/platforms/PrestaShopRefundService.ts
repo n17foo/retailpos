@@ -72,14 +72,6 @@ export class PrestaShopRefundService implements PlatformRefundServiceInterface {
         throw new Error('PrestaShop refund service not initialized');
       }
 
-      const credentials = await this.getPrestaShopCredentials();
-      if (!credentials) {
-        throw new Error('Failed to retrieve PrestaShop API credentials');
-      }
-
-      // PrestaShop creates credit slips (order_slips) for refunds
-      const endpoint = `${credentials.apiUrl}/api/order_slip`;
-
       // Build XML payload for PrestaShop Web Services
       const orderDetailLines =
         refundData.items
@@ -102,25 +94,10 @@ export class PrestaShopRefundService implements PlatformRefundServiceInterface {
   </order_slip>
 </prestashop>`;
 
-      this.logger.info(`Processing PrestaShop refund for order ${orderId} at ${endpoint}`);
+      this.logger.info(`Processing PrestaShop refund for order ${orderId}`);
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          ...this.apiClient['buildHeaders'](),
-          'Content-Type': 'application/xml',
-        },
-        body: xmlPayload,
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`PrestaShop refund API returned ${response.status}: ${errorBody}`);
-      }
-
-      // Parse the response to get the credit slip ID
-      const responseText = await response.text();
-      const idMatch = responseText.match(/<id>.*?(\d+).*?<\/id>/);
+      const responseText = await this.apiClient.post<string>('order_slip', xmlPayload);
+      const idMatch = typeof responseText === 'string' ? responseText.match(/<id>.*?(\d+).*?<\/id>/) : null;
       const refundId = idMatch ? idMatch[1] : `prestashop-refund-${Date.now()}`;
 
       const refundRecord: RefundRecord = {

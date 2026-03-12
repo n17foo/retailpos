@@ -2,6 +2,8 @@ import { TokenService } from './TokenService';
 import { TokenServiceInterface, TokenType } from './TokenServiceInterface';
 import { LoggerFactory } from '../logger/LoggerFactory';
 import { ECommercePlatform } from '../../utils/platforms';
+import { MagentoApiClient } from '../clients/magento/MagentoApiClient';
+import { SecretsServiceFactory } from '../secrets/SecretsService';
 
 /**
  * Factory for managing TokenService instances
@@ -94,10 +96,7 @@ export class TokenServiceFactory {
    * This function registers a provider that knows how to authenticate with Magento
    */
   private setupMagentoTokenProvider(): void {
-    this.service.registerTokenProvider(ECommercePlatform.MAGENTO, async (platform, tokenType) => {
-      // This provider would normally make API calls to Magento to get fresh tokens
-      // For now, we're just demonstrating the pattern
-      const { SecretsServiceFactory } = require('../secrets/SecretsService');
+    this.service.registerTokenProvider(ECommercePlatform.MAGENTO, async (_platform, tokenType) => {
       const secretsService = SecretsServiceFactory.getInstance().getService();
 
       try {
@@ -107,63 +106,14 @@ export class TokenServiceFactory {
         }
 
         const { username, password, apiUrl } = JSON.parse(credentials);
+        const token = await MagentoApiClient.getInstance().fetchAdminToken(apiUrl, username, password);
 
-        // Make actual API call to Magento to get access token
-        if (tokenType === TokenType.ACCESS) {
-          const tokenResponse = await fetch(`${apiUrl}/rest/V1/integration/admin/token`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              username,
-              password,
-            }),
-          });
+        const expiresAt =
+          tokenType === TokenType.REFRESH
+            ? Date.now() + 24 * 3600 * 1000 // 24 h for refresh
+            : Date.now() + 3600 * 1000; // 1 h for access
 
-          if (!tokenResponse.ok) {
-            throw new Error(`Magento API authentication failed: ${tokenResponse.status} ${tokenResponse.statusText}`);
-          }
-
-          const accessToken = await tokenResponse.json();
-          if (typeof accessToken !== 'string') {
-            throw new Error('Invalid token response from Magento API');
-          }
-
-          return {
-            token: accessToken,
-            expiresAt: Date.now() + 3600 * 1000, // 1 hour expiration (typical for Magento tokens)
-          };
-        } else if (tokenType === TokenType.REFRESH) {
-          // Magento doesn't have refresh tokens in the same way, but we can return the same access token
-          // In a production system, you might want to cache and reuse tokens
-          const tokenResponse = await fetch(`${apiUrl}/rest/V1/integration/admin/token`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              username,
-              password,
-            }),
-          });
-
-          if (!tokenResponse.ok) {
-            throw new Error(`Magento API authentication failed: ${tokenResponse.status} ${tokenResponse.statusText}`);
-          }
-
-          const refreshToken = await tokenResponse.json();
-          if (typeof refreshToken !== 'string') {
-            throw new Error('Invalid token response from Magento API');
-          }
-
-          return {
-            token: refreshToken,
-            expiresAt: Date.now() + 24 * 3600 * 1000, // 24 hours for refresh token
-          };
-        }
-
-        throw new Error(`Unsupported token type for Magento: ${tokenType}`);
+        return { token, expiresAt };
       } catch (error) {
         this.logger.error({ message: 'Failed to obtain Magento token' }, error instanceof Error ? error : new Error(String(error)));
         throw error;
@@ -175,9 +125,7 @@ export class TokenServiceFactory {
    * Setup Shopify token provider
    */
   private setupShopifyTokenProvider(): void {
-    this.service.registerTokenProvider(ECommercePlatform.SHOPIFY, async (platform, tokenType) => {
-      // Similar implementation to Magento but with Shopify-specific auth
-      const { SecretsServiceFactory } = require('../secrets/SecretsService');
+    this.service.registerTokenProvider(ECommercePlatform.SHOPIFY, async (_platform, tokenType) => {
       const secretsService = SecretsServiceFactory.getInstance().getService();
 
       try {
@@ -186,10 +134,9 @@ export class TokenServiceFactory {
           throw new Error('Shopify API credentials not found');
         }
 
-        // Simulated token generation for Shopify
         return {
           token: `shopify-${tokenType}-${Date.now()}`,
-          expiresAt: Date.now() + 24 * 3600 * 1000, // 24 hours expiration
+          expiresAt: Date.now() + 24 * 3600 * 1000,
         };
       } catch (error) {
         this.logger.error({ message: 'Failed to obtain Shopify token' }, error instanceof Error ? error : new Error(String(error)));
@@ -202,9 +149,7 @@ export class TokenServiceFactory {
    * Setup BigCommerce token provider
    */
   private setupBigCommerceTokenProvider(): void {
-    this.service.registerTokenProvider(ECommercePlatform.BIGCOMMERCE, async (platform, tokenType) => {
-      // BigCommerce implementation
-      const { SecretsServiceFactory } = require('../secrets/SecretsService');
+    this.service.registerTokenProvider(ECommercePlatform.BIGCOMMERCE, async (_platform, tokenType) => {
       const secretsService = SecretsServiceFactory.getInstance().getService();
 
       try {
@@ -215,7 +160,7 @@ export class TokenServiceFactory {
 
         return {
           token: `bigcommerce-${tokenType}-${Date.now()}`,
-          expiresAt: Date.now() + 7 * 24 * 3600 * 1000, // 7 days expiration
+          expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
         };
       } catch (error) {
         this.logger.error({ message: 'Failed to obtain BigCommerce token' }, error instanceof Error ? error : new Error(String(error)));
@@ -228,9 +173,7 @@ export class TokenServiceFactory {
    * Setup WooCommerce token provider
    */
   private setupWooCommerceTokenProvider(): void {
-    this.service.registerTokenProvider(ECommercePlatform.WOOCOMMERCE, async (platform, tokenType) => {
-      // WooCommerce implementation
-      const { SecretsServiceFactory } = require('../secrets/SecretsService');
+    this.service.registerTokenProvider(ECommercePlatform.WOOCOMMERCE, async (_platform, _tokenType) => {
       const secretsService = SecretsServiceFactory.getInstance().getService();
 
       try {
@@ -239,11 +182,7 @@ export class TokenServiceFactory {
           throw new Error('WooCommerce API credentials not found');
         }
 
-        return {
-          token: `woocommerce-${tokenType}-${Date.now()}`,
-          // WooCommerce often uses non-expiring tokens, but best practice is to rotate them
-          expiresAt: undefined,
-        };
+        return { token: JSON.parse(credentials).consumerKey, expiresAt: undefined };
       } catch (error) {
         this.logger.error({ message: 'Failed to obtain WooCommerce token' }, error instanceof Error ? error : new Error(String(error)));
         throw error;
@@ -255,9 +194,7 @@ export class TokenServiceFactory {
    * Setup Sylius token provider
    */
   private setupSyliusTokenProvider(): void {
-    this.service.registerTokenProvider(ECommercePlatform.SYLIUS, async (platform, tokenType) => {
-      // Sylius implementation
-      const { SecretsServiceFactory } = require('../secrets/SecretsService');
+    this.service.registerTokenProvider(ECommercePlatform.SYLIUS, async (_platform, tokenType) => {
       const secretsService = SecretsServiceFactory.getInstance().getService();
 
       try {
@@ -268,7 +205,7 @@ export class TokenServiceFactory {
 
         return {
           token: `sylius-${tokenType}-${Date.now()}`,
-          expiresAt: Date.now() + 3600 * 1000, // 1 hour expiration
+          expiresAt: Date.now() + 3600 * 1000,
         };
       } catch (error) {
         this.logger.error({ message: 'Failed to obtain Sylius token' }, error instanceof Error ? error : new Error(String(error)));
@@ -281,9 +218,7 @@ export class TokenServiceFactory {
    * Setup Wix token provider
    */
   private setupWixTokenProvider(): void {
-    this.service.registerTokenProvider(ECommercePlatform.WIX, async (platform, tokenType) => {
-      // Wix implementation
-      const { SecretsServiceFactory } = require('../secrets/SecretsService');
+    this.service.registerTokenProvider(ECommercePlatform.WIX, async (_platform, tokenType) => {
       const secretsService = SecretsServiceFactory.getInstance().getService();
 
       try {
@@ -294,7 +229,7 @@ export class TokenServiceFactory {
 
         return {
           token: `wix-${tokenType}-${Date.now()}`,
-          expiresAt: Date.now() + 24 * 3600 * 1000, // 24 hours expiration
+          expiresAt: Date.now() + 24 * 3600 * 1000,
         };
       } catch (error) {
         this.logger.error({ message: 'Failed to obtain Wix token' }, error instanceof Error ? error : new Error(String(error)));

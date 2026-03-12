@@ -29,18 +29,7 @@ export class BigCommerceCategoryService extends BaseCategoryService {
     }
 
     try {
-      const url = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v3/catalog/categories`;
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch BigCommerce categories: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<{ data: any[] }>('catalog/categories?limit=250');
 
       if (!data.data || !Array.isArray(data.data)) {
         return [];
@@ -63,21 +52,7 @@ export class BigCommerceCategoryService extends BaseCategoryService {
     }
 
     try {
-      const url = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v3/catalog/categories/${categoryId}`;
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return undefined;
-        }
-        throw new Error(`Failed to fetch BigCommerce category: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<{ data: any }>(`catalog/categories/${categoryId}`);
 
       if (!data.data) {
         return undefined;
@@ -102,31 +77,16 @@ export class BigCommerceCategoryService extends BaseCategoryService {
     }
 
     try {
-      const url = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v3/catalog/categories`;
-
       // Format category data for BigCommerce
-      const requestData = {
+      const requestData: any = {
         name: category.name,
         description: category.description || '',
+        is_visible: true,
         parent_id: category.parentId ? parseInt(category.parentId, 10) : 0,
         image_url: category.image,
       };
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to create BigCommerce category: ${response.statusText} - ${errorText}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.post<{ data: any }>('catalog/categories', requestData);
 
       if (!data.data) {
         throw new Error('Failed to create category: No data returned');
@@ -148,41 +108,15 @@ export class BigCommerceCategoryService extends BaseCategoryService {
     }
 
     try {
-      const url = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v3/catalog/categories/${categoryId}`;
-
       // Format category data for BigCommerce
-      const requestData: Record<string, any> = {};
+      const requestData: any = {};
 
-      if (categoryData.name !== undefined) {
-        requestData.name = categoryData.name;
-      }
+      if (categoryData.name !== undefined) requestData.name = categoryData.name;
+      if (categoryData.description !== undefined) requestData.description = categoryData.description;
+      if (categoryData.parentId !== undefined) requestData.parent_id = parseInt(categoryData.parentId, 10);
+      if (categoryData.image !== undefined) requestData.image_url = categoryData.image;
 
-      if (categoryData.description !== undefined) {
-        requestData.description = categoryData.description;
-      }
-
-      if (categoryData.parentId !== undefined) {
-        requestData.parent_id = parseInt(categoryData.parentId, 10);
-      }
-
-      if (categoryData.image !== undefined) {
-        requestData.image_url = categoryData.image;
-      }
-
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update BigCommerce category: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.put<{ data: any }>(`catalog/categories/${categoryId}`, requestData);
 
       if (!data.data) {
         throw new Error('Failed to update category: No data returned');
@@ -207,14 +141,8 @@ export class BigCommerceCategoryService extends BaseCategoryService {
     }
 
     try {
-      const url = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v3/catalog/categories/${categoryId}`;
-
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: this.getAuthHeaders(),
-      });
-
-      return response.ok;
+      await this.apiClient.delete(`catalog/categories/${categoryId}`);
+      return true;
     } catch (error) {
       this.logger.error(
         { message: `Error deleting BigCommerce category ${categoryId}:` },

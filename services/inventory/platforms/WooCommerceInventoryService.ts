@@ -3,6 +3,22 @@ import { PlatformConfigRequirements } from './PlatformInventoryServiceInterface'
 import { BaseInventoryService } from './BaseInventoryService';
 import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
+interface WooCommerceInventoryProduct {
+  id: number | string;
+  type?: string;
+  stock_quantity?: number;
+  sku?: string;
+  date_modified?: string;
+  variations?: Array<number | string>;
+}
+
+interface WooCommerceInventoryVariation {
+  id: number | string;
+  stock_quantity?: number;
+  sku?: string;
+  date_modified?: string;
+}
+
 /**
  * WooCommerce-specific inventory service implementation
  * Handles WooCommerce inventory API interactions
@@ -32,18 +48,7 @@ export class WooCommerceInventoryService extends BaseInventoryService {
 
       // WooCommerce API allows fetching multiple products in one request
       const idsParam = productIds.join(',');
-      const apiUrl = `${this.config.storeUrl}/wp-json/wc/v3/products?include=${idsParam}`;
-
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch WooCommerce inventory: ${response.statusText}`);
-      }
-
-      const products = await response.json();
+      const products = await this.apiClient.get<WooCommerceInventoryProduct[]>(`products?include=${idsParam}`);
 
       // Process main products inventory
       for (const product of products) {
@@ -57,15 +62,8 @@ export class WooCommerceInventoryService extends BaseInventoryService {
           });
         } else if (product.type === 'variable' && product.variations && product.variations.length > 0) {
           // For variable products, we need to fetch each variation's inventory
-          const variationsUrl = `${this.config.storeUrl}/wp-json/wc/v3/products/${product.id}/variations`;
-
-          const variationsResponse = await fetch(variationsUrl, {
-            method: 'GET',
-            headers: this.getAuthHeaders(),
-          });
-
-          if (variationsResponse.ok) {
-            const variations = await variationsResponse.json();
+          try {
+            const variations = await this.apiClient.get<WooCommerceInventoryVariation[]>(`products/${product.id}/variations`);
 
             for (const variant of variations) {
               items.push({
@@ -76,6 +74,8 @@ export class WooCommerceInventoryService extends BaseInventoryService {
                 updatedAt: new Date(variant.date_modified),
               });
             }
+          } catch {
+            /* skip variations on error */
           }
         }
       }
@@ -103,16 +103,6 @@ export class WooCommerceInventoryService extends BaseInventoryService {
 
     try {
       for (const update of updates) {
-        let apiUrl: string;
-
-        // Determine if we're updating a main product or a variation
-        if (update.variantId) {
-          apiUrl = `${this.config.storeUrl}/wp-json/wc/v3/products/${update.productId}/variations/${update.variantId}`;
-        } else {
-          apiUrl = `${this.config.storeUrl}/wp-json/wc/v3/products/${update.productId}`;
-        }
-
-        // If this is an adjustment, we need to get the current quantity first
         let newQuantity = update.quantity;
 
         if (update.adjustment) {
@@ -120,36 +110,15 @@ export class WooCommerceInventoryService extends BaseInventoryService {
           const item = currentInventory.items.find(
             i => i.productId === update.productId && (!update.variantId || i.variantId === update.variantId)
           );
-
           if (item) {
-            newQuantity = (item.quantity || 0) + update.quantity;
-            if (newQuantity < 0) newQuantity = 0; // Prevent negative inventory
+            newQuantity = Math.max(0, (item.quantity || 0) + update.quantity);
           }
         }
 
-        // Update the inventory
-        const response = await fetch(apiUrl, {
-          method: 'PUT',
-          headers: {
-            ...this.getAuthHeaders(),
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            stock_quantity: newQuantity,
-            manage_stock: true,
-          }),
-        });
+        const endpoint = update.variantId ? `products/${update.productId}/variations/${update.variantId}` : `products/${update.productId}`;
 
-        if (response.ok) {
-          result.successful++;
-        } else {
-          result.failed++;
-          result.errors.push({
-            productId: update.productId,
-            variantId: update.variantId,
-            error: `Failed to update inventory: ${response.statusText}`,
-          });
-        }
+        await this.apiClient.put(endpoint, { stock_quantity: newQuantity, manage_stock: true });
+        result.successful++;
       }
 
       return result;
@@ -167,13 +136,5 @@ export class WooCommerceInventoryService extends BaseInventoryService {
         ],
       };
     }
-  }
-
-  /**
-   * Create authorization headers for WooCommerce API
-   * WooCommerce uses Basic Authentication
-   */
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 }

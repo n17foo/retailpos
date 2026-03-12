@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
 import { ScannerServiceFactory, ScannerType as ScannerTypeEnum } from '../services/scanner/ScannerServiceFactory';
 import { ScannerServiceInterface } from '../services/scanner/ScannerServiceInterface';
+import { BluetoothScannerService } from '../services/scanner/BluetoothScannerService';
 import { useLogger } from '../hooks/useLogger';
 
 export type ScannerType = 'camera' | 'bluetooth' | 'usb' | 'qr_hardware';
@@ -28,12 +29,22 @@ export interface ScannerSettings {
   enabled: boolean;
   type: ScannerType;
   deviceId: string;
+  /** BLE GATT service UUID for the barcode characteristic (Bluetooth scanners only) */
+  bleServiceUUID: string;
+  /** BLE GATT characteristic UUID for barcode data (Bluetooth scanners only) */
+  bleCharacteristicUUID: string;
 }
+
+/** Microchip RN4020 / generic BLE serial profile — most common on entry-level BT scanners */
+const DEFAULT_BLE_SERVICE_UUID = '49535343-FE7D-4AE5-8FA9-9FAFD205E455';
+const DEFAULT_BLE_CHARACTERISTIC_UUID = '49535343-8841-43F4-A8D4-ECBE34729BB3';
 
 const DEFAULT_SETTINGS: ScannerSettings = {
   enabled: true,
   type: 'camera',
   deviceId: '',
+  bleServiceUUID: DEFAULT_BLE_SERVICE_UUID,
+  bleCharacteristicUUID: DEFAULT_BLE_CHARACTERISTIC_UUID,
 };
 
 export const useScanner = () => {
@@ -106,6 +117,11 @@ export const useScanner = () => {
           }
 
           scannerServiceRef.current = service;
+
+          // For BLE scanners, apply configured UUIDs before connecting
+          if (scannerSettings.type === 'bluetooth' && service instanceof BluetoothScannerService) {
+            service.configure(scannerSettings.bleServiceUUID, scannerSettings.bleCharacteristicUUID);
+          }
 
           // Connect to the scanner device
           const connected = await service.connect(scannerSettings.deviceId);

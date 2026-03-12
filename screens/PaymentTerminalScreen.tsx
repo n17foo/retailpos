@@ -33,6 +33,7 @@ const PROVIDER_LABELS: Record<PaymentProvider, string> = {
   [PaymentProvider.STRIPE]: 'Stripe Terminal',
   [PaymentProvider.STRIPE_NFC]: 'Stripe NFC',
   [PaymentProvider.SQUARE]: 'Square',
+  [PaymentProvider.ELECTRON_STRIPE]: 'Stripe (Desktop)',
 };
 
 const PaymentTerminalScreen: React.FC<PaymentTerminalScreenProps> = ({ navigation, route }) => {

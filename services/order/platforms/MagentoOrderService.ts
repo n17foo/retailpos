@@ -2,8 +2,6 @@
 import { Order } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
-import { MAGENTO_API_VERSION } from '../../config/apiVersions';
-import { QueuedApiService } from '../../queue/QueuedApiService';
 import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
 
 /**
@@ -12,8 +10,6 @@ import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
  */
 export class MagentoOrderService extends BaseOrderService {
   private apiClient = MagentoApiClient.getInstance();
-  private accessToken: string | null = null;
-  private tokenExpiration: Date | null = null;
 
   constructor(config: PlatformOrderConfig = {}) {
     super(config);
@@ -29,9 +25,8 @@ export class MagentoOrderService extends BaseOrderService {
       this.config.username = this.config.username || process.env.MAGENTO_USERNAME || '';
       this.config.password = this.config.password || process.env.MAGENTO_PASSWORD || '';
       this.config.accessToken = this.config.accessToken || process.env.MAGENTO_ACCESS_TOKEN || '';
-      this.config.apiVersion = this.config.apiVersion || process.env.MAGENTO_API_VERSION || MAGENTO_API_VERSION;
+      this.config.apiVersion = this.config.apiVersion || process.env.MAGENTO_API_VERSION || '';
 
-      // Configure and initialize the shared Magento client
       if (!this.apiClient.isInitialized()) {
         this.apiClient.configure({
           storeUrl: this.config.storeUrl as string,
@@ -40,36 +35,16 @@ export class MagentoOrderService extends BaseOrderService {
         });
         await this.apiClient.initialize();
       }
-      this.config.storeUrl = this.apiClient.getBaseUrl();
 
       if (!this.config.storeUrl) {
         this.logger.warn({ message: 'Missing Magento store URL configuration' });
         return false;
       }
 
-      // Get auth token if needed
-      if (!this.config.accessToken && this.config.username && this.config.password) {
-        const token = await this.getAuthToken();
-        if (!token) {
-          this.logger.error({ message: 'Failed to authenticate with Magento' });
-          return false;
-        }
-      }
-
-      // Test connection
       try {
-        const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/orders?searchCriteria[pageSize]=1`;
-        const response = await fetch(apiUrl, {
-          headers: this.getAuthHeaders(),
-        });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to Magento API' });
-          return false;
-        }
+        await this.apiClient.get('orders', { 'searchCriteria[pageSize]': '1' });
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Magento API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -103,36 +78,15 @@ export class MagentoOrderService extends BaseOrderService {
     }
 
     try {
-      // First create a cart
       const cartId = await this.createCart();
 
-      // Add items to cart
       for (const item of order.lineItems) {
         await this.addItemToCart(cartId, item);
       }
 
-      // Set shipping/billing info and place order
-      const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/carts/${cartId}/order`;
-
-      const response = await QueuedApiService.directRequestWithBody(
-        apiUrl,
-        'PUT',
-        {
-          paymentMethod: {
-            method: 'checkmo', // Check/Money Order - for POS use
-          },
-        },
-        {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'application/json',
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to create order on Magento: ${response.statusText}`);
-      }
-
-      const orderId = await response.json();
+      const orderId = await this.apiClient.put<string>(`carts/${cartId}/order`, {
+        paymentMethod: { method: 'checkmo' },
+      });
 
       // Fetch the created order
       return (await this.getOrder(String(orderId))) as Order;
@@ -146,50 +100,16 @@ export class MagentoOrderService extends BaseOrderService {
    * Create a cart for order creation
    */
   private async createCart(): Promise<string> {
-    const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/carts`;
-
-    const response = await QueuedApiService.directRequestWithBody(
-      apiUrl,
-      'POST',
-      {},
-      {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to create cart');
-    }
-
-    return await response.json();
+    return this.apiClient.post<string>('carts', {});
   }
 
   /**
    * Add item to cart
    */
   private async addItemToCart(cartId: string, item: Order['lineItems'][0]): Promise<void> {
-    const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/carts/${cartId}/items`;
-
-    const response = await QueuedApiService.directRequestWithBody(
-      apiUrl,
-      'POST',
-      {
-        cartItem: {
-          sku: item.sku,
-          qty: item.quantity,
-          quote_id: cartId,
-        },
-      },
-      {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to add item ${item.sku} to cart`);
-    }
+    await this.apiClient.post(`carts/${cartId}/items`, {
+      cartItem: { sku: item.sku, qty: item.quantity, quote_id: cartId },
+    });
   }
 
   /**
@@ -201,18 +121,13 @@ export class MagentoOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/orders/${orderId}`;
-
-      const response = await QueuedApiService.directRequest(apiUrl, 'GET', this.getAuthHeaders());
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to fetch order from Magento: ${response.statusText}`);
+      let data: any;
+      try {
+        data = await this.apiClient.get<any>(`orders/${orderId}`);
+      } catch (e: any) {
+        if (e?.status === 404) return null;
+        throw e;
       }
-
-      const data = await response.json();
       return this.mapToOrder(data);
     } catch (error) {
       this.logger.error(
@@ -232,30 +147,13 @@ export class MagentoOrderService extends BaseOrderService {
     }
 
     try {
-      // Magento has limited order update capabilities
-      // We can add comments or update status
-      const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/orders/${orderId}/comments`;
-
-      const response = await QueuedApiService.directRequestWithBody(
-        apiUrl,
-        'POST',
-        {
-          statusHistory: {
-            comment: updates.note || 'Order updated from POS',
-            is_customer_notified: 0,
-            is_visible_on_front: 0,
-          },
+      await this.apiClient.post(`orders/${orderId}/comments`, {
+        statusHistory: {
+          comment: updates.note || 'Order updated from POS',
+          is_customer_notified: 0,
+          is_visible_on_front: 0,
         },
-        {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'application/json',
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to update order on Magento: ${response.statusText}`);
-      }
-
+      });
       return await this.getOrder(orderId);
     } catch (error) {
       this.logger.error(
@@ -264,49 +162,6 @@ export class MagentoOrderService extends BaseOrderService {
       );
       return null;
     }
-  }
-
-  /**
-   * Get admin authentication token
-   */
-  private async getAuthToken(): Promise<string | null> {
-    if (this.accessToken && this.tokenExpiration && this.tokenExpiration > new Date()) {
-      return this.accessToken;
-    }
-
-    try {
-      const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/integration/admin/token`;
-
-      const response = await QueuedApiService.directRequestWithBody(
-        apiUrl,
-        'POST',
-        {
-          username: this.config.username,
-          password: this.config.password,
-        },
-        { 'Content-Type': 'application/json' }
-      );
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const token = await response.json();
-      this.accessToken = token;
-      this.tokenExpiration = new Date(Date.now() + 4 * 60 * 60 * 1000);
-
-      return token;
-    } catch (error) {
-      this.logger.error({ message: 'Error getting Magento auth token' }, error instanceof Error ? error : new Error(String(error)));
-      return null;
-    }
-  }
-
-  /**
-   * Get authorization headers
-   */
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 
   /**

@@ -60,6 +60,14 @@ export abstract class BaseSearchService implements PlatformSearchServiceInterfac
   abstract getCategories(): Promise<string[]>;
 
   /**
+   * Default barcode search — delegates to searchPlatformProducts with searchField='barcode'.
+   * Override in subclasses that have a dedicated /products/barcode/:barcode endpoint.
+   */
+  async searchByBarcode(barcode: string): Promise<SearchProduct[]> {
+    return this.searchPlatformProducts(barcode, { searchField: 'barcode', limit: 5 });
+  }
+
+  /**
    * Add a query to search history
    */
   protected addToSearchHistory(query: string): void {

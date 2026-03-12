@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, TextInput, StyleSheet, Animated, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -27,20 +27,24 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [error, setError] = useState<string | null>(null);
   const [shake] = useState(new Animated.Value(0));
   const [waitingForSwipe, setWaitingForSwipe] = useState(false);
+  const biometricTriggeredRef = useRef(false);
 
   // Load available auth methods on mount
   useEffect(() => {
     authService.getAvailableProviders().then(providers => {
       setAvailableMethods(providers);
+
+      const primaryMethod = authConfig.primaryMethod;
+      const hasPrimaryMethod = providers.some(provider => provider.type === primaryMethod);
+      const fallbackMethod = providers[0]?.type ?? 'pin';
+
+      setActiveMethod(hasPrimaryMethod ? primaryMethod : fallbackMethod);
+      setWaitingForSwipe(
+        (hasPrimaryMethod ? primaryMethod : fallbackMethod) === 'magstripe' ||
+          (hasPrimaryMethod ? primaryMethod : fallbackMethod) === 'rfid_nfc'
+      );
     });
   }, []);
-
-  // Auto-trigger biometric when it is the active method
-  useEffect(() => {
-    if (activeMethod === 'biometric') {
-      handleBiometricAuth();
-    }
-  });
 
   const startShake = useCallback(() => {
     Animated.sequence([
@@ -73,6 +77,17 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       handleAuthResult('biometric', result);
     });
   }, [handleAuthResult]);
+
+  // Auto-trigger biometric when it is the active method
+  useEffect(() => {
+    if (activeMethod === 'biometric' && !biometricTriggeredRef.current && !isLoading) {
+      biometricTriggeredRef.current = true;
+      handleBiometricAuth();
+    }
+    if (activeMethod !== 'biometric') {
+      biometricTriggeredRef.current = false;
+    }
+  }, [activeMethod, handleBiometricAuth, isLoading]);
 
   // ── PIN handlers ────────────────────────────────────────────────────
 
@@ -154,6 +169,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     setPin('');
     setPassword('');
     setError(null);
+    biometricTriggeredRef.current = false;
     setWaitingForSwipe(method === 'magstripe' || method === 'rfid_nfc');
   }, []);
 

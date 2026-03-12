@@ -1,6 +1,6 @@
 import { localApiConfig } from './LocalApiConfig';
-import { localApiClient } from './LocalApiClient';
 import { LoggerFactory } from '../logger/LoggerFactory';
+import { localApiClient } from '../clients/localapi/LocalApiClient';
 
 export interface DiscoveredServer {
   address: string;
@@ -93,23 +93,9 @@ export class LocalApiDiscovery {
    * Uses a short timeout to avoid blocking on unresponsive IPs.
    */
   async probeAddress(address: string, port: number, secret?: string): Promise<DiscoveredServer | null> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 2000);
-
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (secret) headers['x-shared-secret'] = secret;
-
-      const response = await fetch(`http://${address}:${port}/api/health`, {
-        method: 'GET',
-        headers,
-        signal: controller.signal,
-      });
-
-      if (!response.ok) return null;
-
-      const data = await response.json();
-      if (data.ok !== true) return null;
+      const data = await localApiClient.probeHealth(`http://${address}:${port}`, secret, 2000);
+      if (!data || data.ok !== true) return null;
 
       return {
         address,
@@ -119,8 +105,6 @@ export class LocalApiDiscovery {
       };
     } catch {
       return null;
-    } finally {
-      clearTimeout(timeout);
     }
   }
 

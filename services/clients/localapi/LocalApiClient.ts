@@ -1,10 +1,20 @@
-import { localApiConfig } from './LocalApiConfig';
-import { LoggerFactory } from '../logger/LoggerFactory';
-import { OrderRow } from '../../repositories/OrderRepository';
-import { OrderItemRow } from '../../repositories/OrderItemRepository';
-import { Product } from '../../repositories/ProductRepository';
-import { TaxProfileRow } from '../../repositories/TaxProfileRepository';
-import { ReturnRow } from '../../repositories/ReturnRepository';
+import { localApiConfig } from '../../localapi/LocalApiConfig';
+import { LoggerFactory } from '../../logger/LoggerFactory';
+import { OrderRow } from '../../../repositories/OrderRepository';
+import { OrderItemRow } from '../../../repositories/OrderItemRepository';
+import { Product } from '../../../repositories/ProductRepository';
+import { TaxProfileRow } from '../../../repositories/TaxProfileRepository';
+import { ReturnRow } from '../../../repositories/ReturnRepository';
+
+export interface LocalApiHealthResponse {
+  ok: boolean;
+  registerId?: string;
+  registerName?: string;
+}
+
+export interface LocalApiSyncEventsResponse<TEvent> {
+  events: TEvent[];
+}
 
 /**
  * HTTP client for connecting to a Local API Server on the LAN.
@@ -32,7 +42,7 @@ export class LocalApiClient {
   /** Test the connection to the server */
   async testConnection(): Promise<{ ok: boolean; registerName?: string; error?: string }> {
     try {
-      const result = await this.get<{ ok: boolean; registerId: string; registerName: string }>('/api/health');
+      const result = await this.get<LocalApiHealthResponse>('/api/health');
       this.connected = result.ok === true;
       return { ok: true, registerName: result.registerName };
     } catch (error) {
@@ -42,6 +52,19 @@ export class LocalApiClient {
         error: error instanceof Error ? error.message : 'Connection failed',
       };
     }
+  }
+
+  async probeHealth(baseUrl: string, secret?: string, timeoutMs: number = 2000): Promise<LocalApiHealthResponse | null> {
+    try {
+      return await this.getFromBaseUrl<LocalApiHealthResponse>(baseUrl, '/api/health', undefined, secret, timeoutMs);
+    } catch {
+      return null;
+    }
+  }
+
+  async getSyncEvents<TEvent>(since: number): Promise<TEvent[]> {
+    const result = await this.get<LocalApiSyncEventsResponse<TEvent>>('/api/sync/events', { since: String(since) });
+    return result.events || [];
   }
 
   // ── Orders ────────────────────────────────────────────────────────
@@ -117,6 +140,18 @@ export class LocalApiClient {
     return localApiConfig.baseUrl;
   }
 
+  private buildHeaders(secretOverride?: string): Record<string, string> {
+    const h: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'X-Register-Id': localApiConfig.current.registerId,
+    };
+    const secret = secretOverride ?? localApiConfig.current.sharedSecret;
+    if (secret) {
+      h['x-shared-secret'] = secret;
+    }
+    return h;
+  }
+
   private async get<T>(path: string, queryParams?: Record<string, string>): Promise<T> {
     let url = `${this.baseUrl}${path}`;
     if (queryParams) {
@@ -135,6 +170,42 @@ export class LocalApiClient {
     }
 
     return response.json();
+  }
+
+  private async getFromBaseUrl<T>(
+    baseUrl: string,
+    path: string,
+    queryParams?: Record<string, string>,
+    secretOverride?: string,
+    timeoutMs?: number
+  ): Promise<T> {
+    let url = `${baseUrl.replace(/\/$/, '')}${path}`;
+    if (queryParams) {
+      const qs = new URLSearchParams(queryParams).toString();
+      url += `?${qs}`;
+    }
+
+    const controller = timeoutMs ? new AbortController() : undefined;
+    const timeout = timeoutMs ? setTimeout(() => controller?.abort(), timeoutMs) : undefined;
+
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.buildHeaders(secretOverride),
+        signal: controller?.signal,
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.error || `GET ${path} failed: ${response.status}`);
+      }
+
+      return response.json();
+    } finally {
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    }
   }
 
   private async post<T>(path: string, body: unknown): Promise<T> {

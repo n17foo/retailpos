@@ -1,6 +1,7 @@
 import { LoggerFactory } from '../logger/LoggerFactory';
 import { AbstractPrinterService } from './BasePrinterService';
 import { PrinterStatus, ReceiptData } from './PrinterTypes';
+import { receiptConfigService } from './ReceiptConfigService';
 
 // We'll use dynamic imports for these native modules to avoid initialization issues
 // These variables will hold the imported modules when needed
@@ -177,23 +178,36 @@ export class UnifiedPrinterService extends AbstractPrinterService {
     try {
       this.logger.info(`Printing receipt for order ${data.orderId}`);
 
+      const config = receiptConfigService.getConfig();
+      const cs = data.currencySymbol || '£';
+      const divider = receiptConfigService.getDividerLine();
+      const doubleDivider = receiptConfigService.getDoubleDividerLine();
+
       // Initialize the printer
       await this.printerInstance.init();
 
-      // Print centered header with bold text
+      // Header — driven by ReceiptConfigService
       await this.printerInstance.alignCenter();
       await this.printerInstance.setBold(true);
-      await this.printerInstance.printText('RetailPOS\n');
+      await this.printerInstance.printText(`${config.header.businessName}\n`);
       await this.printerInstance.setBold(false);
 
-      // Print store info
-      await this.printerInstance.printText('123 Main Street\n');
-      await this.printerInstance.printText('Anytown, CA 94538\n');
-      await this.printerInstance.printText('Tel: (555) 123-4567\n');
+      if (config.header.addressLine1) {
+        await this.printerInstance.printText(`${config.header.addressLine1}\n`);
+      }
+      if (config.header.addressLine2) {
+        await this.printerInstance.printText(`${config.header.addressLine2}\n`);
+      }
+      if (config.header.phone) {
+        await this.printerInstance.printText(`Tel: ${config.header.phone}\n`);
+      }
+      if (config.header.taxId) {
+        await this.printerInstance.printText(`Tax ID: ${config.header.taxId}\n`);
+      }
 
       // Divider
       await this.printerInstance.alignLeft();
-      await this.printerInstance.printText('--------------------------------\n');
+      await this.printerInstance.printText(`${divider}\n`);
 
       // Order info
       await this.printerInstance.printText(`Order #: ${data.orderId}\n`);
@@ -205,62 +219,63 @@ export class UnifiedPrinterService extends AbstractPrinterService {
       }
 
       // Divider
-      await this.printerInstance.printText('--------------------------------\n');
+      await this.printerInstance.printText(`${divider}\n`);
 
-      // Items header
-      await this.printerInstance.printText('Item                 Qty    Price   Total\n');
-      await this.printerInstance.printText('--------------------------------\n');
-
-      // Order items
+      // Items
       for (const item of data.items) {
         const itemTotal = item.quantity * item.price;
-
-        // Format item name to fit within 20 chars
-        let itemName = item.name.substring(0, 17);
-        if (item.name.length > 17) {
-          itemName += '...';
+        if (item.quantity > 1) {
+          await this.printerInstance.printText(`${item.name}\n`);
+          await this.printerInstance.printText(
+            `${receiptConfigService.formatLine(`  ${item.quantity} x ${cs}${item.price.toFixed(2)}`, `${cs}${itemTotal.toFixed(2)}`)}\n`
+          );
+        } else {
+          await this.printerInstance.printText(`${receiptConfigService.formatLine(item.name, `${cs}${itemTotal.toFixed(2)}`)}\n`);
         }
-
-        // Pad name, quantity, price, and total
-        const cs = data.currencySymbol || '£';
-        const line = `${itemName.padEnd(20)}${item.quantity.toString().padStart(3)} ${cs}${item.price.toFixed(2).padStart(7)} ${cs}${itemTotal.toFixed(2).padStart(7)}`;
-        await this.printerInstance.printText(`${line}\n`);
       }
 
       // Divider
-      await this.printerInstance.printText('--------------------------------\n');
+      await this.printerInstance.printText(`${divider}\n`);
 
       // Totals
       await this.printerInstance.alignRight();
-      const csSummary = data.currencySymbol || '£';
-      await this.printerInstance.printText(`Subtotal: ${csSummary}${data.subtotal.toFixed(2)}\n`);
-      await this.printerInstance.printText(`Tax: ${csSummary}${data.tax.toFixed(2)}\n`);
+      const subtotal = data.subtotal;
+      await this.printerInstance.printText(`Subtotal: ${cs}${subtotal.toFixed(2)}\n`);
+      await this.printerInstance.printText(`Tax: ${cs}${data.tax.toFixed(2)}\n`);
 
-      // Total - bold
+      // Total — bold
       await this.printerInstance.setBold(true);
-      await this.printerInstance.printText(`Total: ${csSummary}${data.total.toFixed(2)}\n`);
+      await this.printerInstance.printText(`${doubleDivider}\n`);
+      await this.printerInstance.printText(`Total: ${cs}${data.total.toFixed(2)}\n`);
       await this.printerInstance.setBold(false);
-
-      // Divider
-      await this.printerInstance.alignCenter();
-      await this.printerInstance.printText('================================\n');
+      await this.printerInstance.printText(`${doubleDivider}\n`);
 
       // Payment method
       await this.printerInstance.alignLeft();
       await this.printerInstance.printText(`Payment Method: ${data.paymentMethod}\n\n`);
 
-      // Footer
+      // Footer — driven by ReceiptConfigService
       await this.printerInstance.alignCenter();
-      await this.printerInstance.printText('Thank you for your purchase!\n');
-      await this.printerInstance.printText('Please come again\n\n');
+      if (config.footer.line1) {
+        await this.printerInstance.printText(`${config.footer.line1}\n`);
+      }
+      if (config.footer.line2) {
+        await this.printerInstance.printText(`${config.footer.line2}\n`);
+      }
+      if (config.footer.line3) {
+        await this.printerInstance.printText(`${config.footer.line3}\n`);
+      }
+      await this.printerInstance.printText('\n\n');
 
-      // Cut paper
-      await this.printerInstance.cutPaper();
+      // Cut paper (if supported)
+      if (config.options.cutPaper) {
+        await this.printerInstance.cutPaper();
+      }
 
       this.logger.info('Receipt printed successfully');
       return true;
     } catch (error) {
-      this.logger.error('Failed to print receipt:', error);
+      this.logger.error({ message: 'Failed to print receipt' }, error instanceof Error ? error : new Error(String(error)));
       return false;
     }
   }
@@ -346,6 +361,48 @@ export class UnifiedPrinterService extends AbstractPrinterService {
         hasPaper: false,
         errorMessage: 'Failed to get printer status',
       };
+    }
+  }
+
+  /**
+   * Override sendBytes to dispatch raw ESC/POS bytes through the active printer SDK.
+   * This powers openDrawer() and any caller using formatReceiptBuffer().
+   */
+  protected async sendBytes(data: Uint8Array): Promise<boolean> {
+    if (!this._isConnected || !this.printerInstance) return false;
+
+    try {
+      const config = this._connectionConfig as PrinterConfig;
+      if (!config || !('printerType' in config)) return false;
+
+      // Convert Uint8Array to base64 — works in React Native without Node.js Buffer polyfill
+      const binary = Array.from(data)
+        .map(b => String.fromCharCode(b))
+        .join('');
+      const base64 = btoa(binary);
+
+      switch (config.printerType) {
+        case PrinterConnectionType.USB: {
+          const usbConfig = config as USBPrinterConfig;
+          await this.printerInstance.printRawData(base64, usbConfig.vendorId, usbConfig.productId);
+          return true;
+        }
+        case PrinterConnectionType.BLUETOOTH: {
+          const bleConfig = config as BluetoothPrinterConfig;
+          await this.printerInstance.printRawData(base64, bleConfig.deviceId, bleConfig.macAddress);
+          return true;
+        }
+        case PrinterConnectionType.NETWORK: {
+          const netConfig = config as NetworkPrinterConfig;
+          await this.printerInstance.printRawData(base64, netConfig.host, netConfig.port);
+          return true;
+        }
+        default:
+          return false;
+      }
+    } catch (error) {
+      this.logger.error({ message: 'sendBytes failed' }, error instanceof Error ? error : new Error(String(error)));
+      return false;
     }
   }
 

@@ -7,7 +7,9 @@ import { BluetoothScannerService } from './BluetoothScannerService';
 import { USBScannerService } from './USBScannerService';
 import { QRHardwareScannerService } from './QRHardwareScannerService';
 import { QRHardwareScannerMockService } from './mock/QRHardwareScannerMockService';
+import { ElectronScannerService } from './ElectronScannerService';
 import { LoggerFactory } from '../logger/LoggerFactory';
+import { isElectron } from '../../utils/electron';
 import { USE_MOCK_SCANNER } from '@env';
 
 /**
@@ -40,11 +42,34 @@ export class ScannerServiceFactory {
    */
   private initializeServices(): void {
     const useMock = USE_MOCK_SCANNER === 'true';
-    this.logger.info(`Initializing scanner services (mock=${useMock})`);
-    this.services.set(ScannerType.CAMERA, useMock ? CameraScannerMockService.getInstance() : new CameraScannerService());
-    this.services.set(ScannerType.BLUETOOTH, useMock ? BluetoothScannerMockService.getInstance() : new BluetoothScannerService());
-    this.services.set(ScannerType.USB, useMock ? USBScannerMockService.getInstance() : new USBScannerService());
-    this.services.set(ScannerType.QR_HARDWARE, useMock ? QRHardwareScannerMockService.getInstance() : new QRHardwareScannerService());
+    const runningInElectron = isElectron();
+    this.logger.info(`Initializing scanner services (mock=${useMock}, electron=${runningInElectron})`);
+
+    if (useMock) {
+      this.services.set(ScannerType.CAMERA, CameraScannerMockService.getInstance());
+      this.services.set(ScannerType.BLUETOOTH, BluetoothScannerMockService.getInstance());
+      this.services.set(ScannerType.USB, USBScannerMockService.getInstance());
+      this.services.set(ScannerType.QR_HARDWARE, QRHardwareScannerMockService.getInstance());
+      return;
+    }
+
+    if (runningInElectron) {
+      // On Electron desktop:
+      //  - Camera: not available (no expo-camera) → use mock as placeholder
+      //  - Bluetooth BLE: react-native-ble-plx is mobile-only → use mock as placeholder
+      //  - USB + QR Hardware: use ElectronScannerService (DOM keydown + IPC HID listener)
+      const electronScanner = new ElectronScannerService();
+      this.services.set(ScannerType.CAMERA, CameraScannerMockService.getInstance());
+      this.services.set(ScannerType.BLUETOOTH, BluetoothScannerMockService.getInstance());
+      this.services.set(ScannerType.USB, electronScanner);
+      this.services.set(ScannerType.QR_HARDWARE, electronScanner);
+    } else {
+      // Mobile / Tablet — use native services
+      this.services.set(ScannerType.CAMERA, new CameraScannerService());
+      this.services.set(ScannerType.BLUETOOTH, new BluetoothScannerService());
+      this.services.set(ScannerType.USB, new USBScannerService());
+      this.services.set(ScannerType.QR_HARDWARE, new QRHardwareScannerService());
+    }
   }
 
   /**

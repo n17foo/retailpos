@@ -91,6 +91,54 @@ export interface ElectronAPI {
   maximizeWindow: () => Promise<void>;
   closeWindow: () => Promise<void>;
   isElectron: boolean;
+
+  // ── Printer IPC ──────────────────────────────────────────────
+  /** Send raw bytes (base64-encoded) to a printer via Node.js net/usb/bt */
+  printerSendRawData: (base64Data: string, config: ElectronPrinterConfig) => Promise<boolean>;
+  /** Discover printers on the network (mDNS / SNMP) or USB bus */
+  printerDiscover: () => Promise<Array<{ id: string; name: string; connectionType: string }>>;
+  /** Get printer status */
+  printerGetStatus: (config: ElectronPrinterConfig) => Promise<{ isOnline: boolean; hasPaper: boolean }>;
+
+  // ── Scanner IPC ──────────────────────────────────────────────
+  /** Subscribe to HID barcode scanner events from the main process */
+  onBarcodeScan: (callback: (data: string) => void) => () => void;
+
+  // ── Drawer IPC ───────────────────────────────────────────────
+  /** Open cash drawer via printer kick or dedicated USB drawer */
+  drawerOpen: (config: ElectronPrinterConfig, pin?: 2 | 5) => Promise<boolean>;
+  /** Query drawer sensor status (if supported) */
+  drawerIsOpen: (config: ElectronPrinterConfig) => Promise<boolean | undefined>;
+
+  // ── Payment IPC ──────────────────────────────────────────────
+  /** Initialise Stripe Terminal JS SDK in the main/renderer process */
+  paymentInit: (config: { publishableKey: string; locationId: string }) => Promise<boolean>;
+  /** Discover Stripe smart readers on the network */
+  paymentDiscoverReaders: () => Promise<Array<{ id: string; name: string }>>;
+  /** Connect to a Stripe smart reader */
+  paymentConnectReader: (readerId: string) => Promise<boolean>;
+  /** Collect payment */
+  paymentCollect: (request: { amount: number; currency: string; reference: string }) => Promise<{
+    success: boolean;
+    transactionId?: string;
+    errorMessage?: string;
+    cardBrand?: string;
+    last4?: string;
+  }>;
+  /** Cancel in-progress payment collection */
+  paymentCancel: () => Promise<void>;
+  /** Disconnect from reader */
+  paymentDisconnect: () => Promise<void>;
+}
+
+/** Printer connection descriptor passed to Electron IPC */
+export interface ElectronPrinterConfig {
+  connectionType: 'network' | 'usb' | 'bluetooth';
+  host?: string;
+  port?: number;
+  vendorId?: string;
+  productId?: string;
+  macAddress?: string;
 }
 
 /**

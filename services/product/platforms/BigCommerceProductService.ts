@@ -4,7 +4,6 @@ import { PlatformProductConfig, PlatformConfigRequirements } from './PlatformPro
 import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../../services/token/TokenIntegration';
-import { BIGCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
@@ -50,24 +49,9 @@ export class BigCommerceProductService extends BaseProductService {
 
       // Test connection with a simple API call
       try {
-        const apiUrl = this.getApiUrl('/catalog/summary');
-        const headers = await this.getAuthHeaders();
-
-        const response = await fetch(apiUrl, {
-          headers,
-        });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          const errorText = await response.text();
-          this.logger.error(
-            { message: `Failed to connect to BigCommerce API: ${response.status}`, response: errorText },
-            new Error(`HTTP error ${response.status}`)
-          );
-          return false;
-        }
+        await this.apiClient.get('catalog/summary');
+        this.initialized = true;
+        return true;
       } catch (error) {
         const errorObj = error instanceof Error ? error : new Error(String(error));
         this.logger.error({ message: 'Error connecting to BigCommerce API' }, errorObj);
@@ -125,20 +109,8 @@ export class BigCommerceProductService extends BaseProductService {
         // Include all related data
         params.append('include', 'variants,images,custom_fields,bulk_pricing_rules,primary_image');
 
-        const apiUrl = this.getApiUrl(`/catalog/products?${params.toString()}`);
+        const data = await this.apiClient.get<{ data: any[]; meta: any }>(`catalog/products?${params.toString()}`);
 
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, {
-          headers,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch products from BigCommerce: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        // Map BigCommerce products to our format
         const products = data.data.map((bcProduct: any) => this.mapToProduct(bcProduct));
 
         return {
@@ -182,23 +154,7 @@ export class BigCommerceProductService extends BaseProductService {
         const params = new URLSearchParams();
         params.append('include', 'variants,images,custom_fields,bulk_pricing_rules,primary_image');
 
-        const apiUrl = this.getApiUrl(`/catalog/products/${productId}?${params.toString()}`);
-
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, {
-          headers,
-        });
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            return null;
-          }
-          throw new Error(`Failed to fetch product from BigCommerce: ${response.statusText}`);
-        }
-
-        const bcProduct = await response.json();
-
-        // Map BigCommerce product to our format
+        const bcProduct = await this.apiClient.get<{ data: any }>(`catalog/products/${productId}?${params.toString()}`);
         return this.mapToProduct(bcProduct.data);
       } catch (error) {
         this.logger.error(
@@ -220,27 +176,8 @@ export class BigCommerceProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.BIGCOMMERCE, async () => {
       try {
-        const apiUrl = this.getApiUrl('/catalog/products');
-
         const bcProduct = this.mapToBigCommerceProduct(product);
-
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(bcProduct),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to create product on BigCommerce: ${response.statusText}`);
-        }
-
-        const createdProduct = await response.json();
-
-        // Map created BigCommerce product to our format
+        const createdProduct = await this.apiClient.post<{ data: any }>('catalog/products', bcProduct);
         return this.mapToProduct(createdProduct.data);
       } catch (error) {
         this.logger.error({ message: 'Error creating product on BigCommerce' }, error instanceof Error ? error : new Error(String(error)));
@@ -259,37 +196,15 @@ export class BigCommerceProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.BIGCOMMERCE, async () => {
       try {
-        const apiUrl = this.getApiUrl(`/catalog/products/${productId}`);
-
         // Get the existing product
         const existingProduct = await this.getProductById(productId);
         if (!existingProduct) {
           throw new Error(`Product with ID ${productId} not found`);
         }
 
-        // Merge the existing product with the update data
         const updatedProduct = { ...existingProduct, ...productData };
-
-        // Map to BigCommerce format
         const bcProduct = this.mapToBigCommerceProduct(updatedProduct);
-
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, {
-          method: 'PUT',
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(bcProduct),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to update product on BigCommerce: ${response.statusText}`);
-        }
-
-        const updatedBcProduct = await response.json();
-
-        // Map updated BigCommerce product to our format
+        const updatedBcProduct = await this.apiClient.put<{ data: any }>(`catalog/products/${productId}`, bcProduct);
         return this.mapToProduct(updatedBcProduct.data);
       } catch (error) {
         this.logger.error(
@@ -311,18 +226,7 @@ export class BigCommerceProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.BIGCOMMERCE, async () => {
       try {
-        const apiUrl = this.getApiUrl(`/catalog/products/${productId}`);
-
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, {
-          method: 'DELETE',
-          headers,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to delete product from BigCommerce: ${response.statusText}`);
-        }
-
+        await this.apiClient.delete(`catalog/products/${productId}`);
         return true;
       } catch (error) {
         this.logger.error(
@@ -372,24 +276,6 @@ export class BigCommerceProductService extends BaseProductService {
     }
 
     return result;
-  }
-
-  /**
-   * Generate the API URL for BigCommerce V3 API
-   */
-  private getApiUrl(endpoint: string): string {
-    const storeHash = this.config.storeHash;
-    const apiVersion = this.config.apiVersion || BIGCOMMERCE_API_VERSION;
-
-    return `https://api.bigcommerce.com/stores/${storeHash}/${apiVersion}${endpoint}`;
-  }
-
-  /**
-   * Create authorization headers for BigCommerce API
-   * @returns Promise resolving to headers object with authentication
-   */
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
   }
 
   /**

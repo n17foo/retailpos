@@ -3,12 +3,17 @@ import { GiftCardInfo, GiftCardRedemptionResult } from '../GiftCardServiceInterf
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { MAGENTO_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
 import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
 
+interface MagentoGiftCardAccount {
+  balance?: string;
+  currency_code?: string;
+  status?: number;
+  date_expires?: string;
+}
+
 export class MagentoGiftCardService extends BaseGiftCardService {
-  private baseUrl = '';
   private apiClient = MagentoApiClient.getInstance();
 
   constructor() {
@@ -18,17 +23,16 @@ export class MagentoGiftCardService extends BaseGiftCardService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.baseUrl = ((await secretsService.getSecret('MAGENTO_BASE_URL')) || '').replace(/\/+$/, '');
-      if (!this.baseUrl) {
+      const baseUrl = ((await secretsService.getSecret('MAGENTO_BASE_URL')) || '').replace(/\/+$/, '');
+      if (!baseUrl) {
         this.logger.warn('Missing Magento base URL');
         return false;
       }
 
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({ storeUrl: this.baseUrl });
+        this.apiClient.configure({ storeUrl: baseUrl });
         await this.apiClient.initialize();
       }
-      this.baseUrl = this.apiClient.getBaseUrl();
 
       this.initialized = true;
       return true;
@@ -41,19 +45,16 @@ export class MagentoGiftCardService extends BaseGiftCardService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async checkBalance(code: string): Promise<GiftCardInfo> {
     if (!this.initialized) return { code, balance: 0, currency: 'USD', status: 'not_found' };
     try {
       return await withTokenRefresh(ECommercePlatform.MAGENTO, async () => {
-        const url = `${this.baseUrl}/rest/${MAGENTO_API_VERSION}/giftCardAccount/${encodeURIComponent(code)}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-        if (!response.ok) return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
-        const card = await response.json();
+        let card: MagentoGiftCardAccount;
+        try {
+          card = await this.apiClient.get<MagentoGiftCardAccount>(`giftCardAccount/${encodeURIComponent(code)}`);
+        } catch {
+          return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
+        }
         const statusMap: Record<number, GiftCardInfo['status']> = { 0: 'active', 1: 'disabled', 2: 'expired' };
         return {
           code,

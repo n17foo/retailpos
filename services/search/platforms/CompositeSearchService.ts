@@ -66,8 +66,12 @@ export class CompositeSearchService implements SearchServiceInterface {
       };
     }
 
-    // Search across all active platform services
-    const searchPromises = activeServices.map(service => service.searchPlatformProducts(query, options));
+    // Route barcode searches through the dedicated searchByBarcode method when available
+    const searchPromises = activeServices.map(service =>
+      options.searchField === 'barcode' && typeof service.searchByBarcode === 'function'
+        ? service.searchByBarcode(query)
+        : service.searchPlatformProducts(query, options)
+    );
 
     // Wait for all searches to complete
     const allResults = await Promise.all(searchPromises);
@@ -89,6 +93,34 @@ export class CompositeSearchService implements SearchServiceInterface {
       localResults: [], // Empty as we're only using e-commerce
       ecommerceResults,
       categories: Array.from(allCategories),
+    };
+  }
+
+  /**
+   * Search for a product by exact barcode across all initialized platform services.
+   * Calls each platform's dedicated searchByBarcode (or falls back to searchPlatformProducts).
+   */
+  async searchByBarcode(barcode: string): Promise<SearchResult> {
+    if (!this.isInitialized()) {
+      throw new Error('Search service is not initialized');
+    }
+
+    const activeServices = this.platformServices.filter(service => service.isInitialized());
+    const results = await Promise.all(
+      activeServices.map(service =>
+        typeof service.searchByBarcode === 'function'
+          ? service.searchByBarcode(barcode)
+          : service.searchPlatformProducts(barcode, { searchField: 'barcode', limit: 5 })
+      )
+    );
+    const ecommerceResults = results.flat();
+
+    return {
+      query: barcode,
+      totalResults: ecommerceResults.length,
+      localResults: [],
+      ecommerceResults,
+      categories: [],
     };
   }
 

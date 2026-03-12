@@ -4,13 +4,10 @@ import { GiftCardInfo, GiftCardRedemptionResult } from '../GiftCardServiceInterf
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
 import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
 export class ShopifyGiftCardService extends BaseGiftCardService {
-  private storeUrl = '';
-  private apiVersion = SHOPIFY_API_VERSION;
   private apiClient = ShopifyApiClient.getInstance();
 
   constructor() {
@@ -20,23 +17,17 @@ export class ShopifyGiftCardService extends BaseGiftCardService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.storeUrl = (await secretsService.getSecret('SHOPIFY_STORE_URL')) || process.env.SHOPIFY_STORE_URL || '';
-      this.apiVersion = (await secretsService.getSecret('SHOPIFY_API_VERSION')) || SHOPIFY_API_VERSION;
+      const storeUrl = (await secretsService.getSecret('SHOPIFY_STORE_URL')) || process.env.SHOPIFY_STORE_URL || '';
 
-      if (!this.storeUrl) {
+      if (!storeUrl) {
         this.logger.warn('Missing Shopify store URL');
         return false;
       }
 
-      // Configure and initialize the shared Shopify client
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({
-          storeUrl: this.storeUrl,
-          apiVersion: this.apiVersion,
-        });
+        this.apiClient.configure({ storeUrl });
         await this.apiClient.initialize();
       }
-      this.storeUrl = this.apiClient.getBaseUrl();
 
       this.initialized = true;
       return true;
@@ -49,10 +40,6 @@ export class ShopifyGiftCardService extends BaseGiftCardService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async checkBalance(code: string): Promise<GiftCardInfo> {
     if (!this.initialized) {
       return { code, balance: 0, currency: 'USD', status: 'not_found' };
@@ -61,15 +48,7 @@ export class ShopifyGiftCardService extends BaseGiftCardService {
     try {
       return await withTokenRefresh(ECommercePlatform.SHOPIFY, async () => {
         // Shopify REST Admin API: search gift cards by code
-        const url = `${this.storeUrl}/admin/api/${this.apiVersion}/gift_cards/search.json?query=${encodeURIComponent(code)}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-
-        if (!response.ok) {
-          throw new Error(`Shopify gift card lookup failed: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.get<{ gift_cards: any[] }>('gift_cards/search.json', { query: encodeURIComponent(code) });
         const cards = data.gift_cards || [];
 
         // Find exact match by last_characters or full code
@@ -126,15 +105,7 @@ export class ShopifyGiftCardService extends BaseGiftCardService {
 
         // Shopify gift card balance adjustment via the Admin API
         // We need the gift card ID — search again to get it
-        const searchUrl = `${this.storeUrl}/admin/api/${this.apiVersion}/gift_cards/search.json?query=${encodeURIComponent(code)}`;
-        const headers = await this.getAuthHeaders();
-        const searchResponse = await fetch(searchUrl, { headers });
-
-        if (!searchResponse.ok) {
-          throw new Error(`Gift card search failed: ${searchResponse.status}`);
-        }
-
-        const searchData = await searchResponse.json();
+        const searchData = await this.apiClient.get<{ gift_cards: any[] }>('gift_cards/search.json', { query: encodeURIComponent(code) });
         const card = (searchData.gift_cards || []).find((c: any) => c.code === code || c.last_characters === code.slice(-4));
 
         if (!card) {
@@ -142,23 +113,10 @@ export class ShopifyGiftCardService extends BaseGiftCardService {
         }
 
         // Adjust the gift card balance (negative adjustment = deduction)
-        const adjustUrl = `${this.storeUrl}/admin/api/${this.apiVersion}/gift_cards/${card.id}.json`;
         const newBalance = parseFloat(card.balance) - amount;
-
-        const adjustResponse = await fetch(adjustUrl, {
-          method: 'PUT',
-          headers,
-          body: JSON.stringify({
-            gift_card: {
-              id: card.id,
-              note: `POS redemption: -${amount.toFixed(2)}`,
-            },
-          }),
+        await this.apiClient.put(`gift_cards/${card.id}.json`, {
+          gift_card: { id: card.id, note: `POS redemption: -${amount.toFixed(2)}` },
         });
-
-        if (!adjustResponse.ok) {
-          throw new Error(`Gift card adjustment failed: ${adjustResponse.status}`);
-        }
 
         return {
           success: true,

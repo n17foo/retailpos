@@ -5,7 +5,6 @@ import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { WIX_API_VERSION } from '../../config/apiVersions';
 import { WixApiClient } from '../../clients/wix/WixApiClient';
 
 /**
@@ -28,7 +27,7 @@ export class WixProductService extends BaseProductService {
       this.config.apiKey = this.config.apiKey || process.env.WIX_API_KEY || '';
       this.config.siteId = this.config.siteId || process.env.WIX_SITE_ID || '';
       this.config.accountId = this.config.accountId || process.env.WIX_ACCOUNT_ID || '';
-      this.config.apiVersion = this.config.apiVersion || process.env.WIX_API_VERSION || WIX_API_VERSION;
+      this.config.apiVersion = this.config.apiVersion || process.env.WIX_API_VERSION || '';
 
       if (!this.config.apiKey || !this.config.siteId) {
         this.logger.warn('Missing Wix API configuration');
@@ -47,23 +46,9 @@ export class WixProductService extends BaseProductService {
 
       // Test connection
       try {
-        const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/products/query`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            query: { paging: { limit: 1 } },
-          }),
-        });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to Wix API' }, new Error(`Status: ${response.status}`));
-          return false;
-        }
+        await this.apiClient.post('stores/v1/products/query', { query: { paging: { limit: 1 } } });
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Wix API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -95,8 +80,6 @@ export class WixProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.WIX, async () => {
       try {
-        const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/products/query`;
-
         // Build query
         const query: any = {
           paging: {
@@ -105,33 +88,15 @@ export class WixProductService extends BaseProductService {
           },
         };
 
-        // Add search filter
         if (options.search) {
-          query.filter = {
-            name: { $contains: options.search },
-          };
+          query.filter = { name: { $contains: options.search } };
         }
 
-        // Add IDs filter
         if (options.ids && options.ids.length > 0) {
-          query.filter = {
-            ...query.filter,
-            id: { $in: options.ids },
-          };
+          query.filter = { ...query.filter, id: { $in: options.ids } };
         }
 
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ query }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch products from Wix: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.post<any>('stores/v1/products/query', { query });
         const products = (data.products || []).map((wixProduct: any) => this.mapToProduct(wixProduct));
 
         return {
@@ -163,20 +128,7 @@ export class WixProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.WIX, async () => {
       try {
-        const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/products/${productId}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, {
-          headers,
-        });
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            return null;
-          }
-          throw new Error(`Failed to fetch product from Wix: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.get<any>(`stores/v1/products/${productId}`);
         return this.mapToProduct(data.product);
       } catch (error) {
         this.logger.error(
@@ -198,22 +150,8 @@ export class WixProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.WIX, async () => {
       try {
-        const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/products`;
         const wixProduct = this.mapToWixProduct(product);
-
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({ product: wixProduct }),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to create product on Wix: ${response.statusText} - ${errorText}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.post<any>('stores/v1/products', { product: wixProduct });
         return this.mapToProduct(data.product);
       } catch (error) {
         this.logger.error({ message: 'Error creating product on Wix' }, error instanceof Error ? error : new Error(String(error)));
@@ -239,21 +177,7 @@ export class WixProductService extends BaseProductService {
 
         const updatedProduct = { ...existingProduct, ...productData };
         const wixProduct = this.mapToWixProduct(updatedProduct);
-
-        const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/products/${productId}`;
-
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, {
-          method: 'PATCH',
-          headers,
-          body: JSON.stringify({ product: wixProduct }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to update product on Wix: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.put<any>(`stores/v1/products/${productId}`, { product: wixProduct });
         return this.mapToProduct(data.product);
       } catch (error) {
         this.logger.error(
@@ -275,15 +199,8 @@ export class WixProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.WIX, async () => {
       try {
-        const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/products/${productId}`;
-
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, {
-          method: 'DELETE',
-          headers,
-        });
-
-        return response.ok;
+        await this.apiClient.delete(`stores/v1/products/${productId}`);
+        return true;
       } catch (error) {
         this.logger.error(
           { message: `Error deleting product ${productId} from Wix` },
@@ -329,13 +246,6 @@ export class WixProductService extends BaseProductService {
     }
 
     return result;
-  }
-
-  /**
-   * Get authorization headers
-   */
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
   }
 
   /**

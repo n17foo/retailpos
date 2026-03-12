@@ -3,7 +3,6 @@ import { RefundData, RefundResult, RefundRecord } from '../ReturnService';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { SQUARESPACE_API_VERSION } from '../../config/apiVersions';
 import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
 
 /**
@@ -73,14 +72,9 @@ export class SquarespaceRefundService implements PlatformRefundServiceInterface 
         throw new Error('Squarespace refund service not initialized');
       }
 
-      const credentials = await this.getSquarespaceCredentials();
-      if (!credentials) {
-        throw new Error('Failed to retrieve Squarespace API credentials');
-      }
+      this.logger.info(`Processing Squarespace refund for order ${orderId}`);
 
-      const endpoint = `https://api.squarespace.com/${SQUARESPACE_API_VERSION}/commerce/orders/${orderId}/refunds`;
-
-      const requestData = {
+      const data = await this.apiClient.post<{ id?: string }>(`commerce/orders/${orderId}/refunds`, {
         amount: String(refundData.amount || 0),
         reason: refundData.reason || 'Refunded via RetailPOS',
         lineItems:
@@ -88,25 +82,7 @@ export class SquarespaceRefundService implements PlatformRefundServiceInterface 
             lineItemId: item.lineItemId,
             quantity: item.quantity,
           })) || [],
-      };
-
-      this.logger.info(`Processing Squarespace refund for order ${orderId} at ${endpoint}`);
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          ...this.apiClient['buildHeaders'](),
-          'User-Agent': 'RetailPOS/1.0',
-        },
-        body: JSON.stringify(requestData),
       });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`Squarespace refund API returned ${response.status}: ${errorBody}`);
-      }
-
-      const data = await response.json();
       const refundId = String(data.id || `squarespace-refund-${Date.now()}`);
 
       const refundRecord: RefundRecord = {

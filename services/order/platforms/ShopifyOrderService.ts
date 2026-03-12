@@ -2,8 +2,6 @@
 import { Order } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
-import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
-import { QueuedApiService } from '../../queue/QueuedApiService';
 import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
 /**
@@ -33,7 +31,6 @@ export class ShopifyOrderService extends BaseOrderService {
         return false;
       }
 
-      // Configure and initialize the shared Shopify client
       if (!this.apiClient.isInitialized()) {
         this.apiClient.configure({
           storeUrl: this.config.storeUrl,
@@ -44,23 +41,11 @@ export class ShopifyOrderService extends BaseOrderService {
         });
         await this.apiClient.initialize();
       }
-      this.config.storeUrl = this.apiClient.getBaseUrl();
 
-      // Test connection with a simple API call
       try {
-        const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-        const apiUrl = `${this.config.storeUrl}/admin/api/${apiVersion}/shop.json`;
-        const response = await fetch(apiUrl, {
-          headers: this.getAuthHeaders(),
-        });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to Shopify API' });
-          return false;
-        }
+        await this.apiClient.get('shop.json');
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Shopify API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -94,32 +79,8 @@ export class ShopifyOrderService extends BaseOrderService {
     }
 
     try {
-      const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-      const apiUrl = `${this.config.storeUrl}/admin/api/${apiVersion}/orders.json`;
-
       const shopifyOrder = this.mapToShopifyOrder(order);
-
-      // For now, keep using direct API call but add X-Request-ID header for idempotency
-      const requestId = `shopify_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      const response = await QueuedApiService.directRequestWithBody(
-        apiUrl,
-        'POST',
-        { order: shopifyOrder },
-        {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'application/json',
-          'X-Request-ID': requestId,
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to create order on Shopify: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Map created Shopify order to our format
+      const data = await this.apiClient.post<{ order: any }>('orders.json', { order: shopifyOrder });
       return this.mapToOrder(data.order);
     } catch (error) {
       this.logger.error({ message: 'Error creating Shopify order:' }, error instanceof Error ? error : new Error(String(error)));
@@ -136,23 +97,13 @@ export class ShopifyOrderService extends BaseOrderService {
     }
 
     try {
-      const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-      const apiUrl = `${this.config.storeUrl}/admin/api/${apiVersion}/orders/${orderId}.json`;
-
-      const response = await fetch(apiUrl, {
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to fetch order from Shopify: ${response.statusText}`);
+      let data: { order: any };
+      try {
+        data = await this.apiClient.get<{ order: any }>(`orders/${orderId}.json`);
+      } catch (e: any) {
+        if (e?.status === 404) return null;
+        throw e;
       }
-
-      const data = await response.json();
-
-      // Map Shopify order to our format
       return this.mapToOrder(data.order);
     } catch (error) {
       this.logger.error(
@@ -172,37 +123,13 @@ export class ShopifyOrderService extends BaseOrderService {
     }
 
     try {
-      const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-      const apiUrl = `${this.config.storeUrl}/admin/api/${apiVersion}/orders/${orderId}.json`;
-
-      // Get the existing order
       const existingOrder = await this.getOrder(orderId);
       if (!existingOrder) {
         throw new Error(`Order with ID ${orderId} not found`);
       }
-
-      // Merge the existing order with the update data
       const updatedOrder = { ...existingOrder, ...updates };
-
-      // Map to Shopify format
       const shopifyOrder = this.mapToShopifyOrder(updatedOrder);
-
-      const response = await fetch(apiUrl, {
-        method: 'PUT',
-        headers: {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ order: shopifyOrder }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update order on Shopify: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Map updated Shopify order to our format
+      const data = await this.apiClient.put<{ order: any }>(`orders/${orderId}.json`, { order: shopifyOrder });
       return this.mapToOrder(data.order);
     } catch (error) {
       this.logger.error(
@@ -214,13 +141,6 @@ export class ShopifyOrderService extends BaseOrderService {
   }
 
   // Refund functionality moved to dedicated refund service
-
-  /**
-   * Create authorization headers for Shopify API
-   */
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
-  }
 
   /**
    * Map our order format to Shopify's format

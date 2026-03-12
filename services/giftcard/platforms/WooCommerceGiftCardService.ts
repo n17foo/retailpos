@@ -3,12 +3,22 @@ import { GiftCardInfo, GiftCardRedemptionResult } from '../GiftCardServiceInterf
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
 import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
+interface WooCommerceGiftCard {
+  balance?: string;
+  currency?: string;
+  active?: boolean;
+  expiration_date?: string;
+}
+
+interface WooCommerceGiftCardRedeemResponse {
+  balance?: string;
+  id?: string | number;
+}
+
 export class WooCommerceGiftCardService extends BaseGiftCardService {
-  private storeUrl = '';
   private apiClient = WooCommerceApiClient.getInstance();
 
   constructor() {
@@ -18,18 +28,16 @@ export class WooCommerceGiftCardService extends BaseGiftCardService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.storeUrl = ((await secretsService.getSecret('WOOCOMMERCE_STORE_URL')) || '').replace(/\/+$/, '');
-      if (!this.storeUrl) {
+      const storeUrl = ((await secretsService.getSecret('WOOCOMMERCE_STORE_URL')) || '').replace(/\/+$/, '');
+      if (!storeUrl) {
         this.logger.warn('Missing WooCommerce store URL');
         return false;
       }
 
-      // Configure and initialize the shared WooCommerce client
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({ storeUrl: this.storeUrl });
+        this.apiClient.configure({ storeUrl });
         await this.apiClient.initialize();
       }
-      this.storeUrl = this.apiClient.getBaseUrl();
 
       this.initialized = true;
       return true;
@@ -42,20 +50,17 @@ export class WooCommerceGiftCardService extends BaseGiftCardService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async checkBalance(code: string): Promise<GiftCardInfo> {
     if (!this.initialized) return { code, balance: 0, currency: 'USD', status: 'not_found' };
     try {
       return await withTokenRefresh(ECommercePlatform.WOOCOMMERCE, async () => {
         // WooCommerce uses the pw-gift-cards plugin endpoint
-        const url = `${this.storeUrl}/wp-json/${WOOCOMMERCE_API_VERSION}/pw-gift-cards?code=${encodeURIComponent(code)}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-        if (!response.ok) return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
-        const cards = await response.json();
+        let cards: WooCommerceGiftCard[];
+        try {
+          cards = await this.apiClient.get<WooCommerceGiftCard[]>('pw-gift-cards', { code: encodeURIComponent(code) });
+        } catch {
+          return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
+        }
         if (!Array.isArray(cards) || cards.length === 0) return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
         const card = cards[0];
         return {
@@ -79,11 +84,7 @@ export class WooCommerceGiftCardService extends BaseGiftCardService {
     if (!this.initialized) return { success: false, amountDeducted: 0, remainingBalance: 0, error: 'Service not initialized' };
     try {
       return await withTokenRefresh(ECommercePlatform.WOOCOMMERCE, async () => {
-        const url = `${this.storeUrl}/wp-json/${WOOCOMMERCE_API_VERSION}/pw-gift-cards/redeem`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { method: 'POST', headers, body: JSON.stringify({ code, amount }) });
-        if (!response.ok) return { success: false, amountDeducted: 0, remainingBalance: 0, error: `Redemption failed: ${response.status}` };
-        const data = await response.json();
+        const data = await this.apiClient.post<WooCommerceGiftCardRedeemResponse>('pw-gift-cards/redeem', { code, amount });
         return {
           success: true,
           amountDeducted: amount,

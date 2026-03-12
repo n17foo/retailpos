@@ -29,18 +29,7 @@ export class WooCommerceCategoryService extends BaseCategoryService {
     }
 
     try {
-      const url = `${this.config.storeUrl}/wp-json/wc/v3/products/categories?per_page=100`;
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch WooCommerce categories: ${response.statusText}`);
-      }
-
-      const categories = await response.json();
+      const categories = await this.apiClient.get<any[]>('products/categories', { per_page: '100' });
 
       // Convert WooCommerce categories to our format
       return this.buildCategoryTree(categories);
@@ -59,21 +48,7 @@ export class WooCommerceCategoryService extends BaseCategoryService {
     }
 
     try {
-      const url = `${this.config.storeUrl}/wp-json/wc/v3/products/categories/${categoryId}`;
-
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return undefined;
-        }
-        throw new Error(`Failed to fetch WooCommerce category: ${response.statusText}`);
-      }
-
-      const category = await response.json();
+      const category = await this.apiClient.get<any>(`products/categories/${categoryId}`);
       return this.mapWooCommerceCategory(category);
     } catch (error) {
       this.logger.error(
@@ -93,8 +68,6 @@ export class WooCommerceCategoryService extends BaseCategoryService {
     }
 
     try {
-      const url = `${this.config.storeUrl}/wp-json/wc/v3/products/categories`;
-
       // Format category data for WooCommerce
       const requestData = {
         name: category.name,
@@ -103,21 +76,7 @@ export class WooCommerceCategoryService extends BaseCategoryService {
         image: category.image ? { src: category.image } : undefined,
       };
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to create WooCommerce category: ${response.statusText} - ${errorText}`);
-      }
-
-      const newCategory = await response.json();
+      const newCategory = await this.apiClient.post<any>('products/categories', requestData);
       return this.mapWooCommerceCategory(newCategory);
     } catch (error) {
       this.logger.error({ message: 'Error creating WooCommerce category:' }, error instanceof Error ? error : new Error(String(error)));
@@ -134,41 +93,15 @@ export class WooCommerceCategoryService extends BaseCategoryService {
     }
 
     try {
-      const url = `${this.config.storeUrl}/wp-json/wc/v3/products/categories/${categoryId}`;
-
       // Format category data for WooCommerce
       const requestData: Record<string, any> = {};
 
-      if (categoryData.name !== undefined) {
-        requestData.name = categoryData.name;
-      }
+      if (categoryData.name !== undefined) requestData.name = categoryData.name;
+      if (categoryData.description !== undefined) requestData.description = categoryData.description;
+      if (categoryData.parentId !== undefined) requestData.parent = parseInt(categoryData.parentId, 10);
+      if (categoryData.image !== undefined) requestData.image = { src: categoryData.image };
 
-      if (categoryData.description !== undefined) {
-        requestData.description = categoryData.description;
-      }
-
-      if (categoryData.parentId !== undefined) {
-        requestData.parent = parseInt(categoryData.parentId, 10);
-      }
-
-      if (categoryData.image !== undefined) {
-        requestData.image = { src: categoryData.image };
-      }
-
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update WooCommerce category: ${response.statusText}`);
-      }
-
-      const updatedCategory = await response.json();
+      const updatedCategory = await this.apiClient.put<any>(`products/categories/${categoryId}`, requestData);
       return this.mapWooCommerceCategory(updatedCategory);
     } catch (error) {
       this.logger.error(
@@ -188,14 +121,8 @@ export class WooCommerceCategoryService extends BaseCategoryService {
     }
 
     try {
-      const url = `${this.config.storeUrl}/wp-json/wc/v3/products/categories/${categoryId}?force=true`;
-
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: this.getAuthHeaders(),
-      });
-
-      return response.ok;
+      await this.apiClient.delete(`products/categories/${categoryId}?force=true`);
+      return true;
     } catch (error) {
       this.logger.error(
         { message: `Error deleting WooCommerce category ${categoryId}:` },
@@ -227,13 +154,5 @@ export class WooCommerceCategoryService extends BaseCategoryService {
 
     // Create a flat list of all categories
     return mappedCategories;
-  }
-
-  /**
-   * Create authorization headers for WooCommerce API
-   * WooCommerce REST API uses Basic Auth
-   */
-  private getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 }

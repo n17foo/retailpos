@@ -4,12 +4,24 @@ import { BasketItem } from '../../basket/basket';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { BIGCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
 import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
+interface BigCommerceCoupon {
+  enabled?: boolean;
+  num_uses?: number;
+  max_uses?: number;
+  min_purchase?: string;
+  type?: string;
+  amount?: string;
+  name?: string;
+}
+
+interface BigCommerceCouponsResponse {
+  data?: BigCommerceCoupon[];
+}
+
 export class BigCommerceDiscountService extends BaseDiscountService {
-  private storeHash = '';
   private apiClient = BigCommerceApiClient.getInstance();
 
   constructor() {
@@ -19,15 +31,14 @@ export class BigCommerceDiscountService extends BaseDiscountService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.storeHash = (await secretsService.getSecret('BIGCOMMERCE_STORE_HASH')) || '';
-      if (!this.storeHash) {
+      const storeHash = (await secretsService.getSecret('BIGCOMMERCE_STORE_HASH')) || '';
+      if (!storeHash) {
         this.logger.warn('Missing BigCommerce store hash');
         return false;
       }
 
-      // Configure and initialize the shared BigCommerce client
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({ storeHash: this.storeHash });
+        this.apiClient.configure({ storeHash });
         await this.apiClient.initialize();
       }
 
@@ -42,24 +53,20 @@ export class BigCommerceDiscountService extends BaseDiscountService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async validateCoupon(code: string, basketTotal: number, _items: BasketItem[]): Promise<CouponValidationResult> {
     if (!this.initialized) return { valid: false, error: 'Discount service not initialized' };
     try {
       return await withTokenRefresh(ECommercePlatform.BIGCOMMERCE, async () => {
-        const url = `https://api.bigcommerce.com/stores/${this.storeHash}/${BIGCOMMERCE_API_VERSION}/coupons?code=${encodeURIComponent(code)}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-        if (!response.ok) throw new Error(`BigCommerce coupon lookup failed: ${response.status}`);
-        const body = await response.json();
-        const coupons = body.data || body;
+        const body = await this.apiClient.get<BigCommerceCouponsResponse | BigCommerceCoupon[]>('coupons', {
+          code: encodeURIComponent(code),
+        });
+        const coupons = Array.isArray(body) ? body : body.data || [];
         if (!Array.isArray(coupons) || coupons.length === 0) return { valid: false, error: 'Invalid coupon code' };
         const coupon = coupons[0];
         if (coupon.enabled === false) return { valid: false, error: 'This coupon is disabled' };
-        if (coupon.num_uses >= coupon.max_uses && coupon.max_uses > 0) return { valid: false, error: 'Coupon usage limit reached' };
+        if ((coupon.num_uses ?? 0) >= (coupon.max_uses ?? 0) && (coupon.max_uses ?? 0) > 0) {
+          return { valid: false, error: 'Coupon usage limit reached' };
+        }
         const minPurchase = coupon.min_purchase ? parseFloat(coupon.min_purchase) : 0;
         if (minPurchase > 0 && basketTotal < minPurchase)
           return { valid: false, error: `Minimum purchase of ${minPurchase} required`, minimumOrderTotal: minPurchase };

@@ -1,5 +1,6 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { useRoute, type RouteProp } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius } from '../utils/theme';
 import { Basket } from './order/Basket';
@@ -15,6 +16,7 @@ import { useEcommerceSettings } from '../hooks/useEcommerceSettings';
 import { useProductsForDisplay } from '../hooks/useProducts';
 import { useResponsive, getProductColumns, getSidebarWidths } from '../hooks/useResponsive';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
+import type { MainTabParamList } from '../navigation/types';
 
 interface OrderScreenProps {
   username?: string;
@@ -25,6 +27,10 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
   const { cartItems, cartItemsMap, addToCart, updateQuantity, itemCount } = useBasketContext();
   const { isTabletOrDesktop, width } = useResponsive();
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Read scannedProductId param from barcode scan navigation
+  const route = useRoute<RouteProp<MainTabParamList, 'Order'>>();
+  const handledScanRef = useRef<string | null>(null);
 
   // eCommerce integration
   const { currentPlatform } = useEcommerceSettings();
@@ -53,6 +59,27 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
     ],
     isTabletOrDesktop
   );
+
+  // Auto-add product when arriving from a barcode scan
+  useEffect(() => {
+    const scannedId = route.params?.scannedProductId;
+    if (!scannedId || scannedId === handledScanRef.current || products.length === 0) return;
+    const product = products.find(p => p.id === scannedId);
+    if (!product) return;
+    handledScanRef.current = scannedId;
+    const cartProduct: CartProduct = {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image,
+      isEcommerceProduct: product.isEcommerceProduct,
+      variantId: product.variantId,
+      sku: product.sku,
+      platformId: product.platformId,
+      platform: product.platform,
+    };
+    addToCart(cartProduct, 1).catch(() => {});
+  }, [route.params?.scannedProductId, products, addToCart]);
 
   // Function to handle adding/updating a product in the cart
   const handleAddToCart = useCallback(

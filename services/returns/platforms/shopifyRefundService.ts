@@ -3,7 +3,6 @@ import { RefundData, RefundResult, RefundRecord } from '../ReturnService';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
 /**
@@ -75,15 +74,9 @@ export class ShopifyRefundService implements PlatformRefundServiceInterface {
    */
   private async processShopifyRefund(orderId: string, refundData: RefundData): Promise<RefundResult> {
     try {
-      const credentials = await this.getShopifyCredentials();
-      if (!credentials) {
-        throw new Error('Failed to retrieve Shopify API credentials');
-      }
+      this.logger.info(`Processing Shopify refund for order ${orderId}`);
 
-      const apiVersion = SHOPIFY_API_VERSION;
-      const endpoint = `${credentials.apiUrl}/admin/api/${apiVersion}/orders/${orderId}/refunds.json`;
-
-      const requestData = {
+      const data = await this.apiClient.post<{ refund?: { id?: number | string } }>(`orders/${orderId}/refunds.json`, {
         refund: {
           notify: true,
           note: refundData.reason || 'Refunded via RetailPOS',
@@ -94,30 +87,9 @@ export class ShopifyRefundService implements PlatformRefundServiceInterface {
               quantity: item.quantity,
               amount: item.amount,
             })) || [],
-          transactions: [
-            {
-              amount: refundData.amount,
-              kind: 'refund',
-              gateway: 'manual',
-            },
-          ],
+          transactions: [{ amount: refundData.amount, kind: 'refund', gateway: 'manual' }],
         },
-      };
-
-      this.logger.info(`Processing Shopify refund for order ${orderId} at ${endpoint}`);
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: this.apiClient['buildHeaders'](),
-        body: JSON.stringify(requestData),
       });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`Shopify refund API returned ${response.status}: ${errorBody}`);
-      }
-
-      const data = await response.json();
       const refundId = String(data.refund?.id || `shopify-refund-${Date.now()}`);
 
       return {

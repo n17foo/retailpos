@@ -4,13 +4,10 @@ import { CustomerSearchOptions, CustomerSearchResult, PlatformCustomer } from '.
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { BIGCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
 import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
 export class BigCommerceCustomerService extends BaseCustomerService {
-  private storeHash = '';
-  private apiVersion = BIGCOMMERCE_API_VERSION;
   private apiClient = BigCommerceApiClient.getInstance();
 
   constructor() {
@@ -20,18 +17,14 @@ export class BigCommerceCustomerService extends BaseCustomerService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.storeHash = (await secretsService.getSecret('BIGCOMMERCE_STORE_HASH')) || '';
-      if (!this.storeHash) {
+      const storeHash = (await secretsService.getSecret('BIGCOMMERCE_STORE_HASH')) || '';
+      if (!storeHash) {
         this.logger.warn('Missing BigCommerce store hash');
         return false;
       }
 
-      // Configure and initialize the shared BigCommerce client
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({
-          storeHash: this.storeHash,
-          apiVersion: this.apiVersion,
-        });
+        this.apiClient.configure({ storeHash });
         await this.apiClient.initialize();
       }
 
@@ -46,25 +39,16 @@ export class BigCommerceCustomerService extends BaseCustomerService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async searchCustomers(options: CustomerSearchOptions): Promise<CustomerSearchResult> {
     if (!this.initialized) return { customers: [], hasMore: false };
     try {
       return await withTokenRefresh(ECommercePlatform.BIGCOMMERCE, async () => {
         const limit = options.limit || 10;
-        const params = new URLSearchParams({ limit: String(limit) });
-        if (options.query) params.append('name:like', options.query);
-        if (options.cursor) params.append('page', options.cursor);
+        const params: Record<string, string> = { limit: String(limit) };
+        if (options.query) params['name:like'] = options.query;
+        if (options.cursor) params['page'] = options.cursor;
 
-        const url = `https://api.bigcommerce.com/stores/${this.storeHash}/${this.apiVersion}/customers?${params}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-        if (!response.ok) throw new Error(`BigCommerce customer search failed: ${response.status}`);
-
-        const body = await response.json();
+        const body = await this.apiClient.get<{ data: any[]; meta: any }>('customers', params);
         const customers: PlatformCustomer[] = (body.data || []).map((c: any) => this.mapCustomer(c));
         const hasMore = !!(body.meta?.pagination?.total_pages && body.meta.pagination.current_page < body.meta.pagination.total_pages);
         return { customers, hasMore, nextCursor: hasMore ? String((body.meta?.pagination?.current_page || 1) + 1) : undefined };
@@ -79,11 +63,7 @@ export class BigCommerceCustomerService extends BaseCustomerService {
     if (!this.initialized) return null;
     try {
       return await withTokenRefresh(ECommercePlatform.BIGCOMMERCE, async () => {
-        const url = `https://api.bigcommerce.com/stores/${this.storeHash}/${this.apiVersion}/customers?id:in=${customerId}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-        if (!response.ok) return null;
-        const body = await response.json();
+        const body = await this.apiClient.get<{ data: any[] }>('customers', { 'id:in': customerId });
         if (!body.data?.length) return null;
         return this.mapCustomer(body.data[0]);
       });

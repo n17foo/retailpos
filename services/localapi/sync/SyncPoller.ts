@@ -2,6 +2,7 @@ import { localApiConfig } from '../LocalApiConfig';
 import { syncEventBus } from './SyncEventBus';
 import { SyncEvent } from './SyncEventTypes';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { localApiClient } from '../../clients/localapi/LocalApiClient';
 
 /**
  * Polls the server register for new sync events.
@@ -73,22 +74,7 @@ export class SyncPoller {
 
   private async poll(): Promise<void> {
     try {
-      const baseUrl = localApiConfig.baseUrl;
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'X-Register-Id': localApiConfig.current.registerId,
-      };
-      const secret = localApiConfig.current.sharedSecret;
-      if (secret) headers['x-shared-secret'] = secret;
-
-      const response = await fetch(`${baseUrl}/api/sync/events?since=${this.lastTimestamp}`, { method: 'GET', headers });
-
-      if (!response.ok) {
-        throw new Error(`Poll failed: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const events: SyncEvent[] = data.events || [];
+      const events = await localApiClient.getSyncEvents<SyncEvent>(this.lastTimestamp);
 
       if (events.length > 0) {
         this.logger.info(`Received ${events.length} sync event(s)`);

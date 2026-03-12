@@ -71,4 +71,17 @@ export class MagentoApiClient extends BaseApiClient<MagentoConfig> {
     const cleanPath = path.startsWith('/') ? path.slice(1) : path;
     return `${base}/rest/${version}/${cleanPath}`;
   }
+
+  /**
+   * Authenticate with Magento admin credentials and return an access token.
+   * Uses the unauthenticated token endpoint directly.
+   */
+  public async fetchAdminToken(apiUrl: string, username: string, password: string): Promise<string> {
+    const url = `${this.normalizeUrl(apiUrl)}/rest/V1/integration/admin/token`;
+    const token = await this.request<string>('POST', url, { username, password });
+    if (typeof token !== 'string') {
+      throw new Error('Invalid token response from Magento API');
+    }
+    return token;
+  }
 }

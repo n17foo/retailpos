@@ -37,6 +37,7 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
     startCheckout,
     markPaymentProcessing,
     completePayment,
+    cancelOrder,
     unsyncedOrdersCount,
     syncAllPendingOrders,
   } = useBasketContext();
@@ -94,9 +95,20 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
     }
   };
 
-  const handleCancelCheckout = () => {
+  const handleCancelCheckout = async () => {
+    const orderId = currentOrderId;
     setCheckoutModalVisible(false);
     setCurrentOrderId(null);
+
+    if (!orderId) {
+      return;
+    }
+
+    try {
+      await cancelOrder(orderId);
+    } catch {
+      // Error handled by context
+    }
   };
 
   const handleSelectCustomer = async (customer: PlatformCustomer) => {

@@ -2,7 +2,6 @@
 import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../InventoryServiceInterface';
 import { PlatformInventoryConfig, PlatformConfigRequirements } from './PlatformInventoryServiceInterface';
 import { BaseInventoryService } from './BaseInventoryService';
-import { MAGENTO_API_VERSION } from '../../config/apiVersions';
 import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
 
 /**
@@ -11,8 +10,6 @@ import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
  */
 export class MagentoInventoryService extends BaseInventoryService {
   private apiClient = MagentoApiClient.getInstance();
-  private accessToken: string | null = null;
-  private tokenExpiration: Date | null = null;
 
   /**
    * Get configuration requirements
@@ -38,7 +35,7 @@ export class MagentoInventoryService extends BaseInventoryService {
       this.config.username = this.config.username || process.env.MAGENTO_USERNAME || '';
       this.config.password = this.config.password || process.env.MAGENTO_PASSWORD || '';
       this.config.accessToken = this.config.accessToken || process.env.MAGENTO_ACCESS_TOKEN || '';
-      this.config.apiVersion = this.config.apiVersion || process.env.MAGENTO_API_VERSION || MAGENTO_API_VERSION;
+      this.config.apiVersion = this.config.apiVersion || process.env.MAGENTO_API_VERSION || '';
       this.config.sourceCode = this.config.sourceCode || process.env.MAGENTO_SOURCE_CODE || 'default';
 
       if (!this.config.storeUrl) {
@@ -57,30 +54,11 @@ export class MagentoInventoryService extends BaseInventoryService {
       }
       this.config.storeUrl = this.apiClient.getBaseUrl();
 
-      // Get auth token if needed
-      if (!this.config.accessToken && this.config.username && this.config.password) {
-        const token = await this.getAuthToken();
-        if (!token) {
-          this.logger.error({ message: 'Failed to authenticate with Magento' });
-          return false;
-        }
-      }
-
       // Test connection
       try {
-        const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/stockItems`;
-        const response = await fetch(`${apiUrl}?searchCriteria[pageSize]=1`, {
-          headers: this.getAuthHeaders(),
-        });
-
-        if (response.ok || response.status === 404) {
-          // 404 is OK - just means no stock items yet
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to Magento API' });
-          return false;
-        }
+        await this.apiClient.get('stockItems', { 'searchCriteria[pageSize]': '1' });
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Magento API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -108,52 +86,26 @@ export class MagentoInventoryService extends BaseInventoryService {
       for (const productId of productIds) {
         try {
           // First get the product to get its SKU
-          const productUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/products/${productId}`;
-          const productResponse = await fetch(productUrl, {
-            headers: this.getAuthHeaders(),
-          });
-
-          if (!productResponse.ok) {
+          let sku: string;
+          try {
+            const product = await this.apiClient.get<any>(`products/${productId}`);
+            sku = product.sku;
+          } catch {
             continue;
           }
 
-          const product = await productResponse.json();
-          const sku = product.sku;
-
           // Get stock item for this SKU
-          const stockUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/stockItems/${sku}`;
-          const stockResponse = await fetch(stockUrl, {
-            headers: this.getAuthHeaders(),
-          });
-
-          if (stockResponse.ok) {
-            const stockItem = await stockResponse.json();
-            items.push({
-              productId,
-              variantId: productId,
-              sku,
-              quantity: stockItem.qty || 0,
-            });
-          } else {
+          try {
+            const stockItem = await this.apiClient.get<any>(`stockItems/${encodeURIComponent(sku)}`);
+            items.push({ productId, variantId: productId, sku, quantity: stockItem.qty || 0 });
+          } catch {
             // Try MSI (Multi-Source Inventory) endpoint
-            const sourceUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/inventory/source-items?searchCriteria[filter_groups][0][filters][0][field]=sku&searchCriteria[filter_groups][0][filters][0][value]=${encodeURIComponent(sku)}`;
-            const sourceResponse = await fetch(sourceUrl, {
-              headers: this.getAuthHeaders(),
-            });
-
-            if (sourceResponse.ok) {
-              const sourceData = await sourceResponse.json();
-              const sourceItem =
-                sourceData.items?.find((item: any) => item.source_code === this.config.sourceCode) || sourceData.items?.[0];
-
-              if (sourceItem) {
-                items.push({
-                  productId,
-                  variantId: productId,
-                  sku,
-                  quantity: sourceItem.quantity || 0,
-                });
-              }
+            const sourceData = await this.apiClient.get<any>(
+              `inventory/source-items?searchCriteria[filter_groups][0][filters][0][field]=sku&searchCriteria[filter_groups][0][filters][0][value]=${encodeURIComponent(sku)}`
+            );
+            const sourceItem = sourceData.items?.find((item: any) => item.source_code === this.config.sourceCode) || sourceData.items?.[0];
+            if (sourceItem) {
+              items.push({ productId, variantId: productId, sku, quantity: sourceItem.quantity || 0 });
             }
           }
         } catch (error) {
@@ -198,38 +150,21 @@ export class MagentoInventoryService extends BaseInventoryService {
           continue;
         }
 
-        // Try to update using standard stock item endpoint
-        const stockUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/products/${encodeURIComponent(sku)}/stockItems/1`;
-
         const newQuantity = update.adjustment === true ? (await this.getCurrentQuantity(sku)) + update.quantity : update.quantity;
 
-        const response = await fetch(stockUrl, {
-          method: 'PUT',
-          headers: {
-            ...this.getAuthHeaders(),
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            stockItem: {
-              qty: newQuantity,
-              is_in_stock: newQuantity > 0,
-            },
-          }),
-        });
-
-        if (response.ok) {
+        try {
+          await this.apiClient.put(`products/${encodeURIComponent(sku)}/stockItems/1`, {
+            stockItem: { qty: newQuantity, is_in_stock: newQuantity > 0 },
+          });
           result.successful++;
-        } else {
+        } catch {
           // Try MSI endpoint
           const msiUpdated = await this.updateMsiInventory(sku, newQuantity);
           if (msiUpdated) {
             result.successful++;
           } else {
             result.failed++;
-            result.errors.push({
-              productId: update.productId,
-              error: `Failed to update inventory: ${response.statusText}`,
-            });
+            result.errors.push({ productId: update.productId, error: 'Failed to update inventory' });
           }
         }
       } catch (error) {
@@ -250,27 +185,10 @@ export class MagentoInventoryService extends BaseInventoryService {
   private async updateMsiInventory(sku: string, quantity: number): Promise<boolean> {
     try {
       const sourceCode = this.config.sourceCode || 'default';
-      const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/inventory/source-items`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          sourceItems: [
-            {
-              sku,
-              source_code: sourceCode,
-              quantity,
-              status: quantity > 0 ? 1 : 0,
-            },
-          ],
-        }),
+      await this.apiClient.post('inventory/source-items', {
+        sourceItems: [{ sku, source_code: sourceCode, quantity, status: quantity > 0 ? 1 : 0 }],
       });
-
-      return response.ok;
+      return true;
     } catch (error) {
       this.logger.error({ message: 'Error updating MSI inventory:' }, error instanceof Error ? error : new Error(String(error)));
       return false;
@@ -282,60 +200,10 @@ export class MagentoInventoryService extends BaseInventoryService {
    */
   private async getCurrentQuantity(sku: string): Promise<number> {
     try {
-      const stockUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/stockItems/${encodeURIComponent(sku)}`;
-      const response = await fetch(stockUrl, {
-        headers: this.getAuthHeaders(),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return data.qty || 0;
-      }
-      return 0;
+      const data = await this.apiClient.get<any>(`stockItems/${encodeURIComponent(sku)}`);
+      return data.qty || 0;
     } catch {
       return 0;
     }
-  }
-
-  /**
-   * Get admin authentication token
-   */
-  private async getAuthToken(): Promise<string | null> {
-    if (this.accessToken && this.tokenExpiration && this.tokenExpiration > new Date()) {
-      return this.accessToken;
-    }
-
-    try {
-      const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/integration/admin/token`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: this.config.username,
-          password: this.config.password,
-        }),
-      });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const token = await response.json();
-      this.accessToken = token;
-      this.tokenExpiration = new Date(Date.now() + 4 * 60 * 60 * 1000);
-
-      return token;
-    } catch (error) {
-      this.logger.error({ message: 'Error getting Magento auth token' }, error instanceof Error ? error : new Error(String(error)));
-      return null;
-    }
-  }
-
-  /**
-   * Get authorization headers
-   */
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 }

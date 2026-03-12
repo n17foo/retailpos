@@ -30,21 +30,13 @@ export class SquarespaceCustomerService extends BaseCustomerService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async searchCustomers(options: CustomerSearchOptions): Promise<CustomerSearchResult> {
     if (!this.initialized) return { customers: [], hasMore: false };
     try {
       return await withTokenRefresh(ECommercePlatform.SQUARESPACE, async () => {
-        const headers = await this.getAuthHeaders();
-        const params = new URLSearchParams();
-        if (options.cursor) params.append('cursor', options.cursor);
-        const url = `https://api.squarespace.com/1.0/profiles?${params}`;
-        const response = await fetch(url, { headers });
-        if (!response.ok) throw new Error(`Squarespace customer search failed: ${response.status}`);
-        const body = await response.json();
+        const params: Record<string, string> = {};
+        if (options.cursor) params['cursor'] = options.cursor;
+        const body = await this.apiClient.get<any>('profiles', params);
         const allProfiles = body.profiles || [];
         const query = (options.query || '').toLowerCase();
         const filtered = query
@@ -68,10 +60,8 @@ export class SquarespaceCustomerService extends BaseCustomerService {
     if (!this.initialized) return null;
     try {
       return await withTokenRefresh(ECommercePlatform.SQUARESPACE, async () => {
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(`https://api.squarespace.com/1.0/profiles/${customerId}`, { headers });
-        if (!response.ok) return null;
-        return this.mapCustomer(await response.json());
+        const data = await this.apiClient.get<any>(`profiles/${customerId}`);
+        return this.mapCustomer(data);
       });
     } catch (error) {
       this.logger.error({ message: 'Error fetching Squarespace customer' }, error instanceof Error ? error : new Error(String(error)));

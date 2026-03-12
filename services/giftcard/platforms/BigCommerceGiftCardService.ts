@@ -3,12 +3,21 @@ import { GiftCardInfo, GiftCardRedemptionResult } from '../GiftCardServiceInterf
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { BIGCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
 import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
+interface BigCommerceGiftCard {
+  balance?: string;
+  currency_code?: string;
+  status?: string;
+  expiry_date?: string;
+}
+
+interface BigCommerceGiftCardsResponse {
+  data?: BigCommerceGiftCard[];
+}
+
 export class BigCommerceGiftCardService extends BaseGiftCardService {
-  private storeHash = '';
   private apiClient = BigCommerceApiClient.getInstance();
 
   constructor() {
@@ -18,15 +27,14 @@ export class BigCommerceGiftCardService extends BaseGiftCardService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.storeHash = (await secretsService.getSecret('BIGCOMMERCE_STORE_HASH')) || '';
-      if (!this.storeHash) {
+      const storeHash = (await secretsService.getSecret('BIGCOMMERCE_STORE_HASH')) || '';
+      if (!storeHash) {
         this.logger.warn('Missing BigCommerce store hash');
         return false;
       }
 
-      // Configure and initialize the shared BigCommerce client
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({ storeHash: this.storeHash });
+        this.apiClient.configure({ storeHash });
         await this.apiClient.initialize();
       }
 
@@ -41,20 +49,19 @@ export class BigCommerceGiftCardService extends BaseGiftCardService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async checkBalance(code: string): Promise<GiftCardInfo> {
     if (!this.initialized) return { code, balance: 0, currency: 'USD', status: 'not_found' };
     try {
       return await withTokenRefresh(ECommercePlatform.BIGCOMMERCE, async () => {
-        const url = `https://api.bigcommerce.com/stores/${this.storeHash}/${BIGCOMMERCE_API_VERSION}/gift-certificates?code=${encodeURIComponent(code)}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-        if (!response.ok) return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
-        const body = await response.json();
-        const cards = body.data || body;
+        let body: BigCommerceGiftCardsResponse | BigCommerceGiftCard[];
+        try {
+          body = await this.apiClient.get<BigCommerceGiftCardsResponse | BigCommerceGiftCard[]>('gift-certificates', {
+            code: encodeURIComponent(code),
+          });
+        } catch {
+          return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
+        }
+        const cards = Array.isArray(body) ? body : body.data || [];
         if (!Array.isArray(cards) || cards.length === 0) return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
         const card = cards[0];
         return {

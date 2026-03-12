@@ -5,7 +5,6 @@ import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { SYLIUS_API_VERSION } from '../../config/apiVersions';
 import { SyliusApiClient } from '../../clients/sylius/SyliusApiClient';
 
 /**
@@ -14,8 +13,6 @@ import { SyliusApiClient } from '../../clients/sylius/SyliusApiClient';
  */
 export class SyliusProductService extends BaseProductService {
   private apiClient = SyliusApiClient.getInstance();
-  private accessToken: string | null = null;
-  private tokenExpiration: Date | null = null;
 
   constructor(config: PlatformProductConfig = {}) {
     super(config);
@@ -32,7 +29,7 @@ export class SyliusProductService extends BaseProductService {
       this.config.apiKey = this.config.apiKey || process.env.SYLIUS_API_KEY || '';
       this.config.apiSecret = this.config.apiSecret || process.env.SYLIUS_API_SECRET || '';
       this.config.accessToken = this.config.accessToken || process.env.SYLIUS_ACCESS_TOKEN || '';
-      this.config.apiVersion = this.config.apiVersion || process.env.SYLIUS_API_VERSION || SYLIUS_API_VERSION;
+      this.config.apiVersion = this.config.apiVersion || process.env.SYLIUS_API_VERSION || '';
 
       if (!this.config.apiUrl) {
         this.logger.warn('Missing Sylius API URL configuration');
@@ -51,28 +48,11 @@ export class SyliusProductService extends BaseProductService {
         await this.apiClient.initialize();
       }
 
-      // Get OAuth token if needed
-      if (!this.config.accessToken && this.config.apiKey && this.config.apiSecret) {
-        const token = await this.getOAuthToken();
-        if (!token) {
-          this.logger.error({ message: 'Failed to authenticate with Sylius' });
-          return false;
-        }
-      }
-
       // Test connection
       try {
-        const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/products?limit=1`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to Sylius API' }, new Error(`Status: ${response.status}`));
-          return false;
-        }
+        await this.apiClient.get('products', { limit: '1' });
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Sylius API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -115,15 +95,7 @@ export class SyliusProductService extends BaseProductService {
           params.append('search', options.search);
         }
 
-        const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/products?${params.toString()}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch products from Sylius: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.get<any>(`products?${params.toString()}`);
 
         // Sylius returns products in _embedded.items or directly as array
         const items = data._embedded?.items || data.items || data || [];
@@ -158,18 +130,7 @@ export class SyliusProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.SYLIUS, async () => {
       try {
-        const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/products/${productId}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            return null;
-          }
-          throw new Error(`Failed to fetch product from Sylius: ${response.statusText}`);
-        }
-
-        const syliusProduct = await response.json();
+        const syliusProduct = await this.apiClient.get<any>(`products/${productId}`);
         return this.mapToProduct(syliusProduct);
       } catch (error) {
         this.logger.error(
@@ -191,25 +152,8 @@ export class SyliusProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.SYLIUS, async () => {
       try {
-        const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/products`;
         const syliusProduct = this.mapToSyliusProduct(product);
-        const headers = await this.getAuthHeaders();
-
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(syliusProduct),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to create product on Sylius: ${response.statusText} - ${errorText}`);
-        }
-
-        const createdProduct = await response.json();
+        const createdProduct = await this.apiClient.post<any>('products', syliusProduct);
         return this.mapToProduct(createdProduct);
       } catch (error) {
         this.logger.error({ message: 'Error creating product on Sylius' }, error instanceof Error ? error : new Error(String(error)));
@@ -235,24 +179,7 @@ export class SyliusProductService extends BaseProductService {
 
         const updatedProduct = { ...existingProduct, ...productData };
         const syliusProduct = this.mapToSyliusProduct(updatedProduct);
-
-        const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/products/${productId}`;
-        const headers = await this.getAuthHeaders();
-
-        const response = await fetch(apiUrl, {
-          method: 'PUT',
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(syliusProduct),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to update product on Sylius: ${response.statusText}`);
-        }
-
-        const updated = await response.json();
+        const updated = await this.apiClient.put<any>(`products/${productId}`, syliusProduct);
         return this.mapToProduct(updated);
       } catch (error) {
         this.logger.error(
@@ -274,15 +201,8 @@ export class SyliusProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.SYLIUS, async () => {
       try {
-        const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/products/${productId}`;
-        const headers = await this.getAuthHeaders();
-
-        const response = await fetch(apiUrl, {
-          method: 'DELETE',
-          headers,
-        });
-
-        return response.ok || response.status === 204;
+        await this.apiClient.delete(`products/${productId}`);
+        return true;
       } catch (error) {
         this.logger.error(
           { message: `Error deleting product ${productId} from Sylius` },
@@ -328,61 +248,6 @@ export class SyliusProductService extends BaseProductService {
     }
 
     return result;
-  }
-
-  /**
-   * Get OAuth token
-   */
-  private async getOAuthToken(): Promise<string | null> {
-    if (this.accessToken && this.tokenExpiration && this.tokenExpiration > new Date()) {
-      return this.accessToken;
-    }
-
-    try {
-      const apiUrl = `${this.config.apiUrl}/api/oauth/v2/token`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'client_credentials',
-          client_id: this.config.apiKey as string,
-          client_secret: this.config.apiSecret as string,
-        }).toString(),
-      });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
-      this.accessToken = data.access_token;
-      this.tokenExpiration = new Date(Date.now() + (data.expires_in || 3600) * 1000);
-
-      return this.accessToken;
-    } catch (error) {
-      this.logger.error({ message: 'Error getting Sylius OAuth token' }, error instanceof Error ? error : new Error(String(error)));
-      return null;
-    }
-  }
-
-  /**
-   * Get authorization headers
-   */
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
-  /**
-   * Normalize URL
-   */
-  private normalizeUrl(url: string): string {
-    if (!url) return '';
-    url = url.replace(/\/$/, '');
-    if (!url.startsWith('http')) {
-      url = `https://${url}`;
-    }
-    return url;
   }
 
   /**

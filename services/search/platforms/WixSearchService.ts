@@ -37,20 +37,21 @@ export class WixSearchService extends BaseSearchService {
         return false;
       }
 
+      // Configure and initialize the shared Wix client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          apiKey: this.config.apiKey as string,
+          siteId: this.config.siteId as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        await this.apiClient.initialize();
+      }
+
       // Test connection with a simple API call
       try {
-        const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/products`;
-        const response = await fetch(apiUrl, {
-          headers: this.getAuthHeaders(),
-        });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to Wix API' });
-          return false;
-        }
+        await this.apiClient.post('stores/v1/products/query', { query: { paging: { limit: 1, offset: 0 } } });
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Wix API:' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -148,18 +149,7 @@ export class WixSearchService extends BaseSearchService {
       }
 
       // Make API request
-      const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/products/query`;
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(query),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Wix API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.post<any>('stores/v1/products/query', query);
       const products = data.products || [];
       const totalItems = data.totalResults || products.length;
       const perPage = options.limit || 100;
@@ -196,17 +186,7 @@ export class WixSearchService extends BaseSearchService {
     }
 
     try {
-      const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/collections`;
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Wix API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<any>('stores/v1/collections');
       return (data.collections || []).map((collection: any) => collection.name);
     } catch (error) {
       this.logger.error({ message: 'Error fetching categories from Wix:' }, error instanceof Error ? error : new Error(String(error)));
@@ -223,17 +203,7 @@ export class WixSearchService extends BaseSearchService {
     }
 
     try {
-      const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/collections`;
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Wix API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<any>('stores/v1/collections');
       const collection = (data.collections || []).find((col: any) => col.name === categoryName);
       return collection ? collection._id : null;
     } catch (error) {
@@ -243,12 +213,5 @@ export class WixSearchService extends BaseSearchService {
       );
       return null;
     }
-  }
-
-  /**
-   * Get authorization headers for Wix API
-   */
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 }

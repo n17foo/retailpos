@@ -1,20 +1,39 @@
 import { ScannerServiceInterface } from './ScannerServiceInterface';
-import { BleManager, Device } from 'react-native-ble-plx';
+import { BleManager, Device, Subscription } from 'react-native-ble-plx';
 import { LoggerFactory } from '../logger/LoggerFactory';
 import { decodeBase64 } from '../../utils/base64';
 
 /**
  * Bluetooth scanner service implementation using BLE
  */
+/** Default UUIDs — Microchip RN4020 BLE serial profile (common on entry-level scanners) */
+const DEFAULT_SERVICE_UUID = '49535343-FE7D-4AE5-8FA9-9FAFD205E455';
+const DEFAULT_CHARACTERISTIC_UUID = '49535343-8841-43F4-A8D4-ECBE34729BB3';
+
 export class BluetoothScannerService implements ScannerServiceInterface {
   private bleManager: BleManager;
   private connectedDevice: Device | null = null;
   private scanListeners: Map<string, (data: string) => void> = new Map();
+  private bleSubscriptions: Map<string, Subscription> = new Map();
+  private serviceUUID: string = DEFAULT_SERVICE_UUID;
+  private characteristicUUID: string = DEFAULT_CHARACTERISTIC_UUID;
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
 
   constructor() {
     this.bleManager = new BleManager();
     this.logger = LoggerFactory.getInstance().createLogger('BluetoothScannerService');
+  }
+
+  /**
+   * Configure BLE GATT UUIDs for the barcode data characteristic.
+   * Call this after loading scanner settings and before connect().
+   * @param serviceUUID GATT service UUID
+   * @param characteristicUUID GATT characteristic UUID for barcode data
+   */
+  configure(serviceUUID: string, characteristicUUID: string): void {
+    this.serviceUUID = serviceUUID || DEFAULT_SERVICE_UUID;
+    this.characteristicUUID = characteristicUUID || DEFAULT_CHARACTERISTIC_UUID;
+    this.logger.info(`BLE UUIDs configured: service=${this.serviceUUID} char=${this.characteristicUUID}`);
   }
 
   /**
@@ -53,6 +72,13 @@ export class BluetoothScannerService implements ScannerServiceInterface {
    */
   async disconnect(): Promise<void> {
     try {
+      // Cancel all active BLE subscriptions before disconnecting
+      for (const [id, sub] of this.bleSubscriptions.entries()) {
+        sub.remove();
+        this.bleSubscriptions.delete(id);
+      }
+      this.scanListeners.clear();
+
       if (this.connectedDevice) {
         await this.bleManager.cancelDeviceConnection(this.connectedDevice.id);
         this.connectedDevice = null;
@@ -85,31 +111,32 @@ export class BluetoothScannerService implements ScannerServiceInterface {
     }
 
     try {
-      // Get the service and characteristic for barcode data
-      // Note: These UUIDs will need to be adjusted for your specific scanner
-      const serviceUUID = '49535343-FE7D-4AE5-8FA9-9FAFD205E455';
-      const characteristicUUID = '49535343-8841-43F4-A8D4-ECBE34729BB3';
-
       // Subscribe to notifications on the barcode data characteristic
+      // UUIDs are set via configure() — defaults to Microchip RN4020 serial profile
       const subscriptionId = `${this.connectedDevice.id}-${Date.now()}`;
 
-      this.connectedDevice.monitorCharacteristicForService(serviceUUID, characteristicUUID, (error, characteristic) => {
-        if (error) {
-          this.logger.error({ message: 'Error reading barcode data' }, error instanceof Error ? error : new Error(String(error)));
-          return;
+      const bleSub = this.connectedDevice.monitorCharacteristicForService(
+        this.serviceUUID,
+        this.characteristicUUID,
+        (error, characteristic) => {
+          if (error) {
+            this.logger.error({ message: 'Error reading barcode data' }, error instanceof Error ? error : new Error(String(error)));
+            return;
+          }
+
+          if (characteristic?.value) {
+            // Decode the base64 value to get the barcode text
+            const barcodeData = decodeBase64(characteristic.value);
+
+            // Call the callback with the barcode data
+            callback(barcodeData);
+          }
         }
+      );
 
-        if (characteristic?.value) {
-          // Decode the base64 value to get the barcode text
-          const barcodeData = decodeBase64(characteristic.value);
-
-          // Call the callback with the barcode data
-          callback(barcodeData);
-        }
-      });
-
-      // Store the callback for later cleanup
+      // Store both the callback and the BLE subscription object for proper cleanup
       this.scanListeners.set(subscriptionId, callback);
+      this.bleSubscriptions.set(subscriptionId, bleSub);
 
       return subscriptionId;
     } catch (error) {
@@ -123,10 +150,11 @@ export class BluetoothScannerService implements ScannerServiceInterface {
    * @param subscriptionId The subscription ID returned from startScanListener
    */
   stopScanListener(subscriptionId: string): void {
-    if (this.scanListeners.has(subscriptionId)) {
-      this.scanListeners.delete(subscriptionId);
-      // The actual BLE notification will be automatically unsubscribed when disconnecting
+    if (this.bleSubscriptions.has(subscriptionId)) {
+      this.bleSubscriptions.get(subscriptionId)!.remove();
+      this.bleSubscriptions.delete(subscriptionId);
     }
+    this.scanListeners.delete(subscriptionId);
   }
 
   /**

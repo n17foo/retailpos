@@ -3,6 +3,7 @@ import { Platform } from 'react-native';
 import { keyValueRepository } from '../../repositories/KeyValueRepository';
 import { StripeTerminalBridgeManager } from '../../contexts/StripeTerminalBridge';
 import { LoggerFactory } from '../logger/LoggerFactory';
+import { StripeApiClient } from '../clients/stripe/StripeApiClient';
 
 /**
  * Implementation of Stripe NFC Tap to Pay service
@@ -422,51 +423,38 @@ export class StripeNfcService implements PaymentServiceInterface {
   }
 
   /**
-   * Get raw transaction data from Stripe API (internal use)
+   * Configure the Stripe API client with current settings.
    */
-  private async getRawTransactionStatus(transactionId: string): Promise<Record<string, unknown>> {
+  private async configureStripeClient(): Promise<StripeApiClient> {
     const apiKey = await keyValueRepository.getItem('stripe_nfc_apiKey');
-
     if (!apiKey) {
       throw new Error('Stripe API key not configured');
     }
+    const backendUrl = (await keyValueRepository.getItem('stripe_nfc_backendUrl')) || undefined;
+    const client = StripeApiClient.getInstance();
+    client.configure({ apiKey, backendUrl, storeUrl: 'https://api.stripe.com' });
+    return client;
+  }
 
-    // Check for direct bridge availability first
+  /**
+   * Get raw transaction data from Stripe API (internal use)
+   */
+  private async getRawTransactionStatus(transactionId: string): Promise<Record<string, unknown>> {
+    const client = await this.configureStripeClient();
+
     const bridgeManager = StripeTerminalBridgeManager.getInstance();
     if (bridgeManager.bridge && bridgeManager.isTerminalInitialized()) {
       try {
-        const backendUrl = await keyValueRepository.getItem('stripe_nfc_backendUrl');
-        if (backendUrl) {
-          const response = await fetch(`${backendUrl}/stripe/payment_intent/${transactionId}`, {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-          });
-
-          if (!response.ok) {
-            throw new Error(`API error: ${response.status}`);
-          }
-
-          return (await response.json()) as Record<string, unknown>;
-        }
+        return await client.getFromBackend<Record<string, unknown>>(
+          `stripe/payment_intent/${transactionId}`,
+          `v1/payment_intents/${transactionId}`
+        );
       } catch (bridgeError) {
         this.logger.warn('Bridge transaction status check failed, falling back to Stripe API', bridgeError);
       }
     }
 
-    // Direct Stripe API call as fallback
-    const response = await fetch(`https://api.stripe.com/v1/payment_intents/${transactionId}`, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      throw new Error(`Stripe API error: ${response.status}`);
-    }
-
-    return (await response.json()) as Record<string, unknown>;
+    return client.get<Record<string, unknown>>(`v1/payment_intents/${transactionId}`);
   }
 
   /**
@@ -530,59 +518,16 @@ export class StripeNfcService implements PaymentServiceInterface {
       }
 
       // If bridge doesn't work or payment is already processed, try API cancellation
-      const apiKey = await keyValueRepository.getItem('stripe_nfc_apiKey');
-      const backendUrl = await keyValueRepository.getItem('stripe_nfc_backendUrl');
-
-      if (!apiKey) {
-        throw new Error('Stripe API key not configured');
-      }
-
-      let response;
-
-      // Try backend endpoint first if available
-      if (backendUrl) {
-        try {
-          response = await fetch(`${backendUrl}/stripe/void_payment`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ paymentIntentId: transactionId }),
-          });
-
-          const result = await response.json();
-
-          if (result.success) {
-            return {
-              success: true,
-              transactionId: transactionId,
-              timestamp: new Date(),
-            };
-          }
-        } catch (backendError) {
-          this.logger.warn('Backend void transaction failed, trying direct API', backendError);
-        }
-      }
-
-      // Direct API call as fallback
-      response = await fetch(`https://api.stripe.com/v1/payment_intents/${transactionId}/cancel`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || `Stripe API error: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const client = await this.configureStripeClient();
+      const result = await client.postToBackend<{ success?: boolean; status?: string }>(
+        'stripe/void_payment',
+        `v1/payment_intents/${transactionId}/cancel`,
+        { paymentIntentId: transactionId }
+      );
 
       return {
-        success: result.status === 'canceled',
-        transactionId: transactionId,
+        success: result.success === true || result.status === 'canceled',
+        transactionId,
         timestamp: new Date(),
       };
     } catch (error: unknown) {
@@ -637,67 +582,18 @@ export class StripeNfcService implements PaymentServiceInterface {
       }
 
       // If bridge doesn't work, try API refund
-      const apiKey = await keyValueRepository.getItem('stripe_nfc_apiKey');
-      const backendUrl = await keyValueRepository.getItem('stripe_nfc_backendUrl');
-
-      if (!apiKey) {
-        throw new Error('Stripe API key not configured');
-      }
-
-      // Try backend endpoint first if available
-      if (backendUrl) {
-        try {
-          const response = await fetch(`${backendUrl}/stripe/refund`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              paymentIntentId: transactionId,
-              amount: Math.round(amount * 100), // Convert to cents
-            }),
-          });
-
-          const result = await response.json();
-
-          if (result.success && result.refundId) {
-            return {
-              success: true,
-              transactionId: result.refundId,
-              timestamp: new Date(),
-              amount: amount,
-            };
-          }
-        } catch (backendError) {
-          this.logger.warn('Backend refund failed, trying direct API', backendError);
-        }
-      }
-
-      // Direct API call as fallback
-      const response = await fetch('https://api.stripe.com/v1/refunds', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          payment_intent: transactionId,
-          amount: Math.round(amount * 100), // Convert to cents
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error?.message || `Stripe API error: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const client = await this.configureStripeClient();
+      const result = await client.postToBackend<{ success?: boolean; refundId?: string; status?: string; id?: string }>(
+        'stripe/refund',
+        'v1/refunds',
+        { payment_intent: transactionId, amount: Math.round(amount * 100) }
+      );
 
       return {
-        success: result.status === 'succeeded',
-        transactionId: result.id,
+        success: result.success === true || result.status === 'succeeded',
+        transactionId: result.refundId || result.id || transactionId,
         timestamp: new Date(),
-        amount: amount,
+        amount,
       };
     } catch (error: unknown) {
       this.logger.error('Error refunding transaction:', error as Error);

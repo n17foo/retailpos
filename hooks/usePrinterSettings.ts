@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Alert } from 'react-native';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
 import { PrinterConnectionType } from '../services/printer/UnifiedPrinterService';
+import { PrinterServiceFactory } from '../services/printer/PrinterServiceFactory';
 import { useTranslate } from './useTranslate';
 import { useLogger } from '../hooks/useLogger';
 
@@ -167,15 +168,16 @@ export const usePrinterSettings = () => {
         // Set a timeout for the connection test
         const timeout = new Promise<boolean>((_, reject) => setTimeout(() => reject(new Error('Connection timeout')), 10000));
 
-        // Actual connection test implementation would go here
-        // This is a placeholder that simulates a successful connection
-        const testPromise = new Promise<boolean>(resolve => {
-          // Simulate network delay
-          setTimeout(() => {
-            // Simulate 90% success rate for testing
-            const isSuccess = Math.random() > 0.1;
-            resolve(isSuccess);
-          }, 2000);
+        // Delegate to the real printer service
+        const printerFactory = PrinterServiceFactory.getInstance();
+        const testPromise = printerFactory.testConnection({
+          connectionType: settings.connectionType,
+          printerName: settings.printerName,
+          macAddress: settings.macAddress,
+          ipAddress: settings.ipAddress,
+          port: settings.port,
+          vendorId: settings.vendorId,
+          productId: settings.productId,
         });
 
         const result = await Promise.race([testPromise, timeout]);

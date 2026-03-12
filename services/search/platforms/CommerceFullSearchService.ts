@@ -154,6 +154,41 @@ export class CommerceFullSearchService implements PlatformSearchServiceInterface
     }
   }
 
+  /**
+   * Dedicated barcode lookup via GET /customer/products/barcode/:barcode.
+   * Returns at most 1 product for an exact barcode match.
+   */
+  async searchByBarcode(barcode: string): Promise<SearchProduct[]> {
+    if (!this.isInitialized()) {
+      throw new Error('CommerceFull search service not initialized');
+    }
+
+    try {
+      const data = await this.apiClient.get<any>(`/customer/products/barcode/${encodeURIComponent(barcode)}`);
+      const product = data.data || data;
+      if (!product || !product.id) return [];
+
+      return [
+        {
+          id: String(product.productId || product.id || ''),
+          name: product.name || product.title || '',
+          description: product.description || '',
+          price: parseFloat(product.price || product.variants?.[0]?.price) || 0,
+          imageUrl: product.images?.[0]?.url || product.thumbnail || '',
+          category: product.productType || product.category || '',
+          sku: product.sku || product.variants?.[0]?.sku || '',
+          barcode,
+          inStock: product.inStock != null ? Boolean(product.inStock) : (product.variants?.[0]?.inventoryQuantity ?? 0) > 0,
+          source: 'ecommerce' as const,
+          originalProduct: product,
+        },
+      ];
+    } catch (error) {
+      this.logger.error({ message: `Barcode lookup failed for ${barcode}` }, error instanceof Error ? error : new Error(String(error)));
+      return [];
+    }
+  }
+
   async getCategories(): Promise<string[]> {
     if (!this.isInitialized()) {
       throw new Error('CommerceFull search service not initialized');

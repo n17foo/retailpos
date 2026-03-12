@@ -32,6 +32,7 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPrintReceipt, plat
     startCheckout,
     markPaymentProcessing,
     completePayment,
+    cancelOrder,
     itemCount,
     unsyncedOrdersCount,
     syncAllPendingOrders,
@@ -100,9 +101,20 @@ export const Basket: React.FC<BasketProps> = ({ onCheckout, onPrintReceipt, plat
     }
   };
 
-  const handleCancelCheckout = () => {
+  const handleCancelCheckout = async () => {
+    const orderId = currentOrderId;
     setCheckoutModalVisible(false);
     setCurrentOrderId(null);
+
+    if (!orderId) {
+      return;
+    }
+
+    try {
+      await cancelOrder(orderId);
+    } catch (error) {
+      Alert.alert(t('common.error'), (error as Error).message);
+    }
   };
 
   // Handle sync of pending orders

@@ -45,8 +45,8 @@ export interface StoredECommerceSettings {
   };
   wix: {
     apiKey: string;
-    accessToken: string;
-    storeUrl: string;
+    siteId: string;
+    accountId: string;
   };
   prestashop?: {
     apiKey: string;
@@ -62,7 +62,6 @@ export interface StoredECommerceSettings {
     storeUrl: string;
   };
   offline?: {
-    menuUrl: string;
     storeName: string;
     lastSync: string;
   };
@@ -208,8 +207,8 @@ export class ServiceConfigBridge {
       case ECommercePlatform.WIX:
         return {
           apiKey: settings.wix.apiKey || settings.apiKey,
-          accessToken: settings.wix.accessToken,
-          storeUrl: settings.wix.storeUrl || settings.apiUrl,
+          siteId: settings.wix.siteId,
+          accountId: settings.wix.accountId,
         };
 
       case ECommercePlatform.PRESTASHOP:
@@ -234,7 +233,6 @@ export class ServiceConfigBridge {
 
       case ECommercePlatform.OFFLINE:
         return {
-          menuUrl: settings.offline?.menuUrl,
           storeName: settings.offline?.storeName,
         };
 

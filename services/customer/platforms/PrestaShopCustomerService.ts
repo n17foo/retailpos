@@ -8,7 +8,6 @@ import secretsService from '../../secrets/SecretsService';
 import { PrestaShopApiClient } from '../../clients/prestashop/PrestaShopApiClient';
 
 export class PrestaShopCustomerService extends BaseCustomerService {
-  private baseUrl = '';
   private apiClient = PrestaShopApiClient.getInstance();
 
   constructor() {
@@ -18,17 +17,16 @@ export class PrestaShopCustomerService extends BaseCustomerService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.baseUrl = ((await secretsService.getSecret('PRESTASHOP_BASE_URL')) || '').replace(/\/+$/, '');
-      if (!this.baseUrl) {
+      const baseUrl = ((await secretsService.getSecret('PRESTASHOP_BASE_URL')) || '').replace(/\/+$/, '');
+      if (!baseUrl) {
         this.logger.warn('Missing PrestaShop base URL');
         return false;
       }
 
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({ storeUrl: this.baseUrl });
+        this.apiClient.configure({ storeUrl: baseUrl });
         await this.apiClient.initialize();
       }
-      this.baseUrl = this.apiClient.getBaseUrl();
 
       this.initialized = true;
       return true;
@@ -41,24 +39,15 @@ export class PrestaShopCustomerService extends BaseCustomerService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async searchCustomers(options: CustomerSearchOptions): Promise<CustomerSearchResult> {
     if (!this.initialized) return { customers: [], hasMore: false };
     try {
       return await withTokenRefresh(ECommercePlatform.PRESTASHOP, async () => {
         const limit = options.limit || 10;
         const offset = options.cursor ? parseInt(options.cursor, 10) : 0;
-        let filter = '';
-        if (options.query)
-          filter = `&filter[email]=[${encodeURIComponent(options.query)}]%25&filter[lastname]=[${encodeURIComponent(options.query)}]%25`;
-        const url = `${this.baseUrl}/api/customers?display=full&limit=${offset},${limit}${filter}&output_format=JSON`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-        if (!response.ok) throw new Error(`PrestaShop customer search failed: ${response.status}`);
-        const body = await response.json();
+        let path = `customers?display=full&limit=${offset},${limit}&output_format=JSON`;
+        if (options.query) path += `&filter[email]=[${encodeURIComponent(options.query)}]%25`;
+        const body = await this.apiClient.get<any>(path);
         const items = body.customers || [];
         const customers: PlatformCustomer[] = items.map((c: any) => this.mapCustomer(c));
         return { customers, hasMore: items.length === limit, nextCursor: items.length === limit ? String(offset + limit) : undefined };
@@ -73,11 +62,7 @@ export class PrestaShopCustomerService extends BaseCustomerService {
     if (!this.initialized) return null;
     try {
       return await withTokenRefresh(ECommercePlatform.PRESTASHOP, async () => {
-        const url = `${this.baseUrl}/api/customers/${customerId}?output_format=JSON`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-        if (!response.ok) return null;
-        const body = await response.json();
+        const body = await this.apiClient.get<any>(`customers/${customerId}?output_format=JSON`);
         return this.mapCustomer(body.customer || body);
       });
     } catch (error) {

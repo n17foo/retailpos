@@ -49,8 +49,12 @@ export interface ECommerceSettings {
     apiKey: string;
     siteId: string;
   };
+  commercefull: {
+    apiKey: string;
+    apiSecret: string;
+    storeUrl: string;
+  };
   offline: {
-    menuUrl?: string;
     storeName: string;
     currency?: string;
     categories?: Array<{
@@ -107,6 +111,11 @@ const DEFAULT_ECOMMERCE_SETTINGS: ECommerceSettings = {
     apiKey: '',
     siteId: '',
   },
+  commercefull: {
+    apiKey: '',
+    apiSecret: '',
+    storeUrl: '',
+  },
   offline: {
     storeName: '',
     currency: 'GBP',
@@ -128,7 +137,7 @@ export const useEcommerceSettings = () => {
   // Add states to match useEcommerceConfig properties
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [currentPlatform, setCurrentPlatform] = useState<ECommercePlatform | null>(DEFAULT_PLATFORM);
+  const [currentPlatform, setCurrentPlatform] = useState<ECommercePlatform | null>(null);
 
   // Track if we've already initialized
   const initialized = useRef(false);
@@ -160,14 +169,20 @@ export const useEcommerceSettings = () => {
         if (storedPlatform) {
           setCurrentPlatform(storedPlatform as ECommercePlatform);
           setIsInitialized(true);
+        } else {
+          setCurrentPlatform(null);
+          setIsInitialized(false);
         }
       } else {
         logger.info({ message: 'No e-commerce settings found, using defaults' });
+        setCurrentPlatform(null);
+        setIsInitialized(false);
       }
       initialized.current = true;
       setIsLoading(false);
     } catch (error) {
       logger.error({ message: 'Failed to load e-commerce settings' }, error instanceof Error ? error : new Error(String(error)));
+      setIsLoading(false);
     }
   }, [logger]);
 
@@ -311,6 +326,9 @@ export const useEcommerceSettings = () => {
       }),
       ...(updates.squarespace && {
         squarespace: { ...current.squarespace, ...updates.squarespace },
+      }),
+      ...(updates.commercefull && {
+        commercefull: { ...current.commercefull, ...updates.commercefull },
       }),
       ...(updates.offline && {
         offline: { ...current.offline, ...updates.offline },

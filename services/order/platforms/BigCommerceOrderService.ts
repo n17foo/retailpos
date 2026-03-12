@@ -2,7 +2,6 @@
 import { Order } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
-import { QueuedApiService } from '../../queue/QueuedApiService';
 import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
 /**
@@ -34,20 +33,15 @@ export class BigCommerceOrderService extends BaseOrderService {
         return false;
       }
 
-      // Test connection with a simple API call
-      try {
-        const apiUrl = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v2/store`;
-        const response = await fetch(apiUrl, {
-          headers: this.getAuthHeaders(),
-        });
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({ storeHash: this.config.storeHash as string });
+        await this.apiClient.initialize();
+      }
 
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to BigCommerce API' });
-          return false;
-        }
+      try {
+        await this.apiClient.get('store');
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to BigCommerce API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -81,26 +75,8 @@ export class BigCommerceOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v2/orders`;
-
       const bcOrder = this.mapToBigCommerceOrder(order);
-
-      // Use QueuedApiService for API call with X-Request-ID for idempotency
-      const requestId = `bigcommerce_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', bcOrder, {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-        'X-Request-ID': requestId,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to create order on BigCommerce: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Map created BigCommerce order to our format
+      const data = await this.apiClient.post<any>('orders', bcOrder);
       return this.mapToOrder(data);
     } catch (error) {
       this.logger.error({ message: 'Error creating order on BigCommerce' }, error instanceof Error ? error : new Error(String(error)));
@@ -117,38 +93,15 @@ export class BigCommerceOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v2/orders/${orderId}`;
-      const productsUrl = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v2/orders/${orderId}/products`;
-
-      // Get the order details
-      const orderResponse = await QueuedApiService.directRequest(apiUrl, 'GET', this.getAuthHeaders());
-
-      if (!orderResponse.ok) {
-        if (orderResponse.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to fetch order from BigCommerce: ${orderResponse.statusText}`);
+      let orderData: any;
+      try {
+        orderData = await this.apiClient.get<any>(`orders/${orderId}`);
+      } catch (e: any) {
+        if (e?.status === 404) return null;
+        throw e;
       }
-
-      const orderData = await orderResponse.json();
-
-      // Get the order products (line items)
-      const productsResponse = await QueuedApiService.directRequest(productsUrl, 'GET', this.getAuthHeaders());
-
-      if (!productsResponse.ok) {
-        throw new Error(`Failed to fetch order products from BigCommerce: ${productsResponse.statusText}`);
-      }
-
-      const productsData = await productsResponse.json();
-
-      // Combine the order data with products
-      const fullOrder = {
-        ...orderData,
-        products: productsData,
-      };
-
-      // Map BigCommerce order to our format
-      return this.mapToOrder(fullOrder);
+      const productsData = await this.apiClient.get<any>(`orders/${orderId}/products`);
+      return this.mapToOrder({ ...orderData, products: productsData });
     } catch (error) {
       this.logger.error(
         { message: `Error fetching order ${orderId} from BigCommerce` },
@@ -167,31 +120,15 @@ export class BigCommerceOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v2/orders/${orderId}`;
-
-      // Get the existing order to ensure it exists
       const existingOrder = await this.getOrder(orderId);
       if (!existingOrder) {
         throw new Error(`Order with ID ${orderId} not found`);
       }
-
-      // BigCommerce has limited order update capabilities
-      // We can only update certain fields
       const bcOrderUpdate = {
         status_id: this.mapStatusToBigCommerce(updates.paymentStatus, updates.fulfillmentStatus),
         customer_message: updates.note,
       };
-
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'PUT', bcOrderUpdate, {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update order on BigCommerce: ${response.statusText}`);
-      }
-
-      // Get the updated order to return
+      await this.apiClient.put(`orders/${orderId}`, bcOrderUpdate);
       return await this.getOrder(orderId);
     } catch (error) {
       this.logger.error(
@@ -203,13 +140,6 @@ export class BigCommerceOrderService extends BaseOrderService {
   }
 
   // Refund functionality moved to dedicated refund service
-
-  /**
-   * Create authorization headers for BigCommerce API
-   */
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
-  }
 
   /**
    * Map our order format to BigCommerce's format

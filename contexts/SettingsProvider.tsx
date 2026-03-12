@@ -2,7 +2,7 @@ import React, { createContext, useContext, ReactNode } from 'react';
 import { useSettings } from '../hooks/useSettings';
 
 interface SettingsContextType {
-  settings: string[];
+  settings: Record<string, unknown>;
   isLoading: boolean;
   error: Error | null;
   getSetting: <T>(key: string, defaultValue: T) => T;

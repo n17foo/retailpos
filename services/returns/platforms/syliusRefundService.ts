@@ -5,6 +5,11 @@ import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
 import { SyliusApiClient } from '../../clients/sylius/SyliusApiClient';
 
+interface SyliusRefundResponse {
+  id?: string | number;
+  '@id'?: string;
+}
+
 /**
  * Sylius-specific implementation of the refund service
  * Handles refunds for Sylius orders
@@ -71,43 +76,17 @@ export class SyliusRefundService implements PlatformRefundServiceInterface {
    */
   private async processSyliusRefund(orderId: string, refundData: RefundData): Promise<RefundResult> {
     try {
-      const credentials = await this.getSyliusCredentials();
-      if (!credentials) {
-        throw new Error('Failed to retrieve Sylius API credentials');
-      }
+      this.logger.info(`Processing Sylius refund for order ${orderId}`);
 
-      const headers = this.apiClient['buildHeaders']();
-
-      // Sylius Refund Plugin endpoint
-      const endpoint = `${credentials.apiUrl}/api/v2/shop/orders/${orderId}/refunds`;
-
-      const requestData = {
-        amount: Math.round((refundData.amount || 0) * 100), // Sylius uses cents
+      const data = await this.apiClient.post<SyliusRefundResponse>(`api/v2/shop/orders/${orderId}/refunds`, {
+        amount: Math.round((refundData.amount || 0) * 100),
         reason: refundData.reason || 'Refunded via RetailPOS',
         units:
           refundData.items?.map(item => ({
             orderItemUnitId: item.lineItemId,
             amount: Math.round((item.amount || 0) * 100),
           })) || [],
-      };
-
-      this.logger.info(`Processing Sylius refund for order ${orderId} at ${endpoint}`);
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          ...headers,
-          Accept: 'application/ld+json',
-        },
-        body: JSON.stringify(requestData),
       });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`Sylius refund API returned ${response.status}: ${errorBody}`);
-      }
-
-      const data = await response.json();
       const refundId = String(data.id || data['@id'] || `sylius-refund-${Date.now()}`);
 
       return {

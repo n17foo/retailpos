@@ -40,17 +40,9 @@ export class PrestaShopProductService extends BaseProductService {
 
       // Test connection
       try {
-        const apiUrl = `${this.config.storeUrl}/api/products?output_format=JSON&limit=1`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to PrestaShop API' }, new Error(`Status: ${response.status}`));
-          return false;
-        }
+        await this.apiClient.get('products', { output_format: 'JSON', limit: '1' });
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to PrestaShop API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -98,25 +90,17 @@ export class PrestaShopProductService extends BaseProductService {
           params.append('filter[id]', `[${options.ids.join('|')}]`);
         }
 
-        const apiUrl = `${this.config.storeUrl}/api/products?${params.toString()}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch products from PrestaShop: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.get<any>(`products?${params.toString()}`);
         const psProducts = data.products || [];
         const products = psProducts.map((p: any) => this.mapToProduct(p));
 
         // Get total count for pagination
-        const countUrl = `${this.config.storeUrl}/api/products?output_format=JSON`;
-        const countResponse = await fetch(countUrl, { headers });
         let totalItems = products.length;
-        if (countResponse.ok) {
-          const countData = await countResponse.json();
+        try {
+          const countData = await this.apiClient.get<any>('products', { output_format: 'JSON' });
           totalItems = countData.products?.length || products.length;
+        } catch {
+          /* use products.length */
         }
 
         return {
@@ -148,18 +132,7 @@ export class PrestaShopProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.PRESTASHOP, async () => {
       try {
-        const apiUrl = `${this.config.storeUrl}/api/products/${productId}?output_format=JSON&display=full`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            return null;
-          }
-          throw new Error(`Failed to fetch product from PrestaShop: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.get<any>(`products/${productId}?output_format=JSON&display=full`);
         return this.mapToProduct(data.product);
       } catch (error) {
         this.logger.error(
@@ -178,26 +151,8 @@ export class PrestaShopProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.PRESTASHOP, async () => {
       try {
-        const apiUrl = `${this.config.storeUrl}/api/products?output_format=JSON`;
         const psProduct = this.mapToPrestaShopProduct(product);
-        const headers = await this.getAuthHeaders();
-
-        // PrestaShop uses XML by default, but we can use JSON
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ product: psProduct }),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to create product on PrestaShop: ${response.statusText} - ${errorText}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.post<any>('products?output_format=JSON', { product: psProduct });
         return this.mapToProduct(data.product);
       } catch (error) {
         this.logger.error({ message: 'Error creating product on PrestaShop' }, error instanceof Error ? error : new Error(String(error)));
@@ -220,24 +175,7 @@ export class PrestaShopProductService extends BaseProductService {
 
         const updatedProduct = { ...existingProduct, ...productData };
         const psProduct = this.mapToPrestaShopProduct(updatedProduct);
-
-        const apiUrl = `${this.config.storeUrl}/api/products/${productId}?output_format=JSON`;
-        const headers = await this.getAuthHeaders();
-
-        const response = await fetch(apiUrl, {
-          method: 'PUT',
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ product: psProduct }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to update product on PrestaShop: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.put<any>(`products/${productId}?output_format=JSON`, { product: psProduct });
         return this.mapToProduct(data.product);
       } catch (error) {
         this.logger.error(
@@ -256,15 +194,8 @@ export class PrestaShopProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.PRESTASHOP, async () => {
       try {
-        const apiUrl = `${this.config.storeUrl}/api/products/${productId}`;
-        const headers = await this.getAuthHeaders();
-
-        const response = await fetch(apiUrl, {
-          method: 'DELETE',
-          headers,
-        });
-
-        return response.ok;
+        await this.apiClient.delete(`products/${productId}`);
+        return true;
       } catch (error) {
         this.logger.error(
           { message: `Error deleting product ${productId} from PrestaShop` },
@@ -307,10 +238,6 @@ export class PrestaShopProductService extends BaseProductService {
     }
 
     return result;
-  }
-
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
   }
 
   protected mapToProduct(psProduct: any): Product {

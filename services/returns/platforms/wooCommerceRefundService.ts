@@ -3,7 +3,6 @@ import { RefundData, RefundResult, RefundRecord } from '../ReturnService';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { SecretsServiceFactory } from '../../secrets/SecretsService';
 import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
-import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 /**
@@ -75,14 +74,9 @@ export class WooCommerceRefundService implements PlatformRefundServiceInterface 
    */
   private async processWooCommerceRefund(orderId: string, refundData: RefundData): Promise<RefundResult> {
     try {
-      const credentials = await this.getWooCommerceCredentials();
-      if (!credentials) {
-        throw new Error('Failed to retrieve WooCommerce API credentials');
-      }
+      this.logger.info(`Processing WooCommerce refund for order ${orderId}`);
 
-      const endpoint = `${credentials.apiUrl}/wp-json/${WOOCOMMERCE_API_VERSION}/orders/${orderId}/refunds`;
-
-      const requestData = {
+      const data = await this.apiClient.post<{ id?: number | string }>(`orders/${orderId}/refunds`, {
         api_refund: true,
         amount: String(refundData.amount || 0),
         reason: refundData.reason || 'Refunded via RetailPOS',
@@ -92,24 +86,7 @@ export class WooCommerceRefundService implements PlatformRefundServiceInterface 
             quantity: item.quantity,
             refund_total: String(item.amount || 0),
           })) || [],
-      };
-
-      this.logger.info(`Processing WooCommerce refund for order ${orderId} at ${endpoint}`);
-
-      const headers = this.apiClient['buildHeaders']();
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestData),
       });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`WooCommerce refund API returned ${response.status}: ${errorBody}`);
-      }
-
-      const data = await response.json();
       const refundId = String(data.id || `wc-refund-${Date.now()}`);
 
       return {

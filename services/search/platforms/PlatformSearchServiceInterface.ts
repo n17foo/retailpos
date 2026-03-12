@@ -42,6 +42,15 @@ export interface PlatformSearchServiceInterface {
   getCategories(): Promise<string[]>;
 
   /**
+   * Search for a product by exact barcode value.
+   * Platforms that expose a dedicated barcode endpoint should override this.
+   * Falls back to searchPlatformProducts with searchField='barcode' otherwise.
+   * @param barcode The barcode string (EAN13, UPC-A, Code128, etc.)
+   * @returns Promise resolving to matched products (usually 0 or 1)
+   */
+  searchByBarcode?(barcode: string): Promise<SearchProduct[]>;
+
+  /**
    * Get configuration requirements for this platform
    * @returns Object describing required and optional configuration fields
    */

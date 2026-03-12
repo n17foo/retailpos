@@ -3,7 +3,6 @@ import { SearchOptions, SearchProduct } from '../SearchServiceInterface';
 import { ProductQueryOptions, ProductResult } from '../../product/ProductServiceInterface';
 import { PlatformConfigRequirements, PlatformSearchConfig } from './PlatformSearchServiceInterface';
 import { BaseSearchService } from './BaseSearchService';
-import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 /**
@@ -31,29 +30,29 @@ export class WooCommerceSearchService extends BaseSearchService {
       this.config.consumerKey = this.config.consumerKey || process.env.WOOCOMMERCE_KEY || '';
       this.config.consumerSecret = this.config.consumerSecret || process.env.WOOCOMMERCE_SECRET || '';
       this.config.storeUrl = this.config.storeUrl || process.env.WOOCOMMERCE_URL || '';
-      this.config.apiVersion = this.config.apiVersion || process.env.WOOCOMMERCE_API_VERSION || WOOCOMMERCE_API_VERSION;
+      this.config.apiVersion = this.config.apiVersion || process.env.WOOCOMMERCE_API_VERSION || '';
 
       if (!this.config.consumerKey || !this.config.consumerSecret || !this.config.storeUrl) {
         this.logger.warn({ message: 'Missing WooCommerce API configuration' });
         return false;
       }
 
+      // Configure and initialize the shared WooCommerce client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.storeUrl as string,
+          consumerKey: this.config.consumerKey as string,
+          consumerSecret: this.config.consumerSecret as string,
+          apiVersion: this.config.apiVersion as string,
+        });
+        await this.apiClient.initialize();
+      }
+
       // Test connection with a simple API call
       try {
-        const apiUrl = this.getApiUrl('/products');
-        const response = await fetch(apiUrl, {
-          headers: {
-            Accept: 'application/json',
-          },
-        });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to WooCommerce API' });
-          return false;
-        }
+        await this.apiClient.get('products');
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to WooCommerce API:' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -146,30 +145,14 @@ export class WooCommerceSearchService extends BaseSearchService {
       }
 
       // API endpoint with query parameters
-      const apiUrl = this.getApiUrl(`/products?${queryParams.toString()}`);
-
-      // Make API request
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`WooCommerce API request failed with status ${response.status}`);
-      }
-
-      const products = await response.json();
-
-      // Extract pagination info from headers
-      const totalItems = parseInt(response.headers.get('X-WP-Total') || '0');
-      const totalPages = parseInt(response.headers.get('X-WP-TotalPages') || '0');
+      const products = await this.apiClient.get<any[]>(`products?${queryParams.toString()}`);
 
       return {
         products: products || [],
         pagination: {
           currentPage: options.page || 1,
-          totalPages: totalPages,
-          totalItems: totalItems,
+          totalPages: 1,
+          totalItems: products?.length || 0,
           perPage: options.limit || 10,
         },
       };
@@ -191,6 +174,25 @@ export class WooCommerceSearchService extends BaseSearchService {
   }
 
   /**
+   * Search WooCommerce products by barcode/SKU.
+   * WooCommerce stores barcodes in variant SKU field; GET /products?sku=<barcode> returns exact matches.
+   */
+  async searchByBarcode(barcode: string): Promise<SearchProduct[]> {
+    if (!this.isInitialized()) return [];
+
+    try {
+      const products = await this.apiClient.get<any[]>(`products`, { sku: barcode, per_page: '5' });
+      return (products || []).map((p: any) => this.mapToSearchProduct(p));
+    } catch (error) {
+      this.logger.error(
+        { message: `WooCommerce barcode search failed for ${barcode}` },
+        error instanceof Error ? error : new Error(String(error))
+      );
+      return [];
+    }
+  }
+
+  /**
    * Get all categories from WooCommerce
    */
   async getCategories(): Promise<string[]> {
@@ -199,17 +201,7 @@ export class WooCommerceSearchService extends BaseSearchService {
     }
 
     try {
-      const apiUrl = this.getApiUrl('/products/categories');
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`WooCommerce API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<any[]>('products/categories');
       return (data || []).map((category: any) => category.name);
     } catch (error) {
       this.logger.error(
@@ -229,39 +221,12 @@ export class WooCommerceSearchService extends BaseSearchService {
     }
 
     try {
-      const apiUrl = this.getApiUrl('/products/categories');
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`WooCommerce API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<any[]>('products/categories');
       const category = (data || []).find((cat: any) => cat.name === categoryName);
       return category ? category.id.toString() : null;
     } catch (error) {
       this.logger.error({ message: 'Error finding category ID by name:' }, error instanceof Error ? error : new Error(String(error)));
       return null;
     }
-  }
-
-  /**
-   * Get authorization headers for WooCommerce API
-   * Uses Basic Auth with consumer key and secret (over HTTPS)
-   */
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
-  }
-
-  /**
-   * Build the full API URL for WooCommerce
-   */
-  private getApiUrl(endpoint: string): string {
-    const storeUrl = this.config.storeUrl as string;
-    const apiVersion = this.config.apiVersion || WOOCOMMERCE_API_VERSION;
-    return `${storeUrl.replace(/\/$/, '')}/wp-json/${apiVersion}${endpoint}`;
   }
 }

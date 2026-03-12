@@ -3,8 +3,32 @@ import { PlatformInventoryConfig, PlatformConfigRequirements } from './PlatformI
 import { BaseInventoryService } from './BaseInventoryService';
 import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
 
-// Squarespace API version
-const SQUARESPACE_API_VERSION = '1.0';
+interface SquarespaceInventoryQuantity {
+  value?: number;
+}
+
+interface SquarespaceInventoryItem {
+  productId: string;
+  variantId?: string;
+  sku?: string;
+  quantity?: number | SquarespaceInventoryQuantity;
+}
+
+interface SquarespaceInventoryListResponse {
+  inventory?: SquarespaceInventoryItem[];
+}
+
+interface SquarespaceInventoryDetailResponse {
+  quantity?: number | SquarespaceInventoryQuantity;
+}
+
+const getSquarespaceQuantityValue = (quantity?: number | SquarespaceInventoryQuantity): number => {
+  if (typeof quantity === 'number') {
+    return quantity;
+  }
+
+  return quantity?.value ?? 0;
+};
 
 /**
  * Squarespace Commerce inventory service implementation
@@ -26,7 +50,7 @@ export class SquarespaceInventoryService extends BaseInventoryService {
     try {
       this.config.apiKey = this.config.apiKey || process.env.SQUARESPACE_API_KEY || '';
       this.config.siteId = this.config.siteId || process.env.SQUARESPACE_SITE_ID || '';
-      this.config.apiVersion = this.config.apiVersion || process.env.SQUARESPACE_API_VERSION || SQUARESPACE_API_VERSION;
+      this.config.apiVersion = this.config.apiVersion || process.env.SQUARESPACE_API_VERSION || '';
 
       if (!this.config.apiKey) {
         this.logger.warn({ message: 'Missing Squarespace API configuration' });
@@ -53,25 +77,18 @@ export class SquarespaceInventoryService extends BaseInventoryService {
 
     try {
       // Squarespace inventory is retrieved through the products API
-      const apiUrl = `https://api.squarespace.com/${this.config.apiVersion}/commerce/inventory`;
-      const response = await fetch(apiUrl, {
-        headers: this.getAuthHeaders(),
-      });
+      const data = await this.apiClient.get<SquarespaceInventoryListResponse>('inventory');
+      const inventoryItems = data.inventory || [];
 
-      if (response.ok) {
-        const data = await response.json();
-        const inventoryItems = data.inventory || [];
-
-        // Filter by requested product IDs
-        for (const invItem of inventoryItems) {
-          if (productIds.includes(invItem.productId)) {
-            items.push({
-              productId: invItem.productId,
-              variantId: invItem.variantId,
-              sku: invItem.sku,
-              quantity: invItem.quantity?.value ?? invItem.quantity ?? 0,
-            });
-          }
+      // Filter by requested product IDs
+      for (const invItem of inventoryItems) {
+        if (productIds.includes(invItem.productId)) {
+          items.push({
+            productId: invItem.productId,
+            variantId: invItem.variantId,
+            sku: invItem.sku,
+            quantity: getSquarespaceQuantityValue(invItem.quantity),
+          });
         }
       }
 
@@ -110,39 +127,19 @@ export class SquarespaceInventoryService extends BaseInventoryService {
     for (const update of updates) {
       try {
         const variantId = update.variantId || update.productId;
-        const apiUrl = `https://api.squarespace.com/${this.config.apiVersion}/commerce/inventory/${variantId}`;
 
-        // Calculate new quantity
         let newQuantity = update.quantity;
         if (update.adjustment === true) {
-          // Get current quantity first
-          const currentResponse = await fetch(apiUrl, {
-            headers: this.getAuthHeaders(),
-          });
-          if (currentResponse.ok) {
-            const current = await currentResponse.json();
-            newQuantity = (current.quantity?.value || current.quantity || 0) + update.quantity;
+          try {
+            const current = await this.apiClient.get<SquarespaceInventoryDetailResponse>(`inventory/${variantId}`);
+            newQuantity = getSquarespaceQuantityValue(current.quantity) + update.quantity;
+          } catch {
+            /* keep update.quantity */
           }
         }
 
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: this.getAuthHeaders(),
-          body: JSON.stringify({
-            quantity: newQuantity,
-            isUnlimited: false,
-          }),
-        });
-
-        if (response.ok) {
-          result.successful++;
-        } else {
-          result.failed++;
-          result.errors.push({
-            productId: update.productId,
-            error: `Failed to update inventory: ${response.statusText}`,
-          });
-        }
+        await this.apiClient.post(`inventory/${variantId}`, { quantity: newQuantity, isUnlimited: false });
+        result.successful++;
       } catch (error) {
         result.failed++;
         result.errors.push({
@@ -153,9 +150,5 @@ export class SquarespaceInventoryService extends BaseInventoryService {
     }
 
     return result;
-  }
-
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 }

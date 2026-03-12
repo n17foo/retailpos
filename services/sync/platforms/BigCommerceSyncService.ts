@@ -43,18 +43,7 @@ export class BigCommerceSyncService extends BasePlatformSyncService {
     }
 
     try {
-      // Test connection by making a simple API call
-      const url = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v3/catalog/summary`;
-
-      const response = await fetch(url, {
-        headers: this.apiClient['buildHeaders'](),
-      });
-
-      if (!response.ok) {
-        this.logger.error({ message: `BigCommerce connection test failed: ${response.statusText}` });
-        return false;
-      }
-
+      await this.apiClient.get('catalog/summary');
       return true;
     } catch (error) {
       this.logger.error({ message: 'Error testing BigCommerce connection' }, error instanceof Error ? error : new Error(String(error)));
@@ -95,29 +84,14 @@ export class BigCommerceSyncService extends BasePlatformSyncService {
       const results = await Promise.all(
         webhookScopes.map(async ({ scope, name }) => {
           try {
-            const url = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v3/hooks`;
-
-            const response = await fetch(url, {
-              method: 'POST',
-              headers: this.apiClient['buildHeaders'](),
-              body: JSON.stringify({
-                name,
-                scope,
-                destination: webhookUrl,
-                is_active: true,
-                headers: {
-                  'X-Webhook-Source': 'RetailPOS-BigCommerce',
-                },
-              }),
+            const data = await this.apiClient.post<{ data?: { id?: string } }>('hooks', {
+              name,
+              scope,
+              destination: webhookUrl,
+              is_active: true,
+              headers: { 'X-Webhook-Source': 'RetailPOS-BigCommerce' },
             });
-
-            if (!response.ok) {
-              this.logger.error({ message: `Failed to register BigCommerce webhook for ${scope}: ${response.statusText}` });
-              return null;
-            }
-
-            const data = await response.json();
-            return data.data?.id;
+            return data.data?.id ?? null;
           } catch (error) {
             this.logger.error(
               { message: `Error registering BigCommerce webhook for ${scope}` },
@@ -151,14 +125,8 @@ export class BigCommerceSyncService extends BasePlatformSyncService {
       const results = await Promise.all(
         this.webhookIds.map(async webhookId => {
           try {
-            const url = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v3/hooks/${webhookId}`;
-
-            const response = await fetch(url, {
-              method: 'DELETE',
-              headers: this.apiClient['buildHeaders'](),
-            });
-
-            return response.ok;
+            await this.apiClient.delete(`hooks/${webhookId}`);
+            return true;
           } catch (error) {
             this.logger.error(
               { message: `Error unregistering BigCommerce webhook ${webhookId}` },

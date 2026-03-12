@@ -5,6 +5,14 @@ import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
 
+interface SquarespaceGiftCard {
+  balance?: {
+    value?: string;
+    currency?: string;
+  };
+  status?: string;
+}
+
 export class SquarespaceGiftCardService extends BaseGiftCardService {
   private apiClient = SquarespaceApiClient.getInstance();
   constructor() {
@@ -29,18 +37,16 @@ export class SquarespaceGiftCardService extends BaseGiftCardService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async checkBalance(code: string): Promise<GiftCardInfo> {
     if (!this.initialized) return { code, balance: 0, currency: 'USD', status: 'not_found' };
     try {
       return await withTokenRefresh(ECommercePlatform.SQUARESPACE, async () => {
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(`https://api.squarespace.com/1.0/commerce/gift-cards/${encodeURIComponent(code)}`, { headers });
-        if (!response.ok) return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
-        const card = await response.json();
+        let card: SquarespaceGiftCard;
+        try {
+          card = await this.apiClient.get<SquarespaceGiftCard>(`commerce/gift-cards/${encodeURIComponent(code)}`);
+        } catch {
+          return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
+        }
         return {
           code,
           balance: card.balance?.value ? parseFloat(card.balance.value) : 0,

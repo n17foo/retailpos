@@ -1,4 +1,5 @@
 import { ReceiptData, PrinterStatus } from './PrinterTypes';
+import { receiptConfigService } from './ReceiptConfigService';
 
 /**
  * ESC/POS Command constants for Epson printers
@@ -122,6 +123,9 @@ export abstract class AbstractPrinterService implements BasePrinterService {
    */
   formatReceiptBuffer(data: ReceiptData): Uint8Array {
     const cs = data.currencySymbol || '£';
+    const config = receiptConfigService.getConfig();
+    const divider = receiptConfigService.getDividerLine();
+    const doubleDivider = receiptConfigService.getDoubleDividerLine();
     let commands: number[] = [];
 
     // Initialize printer
@@ -130,24 +134,34 @@ export abstract class AbstractPrinterService implements BasePrinterService {
     // Center align for header
     commands.push(...ESC_POS_COMMANDS.ALIGN_CENTER);
 
-    // Store name header - bold and double height
+    // Store name — from ReceiptConfigService
     commands.push(...ESC_POS_COMMANDS.BOLD_ON);
     commands.push(...ESC_POS_COMMANDS.DOUBLE_HEIGHT);
-    commands.push(...stringToBytes('RetailPOS'));
+    commands.push(...stringToBytes(config.header.businessName));
     commands.push(...ESC_POS_COMMANDS.NEWLINE);
     commands.push(...ESC_POS_COMMANDS.BOLD_OFF);
     commands.push(...ESC_POS_COMMANDS.NORMAL_SIZE);
 
-    // Store address
-    commands.push(...stringToBytes('123 Main Street'));
+    if (config.header.addressLine1) {
+      commands.push(...stringToBytes(config.header.addressLine1));
+      commands.push(...ESC_POS_COMMANDS.NEWLINE);
+    }
+    if (config.header.addressLine2) {
+      commands.push(...stringToBytes(config.header.addressLine2));
+      commands.push(...ESC_POS_COMMANDS.NEWLINE);
+    }
+    if (config.header.phone) {
+      commands.push(...stringToBytes(`Tel: ${config.header.phone}`));
+      commands.push(...ESC_POS_COMMANDS.NEWLINE);
+    }
+    if (config.header.taxId) {
+      commands.push(...stringToBytes(`Tax ID: ${config.header.taxId}`));
+      commands.push(...ESC_POS_COMMANDS.NEWLINE);
+    }
     commands.push(...ESC_POS_COMMANDS.NEWLINE);
-    commands.push(...stringToBytes('Anytown, CA 94538'));
-    commands.push(...ESC_POS_COMMANDS.NEWLINE);
-    commands.push(...stringToBytes('Tel: (555) 123-4567'));
-    commands.push(...ESC_POS_COMMANDS.NEWLINE, ...ESC_POS_COMMANDS.NEWLINE);
 
     // Divider line
-    commands.push(...stringToBytes('--------------------------------'));
+    commands.push(...stringToBytes(divider));
     commands.push(...ESC_POS_COMMANDS.NEWLINE);
 
     // Return to left alignment for details
@@ -167,33 +181,28 @@ export abstract class AbstractPrinterService implements BasePrinterService {
     }
 
     // Divider line
-    commands.push(...stringToBytes('--------------------------------'));
-    commands.push(...ESC_POS_COMMANDS.NEWLINE);
-
-    // Order items header
-    commands.push(...stringToBytes('Item                 Qty    Price   Total'));
-    commands.push(...ESC_POS_COMMANDS.NEWLINE);
-    commands.push(...stringToBytes('--------------------------------'));
+    commands.push(...stringToBytes(divider));
     commands.push(...ESC_POS_COMMANDS.NEWLINE);
 
     // Order items
     for (const item of data.items) {
       const itemTotal = item.quantity * item.price;
-
-      // Format item name to fit within 20 chars
-      let itemName = item.name.substring(0, 17);
-      if (item.name.length > 17) {
-        itemName += '...';
+      if (item.quantity > 1) {
+        commands.push(...stringToBytes(item.name));
+        commands.push(...ESC_POS_COMMANDS.NEWLINE);
+        commands.push(
+          ...stringToBytes(
+            receiptConfigService.formatLine(`  ${item.quantity} x ${cs}${item.price.toFixed(2)}`, `${cs}${itemTotal.toFixed(2)}`)
+          )
+        );
+      } else {
+        commands.push(...stringToBytes(receiptConfigService.formatLine(item.name, `${cs}${itemTotal.toFixed(2)}`)));
       }
-
-      // Pad name, quantity, price, and total
-      const line = `${itemName.padEnd(20)}${item.quantity.toString().padStart(3)} ${cs}${item.price.toFixed(2).padStart(7)} ${cs}${itemTotal.toFixed(2).padStart(7)}`;
-      commands.push(...stringToBytes(line));
       commands.push(...ESC_POS_COMMANDS.NEWLINE);
     }
 
     // Divider line
-    commands.push(...stringToBytes('--------------------------------'));
+    commands.push(...stringToBytes(divider));
     commands.push(...ESC_POS_COMMANDS.NEWLINE);
 
     // Align right for totals
@@ -205,29 +214,40 @@ export abstract class AbstractPrinterService implements BasePrinterService {
     commands.push(...stringToBytes(`Tax: ${cs}${data.tax.toFixed(2)}`));
     commands.push(...ESC_POS_COMMANDS.NEWLINE);
 
-    // Total - bold
+    // Total — bold
     commands.push(...ESC_POS_COMMANDS.BOLD_ON);
+    commands.push(...stringToBytes(doubleDivider));
+    commands.push(...ESC_POS_COMMANDS.NEWLINE);
     commands.push(...stringToBytes(`Total: ${cs}${data.total.toFixed(2)}`));
     commands.push(...ESC_POS_COMMANDS.NEWLINE);
     commands.push(...ESC_POS_COMMANDS.BOLD_OFF);
-
-    // Divider line - center aligned
-    commands.push(...ESC_POS_COMMANDS.ALIGN_CENTER);
-    commands.push(...stringToBytes('================================'));
+    commands.push(...stringToBytes(doubleDivider));
     commands.push(...ESC_POS_COMMANDS.NEWLINE);
 
-    // Payment method
+    // Payment method — center aligned
+    commands.push(...ESC_POS_COMMANDS.ALIGN_CENTER);
     commands.push(...stringToBytes(`Payment Method: ${data.paymentMethod}`));
     commands.push(...ESC_POS_COMMANDS.NEWLINE, ...ESC_POS_COMMANDS.NEWLINE);
 
-    // Footer
-    commands.push(...stringToBytes('Thank you for your purchase!'));
-    commands.push(...ESC_POS_COMMANDS.NEWLINE);
-    commands.push(...stringToBytes('Please come again'));
+    // Footer — from ReceiptConfigService
+    if (config.footer.line1) {
+      commands.push(...stringToBytes(config.footer.line1));
+      commands.push(...ESC_POS_COMMANDS.NEWLINE);
+    }
+    if (config.footer.line2) {
+      commands.push(...stringToBytes(config.footer.line2));
+      commands.push(...ESC_POS_COMMANDS.NEWLINE);
+    }
+    if (config.footer.line3) {
+      commands.push(...stringToBytes(config.footer.line3));
+      commands.push(...ESC_POS_COMMANDS.NEWLINE);
+    }
     commands.push(...ESC_POS_COMMANDS.NEWLINE, ...ESC_POS_COMMANDS.NEWLINE);
 
-    // Cut receipt
-    commands.push(...ESC_POS_COMMANDS.CUT);
+    // Cut receipt (if supported by model)
+    if (config.options.cutPaper && config.printerModel.supportsCut) {
+      commands.push(...ESC_POS_COMMANDS.CUT);
+    }
 
     return new Uint8Array(commands);
   }

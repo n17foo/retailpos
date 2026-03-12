@@ -78,9 +78,8 @@ export class CommerceFullSyncService extends BasePlatformSyncService {
 
   async testConnection(): Promise<boolean> {
     try {
-      const baseUrl = this.apiClient.getBaseUrl();
-      const response = await fetch(`${baseUrl}/health`);
-      return response.ok;
+      await this.apiClient.get('/health');
+      return true;
     } catch (error) {
       this.logger.error({ message: 'CommerceFull connection test failed' }, error instanceof Error ? error : new Error(String(error)));
       return false;

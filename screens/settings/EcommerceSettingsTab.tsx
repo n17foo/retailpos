@@ -17,6 +17,7 @@ const PLATFORM_NAMES: Record<string, string> = {
   wix: 'Wix',
   prestashop: 'PrestaShop',
   squarespace: 'Squarespace',
+  commercefull: 'CommerceFull',
   offline: 'Offline',
 };
 
@@ -45,15 +46,89 @@ const EcommerceSettingsTab: React.FC = () => {
   // Handle API key change
   const handleApiKeyChange = useCallback(
     (apiKey: string) => {
-      updateSettings({ apiKey });
+      if (ecommerceSettings.platform === 'shopify') {
+        updateSettings({
+          apiKey,
+          shopify: {
+            ...ecommerceSettings.shopify,
+            apiKey,
+            accessToken: apiKey,
+          },
+        });
+      } else if (ecommerceSettings.platform === 'woocommerce') {
+        updateSettings({
+          apiKey,
+          woocommerce: {
+            ...ecommerceSettings.woocommerce,
+            apiKey,
+          },
+        });
+      } else if (ecommerceSettings.platform === 'bigcommerce') {
+        updateSettings({
+          apiKey,
+          bigcommerce: {
+            ...ecommerceSettings.bigcommerce,
+            accessToken: apiKey,
+          },
+        });
+      } else if (ecommerceSettings.platform === 'magento') {
+        updateSettings({
+          apiKey,
+          magento: {
+            ...ecommerceSettings.magento,
+            accessToken: apiKey,
+          },
+        });
+      } else if (ecommerceSettings.platform === 'sylius') {
+        updateSettings({
+          apiKey,
+          sylius: {
+            ...ecommerceSettings.sylius,
+            apiToken: apiKey,
+          },
+        });
+      } else if (ecommerceSettings.platform === 'wix') {
+        updateSettings({
+          apiKey,
+          wix: {
+            ...ecommerceSettings.wix,
+            apiKey,
+          },
+        });
+      } else if (ecommerceSettings.platform === 'prestashop') {
+        updateSettings({
+          apiKey,
+          prestashop: {
+            ...ecommerceSettings.prestashop,
+            apiKey,
+          },
+        });
+      } else if (ecommerceSettings.platform === 'squarespace') {
+        updateSettings({
+          apiKey,
+          squarespace: {
+            ...ecommerceSettings.squarespace,
+            apiKey,
+          },
+        });
+      } else if (ecommerceSettings.platform === 'commercefull') {
+        updateSettings({
+          apiKey,
+          commercefull: {
+            ...ecommerceSettings.commercefull,
+            apiKey,
+          },
+        });
+      } else {
+        updateSettings({ apiKey });
+      }
     },
-    [updateSettings]
+    [updateSettings, ecommerceSettings]
   );
 
   // Handle store URL change
   const handleStoreUrlChange = useCallback(
     (storeUrl: string) => {
-      // Update the store URL in the appropriate platform settings
       if (ecommerceSettings.platform === 'shopify') {
         updateSettings({
           shopify: {
@@ -68,12 +143,48 @@ const EcommerceSettingsTab: React.FC = () => {
             storeUrl: storeUrl,
           },
         });
+      } else if (ecommerceSettings.platform === 'magento') {
+        updateSettings({
+          magento: {
+            ...ecommerceSettings.magento,
+            storeUrl,
+          },
+        });
+      } else if (ecommerceSettings.platform === 'sylius') {
+        updateSettings({
+          sylius: {
+            ...ecommerceSettings.sylius,
+            storeUrl,
+          },
+        });
+      } else if (ecommerceSettings.platform === 'prestashop') {
+        updateSettings({
+          prestashop: {
+            ...ecommerceSettings.prestashop,
+            storeUrl,
+          },
+        });
+      } else if (ecommerceSettings.platform === 'commercefull') {
+        updateSettings({
+          commercefull: {
+            ...ecommerceSettings.commercefull,
+            storeUrl,
+          },
+        });
       } else {
-        // For other platforms, update the main apiUrl
         updateSettings({ apiUrl: storeUrl });
       }
     },
-    [updateSettings, ecommerceSettings.platform, ecommerceSettings.shopify, ecommerceSettings.woocommerce]
+    [
+      updateSettings,
+      ecommerceSettings.platform,
+      ecommerceSettings.shopify,
+      ecommerceSettings.woocommerce,
+      ecommerceSettings.magento,
+      ecommerceSettings.sylius,
+      ecommerceSettings.prestashop,
+      ecommerceSettings.commercefull,
+    ]
   );
 
   // Handle enabled toggle
@@ -101,8 +212,12 @@ const EcommerceSettingsTab: React.FC = () => {
   // Connection test handler
   const handleConnectionTest = useCallback(async () => {
     logger.info('Testing ecommerce connection');
+    if (ecommerceSettings.platform === 'offline') {
+      Alert.alert(t('common.info'), t('settings.ecommerce.localOnlyDescription'));
+      return;
+    }
     await testEcommerceConnection();
-  }, [testEcommerceConnection, logger]);
+  }, [testEcommerceConnection, logger, ecommerceSettings.platform, t]);
 
   return (
     <View style={styles.settingsSection}>
@@ -143,58 +258,93 @@ const EcommerceSettingsTab: React.FC = () => {
             </View>
           </View>
 
-          {/* Store URL */}
-          <View style={styles.optionRow}>
-            <Text style={styles.label}>
-              {ecommerceSettings.platform === 'shopify'
-                ? t('settings.ecommerce.shopifyStoreUrl')
-                : ecommerceSettings.platform === 'woocommerce'
-                  ? t('settings.ecommerce.woocommerceStoreUrl')
-                  : t('settings.ecommerce.storeUrl')}
-            </Text>
-            <TextInput
-              style={styles.input}
-              value={
-                ecommerceSettings.platform === 'shopify'
-                  ? ecommerceSettings.shopify?.storeUrl
-                  : ecommerceSettings.platform === 'woocommerce'
-                    ? ecommerceSettings.woocommerce?.storeUrl
-                    : ecommerceSettings.apiUrl || ''
-              }
-              onChangeText={handleStoreUrlChange}
-              placeholder={
-                ecommerceSettings.platform === 'shopify'
-                  ? t('settings.ecommerce.shopifyUrlPlaceholder')
-                  : ecommerceSettings.platform === 'woocommerce'
-                    ? t('settings.ecommerce.woocommerceUrlPlaceholder')
-                    : t('settings.ecommerce.defaultUrlPlaceholder')
-              }
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={ecommerceSettings.enabled}
-            />
-          </View>
+          {ecommerceSettings.platform !== 'offline' &&
+            ecommerceSettings.platform !== 'wix' &&
+            ecommerceSettings.platform !== 'squarespace' && (
+              <>
+                {/* Store URL */}
+                <View style={styles.optionRow}>
+                  <Text style={styles.label}>
+                    {ecommerceSettings.platform === 'shopify'
+                      ? t('settings.ecommerce.shopifyStoreUrl')
+                      : ecommerceSettings.platform === 'woocommerce'
+                        ? t('settings.ecommerce.woocommerceStoreUrl')
+                        : t('settings.ecommerce.storeUrl')}
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    value={
+                      ecommerceSettings.platform === 'shopify'
+                        ? ecommerceSettings.shopify?.storeUrl
+                        : ecommerceSettings.platform === 'woocommerce'
+                          ? ecommerceSettings.woocommerce?.storeUrl
+                          : ecommerceSettings.platform === 'magento'
+                            ? ecommerceSettings.magento?.storeUrl
+                            : ecommerceSettings.platform === 'sylius'
+                              ? ecommerceSettings.sylius?.storeUrl
+                              : ecommerceSettings.platform === 'prestashop'
+                                ? ecommerceSettings.prestashop?.storeUrl
+                                : ecommerceSettings.platform === 'commercefull'
+                                  ? ecommerceSettings.commercefull?.storeUrl
+                                  : ecommerceSettings.apiUrl || ''
+                    }
+                    onChangeText={handleStoreUrlChange}
+                    placeholder={
+                      ecommerceSettings.platform === 'shopify'
+                        ? t('settings.ecommerce.shopifyUrlPlaceholder')
+                        : ecommerceSettings.platform === 'woocommerce'
+                          ? t('settings.ecommerce.woocommerceUrlPlaceholder')
+                          : t('settings.ecommerce.defaultUrlPlaceholder')
+                    }
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={ecommerceSettings.enabled}
+                    keyboardType="url"
+                  />
+                </View>
 
-          {/* API Key */}
-          <View style={styles.optionRow}>
-            <Text style={styles.label}>
-              {ecommerceSettings.platform === 'shopify' ? t('settings.ecommerce.adminApiToken') : t('settings.payment.apiKey')}
-            </Text>
-            <TextInput
-              style={styles.input}
-              value={ecommerceSettings.apiKey}
-              onChangeText={handleApiKeyChange}
-              placeholder={
-                ecommerceSettings.platform === 'shopify'
-                  ? t('settings.ecommerce.shopifyApiPlaceholder')
-                  : t('settings.ecommerce.apiKeyPlaceholder')
-              }
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={ecommerceSettings.enabled}
-            />
-          </View>
+                {/* API Key */}
+                <View style={styles.optionRow}>
+                  <Text style={styles.label}>
+                    {ecommerceSettings.platform === 'shopify' ? t('settings.ecommerce.adminApiToken') : t('settings.payment.apiKey')}
+                  </Text>
+                  <TextInput
+                    style={styles.input}
+                    value={
+                      ecommerceSettings.platform === 'shopify'
+                        ? ecommerceSettings.shopify?.accessToken || ecommerceSettings.shopify?.apiKey || ecommerceSettings.apiKey
+                        : ecommerceSettings.platform === 'woocommerce'
+                          ? ecommerceSettings.woocommerce?.apiKey || ecommerceSettings.apiKey
+                          : ecommerceSettings.platform === 'bigcommerce'
+                            ? ecommerceSettings.bigcommerce?.accessToken || ecommerceSettings.apiKey
+                            : ecommerceSettings.platform === 'magento'
+                              ? ecommerceSettings.magento?.accessToken || ecommerceSettings.apiKey
+                              : ecommerceSettings.platform === 'sylius'
+                                ? ecommerceSettings.sylius?.apiToken || ecommerceSettings.apiKey
+                                : ecommerceSettings.platform === 'wix'
+                                  ? ecommerceSettings.wix?.apiKey || ecommerceSettings.apiKey
+                                  : ecommerceSettings.platform === 'prestashop'
+                                    ? ecommerceSettings.prestashop?.apiKey || ecommerceSettings.apiKey
+                                    : ecommerceSettings.platform === 'squarespace'
+                                      ? ecommerceSettings.squarespace?.apiKey || ecommerceSettings.apiKey
+                                      : ecommerceSettings.platform === 'commercefull'
+                                        ? ecommerceSettings.commercefull?.apiKey || ecommerceSettings.apiKey
+                                        : ecommerceSettings.apiKey
+                    }
+                    onChangeText={handleApiKeyChange}
+                    placeholder={
+                      ecommerceSettings.platform === 'shopify'
+                        ? t('settings.ecommerce.shopifyApiPlaceholder')
+                        : t('settings.ecommerce.apiKeyPlaceholder')
+                    }
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={ecommerceSettings.enabled}
+                  />
+                </View>
+              </>
+            )}
 
           {/* Platform-specific settings */}
           {ecommerceSettings.platform === 'woocommerce' && (
@@ -209,6 +359,26 @@ const EcommerceSettingsTab: React.FC = () => {
                       ...ecommerceSettings.woocommerce,
                       apiSecret: value,
                     },
+                  })
+                }
+                placeholder={t('settings.ecommerce.consumerSecretPlaceholder')}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={ecommerceSettings.enabled}
+              />
+            </View>
+          )}
+
+          {ecommerceSettings.platform === 'commercefull' && (
+            <View style={styles.optionRow}>
+              <Text style={styles.label}>{t('settings.ecommerce.consumerSecret')}</Text>
+              <TextInput
+                style={styles.input}
+                value={ecommerceSettings.commercefull?.apiSecret || ''}
+                onChangeText={value =>
+                  updateSettings({
+                    commercefull: { ...ecommerceSettings.commercefull, apiSecret: value },
                   })
                 }
                 placeholder={t('settings.ecommerce.consumerSecretPlaceholder')}
@@ -257,80 +427,41 @@ const EcommerceSettingsTab: React.FC = () => {
             </>
           )}
 
-          {ecommerceSettings.platform === 'magento' && (
-            <View style={styles.optionRow}>
-              <Text style={styles.label}>{t('settings.ecommerce.storeUrl')}</Text>
-              <TextInput
-                style={styles.input}
-                value={ecommerceSettings.magento?.storeUrl || ''}
-                onChangeText={value =>
-                  updateSettings({
-                    magento: { ...ecommerceSettings.magento, storeUrl: value },
-                  })
-                }
-                placeholder={t('settings.ecommerce.magentoUrlPlaceholder')}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={ecommerceSettings.enabled}
-              />
-            </View>
-          )}
-
-          {ecommerceSettings.platform === 'sylius' && (
-            <View style={styles.optionRow}>
-              <Text style={styles.label}>{t('settings.ecommerce.apiUrl')}</Text>
-              <TextInput
-                style={styles.input}
-                value={ecommerceSettings.sylius?.storeUrl || ''}
-                onChangeText={value =>
-                  updateSettings({
-                    sylius: { ...ecommerceSettings.sylius, storeUrl: value },
-                  })
-                }
-                placeholder={t('settings.ecommerce.syliusUrlPlaceholder')}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={ecommerceSettings.enabled}
-              />
-            </View>
-          )}
-
           {ecommerceSettings.platform === 'wix' && (
-            <View style={styles.optionRow}>
-              <Text style={styles.label}>{t('settings.ecommerce.siteId')}</Text>
-              <TextInput
-                style={styles.input}
-                value={ecommerceSettings.wix?.siteId || ''}
-                onChangeText={value =>
-                  updateSettings({
-                    wix: { ...ecommerceSettings.wix, siteId: value },
-                  })
-                }
-                placeholder={t('settings.ecommerce.wixSiteIdPlaceholder')}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={ecommerceSettings.enabled}
-              />
-            </View>
-          )}
-
-          {ecommerceSettings.platform === 'prestashop' && (
-            <View style={styles.optionRow}>
-              <Text style={styles.label}>{t('settings.ecommerce.storeUrl')}</Text>
-              <TextInput
-                style={styles.input}
-                value={ecommerceSettings.prestashop?.storeUrl || ''}
-                onChangeText={value =>
-                  updateSettings({
-                    prestashop: { ...ecommerceSettings.prestashop, storeUrl: value },
-                  })
-                }
-                placeholder={t('settings.ecommerce.prestashopUrlPlaceholder')}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={ecommerceSettings.enabled}
-              />
-            </View>
+            <>
+              <View style={styles.optionRow}>
+                <Text style={styles.label}>{t('settings.ecommerce.siteId')}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={ecommerceSettings.wix?.siteId || ''}
+                  onChangeText={value =>
+                    updateSettings({
+                      wix: { ...ecommerceSettings.wix, siteId: value },
+                    })
+                  }
+                  placeholder={t('settings.ecommerce.wixSiteIdPlaceholder')}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={ecommerceSettings.enabled}
+                />
+              </View>
+              <View style={styles.optionRow}>
+                <Text style={styles.label}>{t('settings.ecommerce.clientId')}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={ecommerceSettings.wix?.accountId || ''}
+                  onChangeText={value =>
+                    updateSettings({
+                      wix: { ...ecommerceSettings.wix, accountId: value },
+                    })
+                  }
+                  placeholder={t('settings.ecommerce.clientIdPlaceholder')}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={ecommerceSettings.enabled}
+                />
+              </View>
+            </>
           )}
 
           {ecommerceSettings.platform === 'squarespace' && (
@@ -359,23 +490,6 @@ const EcommerceSettingsTab: React.FC = () => {
                 <Text style={styles.infoText}>{t('settings.ecommerce.localOnlyDescription')}</Text>
               </View>
               <View style={styles.optionRow}>
-                <Text style={styles.label}>{t('settings.ecommerce.menuUrl')}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={ecommerceSettings.offline?.menuUrl || ''}
-                  onChangeText={value =>
-                    updateSettings({
-                      offline: { ...ecommerceSettings.offline, menuUrl: value },
-                    })
-                  }
-                  placeholder={t('settings.ecommerce.menuUrlPlaceholder')}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={ecommerceSettings.enabled}
-                  keyboardType="url"
-                />
-              </View>
-              <View style={styles.optionRow}>
                 <Text style={styles.label}>{t('settings.ecommerce.storeName')}</Text>
                 <TextInput
                   style={styles.input}
@@ -389,32 +503,6 @@ const EcommerceSettingsTab: React.FC = () => {
                   editable={ecommerceSettings.enabled}
                 />
               </View>
-              <Button
-                title={t('settings.ecommerce.downloadMenu')}
-                variant="secondary"
-                onPress={async () => {
-                  const menuUrl = ecommerceSettings.offline?.menuUrl;
-                  if (!menuUrl) {
-                    Alert.alert(t('common.error'), t('settings.ecommerce.menuUrlRequired'));
-                    return;
-                  }
-                  try {
-                    Alert.alert(t('settings.ecommerce.downloading'), t('settings.ecommerce.downloadingMenu'));
-                    const response = await fetch(menuUrl);
-                    const data = await response.json();
-                    const productCount = data.products?.length || data.items?.length || data.menu?.length || 0;
-                    const categoryCount = data.categories?.length || 0;
-                    Alert.alert(
-                      t('common.success'),
-                      t('settings.ecommerce.downloadSuccess', { products: productCount, categories: categoryCount })
-                    );
-                  } catch {
-                    Alert.alert(t('common.error'), t('settings.ecommerce.downloadError'));
-                  }
-                }}
-                disabled={!ecommerceSettings.enabled}
-                style={styles.actionButton}
-              />
             </>
           )}
 
@@ -445,7 +533,7 @@ const EcommerceSettingsTab: React.FC = () => {
               title={t('settings.payment.testConnection')}
               variant="secondary"
               onPress={handleConnectionTest}
-              disabled={!ecommerceSettings.enabled}
+              disabled={!ecommerceSettings.enabled || ecommerceSettings.platform === 'offline'}
               style={styles.actionButton}
             />
 

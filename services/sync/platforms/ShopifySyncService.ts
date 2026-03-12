@@ -5,22 +5,18 @@ import { PlatformSyncConfig, PlatformSyncConfigRequirements } from './PlatformSy
 import { ProductServiceFactory } from '../../product/ProductServiceFactory';
 import { CategoryServiceFactory } from '../../category/CategoryServiceFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
+
+interface ShopifyShopResponse {
+  shop?: Record<string, unknown>;
+}
 
 /**
  * Shopify-specific sync service implementation
  */
 export class ShopifySyncService extends BasePlatformSyncService {
   private webhookIds: string[] = [];
-  private storeUrl: string = '';
-  private accessToken: string = '';
-  private apiVersion: string = SHOPIFY_API_VERSION;
   private apiClient = ShopifyApiClient.getInstance();
-
-  private getShopifyApiUrl(endpoint: string): string {
-    return `${this.storeUrl}/admin/api/${this.apiVersion}/${endpoint}`;
-  }
 
   /**
    * Get configuration requirements for Shopify
@@ -40,20 +36,14 @@ export class ShopifySyncService extends BasePlatformSyncService {
       this.logger.error({ message: 'Shopify storeUrl and accessToken are required' });
       return false;
     }
-    this.storeUrl = config.storeUrl;
-    this.accessToken = config.accessToken;
-    this.apiVersion = config.apiVersion || this.apiVersion;
-
-    // Configure and initialize the shared Shopify client
     if (!this.apiClient.isInitialized()) {
       this.apiClient.configure({
-        storeUrl: this.storeUrl,
-        accessToken: this.accessToken,
-        apiVersion: this.apiVersion,
+        storeUrl: config.storeUrl,
+        accessToken: config.accessToken,
+        apiVersion: config.apiVersion,
       });
       await this.apiClient.initialize();
     }
-    this.storeUrl = this.apiClient.getBaseUrl();
 
     // Call base class initialization
     const baseInitialized = await super.initialize(config);
@@ -74,16 +64,7 @@ export class ShopifySyncService extends BasePlatformSyncService {
     }
 
     try {
-      // Make a simple API call to test the connection
-      const url = this.getShopifyApiUrl('shop.json');
-      const response = await fetch(url, { headers: this.apiClient['buildHeaders']() });
-
-      if (!response.ok) {
-        this.logger.error({ message: `Shopify connection test failed: ${response.statusText}` });
-        return false;
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<ShopifyShopResponse>('shop.json');
       return !!data.shop;
     } catch (error) {
       this.logger.error({ message: 'Error testing Shopify connection' }, error instanceof Error ? error : new Error(String(error)));
@@ -128,26 +109,10 @@ export class ShopifySyncService extends BasePlatformSyncService {
       const results = await Promise.all(
         webhookTopics.map(async topic => {
           try {
-            const url = this.getShopifyApiUrl('webhooks.json');
-            const response = await fetch(url, {
-              method: 'POST',
-              headers: this.apiClient['buildHeaders'](),
-              body: JSON.stringify({
-                webhook: {
-                  topic,
-                  address: webhookUrl,
-                  format: 'json',
-                },
-              }),
+            const data = await this.apiClient.post<{ webhook?: { id?: string } }>('webhooks.json', {
+              webhook: { topic, address: webhookUrl, format: 'json' },
             });
-
-            if (!response.ok) {
-              this.logger.error({ message: `Failed to register Shopify webhook for ${topic}: ${response.statusText}` });
-              return null;
-            }
-
-            const data = await response.json();
-            return data.webhook?.id;
+            return data.webhook?.id ?? null;
           } catch (error) {
             this.logger.error(
               { message: `Error registering Shopify webhook for ${topic}` },
@@ -181,13 +146,8 @@ export class ShopifySyncService extends BasePlatformSyncService {
       const results = await Promise.all(
         this.webhookIds.map(async webhookId => {
           try {
-            const url = this.getShopifyApiUrl(`webhooks/${webhookId}.json`);
-            const response = await fetch(url, {
-              method: 'DELETE',
-              headers: this.apiClient['buildHeaders'](),
-            });
-
-            return response.ok;
+            await this.apiClient.delete(`webhooks/${webhookId}.json`);
+            return true;
           } catch (error) {
             this.logger.error(
               { message: `Error unregistering Shopify webhook ${webhookId}` },

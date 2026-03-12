@@ -3,6 +3,8 @@ import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'rea
 import { CameraView } from 'expo-camera';
 import { useProductsForDisplay } from '../hooks/useProducts';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import { useScanner } from '../hooks/useScanner';
+import { isElectron } from '../utils/electron';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../utils/theme';
 
 interface BarcodeScannerScreenProps {
@@ -11,18 +13,24 @@ interface BarcodeScannerScreenProps {
 }
 
 export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({ onScanSuccess, onClose }) => {
-  // Get scanner settings from local storage or default
+  // Load scanner settings from persistent storage (set during onboarding / Settings)
+  // On Electron desktop, default to 'usb' since camera is not available
+  const { scannerSettings: persistedSettings, isLoading: settingsLoading } = useScanner();
   const scannerSettings = {
-    type: 'camera' as 'camera' | 'bluetooth' | 'usb',
-    enabled: true,
-    deviceId: 'back',
+    type: (isElectron() && persistedSettings.type === 'camera' ? 'usb' : persistedSettings.type) as
+      | 'camera'
+      | 'bluetooth'
+      | 'usb'
+      | 'qr_hardware',
+    enabled: persistedSettings.enabled,
+    deviceId: persistedSettings.deviceId || (persistedSettings.type === 'camera' ? 'back' : ''),
   };
 
   // Get products from the unified product service
   const { products } = useProductsForDisplay();
 
   // Use our custom hook for barcode scanner functionality
-  const { hasPermission, scanned, connected, connecting, setScanned, connectScanner, disconnectScanner, handleBarCodeScanned } =
+  const { hasPermission, scanned, connected, connecting, scanResult, connectScanner, disconnectScanner, handleBarCodeScanned } =
     useBarcodeScanner({
       scannerSettings,
       products,
@@ -40,6 +48,15 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({ onSc
       disconnectScanner();
     };
   }, [connectScanner, disconnectScanner, scannerSettings.enabled]);
+
+  // Wait for persistent scanner settings to load before rendering
+  if (settingsLoading) {
+    return (
+      <View style={styles.permissionContainer}>
+        <ActivityIndicator size="large" color={lightColors.primary} />
+      </View>
+    );
+  }
 
   // Handle permission denied
   if (hasPermission === false) {
@@ -64,21 +81,41 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({ onSc
     );
   }
 
-  // External scanner view (USB or Bluetooth)
+  // Inline scan result banner (shown over both camera and external scanner views)
+  const renderScanResultBanner = () => {
+    if (!scanResult) return null;
+    const bannerStyle =
+      scanResult.status === 'not_found'
+        ? styles.bannerError
+        : scanResult.status === 'searching'
+          ? styles.bannerSearching
+          : styles.bannerSuccess;
+    const label =
+      scanResult.status === 'searching'
+        ? 'Searching...'
+        : scanResult.status === 'not_found'
+          ? 'Product not found'
+          : scanResult.status === 'found_online'
+            ? `\u2713 Online: ${scanResult.name}`
+            : `\u2713 Added: ${scanResult.name}`;
+    return (
+      <View style={[styles.scanResultBanner, bannerStyle]}>
+        <Text style={styles.scanResultText} numberOfLines={1}>
+          {label}
+        </Text>
+      </View>
+    );
+  };
+
+  // External scanner view (USB, Bluetooth, QR Hardware)
   if (scannerSettings.type !== 'camera') {
     return (
       <View style={styles.externalScannerContainer}>
         <View style={styles.externalScannerContent}>
-          {connecting ? (
+          {connected ? (
             <>
-              <ActivityIndicator size="large" color="#2196F3" />
-              <Text style={styles.externalScannerText}>Connecting to {scannerSettings.type} scanner...</Text>
-            </>
-          ) : connected ? (
-            <>
-              <Text style={styles.externalScannerTitle}>{scannerSettings.type.toUpperCase()} Scanner Connected</Text>
-              <Text style={styles.externalScannerText}>Ready to scan products</Text>
-              {scanned && <Text style={styles.externalScannerStatus}>Processing scan...</Text>}
+              <Text style={styles.externalScannerTitle}>{scannerSettings.type.toUpperCase()} Scanner Ready</Text>
+              <Text style={styles.externalScannerText}>Point scanner at a product barcode</Text>
             </>
           ) : (
             <>
@@ -91,9 +128,11 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({ onSc
           )}
         </View>
 
+        {renderScanResultBanner()}
+
         <View style={styles.footer}>
           <TouchableOpacity style={styles.button} onPress={onClose}>
-            <Text style={styles.buttonText}>Cancel</Text>
+            <Text style={styles.buttonText}>Close</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -106,7 +145,7 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({ onSc
       <CameraView
         style={styles.camera}
         barcodeScannerSettings={{
-          barcodeTypes: ['ean13', 'ean8', 'code128', 'code39', 'upc_e'],
+          barcodeTypes: ['ean13', 'ean8', 'code128', 'code39', 'upc_e', 'upc_a', 'qr', 'aztec', 'datamatrix', 'pdf417'],
         }}
         onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
       />
@@ -116,16 +155,12 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({ onSc
         <Text style={styles.scanText}>Align barcode within the frame</Text>
       </View>
 
+      {renderScanResultBanner()}
+
       <View style={styles.footer}>
         <TouchableOpacity style={styles.button} onPress={onClose}>
           <Text style={styles.buttonText}>Cancel</Text>
         </TouchableOpacity>
-
-        {scanned && (
-          <TouchableOpacity style={[styles.button, styles.scanAgainButton]} onPress={() => setScanned(false)}>
-            <Text style={styles.buttonText}>Scan Again</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </View>
   );
@@ -185,9 +220,6 @@ const styles = StyleSheet.create({
     alignItems: 'center' as const,
     ...elevation.medium,
   },
-  scanAgainButton: {
-    backgroundColor: lightColors.success,
-  },
   reconnectButton: {
     backgroundColor: lightColors.success,
     marginTop: spacing.lg,
@@ -220,9 +252,29 @@ const styles = StyleSheet.create({
     marginBottom: spacing.xl,
     color: lightColors.textSecondary,
   },
-  externalScannerStatus: {
+  scanResultBanner: {
+    position: 'absolute' as const,
+    bottom: 90,
+    left: spacing.lg,
+    right: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center' as const,
+    ...elevation.high,
+  },
+  bannerSuccess: {
+    backgroundColor: lightColors.success,
+  },
+  bannerError: {
+    backgroundColor: lightColors.error,
+  },
+  bannerSearching: {
+    backgroundColor: lightColors.primary,
+  },
+  scanResultText: {
+    color: lightColors.textOnPrimary,
     fontSize: typography.fontSize.md,
-    color: lightColors.primary,
-    marginTop: spacing.lg,
+    fontWeight: typography.fontWeight.bold as 'bold',
   },
 });

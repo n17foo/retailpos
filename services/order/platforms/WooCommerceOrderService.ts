@@ -2,8 +2,6 @@
 import { Order } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
-import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
-import { QueuedApiService } from '../../queue/QueuedApiService';
 import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 /**
@@ -35,7 +33,6 @@ export class WooCommerceOrderService extends BaseOrderService {
         return false;
       }
 
-      // Configure and initialize the shared WooCommerce client
       if (!this.apiClient.isInitialized()) {
         this.apiClient.configure({
           storeUrl: this.config.storeUrl,
@@ -45,22 +42,11 @@ export class WooCommerceOrderService extends BaseOrderService {
         });
         await this.apiClient.initialize();
       }
-      this.config.storeUrl = this.apiClient.getBaseUrl();
 
-      // Test connection with a simple API call
       try {
-        const apiUrl = `${this.config.storeUrl}/wp-json/${WOOCOMMERCE_API_VERSION}/`;
-        const response = await fetch(apiUrl, {
-          headers: this.getAuthHeaders(),
-        });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to WooCommerce API' });
-          return false;
-        }
+        await this.apiClient.get('');
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to WooCommerce API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -94,26 +80,8 @@ export class WooCommerceOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `${this.config.storeUrl}/wp-json/${WOOCOMMERCE_API_VERSION}/orders`;
-
       const wooOrder = this.mapToWooCommerceOrder(order);
-
-      // Use QueuedApiService for API call with X-Request-ID for idempotency
-      const requestId = `woocommerce_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'POST', wooOrder, {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-        'X-Request-ID': requestId,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to create order on WooCommerce: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Map created WooCommerce order to our format
+      const data = await this.apiClient.post<any>('orders', wooOrder);
       return this.mapToOrder(data);
     } catch (error) {
       this.logger.error({ message: 'Error creating order on WooCommerce' }, error instanceof Error ? error : new Error(String(error)));
@@ -130,20 +98,13 @@ export class WooCommerceOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `${this.config.storeUrl}/wp-json/${WOOCOMMERCE_API_VERSION}/orders/${orderId}`;
-
-      const response = await QueuedApiService.directRequest(apiUrl, 'GET', this.getAuthHeaders());
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to fetch order from WooCommerce: ${response.statusText}`);
+      let data: any;
+      try {
+        data = await this.apiClient.get<any>(`orders/${orderId}`);
+      } catch (e: any) {
+        if (e?.status === 404) return null;
+        throw e;
       }
-
-      const data = await response.json();
-
-      // Map WooCommerce order to our format
       return this.mapToOrder(data);
     } catch (error) {
       this.logger.error(
@@ -163,32 +124,13 @@ export class WooCommerceOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `${this.config.storeUrl}/wp-json/${WOOCOMMERCE_API_VERSION}/orders/${orderId}`;
-
-      // Get the existing order
       const existingOrder = await this.getOrder(orderId);
       if (!existingOrder) {
         throw new Error(`Order with ID ${orderId} not found`);
       }
-
-      // Merge the existing order with the update data
       const updatedOrder = { ...existingOrder, ...updates };
-
-      // Map to WooCommerce format
       const wooOrder = this.mapToWooCommerceOrder(updatedOrder);
-
-      const response = await QueuedApiService.directRequestWithBody(apiUrl, 'PUT', wooOrder, {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update order on WooCommerce: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Map updated WooCommerce order to our format
+      const data = await this.apiClient.put<any>(`orders/${orderId}`, wooOrder);
       return this.mapToOrder(data);
     } catch (error) {
       this.logger.error(
@@ -200,14 +142,6 @@ export class WooCommerceOrderService extends BaseOrderService {
   }
 
   // Refund functionality moved to dedicated refund service
-
-  /**
-   * Create authorization headers for WooCommerce API
-   * Uses basic authentication with consumer key and consumer secret
-   */
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
-  }
 
   /**
    * Map our order format to WooCommerce's format

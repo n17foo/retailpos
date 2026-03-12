@@ -112,6 +112,33 @@ export const useSearch = () => {
   );
 
   /**
+   * Search for a product by exact barcode value.
+   * Uses platform-specific barcode endpoints (faster than generic search).
+   */
+  const searchByBarcode = useCallback(
+    async (barcode: string) => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        if (!isInitialized) {
+          throw new Error('Search service is not initialized');
+        }
+
+        const results = await searchService.searchByBarcode(barcode);
+        setSearchResults(results);
+        return results;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Barcode search failed');
+        return null;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [searchService, isInitialized]
+  );
+
+  /**
    * Clear search history
    */
   const clearSearchHistory = useCallback(() => {
@@ -144,6 +171,7 @@ export const useSearch = () => {
     searchHistory,
     search,
     searchProducts,
+    searchByBarcode,
     clearSearchHistory,
     searchOptions,
     setSearchFilters,

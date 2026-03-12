@@ -2,7 +2,6 @@
 import { Order } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
-import { QueuedApiService } from '../../queue/QueuedApiService';
 import { PrestaShopApiClient } from '../../clients/prestashop/PrestaShopApiClient';
 
 /**
@@ -31,20 +30,11 @@ export class PrestaShopOrderService extends BaseOrderService {
         });
         await this.apiClient.initialize();
       }
-      this.config.storeUrl = this.apiClient.getBaseUrl();
 
-      // Test connection
       try {
-        const apiUrl = `${this.config.storeUrl}/api/orders?output_format=JSON&limit=1`;
-        const response = await QueuedApiService.directRequest(apiUrl, 'GET', this.getAuthHeaders());
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to PrestaShop API' });
-          return false;
-        }
+        await this.apiClient.get('orders', { output_format: 'JSON', limit: '1' });
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to PrestaShop API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -72,28 +62,8 @@ export class PrestaShopOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `${this.config.storeUrl}/api/orders?output_format=JSON`;
       const psOrder = this.mapToPrestaShopOrder(order);
-
-      // Use QueuedApiService for API call with X-Request-ID for idempotency
-      const requestId = `prestashop_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      const response = await QueuedApiService.directRequestWithBody(
-        apiUrl,
-        'POST',
-        { order: psOrder },
-        {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'application/json',
-          'X-Request-ID': requestId,
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to create order on PrestaShop: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.post<any>('orders?output_format=JSON', { order: psOrder });
       return this.mapToOrder(data.order);
     } catch (error) {
       this.logger.error({ message: 'Error creating order on PrestaShop' }, error instanceof Error ? error : new Error(String(error)));
@@ -107,20 +77,13 @@ export class PrestaShopOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `${this.config.storeUrl}/api/orders/${orderId}?output_format=JSON&display=full`;
-
-      const response = await fetch(apiUrl, {
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to fetch order from PrestaShop: ${response.statusText}`);
+      let data: any;
+      try {
+        data = await this.apiClient.get<any>(`orders/${orderId}?output_format=JSON&display=full`);
+      } catch (e: any) {
+        if (e?.status === 404) return null;
+        throw e;
       }
-
-      const data = await response.json();
       return this.mapToOrder(data.order);
     } catch (error) {
       this.logger.error(
@@ -137,26 +100,9 @@ export class PrestaShopOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `${this.config.storeUrl}/api/orders/${orderId}?output_format=JSON`;
-
-      // PrestaShop order updates are limited - mainly status changes
-      const response = await fetch(apiUrl, {
-        method: 'PUT',
-        headers: {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          order: {
-            current_state: this.mapStatusToPrestaShop(updates.paymentStatus, updates.fulfillmentStatus),
-          },
-        }),
+      await this.apiClient.put(`orders/${orderId}?output_format=JSON`, {
+        order: { current_state: this.mapStatusToPrestaShop(updates.paymentStatus, updates.fulfillmentStatus) },
       });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update order on PrestaShop: ${response.statusText}`);
-      }
-
       return await this.getOrder(orderId);
     } catch (error) {
       this.logger.error(
@@ -165,10 +111,6 @@ export class PrestaShopOrderService extends BaseOrderService {
       );
       return null;
     }
-  }
-
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 
   private mapStatusToPrestaShop(paymentStatus?: string, fulfillmentStatus?: string): number {

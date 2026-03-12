@@ -2,7 +2,6 @@
 import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../InventoryServiceInterface';
 import { PlatformConfigRequirements } from './PlatformInventoryServiceInterface';
 import { BaseInventoryService } from './BaseInventoryService';
-import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
 /**
@@ -31,23 +30,10 @@ export class ShopifyInventoryService extends BaseInventoryService {
     }
 
     try {
-      const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
       const items: InventoryResult['items'] = [];
 
-      // Fetch inventory levels for each product
       for (const productId of productIds) {
-        const apiUrl = `${this.config.storeUrl}/admin/api/${apiVersion}/products/${productId}/variants.json`;
-
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: this.getAuthHeaders(),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch Shopify inventory: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.get<{ variants: any[] }>(`products/${productId}/variants.json`);
 
         // Map Shopify variants to inventory items
         if (data.variants && Array.isArray(data.variants)) {
@@ -85,8 +71,6 @@ export class ShopifyInventoryService extends BaseInventoryService {
     };
 
     try {
-      const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-
       for (const update of updates) {
         if (!update.variantId) {
           result.failed++;
@@ -120,48 +104,20 @@ export class ShopifyInventoryService extends BaseInventoryService {
           continue;
         }
 
-        // Determine if we're adjusting or setting inventory
-        let endpoint, method, body;
-
         if (update.adjustment) {
-          // Adjust inventory
-          endpoint = `${this.config.storeUrl}/admin/api/${apiVersion}/inventory_levels/adjust.json`;
-          method = 'POST';
-          body = {
+          await this.apiClient.post('inventory_levels/adjust.json', {
             inventory_item_id: inventoryItemId,
             location_id: locationId,
             available_adjustment: update.quantity,
-          };
+          });
         } else {
-          // Set inventory
-          endpoint = `${this.config.storeUrl}/admin/api/${apiVersion}/inventory_levels/set.json`;
-          method = 'POST';
-          body = {
+          await this.apiClient.post('inventory_levels/set.json', {
             inventory_item_id: inventoryItemId,
             location_id: locationId,
             available: update.quantity,
-          };
-        }
-
-        const response = await fetch(endpoint, {
-          method: method,
-          headers: {
-            ...this.getAuthHeaders(),
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(body),
-        });
-
-        if (response.ok) {
-          result.successful++;
-        } else {
-          result.failed++;
-          result.errors.push({
-            productId: update.productId,
-            variantId: update.variantId,
-            error: `Failed to update inventory: ${response.statusText}`,
           });
         }
+        result.successful++;
       }
 
       return result;
@@ -182,30 +138,11 @@ export class ShopifyInventoryService extends BaseInventoryService {
   }
 
   /**
-   * Create authorization headers for Shopify API
-   */
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
-  }
-
-  /**
    * Get the inventory item ID for a variant
    */
   private async getInventoryItemId(variantId: string): Promise<string | null> {
     try {
-      const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-      const apiUrl = `${this.config.storeUrl}/admin/api/${apiVersion}/variants/${variantId}.json`;
-
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<{ variant: any }>(`variants/${variantId}.json`);
       return data.variant?.inventory_item_id?.toString() || null;
     } catch (error) {
       this.logger.error(
@@ -221,20 +158,7 @@ export class ShopifyInventoryService extends BaseInventoryService {
    */
   private async getFirstLocationId(): Promise<string | null> {
     try {
-      const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-      const apiUrl = `${this.config.storeUrl}/admin/api/${apiVersion}/locations.json`;
-
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
-      // Get the first active location
+      const data = await this.apiClient.get<{ locations: any[] }>('locations.json');
       const location = data.locations?.find((loc: any) => loc.active);
       return location?.id?.toString() || null;
     } catch (error) {

@@ -4,13 +4,11 @@ import { CustomerSearchOptions, CustomerSearchResult, PlatformCustomer } from '.
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
 import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
 export class ShopifyCustomerService extends BaseCustomerService {
   private storeUrl = '';
-  private apiVersion = SHOPIFY_API_VERSION;
   private apiClient = ShopifyApiClient.getInstance();
 
   constructor() {
@@ -21,22 +19,16 @@ export class ShopifyCustomerService extends BaseCustomerService {
   async initialize(): Promise<boolean> {
     try {
       this.storeUrl = (await secretsService.getSecret('SHOPIFY_STORE_URL')) || process.env.SHOPIFY_STORE_URL || '';
-      this.apiVersion = (await secretsService.getSecret('SHOPIFY_API_VERSION')) || SHOPIFY_API_VERSION;
 
       if (!this.storeUrl) {
         this.logger.warn('Missing Shopify store URL');
         return false;
       }
 
-      // Configure and initialize the shared Shopify client
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({
-          storeUrl: this.storeUrl,
-          apiVersion: this.apiVersion,
-        });
+        this.apiClient.configure({ storeUrl: this.storeUrl });
         await this.apiClient.initialize();
       }
-      this.storeUrl = this.apiClient.getBaseUrl();
 
       this.initialized = true;
       return true;
@@ -49,10 +41,6 @@ export class ShopifyCustomerService extends BaseCustomerService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async searchCustomers(options: CustomerSearchOptions): Promise<CustomerSearchResult> {
     if (!this.initialized) {
       return { customers: [], hasMore: false };
@@ -61,38 +49,14 @@ export class ShopifyCustomerService extends BaseCustomerService {
     try {
       return await withTokenRefresh(ECommercePlatform.SHOPIFY, async () => {
         const limit = options.limit || 10;
-        const params = new URLSearchParams();
-        params.append('limit', String(limit));
+        const params: Record<string, string> = { limit: String(limit) };
+        if (options.query) params['query'] = options.query;
+        if (options.cursor) params['page_info'] = options.cursor;
 
-        if (options.query) {
-          // Shopify REST API uses query parameter for customer search
-          params.append('query', options.query);
-        }
-
-        if (options.cursor) {
-          params.append('page_info', options.cursor);
-        }
-
-        const url = `${this.storeUrl}/admin/api/${this.apiVersion}/customers/search.json?${params.toString()}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-
-        if (!response.ok) {
-          throw new Error(`Shopify customer search failed: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.get<{ customers: any[] }>('customers/search.json', params);
         const customers: PlatformCustomer[] = (data.customers || []).map((c: any) => this.mapCustomer(c));
 
-        // Parse Link header for pagination
-        const linkHeader = response.headers.get('Link') || '';
-        const nextCursor = this.parseNextCursor(linkHeader);
-
-        return {
-          customers,
-          hasMore: !!nextCursor,
-          nextCursor,
-        };
+        return { customers, hasMore: false };
       });
     } catch (error) {
       this.logger.error({ message: 'Error searching Shopify customers' }, error instanceof Error ? error : new Error(String(error)));
@@ -105,13 +69,7 @@ export class ShopifyCustomerService extends BaseCustomerService {
 
     try {
       return await withTokenRefresh(ECommercePlatform.SHOPIFY, async () => {
-        const url = `${this.storeUrl}/admin/api/${this.apiVersion}/customers/${customerId}.json`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-
-        if (!response.ok) return null;
-
-        const data = await response.json();
+        const data = await this.apiClient.get<{ customer: any }>(`customers/${customerId}.json`);
         return data.customer ? this.mapCustomer(data.customer) : null;
       });
     } catch (error) {
@@ -137,10 +95,5 @@ export class ShopifyCustomerService extends BaseCustomerService {
       createdAt: c.created_at ? new Date(c.created_at) : undefined,
       updatedAt: c.updated_at ? new Date(c.updated_at) : undefined,
     };
-  }
-
-  private parseNextCursor(linkHeader: string): string | undefined {
-    const nextMatch = linkHeader.match(/<[^>]*page_info=([^&>]+)[^>]*>;\s*rel="next"/);
-    return nextMatch ? nextMatch[1] : undefined;
   }
 }

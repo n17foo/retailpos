@@ -6,7 +6,6 @@ import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
-import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 
 /**
  * Shopify-specific implementation of the product service
@@ -97,7 +96,6 @@ export class ShopifyProductService extends BaseProductService {
       // Use token refresh wrapper to handle token expiration
       return await withTokenRefresh(ECommercePlatform.SHOPIFY, async () => {
         const limit = options.limit || 50;
-        const apiVersion = this.config.apiVersion || '2024-01';
 
         // Build query params
         const queryParams = new URLSearchParams();
@@ -116,41 +114,21 @@ export class ShopifyProductService extends BaseProductService {
         }
 
         // Handle cursor-based pagination
-        // If a cursor is provided, use it for pagination
         if (options.cursor) {
           queryParams.append('page_info', options.cursor);
         }
 
-        const apiUrl = `${this.config.storeUrl}/admin/api/${apiVersion}/products.json?${queryParams.toString()}`;
-
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, {
-          headers,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch products from Shopify: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        // Map Shopify products to our format
+        const data = await this.apiClient.get<{ products: any[] }>(`products.json?${queryParams.toString()}`);
 
         const products: Product[] = data.products.map((shopifyProduct: any) => this.mapToProduct(shopifyProduct));
-
-        // Parse cursor-based pagination from Link header
-        const linkHeader = response.headers.get('Link') || '';
-        const paginationInfo = this.parsePaginationFromLinkHeader(linkHeader);
 
         return {
           products,
           pagination: {
             currentPage: options.page || 1,
-            totalPages: paginationInfo.hasNextPage ? (options.page || 1) + 1 : options.page || 1,
-            totalItems: products.length, // Shopify doesn't provide total count in REST API
+            totalPages: options.page || 1,
+            totalItems: products.length,
             perPage: limit,
-            nextCursor: paginationInfo.nextCursor,
-            prevCursor: paginationInfo.prevCursor,
           },
         };
       });
@@ -169,24 +147,7 @@ export class ShopifyProductService extends BaseProductService {
     }
 
     try {
-      const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-      const apiUrl = `${this.config.storeUrl}/admin/api/${apiVersion}/products/${productId}.json`;
-
-      const headers = await this.getAuthHeaders();
-      const response = await fetch(apiUrl, {
-        headers,
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to fetch product from Shopify: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Map Shopify product to our format
+      const data = await this.apiClient.get<{ product: any }>(`products/${productId}.json`);
       return this.mapToProduct(data.product);
     } catch (error) {
       this.logger.error(
@@ -206,28 +167,8 @@ export class ShopifyProductService extends BaseProductService {
     }
 
     try {
-      const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-      const apiUrl = `${this.config.storeUrl}/admin/api/${apiVersion}/products.json`;
-
       const shopifyProduct = this.mapToShopifyProduct(product);
-
-      const headers = await this.getAuthHeaders();
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ product: shopifyProduct }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to create product on Shopify: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Map created Shopify product to our format
+      const data = await this.apiClient.post<{ product: any }>('products.json', { product: shopifyProduct });
       return this.mapToProduct(data.product);
     } catch (error) {
       this.logger.error({ message: 'Error creating product on Shopify' }, error instanceof Error ? error : new Error(String(error)));
@@ -244,38 +185,15 @@ export class ShopifyProductService extends BaseProductService {
     }
 
     try {
-      const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-      const apiUrl = `${this.config.storeUrl}/admin/api/${apiVersion}/products/${productId}.json`;
-
       // Get the existing product
       const existingProduct = await this.getProductById(productId);
       if (!existingProduct) {
         throw new Error(`Product with ID ${productId} not found`);
       }
 
-      // Merge the existing product with the update data
       const updatedProduct = { ...existingProduct, ...productData };
-
-      // Map to Shopify format
       const shopifyProduct = this.mapToShopifyProduct(updatedProduct);
-
-      const headers = await this.getAuthHeaders();
-      const response = await fetch(apiUrl, {
-        method: 'PUT',
-        headers: {
-          ...headers,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ product: shopifyProduct }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update product on Shopify: ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Map updated Shopify product to our format
+      const data = await this.apiClient.put<{ product: any }>(`products/${productId}.json`, { product: shopifyProduct });
       return this.mapToProduct(data.product);
     } catch (error) {
       this.logger.error(
@@ -295,19 +213,7 @@ export class ShopifyProductService extends BaseProductService {
     }
 
     try {
-      const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-      const apiUrl = `${this.config.storeUrl}/admin/api/${apiVersion}/products/${productId}.json`;
-
-      const headers = await this.getAuthHeaders();
-      const response = await fetch(apiUrl, {
-        method: 'DELETE',
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to delete product from Shopify: ${response.statusText}`);
-      }
-
+      await this.apiClient.delete(`products/${productId}.json`);
       return true;
     } catch (error) {
       this.logger.error(
@@ -356,13 +262,6 @@ export class ShopifyProductService extends BaseProductService {
     }
 
     return result;
-  }
-
-  /**
-   * Get authorization headers for API requests — delegates to shared ShopifyApiClient.
-   */
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
   }
 
   /**
@@ -447,61 +346,5 @@ export class ShopifyProductService extends BaseProductService {
         position: image.position,
       })),
     };
-  }
-
-  /**
-   * Pagination info extracted from Shopify Link header
-   */
-  private parsePaginationFromLinkHeader(linkHeader: string): {
-    hasNextPage: boolean;
-    hasPrevPage: boolean;
-    nextCursor?: string;
-    prevCursor?: string;
-  } {
-    const result = {
-      hasNextPage: false,
-      hasPrevPage: false,
-      nextCursor: undefined as string | undefined,
-      prevCursor: undefined as string | undefined,
-    };
-
-    if (!linkHeader) {
-      return result;
-    }
-
-    // Parse the Link header
-    // Format: <url>; rel="next", <url>; rel="previous"
-    const links = linkHeader.split(',');
-
-    for (const link of links) {
-      const parts = link.trim().split(';');
-      if (parts.length < 2) continue;
-
-      const urlPart = parts[0].trim();
-      const relPart = parts[1].trim();
-
-      // Extract URL from angle brackets
-      const urlMatch = urlPart.match(/<(.+)>/);
-      const relMatch = relPart.match(/rel="(.+)"/);
-
-      if (urlMatch && relMatch) {
-        const url = urlMatch[1];
-        const rel = relMatch[1];
-
-        // Extract page_info cursor from URL
-        const urlParams = new URL(url).searchParams;
-        const pageInfo = urlParams.get('page_info');
-
-        if (rel === 'next' && pageInfo) {
-          result.hasNextPage = true;
-          result.nextCursor = pageInfo;
-        } else if (rel === 'previous' && pageInfo) {
-          result.hasPrevPage = true;
-          result.prevCursor = pageInfo;
-        }
-      }
-    }
-
-    return result;
   }
 }

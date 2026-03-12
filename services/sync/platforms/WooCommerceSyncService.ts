@@ -13,13 +13,7 @@ import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiCl
  */
 export class WooCommerceSyncService extends BasePlatformSyncService {
   private webhookIds: string[] = [];
-  private storeUrl: string = '';
-  private version: string = 'wc/v3';
   private apiClient = WooCommerceApiClient.getInstance();
-
-  private getWooCommerceApiUrl(endpoint: string): string {
-    return `${this.storeUrl}/wp-json/${this.version}/${endpoint}`;
-  }
 
   /**
    * Get configuration requirements for WooCommerce
@@ -39,8 +33,14 @@ export class WooCommerceSyncService extends BasePlatformSyncService {
       this.logger.error({ message: 'WooCommerce storeUrl, apiKey, and apiSecret are required' });
       return false;
     }
-    this.storeUrl = config.storeUrl;
-    this.version = (config.version as string) || this.version;
+    if (!this.apiClient.isInitialized()) {
+      this.apiClient.configure({
+        storeUrl: config.storeUrl,
+        consumerKey: config.apiKey as string,
+        consumerSecret: config.apiSecret as string,
+      });
+      await this.apiClient.initialize();
+    }
 
     // Call base class initialization
     const baseInitialized = await super.initialize(config);
@@ -61,20 +61,7 @@ export class WooCommerceSyncService extends BasePlatformSyncService {
     }
 
     try {
-      // Create auth header for WooCommerce
-      // Make a simple API call to test the connection
-      const url = this.getWooCommerceApiUrl('system_status');
-
-      const response = await fetch(url, {
-        headers: this.apiClient['buildHeaders'](),
-      });
-
-      if (!response.ok) {
-        this.logger.error({ message: `WooCommerce connection test failed: ${response.statusText}` });
-        return false;
-      }
-
-      // If we get a valid response, the connection is working
+      await this.apiClient.get('system_status');
       return true;
     } catch (error) {
       this.logger.error({ message: 'Error testing WooCommerce connection' }, error instanceof Error ? error : new Error(String(error)));
@@ -111,26 +98,13 @@ export class WooCommerceSyncService extends BasePlatformSyncService {
       const results = await Promise.all(
         webhookTopics.map(async ({ topic, name }) => {
           try {
-            const url = this.getWooCommerceApiUrl('webhooks');
-
-            const response = await fetch(url, {
-              method: 'POST',
-              headers: this.apiClient['buildHeaders'](),
-              body: JSON.stringify({
-                name,
-                topic,
-                delivery_url: webhookUrl,
-                status: 'active',
-              }),
+            const data = await this.apiClient.post<{ id?: string }>('webhooks', {
+              name,
+              topic,
+              delivery_url: webhookUrl,
+              status: 'active',
             });
-
-            if (!response.ok) {
-              this.logger.error({ message: `Failed to register WooCommerce webhook for ${topic}: ${response.statusText}` });
-              return null;
-            }
-
-            const data = await response.json();
-            return data.id;
+            return data.id ?? null;
           } catch (error) {
             this.logger.error(
               { message: `Error registering WooCommerce webhook for ${topic}` },
@@ -164,17 +138,8 @@ export class WooCommerceSyncService extends BasePlatformSyncService {
       const results = await Promise.all(
         this.webhookIds.map(async webhookId => {
           try {
-            const url = this.getWooCommerceApiUrl(`webhooks/${webhookId}`);
-
-            const response = await fetch(url, {
-              method: 'DELETE',
-              headers: this.apiClient['buildHeaders'](),
-              body: JSON.stringify({
-                force: true,
-              }),
-            });
-
-            return response.ok;
+            await this.apiClient.delete(`webhooks/${webhookId}?force=true`);
+            return true;
           } catch (error) {
             this.logger.error(
               { message: `Error unregistering WooCommerce webhook ${webhookId}` },

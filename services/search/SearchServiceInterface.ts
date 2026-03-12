@@ -24,6 +24,15 @@ export interface SearchServiceInterface {
   searchProducts(query: string, options?: SearchOptions): Promise<SearchResult>;
 
   /**
+   * Search for products by exact barcode value.
+   * Delegates to platform-specific barcode endpoints when available,
+   * otherwise falls back to searchProducts with searchField='barcode'.
+   * @param barcode The barcode string (EAN13, UPC-A, Code128, etc.)
+   * @returns Promise resolving to search result with ecommerceResults populated
+   */
+  searchByBarcode(barcode: string): Promise<SearchResult>;
+
+  /**
    * Get search history for the current session
    * @returns Array of recent searches
    */

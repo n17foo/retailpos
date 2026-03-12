@@ -3,6 +3,25 @@ import { PlatformConfigRequirements } from './PlatformInventoryServiceInterface'
 import { BaseInventoryService } from './BaseInventoryService';
 import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
 
+interface BigCommerceVariantInventory {
+  id: number | string;
+  inventory_level?: number;
+  sku?: string;
+  date_modified?: string;
+}
+
+interface BigCommerceProductInventory {
+  id: number | string;
+  inventory_level?: number;
+  sku?: string;
+  date_modified?: string;
+  variants?: BigCommerceVariantInventory[];
+}
+
+interface BigCommerceProductInventoryResponse {
+  data?: BigCommerceProductInventory;
+}
+
 /**
  * BigCommerce-specific inventory service implementation
  * Handles BigCommerce inventory API interactions
@@ -33,19 +52,16 @@ export class BigCommerceInventoryService extends BaseInventoryService {
 
       // BigCommerce requires us to fetch products one by one
       for (const productId of productIds) {
-        const apiUrl = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v3/catalog/products/${productId}?include=variants`;
-
-        const response = await fetch(apiUrl, {
-          method: 'GET',
-          headers: this.getAuthHeaders(),
-        });
-
-        if (!response.ok) {
-          this.logger.error({ message: `Failed to fetch BigCommerce product ${productId}: ${response.statusText}` });
+        let data: BigCommerceProductInventoryResponse;
+        try {
+          data = await this.apiClient.get<BigCommerceProductInventoryResponse>(`catalog/products/${productId}?include=variants`);
+        } catch (err) {
+          this.logger.error(
+            { message: `Failed to fetch BigCommerce product ${productId}` },
+            err instanceof Error ? err : new Error(String(err))
+          );
           continue;
         }
-
-        const data = await response.json();
         const product = data.data;
 
         if (!product) continue;
@@ -96,7 +112,6 @@ export class BigCommerceInventoryService extends BaseInventoryService {
 
     try {
       for (const update of updates) {
-        let apiUrl: string;
         let currentInventory = 0;
 
         // If this is an adjustment, we need to get the current inventory level first
@@ -118,54 +133,14 @@ export class BigCommerceInventoryService extends BaseInventoryService {
 
         // Determine if we're updating a variant or main product
         if (update.variantId) {
-          apiUrl = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v3/catalog/products/${update.productId}/variants/${update.variantId}`;
-
-          const response = await fetch(apiUrl, {
-            method: 'PUT',
-            headers: {
-              ...this.getAuthHeaders(),
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              inventory_level: newInventory,
-            }),
-          });
-
-          if (response.ok) {
-            result.successful++;
-          } else {
-            result.failed++;
-            result.errors.push({
-              productId: update.productId,
-              variantId: update.variantId,
-              error: `Failed to update variant inventory: ${response.statusText}`,
-            });
-          }
+          await this.apiClient.put(`catalog/products/${update.productId}/variants/${update.variantId}`, { inventory_level: newInventory });
         } else {
-          apiUrl = `https://api.bigcommerce.com/stores/${this.config.storeHash}/v3/catalog/products/${update.productId}`;
-
-          const response = await fetch(apiUrl, {
-            method: 'PUT',
-            headers: {
-              ...this.getAuthHeaders(),
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              inventory_level: newInventory,
-              inventory_tracking: 'product',
-            }),
+          await this.apiClient.put(`catalog/products/${update.productId}`, {
+            inventory_level: newInventory,
+            inventory_tracking: 'product',
           });
-
-          if (response.ok) {
-            result.successful++;
-          } else {
-            result.failed++;
-            result.errors.push({
-              productId: update.productId,
-              error: `Failed to update product inventory: ${response.statusText}`,
-            });
-          }
         }
+        result.successful++;
       }
 
       return result;
@@ -183,12 +158,5 @@ export class BigCommerceInventoryService extends BaseInventoryService {
         ],
       };
     }
-  }
-
-  /**
-   * Create authorization headers for BigCommerce API
-   */
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 }

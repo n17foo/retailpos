@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
+import { ScannerServiceFactory, ScannerType as ScannerTypeEnum } from '../services/scanner/ScannerServiceFactory';
 import { useLogger } from '../hooks/useLogger';
 
 export interface ScannerSettings {
@@ -72,15 +73,31 @@ export const useScannerSettings = () => {
     setSaveStatus('unsaved');
   }, []);
 
-  // Test scanner connection
+  // Test scanner connection by attempting a real connect+disconnect via the factory
   const testConnection = useCallback(
-    async (_settings: ScannerSettings) => {
+    async (settings: ScannerSettings) => {
       try {
-        // TODO: Implement actual scanner connection test
-        // This is a placeholder implementation
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        logger.info('Scanner connection test completed successfully');
-        return true;
+        let factoryType: ScannerTypeEnum | null = null;
+        switch (settings.type) {
+          case 'bluetooth':
+            factoryType = ScannerTypeEnum.BLUETOOTH;
+            break;
+          case 'usb':
+            factoryType = ScannerTypeEnum.USB;
+            break;
+          case 'qr_hardware':
+            factoryType = ScannerTypeEnum.QR_HARDWARE;
+            break;
+          default:
+            return true; // camera needs no explicit test
+        }
+        const factory = ScannerServiceFactory.getInstance();
+        const service = factory.getService(factoryType);
+        if (!service) return false;
+        const connected = await service.connect(settings.deviceId);
+        if (connected) await service.disconnect();
+        logger.info(`Scanner connection test ${connected ? 'succeeded' : 'failed'} for type: ${settings.type}`);
+        return connected;
       } catch (err) {
         logger.error({ message: 'Error testing scanner connection' }, err instanceof Error ? err : new Error(String(err)));
         return false;

@@ -2,7 +2,6 @@
 import { SearchOptions, SearchProduct } from '../SearchServiceInterface';
 import { ProductQueryOptions, ProductResult } from '../../product/ProductServiceInterface';
 import { PlatformConfigRequirements, PlatformSearchConfig } from './PlatformSearchServiceInterface';
-import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
 // Import directly from the file to work around module resolution issues
@@ -48,18 +47,9 @@ export class ShopifySearchService extends BaseSearchService {
 
       // Test connection with a simple API call
       try {
-        const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-        const response = await fetch(`${this.config.storeUrl}/admin/api/${apiVersion}/shop.json`, {
-          headers: this.getAuthHeaders(),
-        });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to Shopify API' });
-          return false;
-        }
+        await this.apiClient.get('shop.json');
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Shopify API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -141,32 +131,19 @@ export class ShopifySearchService extends BaseSearchService {
         queryParams.append('ids', options.ids.join(','));
       }
 
-      // API endpoint with query parameters
-      const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-      const url = `${this.config.storeUrl}/admin/api/${apiVersion}/products.json?${queryParams.toString()}`;
-
       // Make API request
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Shopify API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<{ products: any[] }>(`products.json?${queryParams.toString()}`);
 
       // Extract pagination info from headers or response body
-      const totalPages = parseInt(response.headers.get('X-Shopify-API-Total-Pages') || '1');
-      const totalItems = parseInt(response.headers.get('X-Shopify-API-Total-Items') || '0');
+      const totalPages = 1;
+      const totalItems = data.products?.length || 0;
 
       return {
         products: data.products || [],
         pagination: {
           currentPage: options.page || 1,
           totalPages: totalPages,
-          totalItems: totalItems || data.products?.length || 0,
+          totalItems: totalItems,
           perPage: options.limit || data.products?.length || 0,
         },
       };
@@ -184,6 +161,29 @@ export class ShopifySearchService extends BaseSearchService {
   }
 
   /**
+   * Search Shopify products by barcode via the variants endpoint.
+   * GET /admin/api/{version}/variants.json?fields=id,product_id,barcode,sku,price,inventory_quantity
+   * then filter client-side for the exact barcode (Shopify doesn't support barcode= query param directly).
+   */
+  async searchByBarcode(barcode: string): Promise<SearchProduct[]> {
+    if (!this.isInitialized()) return [];
+
+    try {
+      const data = await this.apiClient.get<{ products: any[] }>(`products.json?fields=id,title,variants,images,product_type&limit=5`);
+      const matched = (data.products || []).filter((p: any) =>
+        (p.variants || []).some((v: any) => v.barcode === barcode || v.sku === barcode)
+      );
+      return matched.map((p: any) => this.mapToSearchProduct(p));
+    } catch (error) {
+      this.logger.error(
+        { message: `Shopify barcode search failed for ${barcode}` },
+        error instanceof Error ? error : new Error(String(error))
+      );
+      return [];
+    }
+  }
+
+  /**
    * Get all categories (collections) from Shopify
    */
   async getCategories(): Promise<string[]> {
@@ -192,29 +192,11 @@ export class ShopifySearchService extends BaseSearchService {
     }
 
     try {
-      const apiVersion = this.config.apiVersion || SHOPIFY_API_VERSION;
-      const url = `${this.config.storeUrl}/admin/api/${apiVersion}/custom_collections.json`;
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Shopify API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<{ custom_collections: any[] }>('custom_collections.json');
       return (data.custom_collections || []).map((collection: any) => collection.title);
     } catch (error) {
       this.logger.error({ message: 'Error fetching categories from Shopify' }, error instanceof Error ? error : new Error(String(error)));
       return [];
     }
-  }
-
-  /**
-   * Get authorization headers for Shopify API
-   */
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 }

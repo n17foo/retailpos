@@ -31,19 +31,12 @@ export class SquarespaceDiscountService extends BaseDiscountService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async validateCoupon(code: string, _basketTotal: number, _items: BasketItem[]): Promise<CouponValidationResult> {
     if (!this.initialized) return { valid: false, error: 'Discount service not initialized' };
     try {
       return await withTokenRefresh(ECommercePlatform.SQUARESPACE, async () => {
-        const headers = await this.getAuthHeaders();
         // Squarespace Commerce API: list discounts and find by promoCode
-        const response = await fetch('https://api.squarespace.com/1.0/commerce/discounts', { headers });
-        if (!response.ok) throw new Error(`Squarespace discount lookup failed: ${response.status}`);
-        const body = await response.json();
+        const body = await this.apiClient.get<any>('commerce/discounts');
         const discounts = body.discounts || [];
         const match = discounts.find((d: any) => d.promoCode?.toLowerCase() === code.toLowerCase());
         if (!match) return { valid: false, error: 'Invalid coupon code' };

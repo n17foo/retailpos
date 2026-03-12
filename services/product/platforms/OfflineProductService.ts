@@ -5,41 +5,23 @@ import { LoggerFactory } from '../../logger/LoggerFactory';
 import { keyValueRepository } from '../../../repositories/KeyValueRepository';
 
 const PRODUCTS_STORAGE_KEY = 'offline_local_products';
-const MENU_URL_STORAGE_KEY = 'offline_menu_url';
-const LAST_SYNC_KEY = 'offline_last_menu_sync';
 
 /**
- * Offline product service for local-first POS operation
- * Downloads menu from a public URL and stores locally via SQLite
- * All operations are local-only, no online sync
+ * Offline product service for local-first POS operation.
+ * All operations are local-only via SQLite — no network calls.
  */
 export class OfflineProductService implements PlatformProductServiceInterface {
   private initialized: boolean = false;
   private products: Product[] = [];
-  private menuUrl: string = '';
   private logger = LoggerFactory.getInstance().createLogger('OfflineProductService');
 
-  constructor(config: PlatformProductConfig = {}) {
-    if (config.menuUrl) {
-      this.menuUrl = String(config.menuUrl);
-    }
-  }
+  constructor(_config: PlatformProductConfig = {}) {}
 
   /**
-   * Initialize the offline product service
-   * Loads products from local storage
+   * Initialize the offline product service — loads products from local storage.
    */
   async initialize(): Promise<boolean> {
     try {
-      // Load menu URL from storage if not provided
-      if (!this.menuUrl) {
-        const storedUrl = await keyValueRepository.getItem(MENU_URL_STORAGE_KEY);
-        if (storedUrl) {
-          this.menuUrl = storedUrl;
-        }
-      }
-
-      // Load cached products from local storage
       const storedProducts = await keyValueRepository.getItem(PRODUCTS_STORAGE_KEY);
       if (storedProducts) {
         this.products = JSON.parse(storedProducts);
@@ -71,77 +53,10 @@ export class OfflineProductService implements PlatformProductServiceInterface {
    */
   getConfigRequirements(): PlatformConfigRequirements {
     return {
-      required: ['menuUrl'],
-      optional: ['refreshInterval'],
-      description: 'Offline local-only mode. Provide a public URL to download your menu/products JSON.',
+      required: [],
+      optional: [],
+      description: 'Offline local-only mode. All product data is managed locally.',
     };
-  }
-
-  /**
-   * Set the menu URL and save to storage
-   */
-  async setMenuUrl(url: string): Promise<void> {
-    this.menuUrl = url;
-    await keyValueRepository.setItem(MENU_URL_STORAGE_KEY, url);
-    this.logger.info(`Menu URL set: ${url}`);
-  }
-
-  /**
-   * Download menu from the configured public URL
-   * Expected JSON format:
-   * {
-   *   "products": [...],
-   *   "categories": [...]
-   * }
-   */
-  async downloadMenu(): Promise<{ products: Product[]; categories: Record<string, unknown>[] }> {
-    if (!this.menuUrl) {
-      throw new Error('Menu URL not configured. Please set the menu download URL first.');
-    }
-
-    try {
-      this.logger.info(`Downloading menu from: ${this.menuUrl}`);
-
-      const response = await fetch(this.menuUrl, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to download menu: ${response.status} ${response.statusText}`);
-      }
-
-      const data = await response.json();
-
-      // Parse products from response
-      const rawProducts = data.products || data.items || data.menu || [];
-      const products = rawProducts.map((item: any) => this.mapToProduct(item));
-
-      // Parse categories from response
-      const categories = data.categories || [];
-
-      // Store products locally
-      this.products = products;
-      await keyValueRepository.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
-      await keyValueRepository.setItem(LAST_SYNC_KEY, new Date().toISOString());
-
-      this.logger.info(`Downloaded ${products.length} products and ${categories.length} categories`);
-
-      return { products, categories };
-    } catch (error) {
-      this.logger.error({ message: 'Error downloading menu' }, error instanceof Error ? error : new Error(String(error)));
-      throw error;
-    }
-  }
-
-  /**
-   * Get last sync timestamp
-   */
-  async getLastSyncTime(): Promise<Date | null> {
-    const lastSync = await keyValueRepository.getItem(LAST_SYNC_KEY);
-    return lastSync ? new Date(lastSync) : null;
   }
 
   /**
@@ -363,7 +278,6 @@ export class OfflineProductService implements PlatformProductServiceInterface {
   async clearLocalProducts(): Promise<void> {
     this.products = [];
     await keyValueRepository.removeItem(PRODUCTS_STORAGE_KEY);
-    await keyValueRepository.removeItem(LAST_SYNC_KEY);
     this.logger.info('Cleared all local products');
   }
 }

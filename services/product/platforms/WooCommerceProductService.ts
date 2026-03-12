@@ -5,7 +5,6 @@ import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenUtils';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 /**
@@ -33,7 +32,7 @@ export class WooCommerceProductService extends BaseProductService {
       this.config.consumerKey = this.config.consumerKey || process.env.WOOCOMMERCE_CONSUMER_KEY || '';
       this.config.consumerSecret = this.config.consumerSecret || process.env.WOOCOMMERCE_CONSUMER_SECRET || '';
       this.config.storeUrl = this.config.storeUrl || process.env.WOOCOMMERCE_URL || '';
-      this.config.apiVersion = this.config.apiVersion || process.env.WOOCOMMERCE_API_VERSION || WOOCOMMERCE_API_VERSION;
+      this.config.apiVersion = this.config.apiVersion || process.env.WOOCOMMERCE_API_VERSION || '';
 
       if (!this.config.consumerKey || !this.config.consumerSecret || !this.config.storeUrl) {
         this.logger.warn('Missing WooCommerce API configuration');
@@ -54,21 +53,9 @@ export class WooCommerceProductService extends BaseProductService {
 
       // Test connection with a simple API call
       try {
-        const apiUrl = this.getApiUrl('/products');
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          const responseText = await response.text();
-          this.logger.error(
-            { message: 'Failed to connect to WooCommerce API' },
-            new Error(`Status: ${response.status}, Response: ${responseText}`)
-          );
-          return false;
-        }
+        await this.apiClient.get('products');
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to WooCommerce API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -129,29 +116,16 @@ export class WooCommerceProductService extends BaseProductService {
           params.append('stock_status', 'instock');
         }
 
-        const apiUrl = this.getApiUrl(`/products?${params.toString()}`);
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
+        const products = await this.apiClient.get<any[]>(`products?${params.toString()}`);
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch products from WooCommerce: ${response.statusText}`);
-        }
-
-        const products = await response.json();
-
-        // Map WooCommerce products to our format
         const mappedProducts = products.map((wooProduct: any) => this.mapToProduct(wooProduct));
-
-        // Extract pagination info from headers
-        const totalItems = parseInt(response.headers.get('X-WP-Total') || '0', 10);
-        const totalPages = parseInt(response.headers.get('X-WP-TotalPages') || '0', 10);
 
         return {
           products: mappedProducts,
           pagination: {
             currentPage: options.page || 1,
-            totalPages,
-            totalItems,
+            totalPages: 1,
+            totalItems: mappedProducts.length,
             perPage: options.limit || 10,
           },
         };
@@ -180,18 +154,7 @@ export class WooCommerceProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.WOOCOMMERCE, async () => {
       try {
-        const apiUrl = this.getApiUrl(`/products/${productId}`);
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            return null;
-          }
-          throw new Error(`Failed to fetch product from WooCommerce: ${response.statusText}`);
-        }
-
-        const wooProduct = await response.json();
+        const wooProduct = await this.apiClient.get<any>(`products/${productId}`);
         return this.mapToProduct(wooProduct);
       } catch (error) {
         this.logger.error(
@@ -213,24 +176,8 @@ export class WooCommerceProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.WOOCOMMERCE, async () => {
       try {
-        const apiUrl = this.getApiUrl('/products');
         const wooProduct = this.mapToWooCommerceProduct(product);
-        const headers = await this.getAuthHeaders();
-
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(wooProduct),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to create product in WooCommerce: ${response.statusText}`);
-        }
-
-        const createdProduct = await response.json();
+        const createdProduct = await this.apiClient.post<any>('products', wooProduct);
         return this.mapToProduct(createdProduct);
       } catch (error) {
         this.logger.error(`Error creating product in WooCommerce`, error instanceof Error ? error : new Error(String(error)));
@@ -249,24 +196,8 @@ export class WooCommerceProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.WOOCOMMERCE, async () => {
       try {
-        const apiUrl = this.getApiUrl(`/products/${productId}`);
         const wooProductData = this.mapToWooCommerceProduct(productData as Product);
-        const headers = await this.getAuthHeaders();
-
-        const response = await fetch(apiUrl, {
-          method: 'PUT',
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(wooProductData),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to update product in WooCommerce: ${response.statusText}`);
-        }
-
-        const updatedProduct = await response.json();
+        const updatedProduct = await this.apiClient.put<any>(`products/${productId}`, wooProductData);
         return this.mapToProduct(updatedProduct);
       } catch (error) {
         this.logger.error(`Error updating product ${productId} in WooCommerce`, error instanceof Error ? error : new Error(String(error)));
@@ -285,18 +216,7 @@ export class WooCommerceProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.WOOCOMMERCE, async () => {
       try {
-        const apiUrl = this.getApiUrl(`/products/${productId}?force=true`);
-        const headers = await this.getAuthHeaders();
-
-        const response = await fetch(apiUrl, {
-          method: 'DELETE',
-          headers,
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to delete product from WooCommerce: ${response.statusText}`);
-        }
-
+        await this.apiClient.delete(`products/${productId}?force=true`);
         return true;
       } catch (error) {
         this.logger.error(
@@ -361,23 +281,6 @@ export class WooCommerceProductService extends BaseProductService {
         };
       }
     });
-  }
-
-  /**
-   * Get authorization headers for WooCommerce API
-   * Uses Basic Auth with consumer key and secret
-   */
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
-  /**
-   * Get the full API URL for a WooCommerce API endpoint
-   */
-  protected getApiUrl(endpoint: string): string {
-    const baseUrl = this.apiClient.getBaseUrl();
-    const apiVersion = this.config.apiVersion || WOOCOMMERCE_API_VERSION;
-    return `${baseUrl}/wp-json/${apiVersion}${endpoint}`;
   }
 
   /**

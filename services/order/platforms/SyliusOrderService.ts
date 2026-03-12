@@ -2,8 +2,6 @@
 import { Order } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
-import { SYLIUS_API_VERSION } from '../../config/apiVersions';
-import { QueuedApiService } from '../../queue/QueuedApiService';
 import { SyliusApiClient } from '../../clients/sylius/SyliusApiClient';
 
 /**
@@ -11,8 +9,6 @@ import { SyliusApiClient } from '../../clients/sylius/SyliusApiClient';
  */
 export class SyliusOrderService extends BaseOrderService {
   private apiClient = SyliusApiClient.getInstance();
-  private accessToken: string | null = null;
-  private tokenExpiration: Date | null = null;
 
   constructor(config: PlatformOrderConfig = {}) {
     super(config);
@@ -27,14 +23,13 @@ export class SyliusOrderService extends BaseOrderService {
       this.config.apiKey = this.config.apiKey || process.env.SYLIUS_API_KEY || '';
       this.config.apiSecret = this.config.apiSecret || process.env.SYLIUS_API_SECRET || '';
       this.config.accessToken = this.config.accessToken || process.env.SYLIUS_ACCESS_TOKEN || '';
-      this.config.apiVersion = this.config.apiVersion || process.env.SYLIUS_API_VERSION || SYLIUS_API_VERSION;
+      this.config.apiVersion = this.config.apiVersion || process.env.SYLIUS_API_VERSION || '';
 
       if (!this.config.apiUrl) {
         this.logger.warn({ message: 'Missing Sylius API URL configuration' });
         return false;
       }
 
-      // Configure and initialize the shared Sylius client
       if (!this.apiClient.isInitialized()) {
         this.apiClient.configure({
           storeUrl: this.config.apiUrl as string,
@@ -44,29 +39,10 @@ export class SyliusOrderService extends BaseOrderService {
         await this.apiClient.initialize();
       }
 
-      // Get OAuth token if needed
-      if (!this.config.accessToken && this.config.apiKey && this.config.apiSecret) {
-        const token = await this.getOAuthToken();
-        if (!token) {
-          this.logger.error({ message: 'Failed to authenticate with Sylius' });
-          return false;
-        }
-      }
-
-      // Test connection
       try {
-        const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/orders?limit=1`;
-        const response = await fetch(apiUrl, {
-          headers: this.getAuthHeaders(),
-        });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to Sylius API' });
-          return false;
-        }
+        await this.apiClient.get('orders', { limit: '1' });
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Sylius API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -105,26 +81,7 @@ export class SyliusOrderService extends BaseOrderService {
         await this.addItemToCart(cartToken, item);
       }
 
-      // Complete the order
-      const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/orders/${cartToken}/complete`;
-
-      const response = await QueuedApiService.directRequestWithBody(
-        apiUrl,
-        'PUT',
-        {
-          notes: order.note,
-        },
-        {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'application/json',
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to create order on Sylius: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.put<any>(`orders/${cartToken}/complete`, { notes: order.note });
       return this.mapToOrder(data);
     } catch (error) {
       this.logger.error({ message: 'Error creating order on Sylius' }, error instanceof Error ? error : new Error(String(error)));
@@ -136,26 +93,7 @@ export class SyliusOrderService extends BaseOrderService {
    * Create a cart
    */
   private async createCart(): Promise<string> {
-    const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/orders`;
-
-    const response = await QueuedApiService.directRequestWithBody(
-      apiUrl,
-      'POST',
-      {
-        localeCode: 'en_US',
-        channelCode: 'default',
-      },
-      {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error('Failed to create cart');
-    }
-
-    const data = await response.json();
+    const data = await this.apiClient.post<any>('orders', { localeCode: 'en_US', channelCode: 'default' });
     return data.tokenValue || data.token;
   }
 
@@ -163,24 +101,10 @@ export class SyliusOrderService extends BaseOrderService {
    * Add item to cart
    */
   private async addItemToCart(cartToken: string, item: Order['lineItems'][0]): Promise<void> {
-    const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/orders/${cartToken}/items`;
-
-    const response = await QueuedApiService.directRequestWithBody(
-      apiUrl,
-      'POST',
-      {
-        productCode: item.sku || item.productId,
-        quantity: item.quantity,
-      },
-      {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to add item ${item.sku} to cart`);
-    }
+    await this.apiClient.post(`orders/${cartToken}/items`, {
+      productCode: item.sku || item.productId,
+      quantity: item.quantity,
+    });
   }
 
   /**
@@ -192,18 +116,13 @@ export class SyliusOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/orders/${orderId}`;
-
-      const response = await QueuedApiService.directRequest(apiUrl, 'GET', this.getAuthHeaders());
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to fetch order from Sylius: ${response.statusText}`);
+      let data: any;
+      try {
+        data = await this.apiClient.get<any>(`orders/${orderId}`);
+      } catch (e: any) {
+        if (e?.status === 404) return null;
+        throw e;
       }
-
-      const data = await response.json();
       return this.mapToOrder(data);
     } catch (error) {
       this.logger.error(
@@ -223,24 +142,7 @@ export class SyliusOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `${this.config.apiUrl}/api/${this.config.apiVersion}/orders/${orderId}`;
-
-      const response = await QueuedApiService.directRequestWithBody(
-        apiUrl,
-        'PATCH',
-        {
-          notes: updates.note,
-        },
-        {
-          ...this.getAuthHeaders(),
-          'Content-Type': 'application/merge-patch+json',
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to update order on Sylius: ${response.statusText}`);
-      }
-
+      await this.apiClient.put(`orders/${orderId}`, { notes: updates.note });
       return await this.getOrder(orderId);
     } catch (error) {
       this.logger.error(
@@ -249,47 +151,6 @@ export class SyliusOrderService extends BaseOrderService {
       );
       return null;
     }
-  }
-
-  /**
-   * Get OAuth token
-   */
-  private async getOAuthToken(): Promise<string | null> {
-    if (this.accessToken && this.tokenExpiration && this.tokenExpiration > new Date()) {
-      return this.accessToken;
-    }
-
-    try {
-      const apiUrl = `${this.config.apiUrl}/api/oauth/v2/token`;
-
-      const response = await QueuedApiService.directRequestWithBody(
-        apiUrl,
-        'POST',
-        {
-          grant_type: 'client_credentials',
-          client_id: this.config.apiKey as string,
-          client_secret: this.config.apiSecret as string,
-        },
-        { 'Content-Type': 'application/x-www-form-urlencoded' }
-      );
-
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
-      this.accessToken = data.access_token;
-      this.tokenExpiration = new Date(Date.now() + (data.expires_in || 3600) * 1000);
-
-      return this.accessToken;
-    } catch (error) {
-      this.logger.error({ message: 'Error getting Sylius OAuth token' }, error instanceof Error ? error : new Error(String(error)));
-      return null;
-    }
-  }
-
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 
   protected mapToOrder(syliusOrder: any): Order {

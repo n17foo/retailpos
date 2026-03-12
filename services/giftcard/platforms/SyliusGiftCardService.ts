@@ -6,8 +6,14 @@ import { LoggerFactory } from '../../logger/LoggerFactory';
 import secretsService from '../../secrets/SecretsService';
 import { SyliusApiClient } from '../../clients/sylius/SyliusApiClient';
 
+interface SyliusGiftCard {
+  amount?: number;
+  currencyCode?: string;
+  enabled?: boolean;
+  expiresAt?: string;
+}
+
 export class SyliusGiftCardService extends BaseGiftCardService {
-  private baseUrl = '';
   private apiClient = SyliusApiClient.getInstance();
 
   constructor() {
@@ -17,17 +23,16 @@ export class SyliusGiftCardService extends BaseGiftCardService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.baseUrl = ((await secretsService.getSecret('SYLIUS_BASE_URL')) || '').replace(/\/+$/, '');
-      if (!this.baseUrl) {
+      const baseUrl = ((await secretsService.getSecret('SYLIUS_BASE_URL')) || '').replace(/\/+$/, '');
+      if (!baseUrl) {
         this.logger.warn('Missing Sylius base URL');
         return false;
       }
 
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({ storeUrl: this.baseUrl });
+        this.apiClient.configure({ storeUrl: baseUrl });
         await this.apiClient.initialize();
       }
-      this.baseUrl = this.apiClient.getBaseUrl();
 
       this.initialized = true;
       return true;
@@ -40,20 +45,17 @@ export class SyliusGiftCardService extends BaseGiftCardService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async checkBalance(code: string): Promise<GiftCardInfo> {
     if (!this.initialized) return { code, balance: 0, currency: 'USD', status: 'not_found' };
     try {
       return await withTokenRefresh(ECommercePlatform.SYLIUS, async () => {
         // Sylius gift card plugin endpoint
-        const url = `${this.baseUrl}/api/v2/shop/gift-cards/${encodeURIComponent(code)}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-        if (!response.ok) return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
-        const card = await response.json();
+        let card: SyliusGiftCard;
+        try {
+          card = await this.apiClient.get<SyliusGiftCard>(`api/v2/shop/gift-cards/${encodeURIComponent(code)}`);
+        } catch {
+          return { code, balance: 0, currency: 'USD', status: 'not_found' as const };
+        }
         return {
           code,
           balance: card.amount || 0,

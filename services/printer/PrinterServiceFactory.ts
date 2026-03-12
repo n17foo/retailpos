@@ -2,10 +2,15 @@ import { PrinterConfig, PrinterStatus, ReceiptData } from './PrinterTypes';
 import { BasePrinterService } from './BasePrinterService';
 import { USE_MOCK_PRINTERS } from '@env';
 import { UnifiedPrinterServiceMock } from './UnifiedPrinterServiceMock';
+import { ElectronPrinterService } from './ElectronPrinterService';
 import { LoggerFactory } from '../logger/LoggerFactory';
+import { keyValueRepository } from '../../repositories/KeyValueRepository';
+import { isElectron } from '../../utils/electron';
 
 // Define the connection type for the factory
 type PrinterConnectionType = 'network' | 'usb' | 'bluetooth';
+
+const PRINTER_SETTINGS_KEY = 'printerSettings';
 
 /**
  * Factory service that provides access to different printer types
@@ -15,38 +20,9 @@ export class PrinterServiceFactory {
   private static instance: PrinterServiceFactory;
   private logger = LoggerFactory.getInstance().createLogger('PrinterServiceFactory');
 
-  // Available printers collection
-  private availablePrinters: PrinterConfig[] = [
-    {
-      printerName: 'Epson TM-T20III',
-      connectionType: 'network',
-      ipAddress: '192.168.1.100',
-      port: 9100,
-      paperWidth: 80,
-    },
-    {
-      printerName: 'Epson TM-T88VI',
-      connectionType: 'network',
-      ipAddress: '192.168.1.101',
-      port: 9100,
-      paperWidth: 80,
-    },
-    {
-      printerName: 'Epson TM-m30',
-      connectionType: 'usb',
-      usbId: 'USB001',
-      vendorId: 0x04b8, // Epson vendor ID
-      productId: 0x0202, // Example product ID
-      paperWidth: 80,
-    },
-    {
-      printerName: 'Epson TM-P20',
-      connectionType: 'bluetooth',
-      macAddress: '00:11:22:33:44:55',
-      deviceName: 'TM-P20 Printer',
-      paperWidth: 58,
-    },
-  ];
+  // Available printers — loaded from KV store, never hardcoded
+  private availablePrinters: PrinterConfig[] = [];
+  private printersLoaded = false;
 
   // Single unified printer service instance for all printer types
   private unifiedPrinterService: BasePrinterService;
@@ -73,6 +49,9 @@ export class PrinterServiceFactory {
         if (USE_MOCK_PRINTERS === 'true') {
           factoryLogger.info('Using mock printer service');
           instance.unifiedPrinterService = new UnifiedPrinterServiceMock();
+        } else if (isElectron()) {
+          factoryLogger.info('Using Electron printer service (IPC-based)');
+          instance.unifiedPrinterService = new ElectronPrinterService();
         } else {
           const { UnifiedPrinterService } = require('./UnifiedPrinterService');
           instance.unifiedPrinterService = new UnifiedPrinterService();
@@ -91,7 +70,37 @@ export class PrinterServiceFactory {
   }
 
   /**
-   * Get list of available printers
+   * Load printer configurations from persistent storage.
+   * Idempotent — does nothing if already loaded.
+   */
+  public async loadPrinters(): Promise<void> {
+    if (this.printersLoaded) return;
+    try {
+      const saved = await keyValueRepository.getObject<PrinterConfig[]>(PRINTER_SETTINGS_KEY);
+      this.availablePrinters = saved ?? [];
+      this.printersLoaded = true;
+      this.logger.info(`Loaded ${this.availablePrinters.length} printer(s) from storage`);
+    } catch (error) {
+      this.logger.error({ message: 'Failed to load printer settings' }, error instanceof Error ? error : new Error(String(error)));
+      this.availablePrinters = [];
+      this.printersLoaded = true;
+    }
+  }
+
+  /**
+   * Persist the current printer list to storage.
+   */
+  private async savePrinters(): Promise<void> {
+    try {
+      await keyValueRepository.setObject(PRINTER_SETTINGS_KEY, this.availablePrinters);
+    } catch (error) {
+      this.logger.error({ message: 'Failed to save printer settings' }, error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+
+  /**
+   * Get list of available printers.
+   * Call loadPrinters() at app startup to ensure this is populated.
    */
   public getAvailablePrinters(): PrinterConfig[] {
     return this.availablePrinters;
@@ -195,23 +204,20 @@ export class PrinterServiceFactory {
   }
 
   /**
-   * Add or update a printer configuration
+   * Add or update a printer configuration and persist to storage.
    * @param printerName Name of the printer to update
    * @param config Printer configuration
    */
-  public updatePrinterConfig(printerName: string, config: PrinterConfig): void {
-    // Find if the printer already exists in the available printers list
+  public async updatePrinterConfig(printerName: string, config: PrinterConfig): Promise<void> {
     const existingIndex = this.availablePrinters.findIndex(p => p.printerName === printerName);
 
     if (existingIndex >= 0) {
-      // Update existing printer
       this.availablePrinters[existingIndex] = {
         ...this.availablePrinters[existingIndex],
         ...config,
       };
       this.logger.info(`Updated configuration for printer: ${printerName}`);
     } else {
-      // Add new printer
       this.availablePrinters.push(config);
       this.logger.info(`Added new printer configuration: ${printerName}`);
     }
@@ -223,6 +229,18 @@ export class PrinterServiceFactory {
         ...config,
       };
     }
+
+    await this.savePrinters();
+  }
+
+  /**
+   * Remove a printer configuration and persist to storage.
+   * @param printerName Name of the printer to remove
+   */
+  public async removePrinterConfig(printerName: string): Promise<void> {
+    this.availablePrinters = this.availablePrinters.filter(p => p.printerName !== printerName);
+    this.logger.info(`Removed printer configuration: ${printerName}`);
+    await this.savePrinters();
   }
 
   /**
@@ -268,17 +286,58 @@ export class PrinterServiceFactory {
   }
 
   /**
-   * Discover printers on the network
-   * In a real implementation, this would use network discovery protocols
+   * Discover printers available on the network / USB bus.
+   * On Electron, delegates to the main process via IPC for real mDNS/USB discovery.
+   * On mobile/tablet, returns the persisted printer list.
    */
   public async discoverPrinters(): Promise<PrinterConfig[]> {
-    // This is where you would implement printer discovery
-    // - For network printers: SNMP, mDNS, or vendor discovery protocols
-    // - For USB printers: USB device enumeration
-    // - For Bluetooth printers: Bluetooth device scanning
-
-    // For this example, we're just returning the predefined printers
+    if (isElectron() && this.unifiedPrinterService instanceof ElectronPrinterService) {
+      try {
+        const discovered = await this.unifiedPrinterService.discoverPrinters();
+        // Merge discovered with persisted (avoid duplicates by name)
+        const existingNames = new Set(this.availablePrinters.map(p => p.printerName));
+        for (const d of discovered) {
+          if (!existingNames.has(d.printerName)) {
+            this.availablePrinters.push(d);
+          }
+        }
+        return this.availablePrinters;
+      } catch (error) {
+        this.logger.warn(
+          'Electron printer discovery failed, returning persisted list',
+          error instanceof Error ? error : new Error(String(error))
+        );
+      }
+    }
     return this.availablePrinters;
+  }
+
+  /**
+   * Test connectivity to a printer without persisting or activating it.
+   * Temporarily connects via UnifiedPrinterService and immediately disconnects.
+   * @param config Partial printer config (enough to attempt a connection)
+   * @returns true if connection succeeded
+   */
+  public async testConnection(config: Partial<PrinterConfig> & { connectionType: PrinterConfig['connectionType'] }): Promise<boolean> {
+    try {
+      const unifiedConfig = {
+        printerName: config.printerName ?? 'test',
+        printerType: this.mapConnectionTypeToPrinterType(config.connectionType),
+        macAddress: config.macAddress,
+        host: config.ipAddress,
+        port: config.port,
+        vendorId: config.vendorId?.toString(16),
+        productId: config.productId?.toString(16),
+      };
+      const connected = await this.unifiedPrinterService.connect(unifiedConfig);
+      if (connected) {
+        await this.unifiedPrinterService.disconnect();
+      }
+      return connected;
+    } catch (error) {
+      this.logger.error({ message: 'Printer test connection failed' }, error instanceof Error ? error : new Error(String(error)));
+      return false;
+    }
   }
 
   /**

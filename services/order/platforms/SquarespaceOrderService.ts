@@ -2,11 +2,7 @@
 import { Order } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
-import { QueuedApiService } from '../../queue/QueuedApiService';
 import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
-
-// Squarespace API version
-const SQUARESPACE_API_VERSION = '1.0';
 
 /**
  * Squarespace Commerce implementation of the order service
@@ -21,25 +17,19 @@ export class SquarespaceOrderService extends BaseOrderService {
     try {
       this.config.apiKey = this.config.apiKey || process.env.SQUARESPACE_API_KEY || '';
       this.config.siteId = this.config.siteId || process.env.SQUARESPACE_SITE_ID || '';
-      this.config.apiVersion = this.config.apiVersion || process.env.SQUARESPACE_API_VERSION || SQUARESPACE_API_VERSION;
-
       if (!this.config.apiKey) {
         this.logger.warn({ message: 'Missing Squarespace API configuration' });
         return false;
       }
 
-      // Test connection
-      try {
-        const apiUrl = `https://api.squarespace.com/${this.config.apiVersion}/commerce/orders`;
-        const response = await QueuedApiService.directRequest(apiUrl, 'GET', this.getAuthHeaders());
+      if (!this.apiClient.isInitialized()) {
+        await this.apiClient.initialize();
+      }
 
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to Squarespace API' });
-          return false;
-        }
+      try {
+        await this.apiClient.get('commerce/orders');
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Squarespace API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -73,18 +63,13 @@ export class SquarespaceOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `https://api.squarespace.com/${this.config.apiVersion}/commerce/orders/${orderId}`;
-
-      const response = await QueuedApiService.directRequest(apiUrl, 'GET', this.getAuthHeaders());
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to fetch order from Squarespace: ${response.statusText}`);
+      let data: any;
+      try {
+        data = await this.apiClient.get<any>(`commerce/orders/${orderId}`);
+      } catch (e: any) {
+        if (e?.status === 404) return null;
+        throw e;
       }
-
-      const data = await response.json();
       return this.mapToOrder(data);
     } catch (error) {
       this.logger.error(
@@ -101,31 +86,12 @@ export class SquarespaceOrderService extends BaseOrderService {
     }
 
     try {
-      // Squarespace supports limited order updates - mainly fulfillment status
-      const apiUrl = `https://api.squarespace.com/${this.config.apiVersion}/commerce/orders/${orderId}/fulfillments`;
-
       if (updates.fulfillmentStatus === 'fulfilled') {
-        const response = await QueuedApiService.directRequestWithBody(
-          apiUrl,
-          'POST',
-          {
-            shouldSendNotification: true,
-            shipments: [
-              {
-                carrierName: 'Other',
-                trackingNumber: '',
-                shipDate: new Date().toISOString(),
-              },
-            ],
-          },
-          this.getAuthHeaders()
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to update order on Squarespace: ${response.statusText}`);
-        }
+        await this.apiClient.post(`commerce/orders/${orderId}/fulfillments`, {
+          shouldSendNotification: true,
+          shipments: [{ carrierName: 'Other', trackingNumber: '', shipDate: new Date().toISOString() }],
+        });
       }
-
       return await this.getOrder(orderId);
     } catch (error) {
       this.logger.error(
@@ -145,29 +111,13 @@ export class SquarespaceOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `https://api.squarespace.com/${this.config.apiVersion}/commerce/orders${cursor ? `?cursor=${cursor}` : ''}`;
-
-      const response = await QueuedApiService.directRequest(apiUrl, 'GET', this.getAuthHeaders());
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch orders from Squarespace: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<any>(`commerce/orders${cursor ? `?cursor=${cursor}` : ''}`);
       const orders = (data.result || []).map((o: any) => this.mapToOrder(o));
-
-      return {
-        orders,
-        nextCursor: data.pagination?.nextPageCursor,
-      };
+      return { orders, nextCursor: data.pagination?.nextPageCursor };
     } catch (error) {
       this.logger.error({ message: 'Error fetching orders from Squarespace' }, error instanceof Error ? error : new Error(String(error)));
       return { orders: [] };
     }
-  }
-
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 
   protected mapToOrder(sqOrder: any): Order {

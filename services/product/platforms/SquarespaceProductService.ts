@@ -7,9 +7,6 @@ import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
 
-// Squarespace API version
-const SQUARESPACE_API_VERSION = '1.0';
-
 /**
  * Squarespace Commerce implementation of the product service
  * Uses Squarespace Commerce APIs
@@ -25,7 +22,7 @@ export class SquarespaceProductService extends BaseProductService {
     try {
       this.config.apiKey = this.config.apiKey || process.env.SQUARESPACE_API_KEY || '';
       this.config.siteId = this.config.siteId || process.env.SQUARESPACE_SITE_ID || '';
-      this.config.apiVersion = this.config.apiVersion || process.env.SQUARESPACE_API_VERSION || SQUARESPACE_API_VERSION;
+      this.config.apiVersion = this.config.apiVersion || process.env.SQUARESPACE_API_VERSION || '';
 
       if (!this.config.apiKey) {
         this.logger.warn('Missing Squarespace API configuration');
@@ -43,17 +40,9 @@ export class SquarespaceProductService extends BaseProductService {
 
       // Test connection
       try {
-        const apiUrl = `https://api.squarespace.com/${this.config.apiVersion}/commerce/products?cursor=`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to Squarespace API' }, new Error(`Status: ${response.status}`));
-          return false;
-        }
+        await this.apiClient.get('products', { cursor: '' });
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Squarespace API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -84,15 +73,7 @@ export class SquarespaceProductService extends BaseProductService {
       try {
         // Squarespace uses cursor-based pagination
         const cursor = options.cursor || '';
-        const apiUrl = `https://api.squarespace.com/${this.config.apiVersion}/commerce/products?cursor=${cursor}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (!response.ok) {
-          throw new Error(`Failed to fetch products from Squarespace: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.get<any>('products', { cursor });
         const products = (data.products || []).map((p: any) => this.mapToProduct(p));
 
         // Filter by search if provided (client-side since Squarespace doesn't have search)
@@ -140,18 +121,7 @@ export class SquarespaceProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.SQUARESPACE, async () => {
       try {
-        const apiUrl = `https://api.squarespace.com/${this.config.apiVersion}/commerce/products/${productId}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            return null;
-          }
-          throw new Error(`Failed to fetch product from Squarespace: ${response.statusText}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.get<any>(`products/${productId}`);
         return this.mapToProduct(data);
       } catch (error) {
         this.logger.error(
@@ -189,10 +159,6 @@ export class SquarespaceProductService extends BaseProductService {
         error: 'Squarespace API does not support product sync. Products are read-only.',
       })),
     };
-  }
-
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
   }
 
   protected mapToProduct(sqProduct: any): Product {

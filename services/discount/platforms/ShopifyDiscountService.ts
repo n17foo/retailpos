@@ -4,13 +4,36 @@ import { BasketItem } from '../../basket/basket';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { SHOPIFY_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
 import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 
+interface ShopifyDiscountLookupResponse {
+  discount_code?: {
+    price_rule_id?: number | string;
+    usage_count?: number;
+  };
+}
+
+interface ShopifyPriceRule {
+  starts_at?: string;
+  ends_at?: string;
+  usage_limit?: number;
+  prerequisite_subtotal_range?: { greater_than_or_equal_to?: string };
+  value_type?: string;
+  value?: string;
+  entitled_product_ids?: Array<string | number>;
+  title?: string;
+}
+
+interface ShopifyPriceRuleResponse {
+  price_rule?: ShopifyPriceRule;
+}
+
+interface HttpLikeError {
+  status?: number;
+}
+
 export class ShopifyDiscountService extends BaseDiscountService {
-  private storeUrl = '';
-  private apiVersion = SHOPIFY_API_VERSION;
   private apiClient = ShopifyApiClient.getInstance();
 
   constructor() {
@@ -20,23 +43,17 @@ export class ShopifyDiscountService extends BaseDiscountService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.storeUrl = (await secretsService.getSecret('SHOPIFY_STORE_URL')) || process.env.SHOPIFY_STORE_URL || '';
-      this.apiVersion = (await secretsService.getSecret('SHOPIFY_API_VERSION')) || SHOPIFY_API_VERSION;
+      const storeUrl = (await secretsService.getSecret('SHOPIFY_STORE_URL')) || process.env.SHOPIFY_STORE_URL || '';
 
-      if (!this.storeUrl) {
+      if (!storeUrl) {
         this.logger.warn('Missing Shopify store URL');
         return false;
       }
 
-      // Configure and initialize the shared Shopify client
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({
-          storeUrl: this.storeUrl,
-          apiVersion: this.apiVersion,
-        });
+        this.apiClient.configure({ storeUrl });
         await this.apiClient.initialize();
       }
-      this.storeUrl = this.apiClient.getBaseUrl();
 
       this.initialized = true;
       return true;
@@ -49,10 +66,6 @@ export class ShopifyDiscountService extends BaseDiscountService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async validateCoupon(code: string, basketTotal: number, _items: BasketItem[]): Promise<CouponValidationResult> {
     if (!this.initialized) {
       return { valid: false, error: 'Discount service not initialized' };
@@ -62,18 +75,14 @@ export class ShopifyDiscountService extends BaseDiscountService {
       return await withTokenRefresh(ECommercePlatform.SHOPIFY, async () => {
         // Shopify REST Admin API: look up price rules by title matching the discount code
         // First, find the discount code
-        const url = `${this.storeUrl}/admin/api/${this.apiVersion}/discount_codes/lookup.json?code=${encodeURIComponent(code)}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers, redirect: 'follow' });
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            return { valid: false, error: 'Invalid discount code' };
-          }
-          throw new Error(`Shopify discount lookup failed: ${response.status}`);
+        let data: ShopifyDiscountLookupResponse;
+        try {
+          data = await this.apiClient.get<ShopifyDiscountLookupResponse>(`discount_codes/lookup.json`, { code: encodeURIComponent(code) });
+        } catch (error) {
+          const typedError = error as HttpLikeError;
+          if (typedError?.status === 404) return { valid: false, error: 'Invalid discount code' };
+          throw error;
         }
-
-        const data = await response.json();
         const discountCode = data.discount_code;
 
         if (!discountCode) {
@@ -82,14 +91,12 @@ export class ShopifyDiscountService extends BaseDiscountService {
 
         // Now fetch the associated price rule
         const priceRuleId = discountCode.price_rule_id;
-        const priceRuleUrl = `${this.storeUrl}/admin/api/${this.apiVersion}/price_rules/${priceRuleId}.json`;
-        const priceRuleResponse = await fetch(priceRuleUrl, { headers });
-
-        if (!priceRuleResponse.ok) {
+        let priceRuleData: ShopifyPriceRuleResponse;
+        try {
+          priceRuleData = await this.apiClient.get<ShopifyPriceRuleResponse>(`price_rules/${priceRuleId}.json`);
+        } catch {
           return { valid: false, error: 'Could not verify discount details' };
         }
-
-        const priceRuleData = await priceRuleResponse.json();
         const rule = priceRuleData.price_rule;
 
         // Check if the rule is active

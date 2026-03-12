@@ -15,12 +15,16 @@ import { ScannerServiceInterface } from './ScannerServiceInterface';
  * The service listens for keyboard-style input terminated by Enter/Return,
  * which is the standard output mode for handheld QR scanners.
  */
+const SCAN_INTERVAL_MS = 80;
+const MIN_BARCODE_LENGTH = 3;
+
 export class QRHardwareScannerService implements ScannerServiceInterface {
   private connected: boolean = false;
   private deviceId: string | null = null;
   private scanListeners: Map<string, (data: string) => void> = new Map();
   private inputBuffer: string = '';
-  private keyEventListener: unknown = null;
+  private lastKeyTime: number = 0;
+  private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
 
   constructor() {
@@ -51,15 +55,14 @@ export class QRHardwareScannerService implements ScannerServiceInterface {
    */
   async disconnect(): Promise<void> {
     try {
-      if (this.keyEventListener) {
-        this.keyEventListener = null;
+      if (this.keydownHandler && typeof window !== 'undefined') {
+        window.removeEventListener('keydown', this.keydownHandler, true);
+        this.keydownHandler = null;
       }
-
       this.connected = false;
       this.deviceId = null;
       this.inputBuffer = '';
       this.scanListeners.clear();
-
       this.logger.info('Disconnected from QR hardware scanner');
     } catch (error) {
       this.logger.error(
@@ -77,11 +80,9 @@ export class QRHardwareScannerService implements ScannerServiceInterface {
   }
 
   /**
-   * Start listening for QR code scans from the connected hardware scanner.
-   *
-   * QR hardware scanners output data as rapid keyboard input terminated by
-   * Enter/Return. This method registers a callback that fires when a complete
-   * QR string is received (i.e. after the Enter key).
+   * Start listening for QR/barcode scans via DOM keydown HID events.
+   * QR hardware scanners output rapid keystrokes terminated by Enter —
+   * identical to USB HID barcode scanners.
    */
   startScanListener(callback: (data: string) => void): string {
     if (!this.connected) {
@@ -89,40 +90,50 @@ export class QRHardwareScannerService implements ScannerServiceInterface {
       return '';
     }
 
-    try {
-      const subscriptionId = `qr-hw-${this.deviceId}-${Date.now()}`;
-      this.scanListeners.set(subscriptionId, callback);
+    const subscriptionId = `qr-hw-${this.deviceId}-${Date.now()}`;
+    this.scanListeners.set(subscriptionId, callback);
 
-      // In a real implementation, you would set up native event handlers to
-      // capture HID keyboard input from the specific USB device.
-      //
-      // Example with a hypothetical native module:
-      //
-      // this.keyEventListener = DeviceEventEmitter.addListener(
-      //   'QRHardwareScannerDataReceived',
-      //   (event) => {
-      //     if (event.deviceId === this.deviceId) {
-      //       // Scanner sends complete string terminated by Enter
-      //       this.scanListeners.forEach(cb => cb(event.data));
-      //     }
-      //   }
-      // );
-
-      this.logger.info('Started QR hardware scan listener');
-      return subscriptionId;
-    } catch (error) {
-      this.logger.error({ message: 'Error starting QR hardware scan listener' }, error instanceof Error ? error : new Error(String(error)));
-      return '';
+    if (!this.keydownHandler && typeof window !== 'undefined') {
+      this.inputBuffer = '';
+      this.lastKeyTime = 0;
+      this.keydownHandler = (e: KeyboardEvent) => {
+        const now = Date.now();
+        if (now - this.lastKeyTime > SCAN_INTERVAL_MS && this.inputBuffer.length > 0) {
+          this.inputBuffer = '';
+        }
+        this.lastKeyTime = now;
+        if (e.key === 'Enter') {
+          if (this.inputBuffer.length >= MIN_BARCODE_LENGTH) {
+            const barcode = this.inputBuffer.trim();
+            this.inputBuffer = '';
+            this.scanListeners.forEach(cb => cb(barcode));
+            this.logger.info(`QR hardware scanned: ${barcode}`);
+          } else {
+            this.inputBuffer = '';
+          }
+          return;
+        }
+        if (e.key.length === 1) {
+          this.inputBuffer += e.key;
+        }
+      };
+      window.addEventListener('keydown', this.keydownHandler, true);
+      this.logger.info('DOM keydown HID listener attached for QR hardware scanner');
     }
+
+    return subscriptionId;
   }
 
   /**
    * Stop listening for QR code scans.
    */
   stopScanListener(subscriptionId: string): void {
-    if (this.scanListeners.has(subscriptionId)) {
-      this.scanListeners.delete(subscriptionId);
-      this.logger.info(`Stopped QR hardware scan listener: ${subscriptionId}`);
+    this.scanListeners.delete(subscriptionId);
+    if (this.scanListeners.size === 0 && this.keydownHandler && typeof window !== 'undefined') {
+      window.removeEventListener('keydown', this.keydownHandler, true);
+      this.keydownHandler = null;
+      this.inputBuffer = '';
+      this.logger.info('DOM keydown HID listener removed for QR hardware scanner');
     }
   }
 

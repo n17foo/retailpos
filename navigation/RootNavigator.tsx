@@ -21,16 +21,24 @@ export const RootNavigator: React.FC = () => {
   const logger = useLogger('RootNavigator');
 
   // Handle login with PIN
-  const handleLogin = (pin: string, loggedInUser?: User) => {
-    if (pin && pin.length === 6) {
-      // If user object provided from database, use it; otherwise fallback for development
-      const userData = loggedInUser
-        ? { username: loggedInUser.name, pin, id: loggedInUser.id, role: loggedInUser.role }
-        : { username: 'Staff', pin };
-      setUser(userData);
-      setIsAuthenticated(true);
-      logger.info({ message: `Login successful: ${loggedInUser ? `User: ${loggedInUser.name}` : 'Development mode'}` });
+  const handleLogin = (credential: string, loggedInUser?: User) => {
+    if (!credential) {
+      return;
     }
+
+    // If user object provided from database, use it; otherwise fallback for development
+    const userData = loggedInUser
+      ? {
+          username: loggedInUser.name,
+          pin: credential.length === 6 ? credential : undefined,
+          id: loggedInUser.id,
+          role: loggedInUser.role,
+        }
+      : { username: 'Staff', pin: credential.length === 6 ? credential : undefined };
+
+    setUser(userData);
+    setIsAuthenticated(true);
+    logger.info({ message: `Login successful: ${loggedInUser ? `User: ${loggedInUser.name}` : 'Development mode'}` });
   };
 
   // Handle logout

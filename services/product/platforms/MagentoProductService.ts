@@ -5,7 +5,6 @@ import { BaseProductService } from './BaseProductService';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { MAGENTO_API_VERSION } from '../../config/apiVersions';
 import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
 
 /**
@@ -14,9 +13,6 @@ import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
  */
 export class MagentoProductService extends BaseProductService {
   private apiClient = MagentoApiClient.getInstance();
-  private accessToken: string | null = null;
-  private tokenExpiration: Date | null = null;
-
   constructor(config: PlatformProductConfig = {}) {
     super(config);
     this.logger = LoggerFactory.getInstance().createLogger('MagentoProductService');
@@ -32,7 +28,7 @@ export class MagentoProductService extends BaseProductService {
       this.config.username = this.config.username || process.env.MAGENTO_USERNAME || '';
       this.config.password = this.config.password || process.env.MAGENTO_PASSWORD || '';
       this.config.accessToken = this.config.accessToken || process.env.MAGENTO_ACCESS_TOKEN || '';
-      this.config.apiVersion = this.config.apiVersion || process.env.MAGENTO_API_VERSION || MAGENTO_API_VERSION;
+      this.config.apiVersion = this.config.apiVersion || process.env.MAGENTO_API_VERSION || '';
 
       if (!this.config.storeUrl) {
         this.logger.warn('Missing Magento store URL configuration');
@@ -50,32 +46,11 @@ export class MagentoProductService extends BaseProductService {
       }
       this.config.storeUrl = this.apiClient.getBaseUrl();
 
-      // Get authentication token if not using access token
-      if (!this.config.accessToken && this.config.username && this.config.password) {
-        const token = await this.getAuthToken();
-        if (!token) {
-          this.logger.error({ message: 'Failed to authenticate with Magento' });
-          return false;
-        }
-      }
-
       // Test connection
       try {
-        const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/products?searchCriteria[pageSize]=1`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          const errorText = await response.text();
-          this.logger.error(
-            { message: 'Failed to connect to Magento API' },
-            new Error(`Status: ${response.status}, Response: ${errorText}`)
-          );
-          return false;
-        }
+        await this.apiClient.get('products', { 'searchCriteria[pageSize]': '1' });
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Magento API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -139,17 +114,8 @@ export class MagentoProductService extends BaseProductService {
           params.append(`searchCriteria[filter_groups][${filterIndex}][filters][0][condition_type]`, 'in');
         }
 
-        const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/products?${params.toString()}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
+        const data = await this.apiClient.get<{ items: any[]; total_count: number }>(`products?${params.toString()}`);
 
-        if (!response.ok) {
-          throw new Error(`Failed to fetch products from Magento: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        // Map Magento products to our format
         const products = (data.items || []).map((magentoProduct: any) => this.mapToProduct(magentoProduct));
 
         return {
@@ -181,18 +147,7 @@ export class MagentoProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.MAGENTO, async () => {
       try {
-        const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/products/${productId}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            return null;
-          }
-          throw new Error(`Failed to fetch product from Magento: ${response.statusText}`);
-        }
-
-        const magentoProduct = await response.json();
+        const magentoProduct = await this.apiClient.get<any>(`products/${productId}`);
         return this.mapToProduct(magentoProduct);
       } catch (error) {
         this.logger.error(
@@ -214,18 +169,7 @@ export class MagentoProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.MAGENTO, async () => {
       try {
-        const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/products/${encodeURIComponent(sku)}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(apiUrl, { headers });
-
-        if (!response.ok) {
-          if (response.status === 404) {
-            return null;
-          }
-          throw new Error(`Failed to fetch product from Magento: ${response.statusText}`);
-        }
-
-        const magentoProduct = await response.json();
+        const magentoProduct = await this.apiClient.get<any>(`products/${encodeURIComponent(sku)}`);
         return this.mapToProduct(magentoProduct);
       } catch (error) {
         this.logger.error(
@@ -247,25 +191,8 @@ export class MagentoProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.MAGENTO, async () => {
       try {
-        const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/products`;
         const magentoProduct = this.mapToMagentoProduct(product);
-        const headers = await this.getAuthHeaders();
-
-        const response = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ product: magentoProduct }),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to create product on Magento: ${response.statusText} - ${errorText}`);
-        }
-
-        const createdProduct = await response.json();
+        const createdProduct = await this.apiClient.post<any>('products', { product: magentoProduct });
         return this.mapToProduct(createdProduct);
       } catch (error) {
         this.logger.error({ message: 'Error creating product on Magento' }, error instanceof Error ? error : new Error(String(error)));
@@ -284,35 +211,15 @@ export class MagentoProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.MAGENTO, async () => {
       try {
-        // Get existing product first
         const existingProduct = await this.getProductById(productId);
         if (!existingProduct) {
           throw new Error(`Product with ID ${productId} not found`);
         }
 
-        // Merge and convert
         const updatedProduct = { ...existingProduct, ...productData };
         const magentoProduct = this.mapToMagentoProduct(updatedProduct);
-
-        // Use SKU for Magento API
         const sku = updatedProduct.variants[0]?.sku || productId;
-        const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/products/${encodeURIComponent(sku)}`;
-        const headers = await this.getAuthHeaders();
-
-        const response = await fetch(apiUrl, {
-          method: 'PUT',
-          headers: {
-            ...headers,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ product: magentoProduct }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`Failed to update product on Magento: ${response.statusText}`);
-        }
-
-        const updated = await response.json();
+        const updated = await this.apiClient.put<any>(`products/${encodeURIComponent(sku)}`, { product: magentoProduct });
         return this.mapToProduct(updated);
       } catch (error) {
         this.logger.error(
@@ -334,22 +241,14 @@ export class MagentoProductService extends BaseProductService {
 
     return withTokenRefresh(ECommercePlatform.MAGENTO, async () => {
       try {
-        // Get SKU first (Magento deletes by SKU)
         const product = await this.getProductById(productId);
         if (!product) {
           return false;
         }
 
         const sku = product.variants[0]?.sku || productId;
-        const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/products/${encodeURIComponent(sku)}`;
-        const headers = await this.getAuthHeaders();
-
-        const response = await fetch(apiUrl, {
-          method: 'DELETE',
-          headers,
-        });
-
-        return response.ok;
+        await this.apiClient.delete(`products/${encodeURIComponent(sku)}`);
+        return true;
       } catch (error) {
         this.logger.error(
           { message: `Error deleting product ${productId} from Magento` },
@@ -401,54 +300,6 @@ export class MagentoProductService extends BaseProductService {
     }
 
     return result;
-  }
-
-  /**
-   * Get admin authentication token
-   */
-  private async getAuthToken(): Promise<string | null> {
-    // Check if we have a valid cached token
-    if (this.accessToken && this.tokenExpiration && this.tokenExpiration > new Date()) {
-      return this.accessToken;
-    }
-
-    try {
-      const apiUrl = `${this.config.storeUrl}/rest/${this.config.apiVersion}/integration/admin/token`;
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          username: this.config.username,
-          password: this.config.password,
-        }),
-      });
-
-      if (!response.ok) {
-        this.logger.error({ message: 'Failed to get Magento auth token' });
-        return null;
-      }
-
-      const token = await response.json();
-
-      // Cache the token (Magento tokens typically last 4 hours)
-      this.accessToken = token;
-      this.tokenExpiration = new Date(Date.now() + 4 * 60 * 60 * 1000);
-
-      return token;
-    } catch (error) {
-      this.logger.error({ message: 'Error getting Magento auth token' }, error instanceof Error ? error : new Error(String(error)));
-      return null;
-    }
-  }
-
-  /**
-   * Get authorization headers
-   */
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
   }
 
   /**

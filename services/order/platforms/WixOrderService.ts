@@ -2,8 +2,6 @@
 import { Order } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
-import { WIX_API_VERSION } from '../../config/apiVersions';
-import { QueuedApiService } from '../../queue/QueuedApiService';
 import { WixApiClient } from '../../clients/wix/WixApiClient';
 
 /**
@@ -21,30 +19,20 @@ export class WixOrderService extends BaseOrderService {
       this.config.apiKey = this.config.apiKey || process.env.WIX_API_KEY || '';
       this.config.siteId = this.config.siteId || process.env.WIX_SITE_ID || '';
       this.config.accountId = this.config.accountId || process.env.WIX_ACCOUNT_ID || '';
-      this.config.apiVersion = this.config.apiVersion || process.env.WIX_API_VERSION || WIX_API_VERSION;
-
       if (!this.config.apiKey || !this.config.siteId) {
         this.logger.warn({ message: 'Missing Wix API configuration' });
         return false;
       }
 
-      // Test connection
-      try {
-        const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/orders/query`;
-        const response = await QueuedApiService.directRequestWithBody(
-          apiUrl,
-          'POST',
-          { query: { paging: { limit: 1 } } },
-          this.getAuthHeaders()
-        );
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({ siteId: this.config.siteId as string });
+        await this.apiClient.initialize();
+      }
 
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to Wix API' });
-          return false;
-        }
+      try {
+        await this.apiClient.post('stores/v2/orders/query', { query: { paging: { limit: 1 } } });
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Wix API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -69,28 +57,8 @@ export class WixOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/orders`;
-
       const wixOrder = this.mapToWixOrder(order);
-
-      // Use QueuedApiService for API call with X-Request-ID for idempotency
-      const requestId = `wix_order_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      const response = await QueuedApiService.directRequestWithBody(
-        apiUrl,
-        'POST',
-        { order: wixOrder },
-        {
-          ...this.getAuthHeaders(),
-          'X-Request-ID': requestId,
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to create order on Wix: ${response.statusText}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.post<any>('stores/v2/orders', { order: wixOrder });
       return this.mapToOrder(data.order);
     } catch (error) {
       this.logger.error({ message: 'Error creating order on Wix' }, error instanceof Error ? error : new Error(String(error)));
@@ -104,18 +72,13 @@ export class WixOrderService extends BaseOrderService {
     }
 
     try {
-      const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/orders/${orderId}`;
-
-      const response = await QueuedApiService.directRequest(apiUrl, 'GET', this.getAuthHeaders());
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          return null;
-        }
-        throw new Error(`Failed to fetch order from Wix: ${response.statusText}`);
+      let data: any;
+      try {
+        data = await this.apiClient.get<any>(`stores/v2/orders/${orderId}`);
+      } catch (e: any) {
+        if (e?.status === 404) return null;
+        throw e;
       }
-
-      const data = await response.json();
       return this.mapToOrder(data.order);
     } catch (error) {
       this.logger.error({ message: `Error fetching order ${orderId} from Wix` }, error instanceof Error ? error : new Error(String(error)));
@@ -129,33 +92,12 @@ export class WixOrderService extends BaseOrderService {
     }
 
     try {
-      // Wix has limited order update - mainly fulfillment status
-      const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/orders/${orderId}`;
-
-      const response = await QueuedApiService.directRequestWithBody(
-        apiUrl,
-        'PATCH',
-        {
-          order: {
-            buyerNote: updates.note,
-          },
-        },
-        this.getAuthHeaders()
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to update order on Wix: ${response.statusText}`);
-      }
-
+      await this.apiClient.put(`stores/v2/orders/${orderId}`, { order: { buyerNote: updates.note } });
       return await this.getOrder(orderId);
     } catch (error) {
       this.logger.error({ message: `Error updating order ${orderId} on Wix` }, error instanceof Error ? error : new Error(String(error)));
       return null;
     }
-  }
-
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 
   private mapToWixOrder(order: Order): any {

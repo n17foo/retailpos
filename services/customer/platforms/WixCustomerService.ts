@@ -8,7 +8,6 @@ import secretsService from '../../secrets/SecretsService';
 import { WixApiClient } from '../../clients/wix/WixApiClient';
 
 export class WixCustomerService extends BaseCustomerService {
-  private siteId = '';
   private apiClient = WixApiClient.getInstance();
 
   constructor() {
@@ -18,14 +17,14 @@ export class WixCustomerService extends BaseCustomerService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.siteId = (await secretsService.getSecret('WIX_SITE_ID')) || '';
-      if (!this.siteId) {
+      const siteId = (await secretsService.getSecret('WIX_SITE_ID')) || '';
+      if (!siteId) {
         this.logger.warn('Missing Wix site ID');
         return false;
       }
 
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({ siteId: this.siteId });
+        this.apiClient.configure({ siteId });
         await this.apiClient.initialize();
       }
 
@@ -40,25 +39,14 @@ export class WixCustomerService extends BaseCustomerService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async searchCustomers(options: CustomerSearchOptions): Promise<CustomerSearchResult> {
     if (!this.initialized) return { customers: [], hasMore: false };
     try {
       return await withTokenRefresh(ECommercePlatform.WIX, async () => {
         const limit = options.limit || 10;
-        const headers = await this.getAuthHeaders();
-        const body: any = { search: { expression: options.query || '' }, paging: { limit } };
-        if (options.cursor) body.paging.offset = parseInt(options.cursor, 10);
-        const response = await fetch('https://www.wixapis.com/contacts/v4/contacts/search', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(body),
-        });
-        if (!response.ok) throw new Error(`Wix customer search failed: ${response.status}`);
-        const data = await response.json();
+        const reqBody: any = { search: { expression: options.query || '' }, paging: { limit } };
+        if (options.cursor) reqBody.paging.offset = parseInt(options.cursor, 10);
+        const data = await this.apiClient.post<any>('contacts/v4/contacts/search', reqBody);
         const customers: PlatformCustomer[] = (data.contacts || []).map((c: any) => this.mapCustomer(c));
         const total = data.pagingMetadata?.total || 0;
         const offset = (options.cursor ? parseInt(options.cursor, 10) : 0) + limit;
@@ -74,10 +62,7 @@ export class WixCustomerService extends BaseCustomerService {
     if (!this.initialized) return null;
     try {
       return await withTokenRefresh(ECommercePlatform.WIX, async () => {
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(`https://www.wixapis.com/contacts/v4/contacts/${customerId}`, { headers });
-        if (!response.ok) return null;
-        const data = await response.json();
+        const data = await this.apiClient.get<any>(`contacts/v4/contacts/${customerId}`);
         return this.mapCustomer(data.contact || data);
       });
     } catch (error) {

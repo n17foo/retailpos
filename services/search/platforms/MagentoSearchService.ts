@@ -37,20 +37,22 @@ export class MagentoSearchService extends BaseSearchService {
         return false;
       }
 
+      // Configure and initialize the shared Magento client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.storeUrl as string,
+          accessToken: this.config.accessToken as string,
+          username: this.config.username as string,
+          password: this.config.password as string,
+        });
+        await this.apiClient.initialize();
+      }
+
       // Test connection with a simple API call
       try {
-        const apiUrl = `${this.config.storeUrl}/rest/V1/products`;
-        const response = await fetch(`${apiUrl}?searchCriteria[pageSize]=1`, {
-          headers: this.getAuthHeaders(),
-        });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to Magento API' });
-          return false;
-        }
+        await this.apiClient.get('products', { 'searchCriteria[pageSize]': '1' });
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Magento API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -112,7 +114,6 @@ export class MagentoSearchService extends BaseSearchService {
 
     try {
       // Build Magento search criteria
-      let apiUrl = `${this.config.storeUrl}/rest/V1/products`;
       const searchCriteria = [];
 
       // Pagination
@@ -152,20 +153,8 @@ export class MagentoSearchService extends BaseSearchService {
         searchCriteria.push(`searchCriteria[filterGroups][3][filters][0][conditionType]=eq`);
       }
 
-      // Complete API URL
-      apiUrl = `${apiUrl}?${searchCriteria.join('&')}`;
-
       // Make API request
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Magento API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<{ items: any[]; total_count: number }>(`products?${searchCriteria.join('&')}`);
       const products = data.items || [];
       const totalCount = data.total_count || 0;
 
@@ -193,6 +182,34 @@ export class MagentoSearchService extends BaseSearchService {
   }
 
   /**
+   * Search Magento products by barcode using the barcode custom attribute filter.
+   * Uses /rest/V1/products with searchCriteria filtering on the 'barcode' attribute.
+   */
+  async searchByBarcode(barcode: string): Promise<SearchProduct[]> {
+    if (!this.isInitialized()) return [];
+
+    try {
+      const criteria = [
+        `searchCriteria[filterGroups][0][filters][0][field]=barcode`,
+        `searchCriteria[filterGroups][0][filters][0][value]=${encodeURIComponent(barcode)}`,
+        `searchCriteria[filterGroups][0][filters][0][conditionType]=eq`,
+        `searchCriteria[pageSize]=5`,
+      ].join('&');
+
+      const data = await this.apiClient.get<{ items: any[] }>(`products?${criteria}`);
+      const items = data.items || [];
+      const result = await this.getProducts({ ids: items.map((p: any) => p.id) });
+      return result.products.map(p => this.mapToSearchProduct(p));
+    } catch (error) {
+      this.logger.error(
+        { message: `Magento barcode search failed for ${barcode}` },
+        error instanceof Error ? error : new Error(String(error))
+      );
+      return [];
+    }
+  }
+
+  /**
    * Get all categories from Magento
    */
   async getCategories(): Promise<string[]> {
@@ -201,17 +218,7 @@ export class MagentoSearchService extends BaseSearchService {
     }
 
     try {
-      const apiUrl = `${this.config.storeUrl}/rest/V1/categories`;
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Magento API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<any>('categories');
 
       // Extract category names from the tree structure
       const categories: string[] = [];
@@ -242,18 +249,9 @@ export class MagentoSearchService extends BaseSearchService {
     }
 
     try {
-      const apiUrl = `${this.config.storeUrl}/rest/V1/categories/list?searchCriteria[filterGroups][0][filters][0][field]=name&searchCriteria[filterGroups][0][filters][0][value]=${categoryName}&searchCriteria[filterGroups][0][filters][0][conditionType]=eq`;
-
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Magento API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<{ items: any[] }>(
+        `categories/list?searchCriteria[filterGroups][0][filters][0][field]=name&searchCriteria[filterGroups][0][filters][0][value]=${categoryName}&searchCriteria[filterGroups][0][filters][0][conditionType]=eq`
+      );
       const categories = data.items || [];
 
       if (categories.length > 0) {
@@ -304,12 +302,5 @@ export class MagentoSearchService extends BaseSearchService {
         vendor: '',
       },
     };
-  }
-
-  /**
-   * Get authorization headers for Magento API
-   */
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 }

@@ -36,20 +36,22 @@ export class SyliusSearchService extends BaseSearchService {
         return false;
       }
 
+      // Configure and initialize the shared Sylius client
+      if (!this.apiClient.isInitialized()) {
+        this.apiClient.configure({
+          storeUrl: this.config.apiUrl as string,
+          apiKey: this.config.apiKey as string,
+          apiSecret: this.config.apiSecret as string,
+          accessToken: this.config.accessToken as string,
+        });
+        await this.apiClient.initialize();
+      }
+
       // Test connection with a simple API call
       try {
-        const apiUrl = `${this.config.apiUrl}/api/v1/products`;
-        const response = await fetch(apiUrl, {
-          headers: this.getAuthHeaders(),
-        });
-
-        if (response.ok) {
-          this.initialized = true;
-          return true;
-        } else {
-          this.logger.error({ message: 'Failed to connect to Sylius API' });
-          return false;
-        }
+        await this.apiClient.get('products');
+        this.initialized = true;
+        return true;
       } catch (error) {
         this.logger.error({ message: 'Error connecting to Sylius API' }, error instanceof Error ? error : new Error(String(error)));
         return false;
@@ -142,19 +144,7 @@ export class SyliusSearchService extends BaseSearchService {
       }
 
       // API endpoint with query parameters
-      const apiUrl = `${this.config.apiUrl}/api/v1/products?${queryParams.toString()}`;
-
-      // Make API request
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Sylius API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<any>(`products?${queryParams.toString()}`);
 
       return {
         products: data['hydra:member'] || [],
@@ -188,17 +178,7 @@ export class SyliusSearchService extends BaseSearchService {
     }
 
     try {
-      const apiUrl = `${this.config.apiUrl}/api/v1/taxons`;
-      const response = await fetch(apiUrl, {
-        method: 'GET',
-        headers: this.getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Sylius API request failed with status ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await this.apiClient.get<any>('taxons');
       return (data['hydra:member'] || [])
         .filter((taxon: any) => taxon.level > 0) // Filter out root taxons
         .map((taxon: any) => taxon.name);
@@ -250,12 +230,5 @@ export class SyliusSearchService extends BaseSearchService {
           })) || [],
       },
     };
-  }
-
-  /**
-   * Get authorization headers for Sylius API
-   */
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 }

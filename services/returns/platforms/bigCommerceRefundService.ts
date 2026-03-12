@@ -81,16 +81,9 @@ export class BigCommerceRefundService implements PlatformRefundServiceInterface 
    */
   private async processBigCommerceRefund(orderId: string, refundData: RefundData): Promise<RefundResult> {
     try {
-      const credentials = await this.getBigCommerceCredentials();
-      if (!credentials) {
-        throw new Error('Failed to retrieve BigCommerce API credentials');
-      }
+      this.logger.info(`Processing BigCommerce refund for order ${orderId}`);
 
-      const headers = this.apiClient['buildHeaders']();
-
-      const endpoint = `${credentials.apiUrl}/stores/${credentials.storeHash || ''}/v3/orders/${orderId}/payment_actions/refunds`;
-
-      const requestData = {
+      const data = await this.apiClient.post<{ data?: { id?: number | string } }>(`orders/${orderId}/payment_actions/refunds`, {
         items:
           refundData.items?.map(item => ({
             item_type: 'PRODUCT',
@@ -99,32 +92,8 @@ export class BigCommerceRefundService implements PlatformRefundServiceInterface 
             amount: item.amount,
           })) || [],
         reason: refundData.reason || 'Refunded via RetailPOS',
-        payments: [
-          {
-            provider_id: 'custom',
-            amount: refundData.amount || 0,
-            offline: true,
-          },
-        ],
-      };
-
-      this.logger.info(`Processing BigCommerce refund for order ${orderId} at ${endpoint}`);
-
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          ...headers,
-          Accept: 'application/json',
-        },
-        body: JSON.stringify(requestData),
+        payments: [{ provider_id: 'custom', amount: refundData.amount || 0, offline: true }],
       });
-
-      if (!response.ok) {
-        const errorBody = await response.text();
-        throw new Error(`BigCommerce refund API returned ${response.status}: ${errorBody}`);
-      }
-
-      const data = await response.json();
       const refundId = String(data.data?.id || `bigcommerce-refund-${Date.now()}`);
 
       return {

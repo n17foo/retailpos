@@ -3,7 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../utils/theme';
 import { localApiConfig, LocalApiMode } from '../../services/localapi/LocalApiConfig';
-import { localApiClient } from '../../services/localapi/LocalApiClient';
+import { localApiClient } from '../../services/clients/localapi/LocalApiClient';
 import { localApiServer } from '../../services/localapi/LocalApiServer';
 import { localApiDiscovery, DiscoveredServer } from '../../services/localapi/LocalApiDiscovery';
 import { generateUUID } from '../../utils/uuid';

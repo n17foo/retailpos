@@ -5,6 +5,7 @@ import { StripeNfcMockService } from './mock/StripeNfcMockService';
 import { WorldpayMockService } from './mock/WorldpayMockService';
 import { PaymentServiceInterface } from './PaymentServiceInterface';
 import { LoggerFactory } from '../logger/LoggerFactory';
+import { isElectron } from '../../utils/electron';
 import { USE_MOCK_PAYMENT } from '@env';
 /**
  * Available payment processors
@@ -14,6 +15,7 @@ export enum PaymentProvider {
   STRIPE = 'stripe',
   STRIPE_NFC = 'stripe_nfc',
   SQUARE = 'square',
+  ELECTRON_STRIPE = 'electron_stripe',
 }
 
 /**
@@ -39,9 +41,23 @@ export class PaymentServiceFactory {
    * Note: Only mock services are used in this build to avoid native module errors
    */
   public getPaymentService(): PaymentServiceInterface {
-    this.logger.info(`Getting payment service (mock=${USE_MOCK_PAYMENT}, provider=${this.currentProvider})`);
+    this.logger.info(`Getting payment service (mock=${USE_MOCK_PAYMENT}, provider=${this.currentProvider}, electron=${isElectron()})`);
     try {
+      // On Electron desktop, auto-resolve to the Electron payment service
+      // unless a mock is explicitly requested
+      if (isElectron() && USE_MOCK_PAYMENT !== 'true' && this.currentProvider !== PaymentProvider.ELECTRON_STRIPE) {
+        this.logger.info('Electron detected — auto-selecting ELECTRON_STRIPE provider');
+        this.currentProvider = PaymentProvider.ELECTRON_STRIPE;
+      }
+
       switch (this.currentProvider) {
+        case PaymentProvider.ELECTRON_STRIPE: {
+          if (USE_MOCK_PAYMENT === 'true') {
+            return StripeMockService.getInstance();
+          }
+          const { ElectronPaymentService } = require('./ElectronPaymentService');
+          return ElectronPaymentService.getInstance();
+        }
         case PaymentProvider.STRIPE:
           return USE_MOCK_PAYMENT === 'true' ? StripeMockService.getInstance() : require('./StripeService').StripeService.getInstance();
         case PaymentProvider.STRIPE_NFC:

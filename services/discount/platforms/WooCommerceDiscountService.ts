@@ -4,13 +4,22 @@ import { BasketItem } from '../../basket/basket';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
 import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
+interface WooCommerceCoupon {
+  date_expires?: string;
+  usage_limit?: number;
+  usage_count?: number;
+  minimum_amount?: string;
+  maximum_amount?: string;
+  discount_type?: string;
+  amount: string;
+  product_ids?: string[];
+  description?: string;
+}
+
 export class WooCommerceDiscountService extends BaseDiscountService {
-  private storeUrl = '';
-  private apiVersion = WOOCOMMERCE_API_VERSION;
   private apiClient = WooCommerceApiClient.getInstance();
 
   constructor() {
@@ -20,22 +29,17 @@ export class WooCommerceDiscountService extends BaseDiscountService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.storeUrl = (await secretsService.getSecret('WOOCOMMERCE_STORE_URL')) || process.env.WOOCOMMERCE_STORE_URL || '';
+      const storeUrl = (await secretsService.getSecret('WOOCOMMERCE_STORE_URL')) || process.env.WOOCOMMERCE_STORE_URL || '';
 
-      if (!this.storeUrl) {
+      if (!storeUrl) {
         this.logger.warn('Missing WooCommerce store URL');
         return false;
       }
 
-      // Configure and initialize the shared WooCommerce client
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({
-          storeUrl: this.storeUrl,
-          apiVersion: this.apiVersion,
-        });
+        this.apiClient.configure({ storeUrl });
         await this.apiClient.initialize();
       }
-      this.storeUrl = this.apiClient.getBaseUrl();
 
       this.initialized = true;
       return true;
@@ -48,10 +52,6 @@ export class WooCommerceDiscountService extends BaseDiscountService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async validateCoupon(code: string, basketTotal: number, _items: BasketItem[]): Promise<CouponValidationResult> {
     if (!this.initialized) {
       return { valid: false, error: 'Discount service not initialized' };
@@ -59,16 +59,7 @@ export class WooCommerceDiscountService extends BaseDiscountService {
 
     try {
       return await withTokenRefresh(ECommercePlatform.WOOCOMMERCE, async () => {
-        const params = new URLSearchParams({ code });
-        const url = `${this.storeUrl}/wp-json/${this.apiVersion}/coupons?${params.toString()}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-
-        if (!response.ok) {
-          throw new Error(`WooCommerce coupon lookup failed: ${response.status}`);
-        }
-
-        const coupons = await response.json();
+        const coupons = await this.apiClient.get<WooCommerceCoupon[]>('coupons', { code });
 
         if (!Array.isArray(coupons) || coupons.length === 0) {
           return { valid: false, error: 'Invalid coupon code' };

@@ -1,8 +1,36 @@
 import { InventoryResult, InventoryUpdate, InventoryUpdateResult } from '../InventoryServiceInterface';
 import { PlatformInventoryConfig, PlatformConfigRequirements } from './PlatformInventoryServiceInterface';
 import { BaseInventoryService } from './BaseInventoryService';
-import { WIX_API_VERSION } from '../../config/apiVersions';
 import { WixApiClient } from '../../clients/wix/WixApiClient';
+
+interface WixInventoryVariant {
+  id: string;
+  sku?: string;
+  stock?: {
+    quantity?: number;
+  };
+  variant?: {
+    sku?: string;
+  };
+}
+
+interface WixInventoryProductRecord {
+  sku?: string;
+  stock?: {
+    quantity?: number;
+  };
+  variants?: WixInventoryVariant[];
+}
+
+interface WixInventoryProductResponse {
+  product?: WixInventoryProductRecord;
+}
+
+interface WixInventoryItemResponse {
+  inventoryItem?: {
+    quantity?: number;
+  };
+}
 
 /**
  * Wix-specific inventory service implementation
@@ -26,7 +54,7 @@ export class WixInventoryService extends BaseInventoryService {
       this.config.apiKey = this.config.apiKey || process.env.WIX_API_KEY || '';
       this.config.siteId = this.config.siteId || process.env.WIX_SITE_ID || '';
       this.config.accountId = this.config.accountId || process.env.WIX_ACCOUNT_ID || '';
-      this.config.apiVersion = this.config.apiVersion || process.env.WIX_API_VERSION || WIX_API_VERSION;
+      this.config.apiVersion = this.config.apiVersion || process.env.WIX_API_VERSION || '';
 
       if (!this.config.apiKey || !this.config.siteId) {
         this.logger.warn({ message: 'Missing Wix API configuration' });
@@ -54,34 +82,19 @@ export class WixInventoryService extends BaseInventoryService {
     try {
       for (const productId of productIds) {
         try {
-          // Get product to retrieve inventory
-          const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/products/${productId}`;
-          const response = await fetch(apiUrl, {
-            headers: this.getAuthHeaders(),
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            const product = data.product;
-
-            // Get inventory from variants or product level
-            if (product.variants && product.variants.length > 0) {
-              for (const variant of product.variants) {
-                items.push({
-                  productId,
-                  variantId: variant.id,
-                  sku: variant.variant?.sku || variant.sku,
-                  quantity: variant.stock?.quantity || 0,
-                });
-              }
-            } else {
+          const data = await this.apiClient.get<WixInventoryProductResponse>(`stores/v1/products/${productId}`);
+          const product = data.product;
+          if (product.variants && product.variants.length > 0) {
+            for (const variant of product.variants) {
               items.push({
                 productId,
-                variantId: productId,
-                sku: product.sku,
-                quantity: product.stock?.quantity || 0,
+                variantId: variant.id,
+                sku: variant.variant?.sku || variant.sku,
+                quantity: variant.stock?.quantity || 0,
               });
             }
+          } else {
+            items.push({ productId, variantId: productId, sku: product.sku, quantity: product.stock?.quantity || 0 });
           }
         } catch (error) {
           this.logger.error(
@@ -111,61 +124,29 @@ export class WixInventoryService extends BaseInventoryService {
 
     for (const update of updates) {
       try {
-        // Wix uses the inventory API for updates
-        const apiUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/inventoryItems/${update.variantId || update.productId}`;
+        const invItemId = update.variantId || update.productId;
 
-        // Get current quantity if adjustment
         let newQuantity = update.quantity;
         if (update.adjustment === true) {
-          const currentResponse = await fetch(apiUrl, {
-            headers: this.getAuthHeaders(),
-          });
-          if (currentResponse.ok) {
-            const current = await currentResponse.json();
+          try {
+            const current = await this.apiClient.get<WixInventoryItemResponse>(`stores/v1/inventoryItems/${invItemId}`);
             newQuantity = (current.inventoryItem?.quantity || 0) + update.quantity;
+          } catch {
+            /* keep update.quantity */
           }
         }
 
-        const response = await fetch(`${apiUrl}/updateQuantity`, {
-          method: 'POST',
-          headers: this.getAuthHeaders(),
-          body: JSON.stringify({
-            inventoryItem: {
-              trackQuantity: true,
-              quantity: newQuantity,
-              inStock: newQuantity > 0,
-            },
-          }),
-        });
-
-        if (response.ok) {
-          result.successful++;
-        } else {
-          // Try alternative product update endpoint
-          const productUrl = `https://www.wixapis.com/stores/${this.config.apiVersion}/products/${update.productId}`;
-          const productResponse = await fetch(productUrl, {
-            method: 'PATCH',
-            headers: this.getAuthHeaders(),
-            body: JSON.stringify({
-              product: {
-                stock: {
-                  trackInventory: true,
-                  quantity: newQuantity,
-                  inStock: newQuantity > 0,
-                },
-              },
-            }),
+        try {
+          await this.apiClient.post(`stores/v1/inventoryItems/${invItemId}/updateQuantity`, {
+            inventoryItem: { trackQuantity: true, quantity: newQuantity, inStock: newQuantity > 0 },
           });
-
-          if (productResponse.ok) {
-            result.successful++;
-          } else {
-            result.failed++;
-            result.errors.push({
-              productId: update.productId,
-              error: `Failed to update inventory: ${response.statusText}`,
-            });
-          }
+          result.successful++;
+        } catch {
+          // Try alternative product update endpoint
+          await this.apiClient.put(`stores/v1/products/${update.productId}`, {
+            product: { stock: { trackInventory: true, quantity: newQuantity, inStock: newQuantity > 0 } },
+          });
+          result.successful++;
         }
       } catch (error) {
         result.failed++;
@@ -177,9 +158,5 @@ export class WixInventoryService extends BaseInventoryService {
     }
 
     return result;
-  }
-
-  protected getAuthHeaders(): Record<string, string> {
-    return this.apiClient['buildHeaders']();
   }
 }

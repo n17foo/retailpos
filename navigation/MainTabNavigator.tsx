@@ -1,10 +1,12 @@
-import React, { lazy, Suspense } from 'react';
+import React, { lazy, Suspense, useCallback } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import OrderScreen from '../screens/OrderScreen';
 import { MoreNavigator } from './MoreNavigator';
 import type { MainTabParamList } from './types';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { lightColors, typography, spacing } from '../utils/theme';
 import { canAccessTab } from '../utils/roleAccess';
 import type { UserRole } from '../repositories/UserRepository';
@@ -40,11 +42,15 @@ interface MainTabNavigatorProps {
  * Bottom tab navigation for the main app after login
  */
 export const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ username, userRole, onLogout }) => {
-  // Handler for barcode scan success
-  const handleScanSuccess = (productId: string) => {
-    // TODO: Add product to cart and navigate to Order tab
-    void productId;
-  };
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
+
+  // Handler for barcode scan success — navigate to Order tab and auto-add the scanned product
+  const handleScanSuccess = useCallback(
+    (productId: string) => {
+      navigation.navigate('Order', { scannedProductId: productId });
+    },
+    [navigation]
+  );
 
   return (
     <Tab.Navigator

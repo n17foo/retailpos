@@ -7,8 +7,19 @@ import { LoggerFactory } from '../../logger/LoggerFactory';
 import secretsService from '../../secrets/SecretsService';
 import { WixApiClient } from '../../clients/wix/WixApiClient';
 
+interface WixCoupon {
+  active?: boolean;
+  expired?: boolean;
+  percentOff?: number;
+  moneyOffAmount?: number;
+  name?: string;
+}
+
+interface WixCouponsResponse {
+  coupons?: WixCoupon[];
+}
+
 export class WixDiscountService extends BaseDiscountService {
-  private siteId = '';
   private apiClient = WixApiClient.getInstance();
 
   constructor() {
@@ -18,14 +29,14 @@ export class WixDiscountService extends BaseDiscountService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.siteId = (await secretsService.getSecret('WIX_SITE_ID')) || '';
-      if (!this.siteId) {
+      const siteId = (await secretsService.getSecret('WIX_SITE_ID')) || '';
+      if (!siteId) {
         this.logger.warn('Missing Wix site ID');
         return false;
       }
 
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({ siteId: this.siteId });
+        this.apiClient.configure({ siteId });
         await this.apiClient.initialize();
       }
 
@@ -40,23 +51,11 @@ export class WixDiscountService extends BaseDiscountService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async validateCoupon(code: string, _basketTotal: number, _items: BasketItem[]): Promise<CouponValidationResult> {
     if (!this.initialized) return { valid: false, error: 'Discount service not initialized' };
     try {
       return await withTokenRefresh(ECommercePlatform.WIX, async () => {
-        const headers = await this.getAuthHeaders();
-        const body = { filter: { code: { $eq: code } } };
-        const response = await fetch('https://www.wixapis.com/stores/v2/coupons/query', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(body),
-        });
-        if (!response.ok) throw new Error(`Wix coupon lookup failed: ${response.status}`);
-        const data = await response.json();
+        const data = await this.apiClient.post<WixCouponsResponse>('stores/v2/coupons/query', { filter: { code: { $eq: code } } });
         const coupons = data.coupons || [];
         if (coupons.length === 0) return { valid: false, error: 'Invalid coupon code' };
         const coupon = coupons[0];

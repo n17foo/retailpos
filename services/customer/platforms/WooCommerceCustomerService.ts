@@ -4,13 +4,10 @@ import { CustomerSearchOptions, CustomerSearchResult, PlatformCustomer } from '.
 import { ECommercePlatform } from '../../../utils/platforms';
 import { withTokenRefresh } from '../../token/TokenIntegration';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { WOOCOMMERCE_API_VERSION } from '../../config/apiVersions';
 import secretsService from '../../secrets/SecretsService';
 import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 export class WooCommerceCustomerService extends BaseCustomerService {
-  private storeUrl = '';
-  private apiVersion = WOOCOMMERCE_API_VERSION;
   private apiClient = WooCommerceApiClient.getInstance();
 
   constructor() {
@@ -20,22 +17,17 @@ export class WooCommerceCustomerService extends BaseCustomerService {
 
   async initialize(): Promise<boolean> {
     try {
-      this.storeUrl = (await secretsService.getSecret('WOOCOMMERCE_STORE_URL')) || process.env.WOOCOMMERCE_STORE_URL || '';
+      const storeUrl = (await secretsService.getSecret('WOOCOMMERCE_STORE_URL')) || process.env.WOOCOMMERCE_STORE_URL || '';
 
-      if (!this.storeUrl) {
+      if (!storeUrl) {
         this.logger.warn('Missing WooCommerce store URL');
         return false;
       }
 
-      // Configure and initialize the shared WooCommerce client
       if (!this.apiClient.isInitialized()) {
-        this.apiClient.configure({
-          storeUrl: this.storeUrl,
-          apiVersion: this.apiVersion,
-        });
+        this.apiClient.configure({ storeUrl });
         await this.apiClient.initialize();
       }
-      this.storeUrl = this.apiClient.getBaseUrl();
 
       this.initialized = true;
       return true;
@@ -48,10 +40,6 @@ export class WooCommerceCustomerService extends BaseCustomerService {
     }
   }
 
-  protected async getAuthHeaders(): Promise<Record<string, string>> {
-    return this.apiClient['buildHeaders']();
-  }
-
   async searchCustomers(options: CustomerSearchOptions): Promise<CustomerSearchResult> {
     if (!this.initialized) {
       return { customers: [], hasMore: false };
@@ -60,37 +48,16 @@ export class WooCommerceCustomerService extends BaseCustomerService {
     try {
       return await withTokenRefresh(ECommercePlatform.WOOCOMMERCE, async () => {
         const limit = options.limit || 10;
-        const params = new URLSearchParams();
-        params.append('per_page', String(limit));
+        const params: Record<string, string> = { per_page: String(limit) };
+        if (options.query) params['search'] = options.query;
+        if (options.cursor) params['page'] = options.cursor;
 
-        if (options.query) {
-          params.append('search', options.query);
-        }
-
-        if (options.cursor) {
-          params.append('page', options.cursor);
-        }
-
-        const url = `${this.storeUrl}/wp-json/${this.apiVersion}/customers?${params.toString()}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-
-        if (!response.ok) {
-          throw new Error(`WooCommerce customer search failed: ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = await this.apiClient.get<any[]>('customers', params);
         const customers: PlatformCustomer[] = (data || []).map((c: any) => this.mapCustomer(c));
-
-        const totalPages = parseInt(response.headers.get('X-WP-TotalPages') || '1', 10);
         const currentPage = options.cursor ? parseInt(options.cursor, 10) : 1;
-        const hasMore = currentPage < totalPages;
+        const hasMore = data.length === limit;
 
-        return {
-          customers,
-          hasMore,
-          nextCursor: hasMore ? String(currentPage + 1) : undefined,
-        };
+        return { customers, hasMore, nextCursor: hasMore ? String(currentPage + 1) : undefined };
       });
     } catch (error) {
       this.logger.error({ message: 'Error searching WooCommerce customers' }, error instanceof Error ? error : new Error(String(error)));
@@ -103,13 +70,7 @@ export class WooCommerceCustomerService extends BaseCustomerService {
 
     try {
       return await withTokenRefresh(ECommercePlatform.WOOCOMMERCE, async () => {
-        const url = `${this.storeUrl}/wp-json/${this.apiVersion}/customers/${customerId}`;
-        const headers = await this.getAuthHeaders();
-        const response = await fetch(url, { headers });
-
-        if (!response.ok) return null;
-
-        const data = await response.json();
+        const data = await this.apiClient.get<any>(`customers/${customerId}`);
         return this.mapCustomer(data);
       });
     } catch (error) {
