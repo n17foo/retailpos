@@ -144,8 +144,7 @@
   },
   "lint-staged": {
     "*.{ts,tsx}": [
-      "yarn lint",
-      "eslint --fix",
+      "yarn lint:fix",
       "prettier --write"
     ],
     "*.{js,jsx}": [
