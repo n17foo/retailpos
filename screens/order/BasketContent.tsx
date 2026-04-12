@@ -4,7 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius } from '../../utils/theme';
 import { useBasketContext, CartItem } from '../../contexts/BasketProvider';
 import { formatMoney } from '../../utils/money';
-import { CheckoutModal, PaymentMethod } from '../../components/CheckoutModal';
+import { CheckoutModal, PaymentSelection } from '../../components/CheckoutModal';
 import { cashDrawerServiceFactory } from '../../services/drawer/CashDrawerServiceFactory';
 import { StatusBadge } from '../../components/StatusBadge';
 import { ECommercePlatform } from '../../utils/platforms';
@@ -74,14 +74,14 @@ export const BasketContent: React.FC<BasketContentProps> = ({ platform, onChecko
     }
   };
 
-  const handlePayment = async (method: PaymentMethod) => {
+  const handlePayment = async (selection: PaymentSelection) => {
     if (!currentOrderId) return;
 
     setIsProcessing(true);
     try {
       await markPaymentProcessing(currentOrderId);
 
-      const paymentMethod = method === 'terminal' ? 'card_terminal' : method;
+      const paymentMethod = selection.method === 'terminal' ? 'card_terminal' : selection.method;
       const result = await completePayment(currentOrderId, paymentMethod);
 
       if (result.success) {

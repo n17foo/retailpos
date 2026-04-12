@@ -7,7 +7,7 @@ import { formatMoney } from '../../utils/money';
 import { ECommercePlatform } from '../../utils/platforms';
 import { useCurrency } from '../../hooks/useCurrency';
 import { useTranslate } from '../../hooks/useTranslate';
-import { CheckoutModal, PaymentMethod, PaymentSelection } from '../../components/CheckoutModal';
+import { CheckoutModal, PaymentSelection } from '../../components/CheckoutModal';
 import { usePayment } from '../../hooks/usePayment';
 import { cashDrawerServiceFactory } from '../../services/drawer/CashDrawerServiceFactory';
 

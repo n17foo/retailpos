@@ -79,7 +79,7 @@ const OrderScreen: React.FC<OrderScreenProps> = ({ username = 'User' }) => {
         try {
           const registry = PlatformServiceRegistry.getInstance();
           const service = registry.getProductService(currentPlatform || ECommercePlatform.OFFLINE);
-          const result = await service?.getProductById?.(scannedId);
+          const result = await service?.getProducts({ ids: [scannedId], limit: 1 }).then(r => r.products[0]);
           if (result) {
             const { getDefaultVariant } = await import('../services/product/types');
             const { mapToUnifiedProducts } = await import('../services/product/mappers');
