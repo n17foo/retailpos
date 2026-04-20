@@ -1,4 +1,4 @@
-import { localApiConfig } from '../../localapi/LocalApiConfig';
+import { instoreApiConfig } from '../../instoreapi/InstoreApiConfig';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { OrderRow, CreateOrderInput } from '../../../repositories/OrderRepository';
 import { OrderItemRow, CreateOrderItemInput } from '../../../repositories/OrderItemRepository';
@@ -7,13 +7,13 @@ import { TaxProfileRow } from '../../../repositories/TaxProfileRepository';
 import { ReturnRow, CreateReturnInput } from '../../../repositories/ReturnRepository';
 import { Category } from '../../../services/category/CategoryServiceInterface';
 
-export interface LocalApiHealthResponse {
+export interface InstoreApiHealthResponse {
   ok: boolean;
   registerId?: string;
   registerName?: string;
 }
 
-export interface LocalApiSyncEventsResponse<TEvent> {
+export interface InstoreApiSyncEventsResponse<TEvent> {
   events: TEvent[];
 }
 
@@ -22,18 +22,18 @@ export interface LocalApiSyncEventsResponse<TEvent> {
  * Used by registers in "client" mode to read/write shared data
  * from the server register instead of local SQLite.
  */
-export class LocalApiClient {
-  private static instance: LocalApiClient;
-  private logger = LoggerFactory.getInstance().createLogger('LocalApiClient');
+export class InstoreApiClient {
+  private static instance: InstoreApiClient;
+  private logger = LoggerFactory.getInstance().createLogger('InstoreApiClient');
   private connected = false;
 
   private constructor() {}
 
-  static getInstance(): LocalApiClient {
-    if (!LocalApiClient.instance) {
-      LocalApiClient.instance = new LocalApiClient();
+  static getInstance(): InstoreApiClient {
+    if (!InstoreApiClient.instance) {
+      InstoreApiClient.instance = new InstoreApiClient();
     }
-    return LocalApiClient.instance;
+    return InstoreApiClient.instance;
   }
 
   get isConnected(): boolean {
@@ -43,7 +43,7 @@ export class LocalApiClient {
   /** Test the connection to the server */
   async testConnection(): Promise<{ ok: boolean; registerName?: string; error?: string }> {
     try {
-      const result = await this.get<LocalApiHealthResponse>('/api/health');
+      const result = await this.get<InstoreApiHealthResponse>('/api/health');
       this.connected = result.ok === true;
       return { ok: true, registerName: result.registerName };
     } catch (error) {
@@ -55,16 +55,16 @@ export class LocalApiClient {
     }
   }
 
-  async probeHealth(baseUrl: string, secret?: string, timeoutMs: number = 2000): Promise<LocalApiHealthResponse | null> {
+  async probeHealth(baseUrl: string, secret?: string, timeoutMs: number = 2000): Promise<InstoreApiHealthResponse | null> {
     try {
-      return await this.getFromBaseUrl<LocalApiHealthResponse>(baseUrl, '/api/health', undefined, secret, timeoutMs);
+      return await this.getFromBaseUrl<InstoreApiHealthResponse>(baseUrl, '/api/health', undefined, secret, timeoutMs);
     } catch {
       return null;
     }
   }
 
   async getSyncEvents<TEvent>(since: number): Promise<TEvent[]> {
-    const result = await this.get<LocalApiSyncEventsResponse<TEvent>>('/api/sync/events', { since: String(since) });
+    const result = await this.get<InstoreApiSyncEventsResponse<TEvent>>('/api/sync/events', { since: String(since) });
     return result.events || [];
   }
 
@@ -189,9 +189,9 @@ export class LocalApiClient {
   private get headers(): Record<string, string> {
     const h: Record<string, string> = {
       'Content-Type': 'application/json',
-      'X-Register-Id': localApiConfig.current.registerId,
+      'X-Register-Id': instoreApiConfig.current.registerId,
     };
-    const secret = localApiConfig.current.sharedSecret;
+    const secret = instoreApiConfig.current.sharedSecret;
     if (secret) {
       h['x-shared-secret'] = secret;
     }
@@ -199,15 +199,15 @@ export class LocalApiClient {
   }
 
   private get baseUrl(): string {
-    return localApiConfig.baseUrl;
+    return instoreApiConfig.baseUrl;
   }
 
   private buildHeaders(secretOverride?: string): Record<string, string> {
     const h: Record<string, string> = {
       'Content-Type': 'application/json',
-      'X-Register-Id': localApiConfig.current.registerId,
+      'X-Register-Id': instoreApiConfig.current.registerId,
     };
-    const secret = secretOverride ?? localApiConfig.current.sharedSecret;
+    const secret = secretOverride ?? instoreApiConfig.current.sharedSecret;
     if (secret) {
       h['x-shared-secret'] = secret;
     }
@@ -313,4 +313,4 @@ export class LocalApiClient {
   }
 }
 
-export const localApiClient = LocalApiClient.getInstance();
+export const instoreApiClient = InstoreApiClient.getInstance();

@@ -42,8 +42,8 @@ jest.mock('../../repositories/OrderItemRepository', () => ({
     findByOrderId: jest.fn().mockResolvedValue([]),
   })),
 }));
-jest.mock('../../services/localapi/LocalApiConfig', () => ({
-  localApiConfig: { isClient: false },
+jest.mock('../../services/instoreapi/InstoreApiConfig', () => ({
+  instoreApiConfig: { isClient: false },
 }));
 
 // Mock all platform refund services to avoid HTTP client imports

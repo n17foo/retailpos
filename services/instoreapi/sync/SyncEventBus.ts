@@ -1,5 +1,5 @@
 import { SyncEvent, SyncEventType } from './SyncEventTypes';
-import { localApiConfig } from '../LocalApiConfig';
+import { instoreApiConfig } from '../InstoreApiConfig';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 
 type SyncEventHandler = (event: SyncEvent) => void | Promise<void>;
@@ -36,8 +36,8 @@ export class SyncEventBus {
     const event: SyncEvent = {
       id: `evt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       type,
-      registerId: localApiConfig.current.registerId,
-      registerName: localApiConfig.current.registerName,
+      registerId: instoreApiConfig.current.registerId,
+      registerName: instoreApiConfig.current.registerName,
       payload,
       timestamp: Date.now(),
     };
@@ -57,7 +57,7 @@ export class SyncEventBus {
   /** Dispatch an externally received event (from server polling) */
   receive(event: SyncEvent): void {
     // Don't re-dispatch our own events
-    if (event.registerId === localApiConfig.current.registerId) return;
+    if (event.registerId === instoreApiConfig.current.registerId) return;
     this.dispatch(event);
   }
 

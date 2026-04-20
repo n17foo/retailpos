@@ -1,9 +1,9 @@
 import { ReturnRepository, ReturnRow, CreateReturnInput } from './ReturnRepository';
-import { localApiClient } from '../services/clients/localapi/LocalApiClient';
+import { instoreApiClient } from '../services/clients/instoreapi/InstoreApiClient';
 
-export class LocalApiReturnRepository implements ReturnRepository {
+export class InstoreApiReturnRepository implements ReturnRepository {
   async create(input: CreateReturnInput): Promise<string> {
-    return localApiClient.createReturn(input);
+    return instoreApiClient.createReturn(input);
   }
 
   async findById(_id: string): Promise<ReturnRow | null> {
@@ -11,15 +11,15 @@ export class LocalApiReturnRepository implements ReturnRepository {
   }
 
   async findByOrderId(orderId: string): Promise<ReturnRow[]> {
-    return localApiClient.getReturnsByOrder(orderId);
+    return instoreApiClient.getReturnsByOrder(orderId);
   }
 
   async findAll(status?: string): Promise<ReturnRow[]> {
-    return localApiClient.getReturns(status);
+    return instoreApiClient.getReturns(status);
   }
 
   async findByDateRange(_from: number, _to: number): Promise<ReturnRow[]> {
-    return localApiClient.getReturns();
+    return instoreApiClient.getReturns();
   }
 
   async updateStatus(_id: string, _status: string, _processedBy?: string): Promise<void> {

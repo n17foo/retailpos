@@ -2,24 +2,24 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../utils/theme';
-import { localApiConfig, LocalApiMode } from '../../services/localapi/LocalApiConfig';
-import { localApiClient } from '../../services/clients/localapi/LocalApiClient';
-import { localApiServer } from '../../services/localapi/LocalApiServer';
-import { localApiDiscovery, DiscoveredServer } from '../../services/localapi/LocalApiDiscovery';
+import { instoreApiConfig, InstoreApiMode } from '../../services/instoreapi/InstoreApiConfig';
+import { instoreApiClient } from '../../services/clients/instoreapi/InstoreApiClient';
+import { instoreApiServer } from '../../services/instoreapi/InstoreApiServer';
+import { instoreApiDiscovery, DiscoveredServer } from '../../services/instoreapi/InstoreApiDiscovery';
 import { BasketServiceFactory } from '../../services/basket/BasketServiceFactory';
-import { syncPoller } from '../../services/localapi/sync/SyncPoller';
+import { syncPoller } from '../../services/instoreapi/sync/SyncPoller';
 import { generateUUID } from '../../utils/uuid';
 import { useTranslate } from '../../hooks/useTranslate';
 
-const MODE_OPTION_KEYS: { value: LocalApiMode; labelKey: string; descKey: string }[] = [
-  { value: 'standalone', labelKey: 'settings.localApi.standalone', descKey: 'settings.localApi.standaloneDesc' },
-  { value: 'server', labelKey: 'settings.localApi.server', descKey: 'settings.localApi.serverDesc' },
-  { value: 'client', labelKey: 'settings.localApi.client', descKey: 'settings.localApi.clientDesc' },
+const MODE_OPTION_KEYS: { value: InstoreApiMode; labelKey: string; descKey: string }[] = [
+  { value: 'standalone', labelKey: 'settings.instoreApi.standalone', descKey: 'settings.instoreApi.standaloneDesc' },
+  { value: 'server', labelKey: 'settings.instoreApi.server', descKey: 'settings.instoreApi.serverDesc' },
+  { value: 'client', labelKey: 'settings.instoreApi.client', descKey: 'settings.instoreApi.clientDesc' },
 ];
 
-const LocalApiSettingsTab: React.FC = () => {
+const InstoreApiSettingsTab: React.FC = () => {
   const { t } = useTranslate();
-  const [mode, setMode] = useState<LocalApiMode>('standalone');
+  const [mode, setMode] = useState<InstoreApiMode>('standalone');
   const [port, setPort] = useState('8787');
   const [sharedSecret, setSharedSecret] = useState('');
   const [registerName, setRegisterName] = useState('Register 1');
@@ -31,7 +31,7 @@ const LocalApiSettingsTab: React.FC = () => {
 
   useEffect(() => {
     (async () => {
-      const settings = await localApiConfig.load();
+      const settings = await instoreApiConfig.load();
       setMode(settings.mode);
       setPort(String(settings.port));
       setSharedSecret(settings.sharedSecret);
@@ -41,8 +41,8 @@ const LocalApiSettingsTab: React.FC = () => {
   }, []);
 
   const handleSave = useCallback(async () => {
-    const registerId = localApiConfig.current.registerId || generateUUID();
-    await localApiConfig.save({
+    const registerId = instoreApiConfig.current.registerId || generateUUID();
+    await instoreApiConfig.save({
       mode,
       port: parseInt(port, 10) || 8787,
       sharedSecret,
@@ -52,29 +52,29 @@ const LocalApiSettingsTab: React.FC = () => {
     });
 
     if (mode === 'server') {
-      localApiServer.start();
+      instoreApiServer.start();
       syncPoller.stop();
       BasketServiceFactory.getInstance().reset();
-      Alert.alert(t('common.saved'), t('settings.localApi.savedServer', { port }));
+      Alert.alert(t('common.saved'), t('settings.instoreApi.savedServer', { port }));
     } else if (mode === 'client') {
-      localApiServer.stop();
+      instoreApiServer.stop();
       syncPoller.start();
       BasketServiceFactory.getInstance().reset();
-      Alert.alert(t('common.saved'), t('settings.localApi.savedClient'));
+      Alert.alert(t('common.saved'), t('settings.instoreApi.savedClient'));
     } else {
-      localApiServer.stop();
+      instoreApiServer.stop();
       syncPoller.stop();
       BasketServiceFactory.getInstance().reset();
-      Alert.alert(t('common.saved'), t('settings.localApi.savedStandalone'));
+      Alert.alert(t('common.saved'), t('settings.instoreApi.savedStandalone'));
     }
   }, [mode, port, sharedSecret, registerName, serverAddress, t]);
 
   const handleTestConnection = useCallback(async () => {
     setConnectionStatus('testing');
-    const result = await localApiClient.testConnection();
+    const result = await instoreApiClient.testConnection();
     setConnectionStatus(result.ok ? 'connected' : 'failed');
     if (!result.ok) {
-      Alert.alert(t('settings.localApi.connectionFailed'), result.error || t('settings.localApi.connectionFailedMessage'));
+      Alert.alert(t('settings.instoreApi.connectionFailed'), result.error || t('settings.instoreApi.connectionFailedMessage'));
     }
   }, [t]);
 
@@ -83,7 +83,7 @@ const LocalApiSettingsTab: React.FC = () => {
     setScanProgress(0);
     setDiscoveredServers([]);
 
-    const servers = await localApiDiscovery.scanSubnet(undefined, (checked, total) => {
+    const servers = await instoreApiDiscovery.scanSubnet(undefined, (checked, total) => {
       setScanProgress(Math.round((checked / total) * 100));
     });
 
@@ -91,32 +91,32 @@ const LocalApiSettingsTab: React.FC = () => {
     setScanning(false);
 
     if (servers.length === 0) {
-      Alert.alert(t('settings.localApi.noServersFound'), t('settings.localApi.noServersFoundMessage'));
+      Alert.alert(t('settings.instoreApi.noServersFound'), t('settings.instoreApi.noServersFoundMessage'));
     }
   }, [t]);
 
   const handleSelectServer = useCallback(async (server: DiscoveredServer) => {
     setServerAddress(server.address);
     setPort(String(server.port));
-    await localApiConfig.save({
+    await instoreApiConfig.save({
       mode: 'client',
       serverAddress: server.address,
       port: server.port,
     });
     setMode('client');
     setConnectionStatus('testing');
-    const ok = await localApiDiscovery.connectToServer(server);
+    const ok = await instoreApiDiscovery.connectToServer(server);
     setConnectionStatus(ok ? 'connected' : 'failed');
   }, []);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{t('settings.localApi.title')}</Text>
-      <Text style={styles.subtitle}>{t('settings.localApi.description')}</Text>
+      <Text style={styles.title}>{t('settings.instoreApi.title')}</Text>
+      <Text style={styles.subtitle}>{t('settings.instoreApi.description')}</Text>
 
       {/* Mode selector */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>{t('settings.localApi.mode')}</Text>
+        <Text style={styles.sectionTitle}>{t('settings.instoreApi.mode')}</Text>
         <View style={styles.modeRow}>
           {MODE_OPTION_KEYS.map(opt => (
             <TouchableOpacity
@@ -139,18 +139,18 @@ const LocalApiSettingsTab: React.FC = () => {
       {/* Common fields */}
       {mode !== 'standalone' && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.localApi.configuration')}</Text>
+          <Text style={styles.sectionTitle}>{t('settings.instoreApi.configuration')}</Text>
 
-          <Text style={styles.fieldLabel}>{t('settings.localApi.registerName')}</Text>
+          <Text style={styles.fieldLabel}>{t('settings.instoreApi.registerName')}</Text>
           <TextInput
             style={styles.input}
             value={registerName}
             onChangeText={setRegisterName}
-            placeholder={t('settings.localApi.registerNamePlaceholder')}
+            placeholder={t('settings.instoreApi.registerNamePlaceholder')}
             placeholderTextColor={lightColors.textSecondary}
           />
 
-          <Text style={styles.fieldLabel}>{t('settings.localApi.port')}</Text>
+          <Text style={styles.fieldLabel}>{t('settings.instoreApi.port')}</Text>
           <TextInput
             style={styles.input}
             value={port}
@@ -160,12 +160,12 @@ const LocalApiSettingsTab: React.FC = () => {
             placeholderTextColor={lightColors.textSecondary}
           />
 
-          <Text style={styles.fieldLabel}>{t('settings.localApi.sharedSecret')}</Text>
+          <Text style={styles.fieldLabel}>{t('settings.instoreApi.sharedSecret')}</Text>
           <TextInput
             style={styles.input}
             value={sharedSecret}
             onChangeText={setSharedSecret}
-            placeholder={t('settings.localApi.sharedSecretPlaceholder')}
+            placeholder={t('settings.instoreApi.sharedSecretPlaceholder')}
             placeholderTextColor={lightColors.textSecondary}
             secureTextEntry
           />
@@ -175,14 +175,14 @@ const LocalApiSettingsTab: React.FC = () => {
       {/* Client-specific: server address + discovery */}
       {mode === 'client' && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('settings.localApi.serverConnection')}</Text>
+          <Text style={styles.sectionTitle}>{t('settings.instoreApi.serverConnection')}</Text>
 
-          <Text style={styles.fieldLabel}>{t('settings.localApi.serverAddress')}</Text>
+          <Text style={styles.fieldLabel}>{t('settings.instoreApi.serverAddress')}</Text>
           <TextInput
             style={styles.input}
             value={serverAddress}
             onChangeText={setServerAddress}
-            placeholder={t('settings.localApi.serverAddressPlaceholder')}
+            placeholder={t('settings.instoreApi.serverAddressPlaceholder')}
             placeholderTextColor={lightColors.textSecondary}
             keyboardType="numbers-and-punctuation"
           />
@@ -208,7 +208,7 @@ const LocalApiSettingsTab: React.FC = () => {
               ) : (
                 <>
                   <MaterialIcons name="search" size={16} color={lightColors.primary} />
-                  <Text style={styles.secondaryButtonText}>{t('settings.localApi.scanNetwork')}</Text>
+                  <Text style={styles.secondaryButtonText}>{t('settings.instoreApi.scanNetwork')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -217,20 +217,20 @@ const LocalApiSettingsTab: React.FC = () => {
           {connectionStatus === 'connected' && (
             <View style={styles.statusBox}>
               <MaterialIcons name="check-circle" size={16} color={lightColors.success} />
-              <Text style={[styles.statusText, { color: lightColors.success }]}>{t('settings.localApi.connectedToServer')}</Text>
+              <Text style={[styles.statusText, { color: lightColors.success }]}>{t('settings.instoreApi.connectedToServer')}</Text>
             </View>
           )}
           {connectionStatus === 'failed' && (
             <View style={styles.statusBox}>
               <MaterialIcons name="error" size={16} color={lightColors.error} />
-              <Text style={[styles.statusText, { color: lightColors.error }]}>{t('settings.localApi.connectionFailed')}</Text>
+              <Text style={[styles.statusText, { color: lightColors.error }]}>{t('settings.instoreApi.connectionFailed')}</Text>
             </View>
           )}
 
           {/* Discovered servers */}
           {discoveredServers.length > 0 && (
             <View style={styles.discoveredList}>
-              <Text style={styles.fieldLabel}>{t('settings.localApi.discoveredServers')}</Text>
+              <Text style={styles.fieldLabel}>{t('settings.instoreApi.discoveredServers')}</Text>
               {discoveredServers.map((server, i) => (
                 <TouchableOpacity key={i} style={styles.discoveredItem} onPress={() => handleSelectServer(server)}>
                   <MaterialIcons name="dns" size={20} color={lightColors.primary} />
@@ -250,7 +250,7 @@ const LocalApiSettingsTab: React.FC = () => {
 
       {/* Save button */}
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>{t('settings.localApi.saveConfig')}</Text>
+        <Text style={styles.saveButtonText}>{t('settings.instoreApi.saveConfig')}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -413,4 +413,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default LocalApiSettingsTab;
+export default InstoreApiSettingsTab;

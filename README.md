@@ -177,7 +177,7 @@ retailpos/
 ├── repositories/              # Data access layer
 │   ├── OrderRepository.ts     # Interface + factory
 │   ├── OfflineOrderRepository.ts  # SQLite implementation
-│   ├── LocalApiOrderRepository.ts # HTTP implementation (multi-register)
+│   ├── InstoreApiOrderRepository.ts # HTTP implementation (multi-register)
 │   └── ...
 ├── services/
 │   ├── audit/                 # Audit log (KV-backed, append-only)
@@ -190,7 +190,7 @@ retailpos/
 │   ├── drawer/                # Cash drawer peripheral
 │   ├── inventory/             # Inventory queries + updates
 │   ├── kds/                   # Kitchen Display System (HTTP, WebSocket, Electron)
-│   ├── localapi/              # Multi-register local HTTP API
+│   ├── instoreapi/              # Multi-register local HTTP API
 │   ├── logger/                # Pluggable structured logger
 │   ├── notifications/         # In-app notification event bus
 │   ├── order/                 # Platform order services (9 platforms)

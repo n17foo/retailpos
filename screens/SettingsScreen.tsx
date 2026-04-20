@@ -15,7 +15,7 @@ import OfflineManagementTab from './settings/OfflineManagementTab';
 import ReceiptSettingsTab from './settings/ReceiptSettingsTab';
 import POSConfigSettingsTab from './settings/POSConfigSettingsTab';
 import AuthMethodSettingsTab from './settings/AuthMethodSettingsTab';
-import LocalApiSettingsTab from './settings/LocalApiSettingsTab';
+import InstoreApiSettingsTab from './settings/InstoreApiSettingsTab';
 import KdsSettingsTab from './settings/KdsSettingsTab';
 
 type SettingsTab =
@@ -134,7 +134,7 @@ const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
       case 'receipt':
         return <ReceiptSettingsTab />;
       case 'multiregister':
-        return <LocalApiSettingsTab />;
+        return <InstoreApiSettingsTab />;
       case 'kds':
         return <KdsSettingsTab />;
     }

@@ -1,6 +1,7 @@
 import { CreateOrderItemInput } from './OrderItemRepository';
-import { localApiConfig } from '../services/localapi/LocalApiConfig';
+import { instoreApiConfig } from '../services/instoreapi/InstoreApiConfig';
 import { OfflineOrderRepository } from './OfflineOrderRepository';
+import { InstoreApiOrderRepository } from './InstoreApiOrderRepository';
 
 /** DB row shape for the unified orders table */
 export interface OrderRow {
@@ -73,10 +74,8 @@ export const orderRepository = new OfflineOrderRepository();
  * Client             → LocalApiOrderRepository (HTTP to server register)
  */
 export function getOrderRepository(): OrderRepository {
-  if (localApiConfig.isClient) {
-    // Lazy import to avoid circular dependency at module load time
-    const { LocalApiOrderRepository } = require('./LocalApiOrderRepository');
-    return new LocalApiOrderRepository();
+  if (instoreApiConfig.isClient) {
+    return new InstoreApiOrderRepository();
   }
   return orderRepository;
 }

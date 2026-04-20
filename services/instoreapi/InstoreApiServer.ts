@@ -1,4 +1,4 @@
-import { localApiConfig } from './LocalApiConfig';
+import { instoreApiConfig } from './InstoreApiConfig';
 import { LoggerFactory } from '../logger/LoggerFactory';
 import { orderRepository, CreateOrderInput } from '../../repositories/OrderRepository';
 import { OrderItemRepository, CreateOrderItemInput } from '../../repositories/OrderItemRepository';
@@ -19,18 +19,18 @@ interface RouteHandler {
 }
 
 /**
- * Lightweight local API server for multi-register offline setups.
+ * Lightweight instoreapi API server for multi-register offline setups.
  *
  * In React Native / Expo, we can't run a traditional Express server.
  * This service provides the *logic layer* — route definitions and handlers —
  * that can be mounted on top of a transport (e.g. a polled HTTP server via
  * `react-native-http-bridge`, or a WebSocket relay).
  *
- * The actual transport binding is in `LocalApiTransport.ts`.
+ * The actual transport binding is in `InstoreApiTransport.ts`.
  */
-export class LocalApiServer {
-  private static instance: LocalApiServer;
-  private logger = LoggerFactory.getInstance().createLogger('LocalApiServer');
+export class InstoreApiServer {
+  private static instance: InstoreApiServer;
+  private logger = LoggerFactory.getInstance().createLogger('InstoreApiServer');
   private routes: RouteHandler[] = [];
   private running = false;
   private orderItemRepo = new OrderItemRepository();
@@ -40,11 +40,11 @@ export class LocalApiServer {
     this.registerRoutes();
   }
 
-  static getInstance(): LocalApiServer {
-    if (!LocalApiServer.instance) {
-      LocalApiServer.instance = new LocalApiServer();
+  static getInstance(): InstoreApiServer {
+    if (!InstoreApiServer.instance) {
+      InstoreApiServer.instance = new InstoreApiServer();
     }
-    return LocalApiServer.instance;
+    return InstoreApiServer.instance;
   }
 
   get isRunning(): boolean {
@@ -52,12 +52,12 @@ export class LocalApiServer {
   }
 
   start(): void {
-    if (!localApiConfig.isServer) {
+    if (!instoreApiConfig.isServer) {
       this.logger.warn('Cannot start server — not in server mode');
       return;
     }
     this.running = true;
-    this.logger.info(`Local API server started on port ${localApiConfig.current.port}`);
+    this.logger.info(`Local API server started on port ${instoreApiConfig.current.port}`);
   }
 
   stop(): void {
@@ -80,7 +80,7 @@ export class LocalApiServer {
     }
 
     // Authenticate via shared secret
-    const secret = localApiConfig.current.sharedSecret;
+    const secret = instoreApiConfig.current.sharedSecret;
     if (secret && headers?.['x-shared-secret'] !== secret) {
       return { status: 401, body: { error: 'Unauthorized' } };
     }
@@ -110,8 +110,8 @@ export class LocalApiServer {
       status: 200,
       body: {
         ok: true,
-        registerId: localApiConfig.current.registerId,
-        registerName: localApiConfig.current.registerName,
+        registerId: instoreApiConfig.current.registerId,
+        registerName: instoreApiConfig.current.registerName,
         timestamp: Date.now(),
       },
     }));
@@ -293,4 +293,4 @@ export class LocalApiServer {
   }
 }
 
-export const localApiServer = LocalApiServer.getInstance();
+export const instoreApiServer = InstoreApiServer.getInstance();

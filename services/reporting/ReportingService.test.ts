@@ -22,8 +22,8 @@ jest.mock('../logger/LoggerFactory', () => ({
 }));
 
 jest.mock('../../utils/db', () => ({}));
-jest.mock('../../services/localapi/LocalApiConfig', () => ({
-  localApiConfig: { isClient: false },
+jest.mock('../../services/instoreapi/InstoreApiConfig', () => ({
+  instoreApiConfig: { isClient: false },
 }));
 jest.mock('../../repositories/OrderRepository', () => ({
   orderRepository: { findByDateRange: jest.fn() },

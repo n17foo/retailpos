@@ -1,5 +1,6 @@
-import { localApiConfig } from '../services/localapi/LocalApiConfig';
+import { instoreApiConfig } from '../services/instoreapi/InstoreApiConfig';
 import { OfflineReturnRepository } from './OfflineReturnRepository';
+import { InstoreApiReturnRepository } from './InstoreApiReturnRepository';
 
 export interface ReturnRow {
   id: string;
@@ -55,9 +56,8 @@ export const returnRepository = new OfflineReturnRepository();
  * Client             → LocalApiReturnRepository (HTTP to server register)
  */
 export function getReturnRepository(): ReturnRepository {
-  if (localApiConfig.isClient) {
-    const { LocalApiReturnRepository } = require('./LocalApiReturnRepository');
-    return new LocalApiReturnRepository();
+  if (instoreApiConfig.isClient) {
+    return new InstoreApiReturnRepository();
   }
   return returnRepository;
 }

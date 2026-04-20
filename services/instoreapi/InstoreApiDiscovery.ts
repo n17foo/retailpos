@@ -1,6 +1,6 @@
-import { localApiConfig } from './LocalApiConfig';
+import { instoreApiConfig } from './InstoreApiConfig';
 import { LoggerFactory } from '../logger/LoggerFactory';
-import { localApiClient } from '../clients/localapi/LocalApiClient';
+import { instoreApiClient } from '../clients/instoreapi/InstoreApiClient';
 
 export interface DiscoveredServer {
   address: string;
@@ -17,18 +17,18 @@ export interface DiscoveredServer {
  * mDNS/Bonjour via a native module, but subnet scanning works without
  * native dependencies and is sufficient for small retail LANs.
  */
-export class LocalApiDiscovery {
-  private static instance: LocalApiDiscovery;
-  private logger = LoggerFactory.getInstance().createLogger('LocalApiDiscovery');
+export class InstoreApiDiscovery {
+  private static instance: InstoreApiDiscovery;
+  private logger = LoggerFactory.getInstance().createLogger('InstoreApiDiscovery');
   private scanning = false;
 
   private constructor() {}
 
-  static getInstance(): LocalApiDiscovery {
-    if (!LocalApiDiscovery.instance) {
-      LocalApiDiscovery.instance = new LocalApiDiscovery();
+  static getInstance(): InstoreApiDiscovery {
+    if (!InstoreApiDiscovery.instance) {
+      InstoreApiDiscovery.instance = new InstoreApiDiscovery();
     }
-    return LocalApiDiscovery.instance;
+    return InstoreApiDiscovery.instance;
   }
 
   get isScanning(): boolean {
@@ -44,8 +44,8 @@ export class LocalApiDiscovery {
     if (this.scanning) return [];
     this.scanning = true;
 
-    const port = localApiConfig.current.port;
-    const secret = localApiConfig.current.sharedSecret;
+    const port = instoreApiConfig.current.port;
+    const secret = instoreApiConfig.current.sharedSecret;
     const discovered: DiscoveredServer[] = [];
 
     // Determine subnet to scan
@@ -94,7 +94,7 @@ export class LocalApiDiscovery {
    */
   async probeAddress(address: string, port: number, secret?: string): Promise<DiscoveredServer | null> {
     try {
-      const data = await localApiClient.probeHealth(`http://${address}:${port}`, secret, 2000);
+      const data = await instoreApiClient.probeHealth(`http://${address}:${port}`, secret, 2000);
       if (!data || data.ok !== true) return null;
 
       return {
@@ -113,13 +113,13 @@ export class LocalApiDiscovery {
    * and tests the connection via the client.
    */
   async connectToServer(server: DiscoveredServer): Promise<boolean> {
-    await localApiConfig.save({
+    await instoreApiConfig.save({
       mode: 'client',
       serverAddress: server.address,
       port: server.port,
     });
 
-    const result = await localApiClient.testConnection();
+    const result = await instoreApiClient.testConnection();
     if (result.ok) {
       this.logger.info(`Connected to server at ${server.address}:${server.port}`);
     } else {
@@ -129,4 +129,4 @@ export class LocalApiDiscovery {
   }
 }
 
-export const localApiDiscovery = LocalApiDiscovery.getInstance();
+export const instoreApiDiscovery = InstoreApiDiscovery.getInstance();

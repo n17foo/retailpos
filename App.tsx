@@ -18,8 +18,8 @@ import { queueManager } from './services/queue/QueueManager';
 import { backgroundSyncService } from './services/sync/BackgroundSyncService';
 import { posConfig } from './services/config/POSConfigService';
 import { authConfig } from './services/auth/AuthConfigService';
-import { localApiConfig } from './services/localapi/LocalApiConfig';
-import { syncPoller } from './services/localapi/sync/SyncPoller';
+import { instoreApiConfig } from './services/instoreapi/InstoreApiConfig';
+import { syncPoller } from './services/instoreapi/sync/SyncPoller';
 import RootNavigator from './navigation/RootNavigator';
 import ErrorBoundary from './components/ErrorBoundary';
 import { NotificationProvider, useNotifications } from './contexts/NotificationProvider';
@@ -112,10 +112,10 @@ const AppContent = () => {
     });
 
     // Load local API config and start SyncPoller if in client mode
-    localApiConfig
+    instoreApiConfig
       .load()
       .then(() => {
-        if (localApiConfig.isClient) {
+        if (instoreApiConfig.isClient) {
           syncPoller.start();
           loggerRef.current.info({ message: 'SyncPoller started — client mode active' });
         }

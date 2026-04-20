@@ -1,8 +1,8 @@
-import { localApiConfig } from '../LocalApiConfig';
+import { instoreApiConfig } from '../InstoreApiConfig';
 import { syncEventBus } from './SyncEventBus';
 import { SyncEvent } from './SyncEventTypes';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { localApiClient } from '../../clients/localapi/LocalApiClient';
+import { instoreApiClient } from '../../clients/instoreapi/InstoreApiClient';
 
 /**
  * Polls the server register for new sync events.
@@ -34,7 +34,7 @@ export class SyncPoller {
 
   start(intervalMs?: number): void {
     if (this.running) return;
-    if (!localApiConfig.isClient) {
+    if (!instoreApiConfig.isClient) {
       this.logger.warn('SyncPoller only runs in client mode');
       return;
     }
@@ -74,7 +74,7 @@ export class SyncPoller {
 
   private async poll(): Promise<void> {
     try {
-      const events = await localApiClient.getSyncEvents<SyncEvent>(this.lastTimestamp);
+      const events = await instoreApiClient.getSyncEvents<SyncEvent>(this.lastTimestamp);
 
       if (events.length > 0) {
         this.logger.info(`Received ${events.length} sync event(s)`);

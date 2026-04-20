@@ -1,34 +1,34 @@
 import { OrderRepository, OrderRow, CreateOrderInput } from './OrderRepository';
 import { CreateOrderItemInput } from './OrderItemRepository';
-import { localApiClient } from '../services/clients/localapi/LocalApiClient';
+import { instoreApiClient } from '../services/clients/instoreapi/InstoreApiClient';
 
-export class LocalApiOrderRepository implements OrderRepository {
+export class InstoreApiOrderRepository implements OrderRepository {
   async create(input: CreateOrderInput): Promise<void> {
     // In client mode, create is always called via createWithItems
     // This no-op prevents double-creation if called directly
-    await localApiClient.createOrder(input, []);
+    await instoreApiClient.createOrder(input, []);
   }
 
   async createWithItems(input: CreateOrderInput, items: CreateOrderItemInput[]): Promise<void> {
-    await localApiClient.createOrder(input, items);
+    await instoreApiClient.createOrder(input, items);
   }
 
   async findById(orderId: string): Promise<OrderRow | null> {
-    const result = await localApiClient.getOrder(orderId);
+    const result = await instoreApiClient.getOrder(orderId);
     return result?.order ?? null;
   }
 
   async findAll(status?: string): Promise<OrderRow[]> {
-    return localApiClient.getOrders(status);
+    return instoreApiClient.getOrders(status);
   }
 
   async findUnsynced(): Promise<OrderRow[]> {
-    return localApiClient.getUnsyncedOrders();
+    return instoreApiClient.getUnsyncedOrders();
   }
 
   async findByDateRange(fromTimestamp: number, toTimestamp: number, cashierId?: string): Promise<OrderRow[]> {
     // Server doesn't have a date-range endpoint yet — fall back to getOrders and filter client-side
-    const rows = await localApiClient.getOrders();
+    const rows = await instoreApiClient.getOrders();
     return rows.filter(r => {
       const inRange = r.created_at >= fromTimestamp && r.created_at < toTimestamp;
       return cashierId ? inRange && r.cashier_id === cashierId : inRange;
@@ -36,11 +36,11 @@ export class LocalApiOrderRepository implements OrderRepository {
   }
 
   async updateStatus(orderId: string, status: string): Promise<void> {
-    await localApiClient.updateOrderStatus(orderId, status);
+    await instoreApiClient.updateOrderStatus(orderId, status);
   }
 
   async updatePayment(orderId: string, paymentMethod: string, transactionId: string | null): Promise<void> {
-    await localApiClient.updateOrderPayment(orderId, paymentMethod, transactionId ?? undefined);
+    await instoreApiClient.updateOrderPayment(orderId, paymentMethod, transactionId ?? undefined);
   }
 
   async updateSyncSuccess(orderId: string, platformOrderId: string): Promise<void> {
@@ -57,6 +57,6 @@ export class LocalApiOrderRepository implements OrderRepository {
   }
 
   async delete(orderId: string): Promise<void> {
-    await localApiClient.updateOrderStatus(orderId, 'cancelled');
+    await instoreApiClient.updateOrderStatus(orderId, 'cancelled');
   }
 }

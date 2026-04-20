@@ -1,10 +1,10 @@
 import { keyValueRepository } from '../../repositories/KeyValueRepository';
 import { LoggerFactory } from '../logger/LoggerFactory';
 
-export type LocalApiMode = 'standalone' | 'server' | 'client';
+export type InstoreApiMode = 'standalone' | 'server' | 'client';
 
-export interface LocalApiSettings {
-  mode: LocalApiMode;
+export interface InstoreApiSettings {
+  mode: InstoreApiMode;
   serverAddress: string;
   port: number;
   sharedSecret: string;
@@ -12,7 +12,7 @@ export interface LocalApiSettings {
   registerName: string;
 }
 
-const DEFAULTS: LocalApiSettings = {
+const DEFAULTS: InstoreApiSettings = {
   mode: 'standalone',
   serverAddress: '',
   port: 8787,
@@ -21,7 +21,7 @@ const DEFAULTS: LocalApiSettings = {
   registerName: 'Register 1',
 };
 
-const KV_KEY = 'localapi.settings';
+const KV_KEY = 'instoreapi.settings';
 
 /**
  * Configuration for the local shared API.
@@ -29,22 +29,22 @@ const KV_KEY = 'localapi.settings';
  * - **server**: this device runs the HTTP server; other registers connect to it
  * - **client**: this device connects to a server register over the LAN
  */
-export class LocalApiConfig {
-  private static instance: LocalApiConfig;
-  private settings: LocalApiSettings = { ...DEFAULTS };
+export class InstoreApiConfig {
+  private static instance: InstoreApiConfig;
+  private settings: InstoreApiSettings = { ...DEFAULTS };
   private loaded = false;
-  private logger = LoggerFactory.getInstance().createLogger('LocalApiConfig');
+  private logger = LoggerFactory.getInstance().createLogger('InstoreApiConfig');
 
   private constructor() {}
 
-  static getInstance(): LocalApiConfig {
-    if (!LocalApiConfig.instance) {
-      LocalApiConfig.instance = new LocalApiConfig();
+  static getInstance(): InstoreApiConfig {
+    if (!InstoreApiConfig.instance) {
+      InstoreApiConfig.instance = new InstoreApiConfig();
     }
-    return LocalApiConfig.instance;
+    return InstoreApiConfig.instance;
   }
 
-  async load(): Promise<LocalApiSettings> {
+  async load(): Promise<InstoreApiSettings> {
     try {
       const raw = await keyValueRepository.getItem(KV_KEY);
       if (raw) {
@@ -57,12 +57,12 @@ export class LocalApiConfig {
     return this.settings;
   }
 
-  async save(updates: Partial<LocalApiSettings>): Promise<void> {
+  async save(updates: Partial<InstoreApiSettings>): Promise<void> {
     this.settings = { ...this.settings, ...updates };
     await keyValueRepository.setItem(KV_KEY, JSON.stringify(this.settings));
   }
 
-  get current(): LocalApiSettings {
+  get current(): InstoreApiSettings {
     return { ...this.settings };
   }
 
@@ -90,4 +90,4 @@ export class LocalApiConfig {
   }
 }
 
-export const localApiConfig = LocalApiConfig.getInstance();
+export const instoreApiConfig = InstoreApiConfig.getInstance();
