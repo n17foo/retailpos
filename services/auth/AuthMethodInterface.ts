@@ -87,7 +87,7 @@ export const AUTH_METHOD_INFO: Record<AuthMethodType, AuthMethodInfo> = {
     icon: '🔢',
     requiresHardware: false,
     requiresPlatformSupport: false,
-    supportedModes: ['offline'],
+    supportedModes: ['online', 'offline'],
   },
   biometric: {
     type: 'biometric',
@@ -96,7 +96,7 @@ export const AUTH_METHOD_INFO: Record<AuthMethodType, AuthMethodInfo> = {
     icon: '👆',
     requiresHardware: false,
     requiresPlatformSupport: true,
-    supportedModes: ['offline'],
+    supportedModes: ['online', 'offline'],
   },
   password: {
     type: 'password',
@@ -105,7 +105,7 @@ export const AUTH_METHOD_INFO: Record<AuthMethodType, AuthMethodInfo> = {
     icon: '🔑',
     requiresHardware: false,
     requiresPlatformSupport: false,
-    supportedModes: ['offline'],
+    supportedModes: ['online', 'offline'],
   },
   magstripe: {
     type: 'magstripe',
@@ -114,7 +114,7 @@ export const AUTH_METHOD_INFO: Record<AuthMethodType, AuthMethodInfo> = {
     icon: '💳',
     requiresHardware: true,
     requiresPlatformSupport: false,
-    supportedModes: ['offline'],
+    supportedModes: ['online', 'offline'],
   },
   rfid_nfc: {
     type: 'rfid_nfc',
@@ -123,7 +123,7 @@ export const AUTH_METHOD_INFO: Record<AuthMethodType, AuthMethodInfo> = {
     icon: '📡',
     requiresHardware: true,
     requiresPlatformSupport: false,
-    supportedModes: ['offline'],
+    supportedModes: ['online', 'offline'],
   },
   platform_auth: {
     type: 'platform_auth',

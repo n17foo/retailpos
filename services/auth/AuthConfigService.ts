@@ -1,5 +1,6 @@
 import { KeyValueRepository, keyValueRepository } from '../../repositories/KeyValueRepository';
 import { AuthMethodType, AuthMode, ALL_AUTH_METHODS } from './AuthMethodInterface';
+import { LoggerFactory } from '../logger/LoggerFactory';
 
 // ── Storage keys ────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ const KEYS = {
  */
 export class AuthConfigService {
   private static instance: AuthConfigService;
+  private logger = LoggerFactory.getInstance().createLogger('AuthConfigService');
 
   private primary: AuthMethodType = 'pin';
   private allowed: AuthMethodType[] = ['pin'];
@@ -42,22 +44,26 @@ export class AuthConfigService {
 
   /** Load persisted auth config from DB. Call once at app startup. */
   async load(): Promise<void> {
-    const storedPrimary = await this.kv.getObject<AuthMethodType>(KEYS.primaryMethod);
-    const storedAllowed = await this.kv.getObject<AuthMethodType[]>(KEYS.allowedMethods);
-    const storedMode = await this.kv.getObject<AuthMode>(KEYS.authMode);
+    try {
+      const storedPrimary = await this.kv.getObject<AuthMethodType>(KEYS.primaryMethod);
+      const storedAllowed = await this.kv.getObject<AuthMethodType[]>(KEYS.allowedMethods);
+      const storedMode = await this.kv.getObject<AuthMode>(KEYS.authMode);
 
-    if (storedPrimary && ALL_AUTH_METHODS.includes(storedPrimary)) {
-      this.primary = storedPrimary;
-    }
+      if (storedPrimary && ALL_AUTH_METHODS.includes(storedPrimary)) {
+        this.primary = storedPrimary;
+      }
 
-    if (storedAllowed && Array.isArray(storedAllowed)) {
-      // Ensure PIN is always in the allowed list
-      const valid = storedAllowed.filter(m => ALL_AUTH_METHODS.includes(m));
-      this.allowed = valid.includes('pin') ? valid : ['pin', ...valid];
-    }
+      if (storedAllowed && Array.isArray(storedAllowed)) {
+        // Ensure PIN is always in the allowed list
+        const valid = storedAllowed.filter(m => ALL_AUTH_METHODS.includes(m));
+        this.allowed = valid.includes('pin') ? valid : ['pin', ...valid];
+      }
 
-    if (storedMode === 'online' || storedMode === 'offline') {
-      this.mode = storedMode;
+      if (storedMode === 'online' || storedMode === 'offline') {
+        this.mode = storedMode;
+      }
+    } catch (err) {
+      this.logger.error('[AuthConfigService] Failed to parse persisted config, using defaults:', err);
     }
 
     this.loaded = true;

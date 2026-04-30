@@ -5,6 +5,10 @@ module.exports = {
   roots: ['<rootDir>'],
   testMatch: ['**/__tests__/**/*.test.ts', '**/*.test.ts'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+  globals: {
+    // React Native global — not defined in the node test environment
+    __DEV__: true,
+  },
   transform: {
     '^.+\\.tsx?$': [
       'ts-jest',

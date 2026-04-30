@@ -64,9 +64,13 @@ export class AuthService {
     for (const method of allowed) {
       const provider = this.providers.get(method);
       if (provider) {
-        const isAvail = await provider.isAvailable();
-        if (isAvail) {
-          available.push(provider);
+        try {
+          const isAvail = await provider.isAvailable();
+          if (isAvail) {
+            available.push(provider);
+          }
+        } catch {
+          // treat as unavailable and continue evaluating remaining providers
         }
       }
     }
