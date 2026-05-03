@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.3.0](https://github.com/n17foo/retailpos/compare/v0.2.0...v0.3.0) (2026-05-03)
+
+### Features
+
+- adding features crm-loyalty, permisions and exchange on refunds ([8e49463](https://github.com/n17foo/retailpos/commit/8e4946324fd217249552697a6806242f75f70b43))
+- adding procurement feature ([2f4f886](https://github.com/n17foo/retailpos/commit/2f4f886d1d068adac8e25628a446c4e778768d4f))
+- adding tax handling per service ([c826d6b](https://github.com/n17foo/retailpos/commit/c826d6b51179aa96372d09f4233fba7044261af3))
+
+### Bug Fixes
+
+- align different gaps on the system ([d92c635](https://github.com/n17foo/retailpos/commit/d92c6350ea04c1a07316743a0a3b710a8f00fceb))
+- align specs to code ([e22f2be](https://github.com/n17foo/retailpos/commit/e22f2bed3a4846a46b6fb2d2e3039ba71660be7d))
+- align stability ([4d13e4b](https://github.com/n17foo/retailpos/commit/4d13e4b54ef08ae186a798d68ff24e2fdaa5d524))
+- doctor report ([c327f1a](https://github.com/n17foo/retailpos/commit/c327f1a594cc80e5744d1d69f110c9194567e0ea))
+- improve performance leading ([15fa8fa](https://github.com/n17foo/retailpos/commit/15fa8faa353e35c675ee7f2eba83d63e73203923))
+
 ## [0.2.0](https://github.com/n17foo/retailpos/compare/v0.1.0...v0.2.0) (2026-05-01)
 
 ### Features
