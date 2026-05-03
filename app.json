@@ -6,14 +6,12 @@
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "jsEngine": "hermes",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#5B628F"
     },
     "ios": {
-      "jsEngine": "hermes",
       "supportsTablet": true,
       "bundleIdentifier": "com.n17foo.retail-pos",
       "infoPlist": {
@@ -27,7 +25,6 @@
       "requireFullScreen": false
     },
     "android": {
-      "enableHermes": true,
       "package": "com.n17foo.retailpos",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon-foreground.png",

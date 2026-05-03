@@ -47,6 +47,7 @@
     "expo": "55.0.19",
     "expo-camera": "55.0.16",
     "expo-file-system": "^55.0.17",
+    "expo-image": "^55.0.9",
     "expo-localization": "55.0.13",
     "expo-sharing": "^55.0.18",
     "expo-sqlite": "55.0.15",
@@ -58,7 +59,6 @@
     "react-i18next": "17.0.6",
     "react-native": "0.83.6",
     "react-native-ble-plx": "3.5.1",
-    "react-native-fast-image": "^8.6.3",
     "react-native-gesture-handler": "~2.30.0",
     "react-native-get-random-values": "~1.11.0",
     "react-native-http-bridge": "^0.6.1",
@@ -153,7 +153,8 @@
           "@tillpos/rn-receipt-printer-utils",
           "@worldpay/access-worldpay-checkout-react-native-sdk",
           "react-native-square-in-app-payments",
-          "react-native-esc-pos-printer"
+          "react-native-esc-pos-printer",
+          "react-native-http-bridge"
         ]
       }
     }
