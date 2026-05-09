@@ -38,10 +38,39 @@ config.transformer = {
   }),
 };
 
-// Add .wasm to asset extensions for expo-sqlite web support
+// ---------------------------------------------------------------------------
+// Native-only SDKs that must never be bundled for web.
+//
+// These packages import react-native internals (codegenNativeComponent, etc.)
+// that are not available in the web/Electron bundle. When Metro resolves one
+// of these on the web platform it returns an empty module stub instead of
+// attempting to bundle the native code.
+// ---------------------------------------------------------------------------
+const NATIVE_ONLY_MODULES = new Set([
+  '@adyen/react-native',
+  'card-react-native',
+  'react-native-square-in-app-payments',
+  '@stripe/stripe-terminal-react-native',
+]);
+
+const originalResolveRequest = config.resolver.resolveRequest;
+
 config.resolver = {
   ...config.resolver,
   assetExts: [...config.resolver.assetExts, 'wasm'],
+  resolveRequest: (context, moduleName, platform) => {
+    // On web, stub out native-only modules so they never reach the bundler.
+    if (platform === 'web' && NATIVE_ONLY_MODULES.has(moduleName)) {
+      return {
+        type: 'empty',
+      };
+    }
+    // Fall through to the default resolver (or any previously set custom one).
+    if (originalResolveRequest) {
+      return originalResolveRequest(context, moduleName, platform);
+    }
+    return context.resolveRequest(context, moduleName, platform);
+  },
 };
 
 module.exports = config;
