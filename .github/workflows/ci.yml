@@ -10,7 +10,7 @@ jobs:
   test-lint-build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-latest, macos-26, windows-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -25,6 +25,14 @@ jobs:
 
     - name: Setup Expo
       uses: expo/expo-github-action@v8
+
+    - name: Select Xcode 26.2
+      if: matrix.os == 'macos-26'
+      run: sudo xcode-select -s /Applications/Xcode_26.2.app
+
+    - name: Verify Xcode version
+      if: matrix.os == 'macos-26'
+      run: xcodebuild -version
 
     - name: Install dependencies
       run: yarn install --frozen-lockfile --network-timeout 100000 --network-concurrency 1 --mutex file
@@ -48,6 +56,10 @@ jobs:
     - name: Build Electron app (Linux)
       if: matrix.os == 'ubuntu-latest'
       run: yarn desktop:build-linux
+
+    - name: Build Electron app (macOS)
+      if: matrix.os == 'macos-26'
+      run: yarn desktop:build-mac
 
     - name: Build Electron app (Windows)
       if: matrix.os == 'windows-latest'
