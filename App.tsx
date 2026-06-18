@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { StatusBar, StyleSheet, I18nManager } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { I18nextProvider } from 'react-i18next';
 import * as Localization from 'expo-localization';
@@ -198,11 +198,13 @@ const AppToast: React.FC = () => {
 export default function App() {
   return (
     <GestureHandlerRootView style={styles.root}>
-      <I18nextProvider i18n={i18n}>
-        <ThemeProvider>
-          <AppContent />
-        </ThemeProvider>
-      </I18nextProvider>
+      <SafeAreaProvider>
+        <I18nextProvider i18n={i18n}>
+          <ThemeProvider>
+            <AppContent />
+          </ThemeProvider>
+        </I18nextProvider>
+      </SafeAreaProvider>
     </GestureHandlerRootView>
   );
 }

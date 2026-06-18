@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, shell, session } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -35,6 +35,7 @@ function saveWindowState() {
 app.commandLine.appendSwitch('enable-v8-code-cache');
 app.commandLine.appendSwitch('enable-gpu-rasterization');
 app.commandLine.appendSwitch('enable-zero-copy');
+app.commandLine.appendSwitch('enable-features', 'SharedArrayBuffer');
 
 function createWindow() {
   const windowState = loadWindowState();
@@ -360,6 +361,17 @@ function registerIpcHandlers() {
 
 // App lifecycle
 app.whenReady().then(() => {
+  // Enable Cross-Origin Isolation headers globally for SharedArrayBuffer (required by expo-sqlite on web)
+  session.defaultSession.webRequest.onHeadersReceived({ urls: ['*://*/*'] }, (details, callback) => {
+    console.log('[Main Process] Intercepting headers for:', details.url);
+    const responseHeaders = {
+      ...details.responseHeaders,
+      'Cross-Origin-Opener-Policy': ['same-origin'],
+      'Cross-Origin-Embedder-Policy': ['require-corp'],
+    };
+    callback({ responseHeaders });
+  });
+
   registerIpcHandlers();
   buildMenu();
   createWindow();

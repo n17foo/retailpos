@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { CameraView } from 'expo-camera';
 import { useProductsForDisplay } from '../hooks/useProducts';
@@ -16,15 +16,18 @@ export const BarcodeScannerScreen: React.FC<BarcodeScannerScreenProps> = ({ onSc
   // Load scanner settings from persistent storage (set during onboarding / Settings)
   // On Electron desktop, default to 'usb' since camera is not available
   const { scannerSettings: persistedSettings, isLoading: settingsLoading } = useScanner();
-  const scannerSettings = {
-    type: (isElectron() && persistedSettings.type === 'camera' ? 'usb' : persistedSettings.type) as
-      | 'camera'
-      | 'bluetooth'
-      | 'usb'
-      | 'qr_hardware',
-    enabled: persistedSettings.enabled,
-    deviceId: persistedSettings.deviceId || (persistedSettings.type === 'camera' ? 'back' : ''),
-  };
+  const scannerSettings = useMemo(
+    () => ({
+      type: (isElectron() && persistedSettings.type === 'camera' ? 'usb' : persistedSettings.type) as
+        | 'camera'
+        | 'bluetooth'
+        | 'usb'
+        | 'qr_hardware',
+      enabled: persistedSettings.enabled,
+      deviceId: persistedSettings.deviceId || (persistedSettings.type === 'camera' ? 'back' : ''),
+    }),
+    [persistedSettings.type, persistedSettings.enabled, persistedSettings.deviceId]
+  );
 
   // Get products from the unified product service
   const { products } = useProductsForDisplay();

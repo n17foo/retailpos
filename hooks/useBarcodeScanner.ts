@@ -34,6 +34,7 @@ export interface ScanResult {
 
 export const useBarcodeScanner = ({ scannerSettings, products, onScanSuccess }: UseBarcodeScannerServiceProps) => {
   const logger = useLogger('useBarcodeScanner');
+  const { type: settingsType, deviceId: settingsDeviceId } = scannerSettings;
   // Scanner state
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [scanned, setScanned] = useState(false);
@@ -189,7 +190,7 @@ export const useBarcodeScanner = ({ scannerSettings, products, onScanSuccess }: 
       await executeScannerOperation('initializing scanner', async () => {
         // Get the appropriate scanner type
         let scannerType: ScannerType;
-        switch (scannerSettings.type) {
+        switch (settingsType) {
           case 'camera':
             scannerType = ScannerType.CAMERA;
             break;
@@ -207,25 +208,25 @@ export const useBarcodeScanner = ({ scannerSettings, products, onScanSuccess }: 
         // Get the scanner service from the factory
         const scannerService = scannerFactory.getService(scannerType);
         if (!scannerService) {
-          showScannerAlert('Error', `Failed to initialize ${scannerSettings.type} scanner.`);
-          throw new Error(`Failed to get scanner service for type: ${scannerSettings.type}`);
+          showScannerAlert('Error', `Failed to initialize ${settingsType} scanner.`);
+          throw new Error(`Failed to get scanner service for type: ${settingsType}`);
         }
 
         // Store the scanner service
         scannerServiceRef.current = scannerService;
 
         // Connect to the scanner
-        const deviceId = scannerSettings.type === 'camera' ? 'back' : scannerSettings.deviceId;
+        const deviceId = settingsType === 'camera' ? 'back' : settingsDeviceId;
         const isConnected = await scannerService.connect(deviceId);
         setConnected(isConnected);
 
         if (!isConnected) {
-          showScannerAlert('Connection Failed', `Unable to connect to ${scannerSettings.type} scanner. Please check your settings.`);
-          throw new Error(`Failed to connect to ${scannerSettings.type} scanner`);
+          showScannerAlert('Connection Failed', `Unable to connect to ${settingsType} scanner. Please check your settings.`);
+          throw new Error(`Failed to connect to ${settingsType} scanner`);
         }
 
         // Start listening for barcode scans
-        if (scannerSettings.type === 'camera') {
+        if (settingsType === 'camera') {
           // For camera scanner, we don't need to start a listener as we'll use the CameraView component
           // But we'll store the service so we can trigger scan events
           setHasPermission(true);
@@ -236,11 +237,11 @@ export const useBarcodeScanner = ({ scannerSettings, products, onScanSuccess }: 
         }
       });
     } catch {
-      showScannerAlert('Error', `Failed to connect to ${scannerSettings.type} scanner.`);
+      showScannerAlert('Error', `Failed to connect to ${settingsType} scanner.`);
     } finally {
       setConnecting(false);
     }
-  }, [disconnectScanner, executeScannerOperation, processBarcodeData, scannerSettings, showScannerAlert, scannerFactory]);
+  }, [disconnectScanner, executeScannerOperation, processBarcodeData, settingsType, settingsDeviceId, showScannerAlert, scannerFactory]);
 
   // Handle camera barcode scanning
   const handleBarCodeScanned = useCallback(
