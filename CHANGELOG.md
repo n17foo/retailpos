@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.1](https://github.com/n17foo/retailpos/compare/v0.5.0...v0.5.1) (2026-06-21)
+
+### Bug Fixes
+
+- resolve dashboard UI freeze, onboarding PIN loops, and configure SQLite for Electron ([0b6ab7c](https://github.com/n17foo/retailpos/commit/0b6ab7c82dd189323f9bab8260fcc71eba68b8f4))
+
 ## [0.5.0](https://github.com/n17foo/retailpos/compare/v0.4.0...v0.5.0) (2026-05-10)
 
 ### Features
