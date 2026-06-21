@@ -57,6 +57,7 @@ const originalResolveRequest = config.resolver.resolveRequest;
 
 config.resolver = {
   ...config.resolver,
+  unstable_conditionNames: ['browser', 'require', 'react-native'],
   assetExts: [...config.resolver.assetExts, 'wasm'],
   resolveRequest: (context, moduleName, platform) => {
     // On web, stub out native-only modules so they never reach the bundler.

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Button, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Button, Alert, ScrollView, Platform } from 'react-native';
 import PinKeypad from '../../components/PinKeypad';
 import PinDisplay from '../../components/PinDisplay';
 import { useUsers } from '../../hooks/useUsers';
@@ -14,7 +14,7 @@ interface AdminUserStepProps {
 const PIN_LENGTH = 6;
 
 const AdminUserStep: React.FC<AdminUserStepProps> = ({ onBack, onComplete }) => {
-  const { createUser, isPinUnique, isLoading } = useUsers();
+  const { createUser, isPinUnique, validatePin, isLoading } = useUsers();
   const { t } = useTranslate();
 
   const [name, setName] = useState('');
@@ -89,6 +89,19 @@ const AdminUserStep: React.FC<AdminUserStepProps> = ({ onBack, onComplete }) => 
       // Check if PIN is unique
       const isUnique = await isPinUnique(pin);
       if (!isUnique) {
+        const existingUser = await validatePin(pin);
+        if (existingUser && existingUser.role === 'admin') {
+          // This admin user was already created in a previous attempt.
+          // We can safely advance the onboarding wizard.
+          if (Platform.OS === 'web') {
+            onComplete();
+          } else {
+            Alert.alert(t('adminUser.adminCreatedTitle'), t('adminUser.adminCreatedMessage', { name }), [
+              { text: t('common.continue'), onPress: onComplete },
+            ]);
+          }
+          return;
+        }
         setError(t('adminUser.pinInUse'));
         setPin('');
         setConfirmPin('');
@@ -104,9 +117,14 @@ const AdminUserStep: React.FC<AdminUserStepProps> = ({ onBack, onComplete }) => 
         role: 'admin',
       });
 
-      Alert.alert(t('adminUser.adminCreatedTitle'), t('adminUser.adminCreatedMessage', { name }), [
-        { text: t('common.continue'), onPress: onComplete },
-      ]);
+      if (Platform.OS === 'web') {
+        alert(t('adminUser.adminCreatedMessage', { name }));
+        onComplete();
+      } else {
+        Alert.alert(t('adminUser.adminCreatedTitle'), t('adminUser.adminCreatedMessage', { name }), [
+          { text: t('common.continue'), onPress: onComplete },
+        ]);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('adminUser.failedToCreate'));
       setPin('');
