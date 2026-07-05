@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.2](https://github.com/n17foo/retailpos/compare/v0.5.1...v0.5.2) (2026-07-05)
+
+### Features
+
+- extend the instore api support ([2fc1070](https://github.com/n17foo/retailpos/commit/2fc1070716fe7307b754feb710cd582a97a76f50))
+
 ### [0.5.1](https://github.com/n17foo/retailpos/compare/v0.5.0...v0.5.1) (2026-06-21)
 
 ### Bug Fixes
