@@ -24,6 +24,7 @@ Providers without a React Native SDK must be integrated through the **Instore AP
 | Square          | `SQUARE`       | `react-native-square-in-app-payments`  | Lazy-loaded                      |
 | Adyen           | `ADYEN`        | `@adyen/react-native`                  | Lazy-loaded                      |
 | Tap Payments    | `TAP_PAYMENTS` | `@tap-payments/card-sdk`               | Lazy-loaded                      |
+| Instore API     | `INSTORE_API`  | None (HTTP to store-api)               | PED via payment orchestration    |
 
 ### Provider Resolution
 
@@ -35,8 +36,27 @@ PaymentServiceFactory.getPaymentService()
   → SQUARE                            → SquareService   (lazy, fallback to mock on load error)
   → ADYEN                             → AdyenService    (lazy, fallback to mock on load error)
   → TAP_PAYMENTS                      → TapPaymentsService (lazy, fallback to mock on load error)
+  → INSTORE_API                       → InstoreApiPaymentService (PED via store-api)
   → any other value                   → throw 'Unsupported payment provider'
 ```
+
+### Instore API Provider (PED via Store-API)
+
+The `INSTORE_API` provider routes payments through the integration-hub's store-api
+payment orchestration layer. It supports PED providers that do NOT have a React Native
+SDK: Worldpay, Worldline, Adyen Terminal API (Cloud), Global Payments, Nexi, Elavon, Fiserv.
+
+**Flow:**
+
+1. `InstoreApiPaymentService.processPayment()` calls `POST /api/payment-intents`
+2. The store-api sends the payment request to the configured PED terminal
+3. The POS waits for a terminal state via WebSocket outbox messages (or polls)
+4. The final `PaymentIntent` is mapped to the standard `PaymentResponse`
+
+**Configuration:** Set provider to `INSTORE_API` in Settings → Payment. The PED terminal
+and provider are configured on the store-api side (environment variables).
+
+**See also:** `services/instoreapi/payment/` directory and `integration-hub/docs/retailpos-integration.md`.
 
 ### Mock Strategy
 

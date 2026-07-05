@@ -34,6 +34,7 @@ const PROVIDER_LABELS: Record<PaymentProvider, string> = {
   [PaymentProvider.SQUARE]: 'Square',
   [PaymentProvider.ADYEN]: 'Adyen',
   [PaymentProvider.TAP_PAYMENTS]: 'Tap Payments',
+  [PaymentProvider.INSTORE_API]: 'Instore PED',
 };
 
 const PaymentTerminalScreen: React.FC<PaymentTerminalScreenProps> = ({ navigation, route }) => {

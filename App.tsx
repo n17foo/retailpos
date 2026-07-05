@@ -24,6 +24,7 @@ import { authConfig } from './services/auth/AuthConfigService';
 import { instoreApiConfig } from './services/instoreapi/InstoreApiConfig';
 import { instoreApiServer } from './services/instoreapi/InstoreApiServer';
 import { syncPoller } from './services/instoreapi/sync/SyncPoller';
+import { storeApiConnectionManager } from './services/instoreapi/websocket/StoreApiConnectionManager';
 import RootNavigator from './navigation/RootNavigator';
 import ErrorBoundary from './components/ErrorBoundary';
 import { NotificationProvider, useNotifications } from './contexts/NotificationProvider';
@@ -135,6 +136,18 @@ const AppContent = () => {
             );
           }
         }
+
+        // Start WebSocket connection to store-api for real-time outbox delivery
+        // (payment events, order updates, etc.). The connection manager handles
+        // its own fallback to SyncPoller if the WebSocket is unavailable.
+        if (instoreApiConfig.isMultiRegister) {
+          storeApiConnectionManager.start().catch(err => {
+            loggerRef.current.error(
+              { message: 'Failed to start StoreApiConnectionManager' },
+              err instanceof Error ? err : new Error(String(err))
+            );
+          });
+        }
       })
       .catch(err => {
         loggerRef.current.error({ message: 'Failed to load local API config' }, err instanceof Error ? err : new Error(String(err)));
@@ -152,6 +165,7 @@ const AppContent = () => {
       backgroundSyncService.stop();
       queueManager.dispose();
       syncPoller.stop();
+      storeApiConnectionManager.stop().catch(() => {}); // Don't throw on cleanup
       instoreApiServer.stop().catch(() => {}); // Don't throw on cleanup
     };
   }, []);

@@ -3,15 +3,18 @@ import { LoggerFactory } from '../logger/LoggerFactory';
 import { USE_MOCK_PAYMENT } from '@env';
 import Constants from 'expo-constants';
 import { MockPaymentService } from './mock/MockPaymentService';
+import { InstoreApiPaymentService } from '../instoreapi/payment/InstoreApiPaymentService';
 
 /**
- * Available tap-to-pay payment providers.
+ * Available payment providers.
  *
- * Only providers that ship a React Native SDK for contactless (tap-to-pay)
- * payments on mobile / tablet are listed here.
+ * SDK providers ship a React Native SDK for contactless (tap-to-pay)
+ * payments on mobile / tablet.
  *
- * Providers without a React Native SDK
- * must be integrated through the Instore API layer and are NOT represented here.
+ * INSTORE_API routes payments through the store-api's payment orchestration
+ * layer for PED providers that do NOT have a React Native SDK (Worldpay,
+ * Worldline, Global Payments, Nexi, Elavon, Fiserv, and Adyen Terminal API
+ * via Cloud). See ADR-015.
  */
 export enum PaymentProvider {
   STRIPE_NFC = 'stripe_nfc',
@@ -19,6 +22,7 @@ export enum PaymentProvider {
   SQUARE = 'square',
   ADYEN = 'adyen',
   TAP_PAYMENTS = 'tap_payments',
+  INSTORE_API = 'instore_api',
 }
 
 /** Returns true when the app is running inside Expo Go (no native modules). */
@@ -88,6 +92,9 @@ export class PaymentServiceFactory {
         case PaymentProvider.TAP_PAYMENTS:
           return this.loadWithMockFallback(() => require('./TapPaymentsService').TapPaymentsService.getInstance(), 'TapPayments');
 
+        case PaymentProvider.INSTORE_API:
+          return this.getInstoreApiPaymentService();
+
         default: {
           // TypeScript exhaustiveness guard — should never reach here at runtime
           // if callers only pass valid PaymentProvider values.
@@ -100,6 +107,18 @@ export class PaymentServiceFactory {
       this.logger.error({ message: 'Failed to initialize payment service' }, error instanceof Error ? error : new Error(msg));
       throw new Error(`Failed to initialize payment service: ${msg}`);
     }
+  }
+
+  /**
+   * Returns the InstoreApiPaymentService singleton.
+   * Used for PED providers routed through the store-api.
+   */
+  private instoreApiService: InstoreApiPaymentService | null = null;
+  private getInstoreApiPaymentService(): PaymentServiceInterface {
+    if (!this.instoreApiService) {
+      this.instoreApiService = new InstoreApiPaymentService();
+    }
+    return this.instoreApiService;
   }
 
   /**

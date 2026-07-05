@@ -23,6 +23,7 @@ const PROVIDER_LABELS: Record<PaymentProvider, string> = {
   [PaymentProvider.SQUARE]: 'Square',
   [PaymentProvider.ADYEN]: 'Adyen',
   [PaymentProvider.TAP_PAYMENTS]: 'Tap Payments',
+  [PaymentProvider.INSTORE_API]: 'Instore PED',
 };
 
 // ---------------------------------------------------------------------------

@@ -184,6 +184,58 @@ export class InstoreApiClient {
     return result.returnId;
   }
 
+  // ── Snapshot ────────────────────────────────────────────────────────
+
+  async getSnapshot(): Promise<{
+    snapshot_version: number;
+    orders: unknown[];
+    products: unknown[];
+    categories: unknown[];
+    tax_profiles: unknown[];
+  }> {
+    return this.get('/api/snapshot');
+  }
+
+  // ── Users ─────────────────────────────────────────────────────────
+
+  async getUsers(): Promise<Array<{ id: string; name: string; role: string; is_active: boolean }>> {
+    const result = await this.get<{ users: Array<{ id: string; name: string; role: string; is_active: boolean }> }>('/api/users');
+    return result.users;
+  }
+
+  async verifyPin(pin: string): Promise<{ id: string; name: string; role: string } | null> {
+    try {
+      const result = await this.post<{ user: { id: string; name: string; role: string } }>('/api/users/verify-pin', { pin });
+      return result.user;
+    } catch {
+      // 401 = invalid PIN, not a network error
+      return null;
+    }
+  }
+
+  // ── Shifts ────────────────────────────────────────────────────────
+
+  async getShifts(): Promise<unknown[]> {
+    const result = await this.get<{ shifts: unknown[] }>('/api/shifts');
+    return result.shifts;
+  }
+
+  async openShift(cashierId: string, openingFloat?: number): Promise<unknown> {
+    const result = await this.post<{ shift: unknown }>('/api/shifts', {
+      cashier_id: cashierId,
+      opening_float: openingFloat ?? 0,
+    });
+    return result.shift;
+  }
+
+  async closeShift(shiftId: string, closingFloat?: number, notes?: string): Promise<unknown> {
+    const result = await this.put<{ shift: unknown }>(`/api/shifts/${shiftId}`, {
+      closing_float: closingFloat ?? 0,
+      notes: notes ?? '',
+    });
+    return result.shift;
+  }
+
   // ── Generic HTTP helpers ──────────────────────────────────────────
 
   private get headers(): Record<string, string> {

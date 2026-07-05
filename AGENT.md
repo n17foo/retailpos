@@ -51,32 +51,32 @@ utils/              # money.ts, theme.ts, platforms.ts, platformCapabilities.ts,
 
 ### Key `services/` directories
 
-| Directory        | Purpose                                                                                                                                |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `audit/`         | AuditLogService — KV-backed append-only log + CSV export                                                                               |
-| `auth/`          | Pluggable multi-method auth (PIN, biometric, magstripe, …)                                                                             |
-| `basket/`        | BasketService — cart CRUD only                                                                                                         |
-| `checkout/`      | CheckoutService — startCheckout, completePayment, order queries                                                                        |
-| `config/`        | POSConfigService + ServiceConfigBridge                                                                                                 |
-| `customer/`      | Customer lookup — 10 platforms + factory                                                                                               |
-| `discount/`      | Coupon / discount validation — 10 platforms + factory                                                                                  |
-| `drawer/`        | CashDrawer peripheral (decoupled from printer)                                                                                         |
-| `giftcard/`      | Gift card — 10 platforms + factory                                                                                                     |
-| `inventory/`     | Inventory read / write — 10 platforms + factory                                                                                        |
-| `localapi/`      | Multi-register LAN API (server / client / discovery / sync)                                                                            |
-| `logger/`        | LoggerFactory + pluggable LogTransport                                                                                                 |
-| `notifications/` | NotificationService singleton + Toast                                                                                                  |
-| `order/`         | Order domain — 10 platforms + factory                                                                                                  |
-| `payment/`       | Payment terminals — Stripe NFC, Stripe, Square, Adyen, Tap Payments (tap-to-pay SDK providers only; non-SDK providers via Instore API) |
-| `permissions/`   | PermissionService, ManagerApprovalService, action registry                                                                             |
-| `printer/`       | Receipt printing — USB/BT/Net/Electron                                                                                                 |
-| `product/`       | Product catalog — 10 platforms + factory                                                                                               |
-| `procurement/`   | Purchase orders, vendors, stock-takes, transfer orders                                                                                 |
-| `returns/`       | ReturnService — returns + refunds, 10 platform adapters                                                                                |
-| `scanner/`       | Barcode scanning — camera, BT, USB, QR hardware, Electron                                                                              |
-| `search/`        | Product search — 10 platforms + factory                                                                                                |
-| `sync/`          | OrderSyncService + BackgroundSyncService (exponential backoff)                                                                         |
-| `tax/`           | TaxProfileService + TaxServiceFactory (strategy pattern)                                                                               |
+| Directory        | Purpose                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `audit/`         | AuditLogService — KV-backed append-only log + CSV export                                                           |
+| `auth/`          | Pluggable multi-method auth (PIN, biometric, magstripe, …)                                                         |
+| `basket/`        | BasketService — cart CRUD only                                                                                     |
+| `checkout/`      | CheckoutService — startCheckout, completePayment, order queries                                                    |
+| `config/`        | POSConfigService + ServiceConfigBridge                                                                             |
+| `customer/`      | Customer lookup — 10 platforms + factory                                                                           |
+| `discount/`      | Coupon / discount validation — 10 platforms + factory                                                              |
+| `drawer/`        | CashDrawer peripheral (decoupled from printer)                                                                     |
+| `giftcard/`      | Gift card — 10 platforms + factory                                                                                 |
+| `inventory/`     | Inventory read / write — 10 platforms + factory                                                                    |
+| `localapi/`      | Multi-register LAN API (server / client / discovery / sync / WebSocket / payment orchestration)                    |
+| `logger/`        | LoggerFactory + pluggable LogTransport                                                                             |
+| `notifications/` | NotificationService singleton + Toast                                                                              |
+| `order/`         | Order domain — 10 platforms + factory                                                                              |
+| `payment/`       | Payment terminals — Stripe NFC, Stripe, Square, Adyen, Tap Payments, Instore API (PED via store-api orchestration) |
+| `permissions/`   | PermissionService, ManagerApprovalService, action registry                                                         |
+| `printer/`       | Receipt printing — USB/BT/Net/Electron                                                                             |
+| `product/`       | Product catalog — 10 platforms + factory                                                                           |
+| `procurement/`   | Purchase orders, vendors, stock-takes, transfer orders                                                             |
+| `returns/`       | ReturnService — returns + refunds, 10 platform adapters                                                            |
+| `scanner/`       | Barcode scanning — camera, BT, USB, QR hardware, Electron                                                          |
+| `search/`        | Product search — 10 platforms + factory                                                                            |
+| `sync/`          | OrderSyncService + BackgroundSyncService (exponential backoff)                                                     |
+| `tax/`           | TaxProfileService + TaxServiceFactory (strategy pattern)                                                           |
 
 ---
 

@@ -65,6 +65,7 @@ const PROVIDER_LABEL: Record<PaymentProvider, string> = {
   [PaymentProvider.SQUARE]: 'Square',
   [PaymentProvider.ADYEN]: 'Adyen',
   [PaymentProvider.TAP_PAYMENTS]: 'Tap Payments',
+  [PaymentProvider.INSTORE_API]: 'Instore PED',
 };
 
 const PROVIDER_ICON: Record<PaymentProvider, string> = {
@@ -73,6 +74,7 @@ const PROVIDER_ICON: Record<PaymentProvider, string> = {
   [PaymentProvider.SQUARE]: '🟦',
   [PaymentProvider.ADYEN]: '💳',
   [PaymentProvider.TAP_PAYMENTS]: '📲',
+  [PaymentProvider.INSTORE_API]: '🏪',
 };
 
 // ---------------------------------------------------------------------------

@@ -173,11 +173,23 @@ Three fixed, immutable roles. Role rank: `admin (3) > manager (2) > cashier (1)`
 
 ## Register Modes (Multi-Register)
 
-| Mode         | Data source    | Hosts Instore API |
-| ------------ | -------------- | ----------------- |
-| `standalone` | Local SQLite   | No                |
-| `server`     | Local SQLite   | Yes — LAN HTTP    |
-| `client`     | Server via LAN | No                |
+| Mode         | Data source    | Hosts Instore API | Store-API Connection |
+| ------------ | -------------- | ----------------- | -------------------- |
+| `standalone` | Local SQLite   | No                | None                 |
+| `server`     | Local SQLite   | Yes — LAN HTTP    | WebSocket + REST     |
+| `client`     | Server via LAN | No                | WebSocket + REST     |
+
+In `client` or `server` mode the POS also establishes a **WebSocket connection** to the store-api (`/ws`) for real-time outbox delivery. The connection uses the HELLO/replay/snapshot state machine:
+
+1. Client sends HELLO with `device_id`, `last_acked_server_seq`
+2. Server replays missed outbox messages or triggers a snapshot
+3. Client acks each message; server pings every 10s
+
+If the WebSocket is unavailable, the POS falls back to polling `GET /api/sync/events`.
+
+### Authentication in Client Mode
+
+In client mode, PIN verification is delegated to the store-api (`POST /api/users/verify-pin`) so that user management is centralised on the server. In standalone/server mode, PINs are verified against local SQLite.
 
 ---
 
@@ -185,14 +197,28 @@ Three fixed, immutable roles. Role rank: `admin (3) > manager (2) > cashier (1)`
 
 All hardware peripherals use the same interface → factory → implementation pattern:
 
-| Peripheral  | Mobile / Tablet                                     | Electron Desktop                              |
-| ----------- | --------------------------------------------------- | --------------------------------------------- |
-| Printer     | `UnifiedPrinterService`                             | `ElectronPrinterService`                      |
-| Scanner     | Camera / BT / USB HID keydown                       | `ElectronScannerService`                      |
-| Payment     | Stripe NFC / Stripe / Square / Adyen / Tap Payments | Instore API (no direct Electron payment path) |
-| Cash Drawer | `PrinterDrawerDriver` or NoOp                       | `ElectronDrawerDriver`                        |
+| Peripheral  | Mobile / Tablet                                                   | Electron Desktop                              |
+| ----------- | ----------------------------------------------------------------- | --------------------------------------------- |
+| Printer     | `UnifiedPrinterService`                                           | `ElectronPrinterService`                      |
+| Scanner     | Camera / BT / USB HID keydown                                     | `ElectronScannerService`                      |
+| Payment     | Stripe NFC / Stripe / Square / Adyen / Tap Payments / Instore API | Instore API (no direct Electron payment path) |
+| Cash Drawer | `PrinterDrawerDriver` or NoOp                                     | `ElectronDrawerDriver`                        |
 
 PED (PIN Entry Device) integration must go through the Instore API — never as a direct `PaymentProvider` in the POS client (ADR-015).
+
+### Instore API Payment Flow (PED)
+
+The `INSTORE_API` payment provider routes payments through the store-api's orchestration layer:
+
+```
+PaymentServiceFactory → InstoreApiPaymentService
+  → PaymentIntentClient.initiatePayment()
+  → POST /api/payment-intents → store-api → PED terminal
+  → poll or listen via WebSocket for payment.approved/declined
+  → map PaymentIntent → PaymentResponse
+```
+
+Supports: initiate, cancel, refund, unknown-outcome recovery, receipt retrieval.
 
 ---
 
