@@ -117,7 +117,7 @@ Cross-references to other specs:
 
 **5.2** When the E-commerce toggle is turned `ON`, the platform selector and credential fields shall appear.
 
-**5.3** The platform selector shall render radio buttons for all supported platforms: Shopify, WooCommerce, BigCommerce, Magento, Sylius, Wix, PrestaShop, Squarespace, CommerceFull, Offline.
+**5.3** The platform selector shall render radio buttons for all supported platforms: Shopify, WooCommerce, BigCommerce, Magento, Sylius, Wix, PrestaShop, Squarespace, Commercefull, Offline.
 
 **5.3.a** When a platform is selected, the system shall render a **Platform Capability Summary** panel showing feature status for at least: catalog, customers, inventory, order sync, draft orders, discounts, gift cards, and refunds.
 

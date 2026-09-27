@@ -64,7 +64,7 @@
 
 **Basket Mode**:
 
-- `native_draft` — Platform creates mutable draft at checkout; tax is platform-authoritative (Shopify, Wix, CommerceFull)
+- `native_draft` — Platform creates mutable draft at checkout; tax is platform-authoritative (Shopify, Wix, Commercefull)
 - `remote_cart` — No platform call at checkout; POS basket local-authoritative; sync creates order (WooCommerce, Magento, BigCommerce, Sylius, PrestaShop)
 - `local_only` — Fully local basket; order imported post-payment (Squarespace, Offline)
 

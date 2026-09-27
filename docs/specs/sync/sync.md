@@ -11,7 +11,7 @@
 
 After a payment is completed locally, the order must be synchronised to the e-commerce platform. Sync behavior is capability-driven by `basketMode`:
 
-- **`native_draft` platforms** (Shopify, Wix, CommerceFull):
+- **`native_draft` platforms** (Shopify, Wix, Commercefull):
   - If `platformOrderId` exists, sync completes the existing draft via `orderService.completeOrder()`.
 - **`remote_cart` platforms** (WooCommerce, Magento, BigCommerce, Sylius, PrestaShop):
   - No draft was created at checkout time. Sync creates a new order via `orderService.createOrder()`.

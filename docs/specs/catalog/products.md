@@ -38,7 +38,7 @@ Offline mode uses `OfflineProductService` backed by SQLite. Online mode uses the
 | `wix`          | Page-based   | `mapGenericProduct`     | `WixProductService`          |
 | `prestashop`   | Page-based   | `mapGenericProduct`     | `PrestaShopProductService`   |
 | `squarespace`  | Page-based   | `mapGenericProduct`     | `SquarespaceProductService`  |
-| `commercefull` | Page-based   | `mapGenericProduct`     | `CommerceFullProductService` |
+| `commercefull` | Page-based   | `mapGenericProduct`     | `CommercefullProductService` |
 
 ### Category Navigation State Machine
 
@@ -463,7 +463,7 @@ Scroll to bottom → loadMore()
 
 ### 9.1 TaxServiceFactory
 
-**9.1.1** When `TaxServiceFactory.getInstance()` is called, the system shall return the singleton instance and register one strategy per platform: Shopify, WooCommerce, BigCommerce, Magento, Sylius, Wix, PrestaShop, Squarespace, CommerceFull, and Offline.
+**9.1.1** When `TaxServiceFactory.getInstance()` is called, the system shall return the singleton instance and register one strategy per platform: Shopify, WooCommerce, BigCommerce, Magento, Sylius, Wix, PrestaShop, Squarespace, Commercefull, and Offline.
 
 **9.1.2** When `TaxServiceFactory.getService(platform)` is called with a registered platform, the system shall return the corresponding `TaxServiceInterface` strategy instance.
 
@@ -510,7 +510,7 @@ Rate resolution in `BaseTaxStrategy.resolveTax(taxCode)` follows a strict priori
 | WooCommerce  | ✅                  | `GET /wp-json/wc/v3/taxes?class=<code>` → `rate` field (%)         | Live          |
 | Magento      | ✅                  | `GET /rest/V1/taxRates/search?code=<code>` → `rate` field (%)      | Live          |
 | Sylius       | ✅                  | `GET /api/v2/shop/tax-rates?taxCategory.code=<code>` → `amount`    | Live          |
-| CommerceFull | ✅                  | Inline in tax code string: `"standard:inclusive:20"` (no API call) | Live          |
+| Commercefull | ✅                  | Inline in tax code string: `"standard:inclusive:20"` (no API call) | Live          |
 | Shopify      | ❌                  | No public Tax Rates API — location-based, server-side only         | Returns zero  |
 | BigCommerce  | ❌                  | Tax Classes API has no rate values — zone-based, server-side       | Returns zero  |
 | Wix          | ❌                  | No public Tax Rates API                                            | Returns zero  |
@@ -536,7 +536,7 @@ Rate resolution in `BaseTaxStrategy.resolveTax(taxCode)` follows a strict priori
 
 **9.7.3** When `normaliseTaxCode` returns a `canonical` value, `BaseTaxStrategy` shall attempt to match an active `TaxProfile` by name (case-insensitive substring match on `canonical`); if matched, the profile's `rate` is used unless a live platform rate was already obtained.
 
-**9.7.4** When `CommerceFullTaxStrategy.normaliseTaxCode()` receives a code in the format `"<code>:<type>:<rate>"` (e.g. `"standard:inclusive:20"`), the system shall parse the type hint and the rate segment, returning the rate via `fetchPlatformRate` without making any API call.
+**9.7.4** When `CommercefullTaxStrategy.normaliseTaxCode()` receives a code in the format `"<code>:<type>:<rate>"` (e.g. `"standard:inclusive:20"`), the system shall parse the type hint and the rate segment, returning the rate via `fetchPlatformRate` without making any API call.
 
 ### 9.8 Edge Cases
 

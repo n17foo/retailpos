@@ -72,8 +72,8 @@ jest.mock('./platforms/SquarespaceCustomerService', () => ({
   })),
 }));
 
-jest.mock('./platforms/CommerceFullCustomerService', () => ({
-  CommerceFullCustomerService: jest.fn().mockImplementation(() => ({
+jest.mock('./platforms/CommercefullCustomerService', () => ({
+  CommercefullCustomerService: jest.fn().mockImplementation(() => ({
     initialize: jest.fn().mockResolvedValue(true),
     isInitialized: jest.fn().mockReturnValue(true),
   })),

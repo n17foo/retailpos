@@ -9,10 +9,10 @@ import { SyliusSyncService } from './platforms/SyliusSyncService';
 import { OfflineSyncService } from './platforms/OfflineSyncService';
 import { PrestaShopSyncService } from './platforms/PrestaShopSyncService';
 import { SquarespaceSyncService } from './platforms/SquarespaceSyncService';
-import { CommerceFullSyncService } from './platforms/CommerceFullSyncService';
+import { CommercefullSyncService } from './platforms/CommercefullSyncService';
 import { PlatformSyncConfig } from './platforms/PlatformSyncServiceInterface';
 import { LoggerFactory } from '../logger/LoggerFactory';
-import { CommerceFullWebhookReceiver } from '../clients/commercefull/CommerceFullWebhookReceiver';
+import { CommercefullWebhookReceiver } from '../clients/commercefull/CommercefullWebhookReceiver';
 
 /**
  * Factory for creating sync service instances
@@ -134,7 +134,7 @@ export class SyncServiceFactory {
         break;
 
       case ECommercePlatform.COMMERCEFULL:
-        service = this.createCommerceFullSyncService();
+        service = this.createCommercefullSyncService();
         break;
 
       // Magento and Sylius have dedicated (stub) sync services — use them
@@ -291,8 +291,8 @@ export class SyncServiceFactory {
     return service;
   }
 
-  private createCommerceFullSyncService(): SyncServiceInterface {
-    const service = new CommerceFullSyncService();
+  private createCommercefullSyncService(): SyncServiceInterface {
+    const service = new CommercefullSyncService();
 
     const config: PlatformSyncConfig = {
       storeUrl: process.env.COMMERCEFULL_STORE_URL,
@@ -305,12 +305,12 @@ export class SyncServiceFactory {
       .initialize(config)
       .then(ok => {
         if (ok) {
-          this.wireCommerceFullWebhooks(service, config.webhookUrl);
+          this.wireCommercefullWebhooks(service, config.webhookUrl);
         }
       })
       .catch(err => {
         this.logger.error(
-          { message: 'Failed to initialize CommerceFull sync service' },
+          { message: 'Failed to initialize Commercefull sync service' },
           err instanceof Error ? err : new Error(String(err))
         );
       });
@@ -319,13 +319,13 @@ export class SyncServiceFactory {
   }
 
   /**
-   * Wire the CommerceFull webhook receiver to the sync service,
+   * Wire the Commercefull webhook receiver to the sync service,
    * register default event listeners, and auto-register webhooks
-   * on the CommerceFull platform when a webhookUrl is configured.
+   * on the Commercefull platform when a webhookUrl is configured.
    */
-  private wireCommerceFullWebhooks(service: CommerceFullSyncService, webhookUrl?: string): void {
+  private wireCommercefullWebhooks(service: CommercefullSyncService, webhookUrl?: string): void {
     // 1. Wire the webhook receiver singleton to this sync service
-    const receiver = CommerceFullWebhookReceiver.getInstance();
+    const receiver = CommercefullWebhookReceiver.getInstance();
     receiver.setSyncService(service);
 
     // 2. Register default event listeners for real-time sync
@@ -349,20 +349,20 @@ export class SyncServiceFactory {
       await this.handleCustomerWebhook(event);
     });
 
-    // 3. Auto-register webhooks on CommerceFull if webhookUrl is provided
+    // 3. Auto-register webhooks on Commercefull if webhookUrl is provided
     if (webhookUrl) {
       service
         .registerSyncWebhooks(webhookUrl)
         .then(ok => {
           if (ok) {
-            this.logger.info({ message: `[Webhook] Registered CommerceFull webhooks → ${webhookUrl}` });
+            this.logger.info({ message: `[Webhook] Registered Commercefull webhooks → ${webhookUrl}` });
           } else {
-            this.logger.warn({ message: '[Webhook] Failed to register CommerceFull webhooks' });
+            this.logger.warn({ message: '[Webhook] Failed to register Commercefull webhooks' });
           }
         })
         .catch(err => {
           this.logger.error(
-            { message: '[Webhook] Error registering CommerceFull webhooks' },
+            { message: '[Webhook] Error registering Commercefull webhooks' },
             err instanceof Error ? err : new Error(String(err))
           );
         });
@@ -675,17 +675,17 @@ export class SyncServiceFactory {
       }
 
       case ECommercePlatform.COMMERCEFULL: {
-        const cfService = new CommerceFullSyncService();
+        const cfService = new CommercefullSyncService();
         cfService
           .initialize(config)
           .then(ok => {
             if (ok) {
-              this.wireCommerceFullWebhooks(cfService, config.webhookUrl);
+              this.wireCommercefullWebhooks(cfService, config.webhookUrl);
             }
           })
           .catch(err => {
             this.logger.error(
-              { message: 'Failed to initialize CommerceFull sync service with config' },
+              { message: 'Failed to initialize Commercefull sync service with config' },
               err instanceof Error ? err : new Error(String(err))
             );
           });

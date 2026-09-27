@@ -15,7 +15,7 @@ The basket is the in-progress order before payment. It is persisted to SQLite vi
 
 All monetary arithmetic uses `utils/money.ts` (integer-cent internally) to avoid floating-point errors. Tax rates stored on `BasketItem` at add-to-cart time are used for local basket totals display. The checkout mode depends on the platform's `basketMode` capability:
 
-- **`native_draft`** (Shopify, Wix, CommerceFull): the authoritative tax calculation happens when the draft order is created on the platform at checkout time — the platform's returned totals replace the basket estimates.
+- **`native_draft`** (Shopify, Wix, Commercefull): the authoritative tax calculation happens when the draft order is created on the platform at checkout time — the platform's returned totals replace the basket estimates.
 - **`remote_cart`** (WooCommerce, Magento, BigCommerce, Sylius, PrestaShop): the POS basket is authoritative; the platform order is created post-payment by `OrderSyncService`.
 - **`local_only`** (Squarespace, Offline): fully local basket; order imported to platform after payment. For offline mode, the per-item `taxRate` stored at add-to-cart time remains authoritative throughout.
 
@@ -337,7 +337,7 @@ Cashier taps "Complete Order"
   → useCheckout.handleStartCheckout()
     → BasketProvider.startCheckout(platform)
       → CheckoutService.startCheckout(platform, cashierId, cashierName)
-        ── native_draft (Shopify, Wix, CommerceFull) ────────────────────
+        ── native_draft (Shopify, Wix, Commercefull) ────────────────────
         → OrderServiceFactory.getService(platform).createDraftOrder()
             → platform returns { platformOrderId, subtotal, tax, total, lineItems[].taxRate }
             → status = 'draft'

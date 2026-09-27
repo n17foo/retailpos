@@ -1,29 +1,29 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
 import { Category } from '../CategoryServiceInterface';
 import { PlatformCategoryServiceInterface, PlatformCategoryConfig, PlatformConfigRequirements } from './PlatformCategoryServiceInterface';
-import { CommerceFullApiClient, CommerceFullConfig } from '../../clients/commercefull/CommerceFullApiClient';
+import { CommercefullApiClient, CommercefullConfig } from '../../clients/commercefull/CommercefullApiClient';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 
 /**
- * CommerceFull platform implementation of the category service.
+ * Commercefull platform implementation of the category service.
  *
  * Endpoint mapping:
  *   GET  /customer/categories                      → getCategories (all active)
  *   GET  /customer/categories/:identifier          → getCategoryById (by ID or slug)
  *   GET  /customer/categories/:categoryId/children → subcategories
  */
-export class CommerceFullCategoryService implements PlatformCategoryServiceInterface {
+export class CommercefullCategoryService implements PlatformCategoryServiceInterface {
   private initialized = false;
   private config: PlatformCategoryConfig = {};
-  private apiClient: CommerceFullApiClient;
-  private logger = LoggerFactory.getInstance().createLogger('CommerceFullCategoryService');
+  private apiClient: CommercefullApiClient;
+  private logger = LoggerFactory.getInstance().createLogger('CommercefullCategoryService');
   private cachedCategories: Category[] = [];
   private lastFetch = 0;
   private cacheTtlMs = 5 * 60 * 1000; // 5 minutes
 
   constructor(config: PlatformCategoryConfig = {}) {
     this.config = config;
-    this.apiClient = CommerceFullApiClient.getInstance();
+    this.apiClient = CommercefullApiClient.getInstance();
   }
 
   getConfigRequirements(): PlatformConfigRequirements {
@@ -37,7 +37,7 @@ export class CommerceFullCategoryService implements PlatformCategoryServiceInter
     try {
       if (config) this.config = config;
 
-      const clientConfig: CommerceFullConfig = {
+      const clientConfig: CommercefullConfig = {
         storeUrl: this.config.storeUrl,
         apiKey: this.config.apiKey || this.config.accessToken,
         apiSecret: this.config.apiSecret,
@@ -49,7 +49,7 @@ export class CommerceFullCategoryService implements PlatformCategoryServiceInter
       if (ok) this.initialized = true;
     } catch (error) {
       this.logger.error(
-        { message: 'Failed to initialize CommerceFull category service' },
+        { message: 'Failed to initialize Commercefull category service' },
         error instanceof Error ? error : new Error(String(error))
       );
     }
@@ -61,7 +61,7 @@ export class CommerceFullCategoryService implements PlatformCategoryServiceInter
 
   async getCategories(): Promise<Category[]> {
     if (!this.isInitialized()) {
-      throw new Error('CommerceFull category service not initialized');
+      throw new Error('Commercefull category service not initialized');
     }
 
     // Return cached if fresh
@@ -74,12 +74,21 @@ export class CommerceFullCategoryService implements PlatformCategoryServiceInter
       const categories = data.data || data.categories || data || [];
 
       this.cachedCategories = categories.map((c: any) => this.mapCategory(c));
+
+      // The platform returns a flat list — attach children via parentId.
+      const byId = new Map(this.cachedCategories.map(c => [c.id, c]));
+      for (const c of this.cachedCategories) {
+        if (c.parentId && byId.has(c.parentId)) {
+          const parent = byId.get(c.parentId)!;
+          parent.subcategories = [...(parent.subcategories || []), c];
+        }
+      }
       this.lastFetch = Date.now();
 
       return this.cachedCategories;
     } catch (error) {
       this.logger.error(
-        { message: 'Error fetching categories from CommerceFull' },
+        { message: 'Error fetching categories from Commercefull' },
         error instanceof Error ? error : new Error(String(error))
       );
       return [];
@@ -88,7 +97,7 @@ export class CommerceFullCategoryService implements PlatformCategoryServiceInter
 
   async getCategoryById(categoryId: string): Promise<Category | undefined> {
     if (!this.isInitialized()) {
-      throw new Error('CommerceFull category service not initialized');
+      throw new Error('Commercefull category service not initialized');
     }
 
     try {

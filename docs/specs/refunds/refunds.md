@@ -45,7 +45,7 @@ Legend:
 | Wix          | S                 | `platform_native`   |
 | PrestaShop   | C                 | `custom_adapter`    |
 | Squarespace  | NR                | `local_record_only` |
-| CommerceFull | S                 | `platform_native`   |
+| Commercefull | S                 | `platform_native`   |
 | Offline      | S                 | `local_record_only` |
 
 `refundMode` semantics:

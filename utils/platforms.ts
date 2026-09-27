@@ -51,7 +51,7 @@ export const PLATFORM_DISPLAY_NAMES: Readonly<Record<ECommercePlatform, string>>
   [ECommercePlatform.WIX]: 'Wix',
   [ECommercePlatform.PRESTASHOP]: 'PrestaShop',
   [ECommercePlatform.SQUARESPACE]: 'Squarespace',
-  [ECommercePlatform.COMMERCEFULL]: 'CommerceFull',
+  [ECommercePlatform.COMMERCEFULL]: 'Commercefull',
   [ECommercePlatform.OFFLINE]: 'Offline Mode',
 };
 

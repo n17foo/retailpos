@@ -10,7 +10,7 @@ import { SyliusTaxStrategy } from './platforms/SyliusTaxStrategy';
 import { WixTaxStrategy } from './platforms/WixTaxStrategy';
 import { PrestaShopTaxStrategy } from './platforms/PrestaShopTaxStrategy';
 import { SquarespaceTaxStrategy } from './platforms/SquarespaceTaxStrategy';
-import { CommerceFullTaxStrategy } from './platforms/CommerceFullTaxStrategy';
+import { CommercefullTaxStrategy } from './platforms/CommercefullTaxStrategy';
 import { LoggerFactory } from '../logger/LoggerFactory';
 
 const logger = LoggerFactory.getInstance().createLogger('TaxServiceFactory');
@@ -57,7 +57,7 @@ export class TaxServiceFactory {
     this.strategies.set(ECommercePlatform.WIX, new WixTaxStrategy());
     this.strategies.set(ECommercePlatform.PRESTASHOP, new PrestaShopTaxStrategy());
     this.strategies.set(ECommercePlatform.SQUARESPACE, new SquarespaceTaxStrategy());
-    this.strategies.set(ECommercePlatform.COMMERCEFULL, new CommerceFullTaxStrategy());
+    this.strategies.set(ECommercePlatform.COMMERCEFULL, new CommercefullTaxStrategy());
 
     logger.info({ message: 'Tax strategies registered', count: this.strategies.size });
   }

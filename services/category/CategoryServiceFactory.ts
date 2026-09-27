@@ -11,7 +11,7 @@ import { SquarespaceCategoryService } from './platforms/SquarespaceCategoryServi
 import { MagentoCategoryService } from './platforms/MagentoCategoryService';
 import { SyliusCategoryService } from './platforms/SyliusCategoryService';
 import { WixCategoryService } from './platforms/WixCategoryService';
-import { CommerceFullCategoryService } from './platforms/CommerceFullCategoryService';
+import { CommercefullCategoryService } from './platforms/CommercefullCategoryService';
 import { LoggerFactory } from '../logger/LoggerFactory';
 
 /**
@@ -106,7 +106,7 @@ export class CategoryServiceFactory {
         break;
 
       case ECommercePlatform.COMMERCEFULL:
-        service = this.createCommerceFullService();
+        service = this.createCommercefullService();
         break;
 
       case ECommercePlatform.OFFLINE:
@@ -161,7 +161,7 @@ export class CategoryServiceFactory {
             service = this.createSquarespaceService();
             break;
           case ECommercePlatform.COMMERCEFULL:
-            service = this.createCommerceFullService();
+            service = this.createCommercefullService();
             break;
           case ECommercePlatform.OFFLINE:
             service = this.createOfflineService();
@@ -333,12 +333,12 @@ export class CategoryServiceFactory {
   /**
    * Create and initialize an Offline category service
    */
-  private createCommerceFullService(): CategoryServiceInterface {
-    const service = new CommerceFullCategoryService();
+  private createCommercefullService(): CategoryServiceInterface {
+    const service = new CommercefullCategoryService();
 
     service.initialize().catch(err => {
       this.logger.error(
-        { message: 'Failed to initialize CommerceFull category service:' },
+        { message: 'Failed to initialize Commercefull category service:' },
         err instanceof Error ? err : new Error(String(err))
       );
     });

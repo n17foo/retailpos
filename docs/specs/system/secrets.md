@@ -39,7 +39,7 @@ The system defines a comprehensive enum of secret keys for all supported platfor
 | E-commerce (WooCommerce) | `WOOCOMMERCE_CONSUMER_KEY`, `WOOCOMMERCE_CONSUMER_SECRET`, `WOOCOMMERCE_STORE_URL`                           |
 | E-commerce (Magento)     | `MAGENTO_ACCESS_TOKEN`, `MAGENTO_STORE_URL`, `MAGENTO_API_VERSION`                                           |
 | E-commerce (BigCommerce) | `BIGCOMMERCE_CLIENT_ID`, `BIGCOMMERCE_ACCESS_TOKEN`, `BIGCOMMERCE_STORE_HASH`                                |
-| E-commerce (Others)      | Sylius, Wix, PrestaShop, Squarespace, CommerceFull                                                           |
+| E-commerce (Others)      | Sylius, Wix, PrestaShop, Squarespace, Commercefull                                                           |
 
 ### Key Defaults
 

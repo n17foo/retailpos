@@ -9,7 +9,7 @@
 
 ## Context
 
-The search service provides unified product search across local inventory and multiple e-commerce platforms. It uses a composite pattern to aggregate results from platform-specific search implementations (Shopify, WooCommerce, BigCommerce, Magento, Sylius, Wix, CommerceFull) and presents them in a unified format.
+The search service provides unified product search across local inventory and multiple e-commerce platforms. It uses a composite pattern to aggregate results from platform-specific search implementations (Shopify, WooCommerce, BigCommerce, Magento, Sylius, Wix, Commercefull) and presents them in a unified format.
 
 The service supports text search, barcode search, category filtering, and maintains a session-based search history. All platform services are initialized lazily and failures are isolated — one platform's search failure does not affect others.
 
@@ -39,7 +39,7 @@ The service supports text search, barcode search, category filtering, and mainta
 | Magento      | `MagentoSearchService`            | ✅ Implemented |
 | Sylius       | `SyliusSearchService`             | ✅ Implemented |
 | Wix          | `WixSearchService`                | ✅ Implemented |
-| CommerceFull | `CommerceFullSearchService`       | ✅ Implemented |
+| Commercefull | `CommercefullSearchService`       | ✅ Implemented |
 | PrestaShop   | `OfflineSearchService` (fallback) | ✅ Implemented |
 | Squarespace  | `OfflineSearchService` (fallback) | ✅ Implemented |
 | Offline      | `OfflineSearchService`            | ✅ Implemented |
@@ -121,7 +121,7 @@ The service supports text search, barcode search, category filtering, and mainta
 
 **2.3.8** When a PrestaShop or Squarespace config is provided, the system shall create a new `OfflineSearchService` and add it to the platform services array.
 
-**2.3.9** When a CommerceFull config is provided, the system shall create a new `CommerceFullSearchService` with the config and add it to the platform services array.
+**2.3.9** When a Commercefull config is provided, the system shall create a new `CommercefullSearchService` with the config and add it to the platform services array.
 
 **2.3.10** When an Offline config is provided, the system shall create a new `OfflineSearchService` and add it to the platform services array.
 
@@ -441,7 +441,7 @@ Runtime addition of new platform
 | Magento service created                   | `new MagentoSearchService(config)`                       | `services/search/platforms/MagentoSearchService.ts`      |
 | Sylius service created                    | `new SyliusSearchService(config)`                        | `services/search/platforms/SyliusSearchService.ts`       |
 | Wix service created                       | `new WixSearchService(config)`                           | `services/search/platforms/WixSearchService.ts`          |
-| CommerceFull service created              | `new CommerceFullSearchService(config)`                  | `services/search/platforms/CommerceFullSearchService.ts` |
+| Commercefull service created              | `new CommercefullSearchService(config)`                  | `services/search/platforms/CommercefullSearchService.ts` |
 | Offline service created                   | `new OfflineSearchService()`                             | `services/search/platforms/OfflineSearchService.ts`      |
 | Logger created                            | `LoggerFactory.getInstance().createLogger`               | `services/logger/LoggerFactory.ts`                       |
 

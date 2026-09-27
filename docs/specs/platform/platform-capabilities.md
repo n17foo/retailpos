@@ -15,7 +15,7 @@ Every platform is assigned a **basket mode** that determines how the POS manages
 
 | Basket mode    | Description                                                                                | Platforms                                             |
 | -------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
-| `native_draft` | Platform creates a mutable draft order with server-calculated tax at checkout start        | Shopify, Wix, CommerceFull                            |
+| `native_draft` | Platform creates a mutable draft order with server-calculated tax at checkout start        | Shopify, Wix, Commercefull                            |
 | `remote_cart`  | Platform has a cart/quote/in-progress order; POS basket is local-authoritative at checkout | WooCommerce, Magento, BigCommerce, Sylius, PrestaShop |
 | `local_only`   | Fully local basket; order imported to platform post-payment via `createOrder()`            | Squarespace, Offline                                  |
 
@@ -36,7 +36,7 @@ Every platform also has a capability level for each advanced feature:
 
 ### Platform Capability Matrix
 
-| Feature              | Shopify | WooCommerce | Magento | BigCommerce | Sylius | Wix | PrestaShop | Squarespace | CommerceFull | Offline |
+| Feature              | Shopify | WooCommerce | Magento | BigCommerce | Sylius | Wix | PrestaShop | Squarespace | Commercefull | Offline |
 | -------------------- | ------- | ----------- | ------- | ----------- | ------ | --- | ---------- | ----------- | ------------ | ------- |
 | Basket mode          | ND      | RC          | RC      | RC          | RC     | ND  | RC         | LO          | ND           | LO      |
 | Catalog / variants   | S       | S           | S       | S           | C      | S   | S          | S           | S            | S       |
@@ -248,7 +248,7 @@ App launches
 CheckoutService.startCheckout(platform)
   → getBasketMode(getPlatformCapabilities(platform))
 
-  [native_draft: Shopify, Wix, CommerceFull]
+  [native_draft: Shopify, Wix, Commercefull]
     → createDraftOrder()
         → [success] use platform totals, status: 'draft', store platformOrderId
         → [failure] fall back to basket totals, status: 'pending'

@@ -12,7 +12,7 @@ Website: [retailpos.org](https://retailpos.org)
 
 ## Features
 
-- **Multi-Platform Support** — Shopify, WooCommerce, BigCommerce, Magento, Sylius, Wix, PrestaShop, Squarespace, CommerceFull, Offline
+- **Multi-Platform Support** — Shopify, WooCommerce, BigCommerce, Magento, Sylius, Wix, PrestaShop, Squarespace, Commercefull, Offline
 - **Offline-First** — Full POS functionality without internet; background sync with retry and exponential backoff
 - **Multi-Register** — Server/client mode over LAN with event-driven sync (SyncEventBus + SyncPoller)
 - **Product Variants** — Option-based variants with inventory tracking and barcode lookup

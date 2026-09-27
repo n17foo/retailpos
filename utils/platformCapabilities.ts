@@ -174,8 +174,8 @@ export const PLATFORM_CAPABILITY_MATRIX: Readonly<Record<ECommercePlatform, Plat
     discounts: 'supported',
     giftCards: 'supported',
     refunds: 'supported',
-    loyalty: 'custom', // CommerceFull has loyalty extension — custom adapter
-    storeCredit: 'custom', // CommerceFull has store credit extension — custom adapter
+    loyalty: 'custom', // Commercefull has loyalty extension — custom adapter
+    storeCredit: 'custom', // Commercefull has store credit extension — custom adapter
   },
   [ECommercePlatform.OFFLINE]: {
     catalog: 'supported',

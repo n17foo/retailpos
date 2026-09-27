@@ -54,7 +54,7 @@ Two new capability keys are added to `PlatformCapabilities`:
 
 ### Capability Matrix Extension
 
-| Feature       | Shopify | WooCommerce | Magento | BigCommerce | Sylius | Wix | PrestaShop | Squarespace | CommerceFull | Offline |
+| Feature       | Shopify | WooCommerce | Magento | BigCommerce | Sylius | Wix | PrestaShop | Squarespace | Commercefull | Offline |
 | ------------- | ------- | ----------- | ------- | ----------- | ------ | --- | ---------- | ----------- | ------------ | ------- |
 | `loyalty`     | C       | NR          | NR      | NR          | NR     | NR  | NR         | NR          | C            | S       |
 | `storeCredit` | C       | NR          | NR      | NR          | NR     | NR  | NR         | NR          | C            | S       |

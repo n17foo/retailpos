@@ -19,7 +19,7 @@ This spec is **capability-driven** and supersedes the older universal draft-firs
 
 For online platforms, `startCheckout()` follows one of three modes determined by `getBasketMode(getPlatformCapabilities(platform))`:
 
-1. **`native_draft` mode** (Shopify, Wix, CommerceFull)
+1. **`native_draft` mode** (Shopify, Wix, Commercefull)
    - The basket items are sent to the platform via `OrderServiceFactory.getService(platform).createDraftOrder()`.
    - The platform returns authoritative `tax`, `subtotal`, `total`, and per-line `taxAmount` / `taxRate`.
    - Platform values replace local estimates on `LocalOrder` and `order_items`.
@@ -403,7 +403,7 @@ Cashier taps "Complete Order"
       → basketService.getBasket()                    ← validate non-empty
       → generateUUID()                               ← orderId
 
-      ── native_draft platforms (Shopify, Wix, CommerceFull) ──────────
+      ── native_draft platforms (Shopify, Wix, Commercefull) ──────────
       → OrderServiceFactory.getService(platform).createDraftOrder(basketAsOrder)
           → platform API creates draft order
           → returns { platformOrderId, subtotal, tax, total, lineItems[].taxRate }

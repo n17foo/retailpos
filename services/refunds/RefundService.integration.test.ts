@@ -73,8 +73,8 @@ jest.mock('./platforms/PrestaShopRefundService', () => ({
 jest.mock('./platforms/SquarespaceRefundService', () => ({
   SquarespaceRefundService: jest.fn().mockImplementation(mockPlatformRefundImpl),
 }));
-jest.mock('./platforms/CommerceFullRefundService', () => ({
-  CommerceFullRefundService: jest.fn().mockImplementation(mockPlatformRefundImpl),
+jest.mock('./platforms/CommercefullRefundService', () => ({
+  CommercefullRefundService: jest.fn().mockImplementation(mockPlatformRefundImpl),
 }));
 jest.mock('./platforms/OfflineRefundService', () => ({
   OfflineRefundService: jest.fn().mockImplementation(() => ({

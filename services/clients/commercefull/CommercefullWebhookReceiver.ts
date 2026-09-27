@@ -1,41 +1,41 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw webhook payload handling */
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { CommerceFullSyncService, CommerceFullWebhookEvent } from '../../sync/platforms/CommerceFullSyncService';
+import { CommercefullSyncService, CommercefullWebhookEvent } from '../../sync/platforms/CommercefullSyncService';
 
 /**
- * Webhook receiver for CommerceFull real-time sync events.
+ * Webhook receiver for Commercefull real-time sync events.
  *
- * This service handles incoming HTTP POST requests from CommerceFull's
+ * This service handles incoming HTTP POST requests from Commercefull's
  * webhook dispatch system. It verifies the HMAC signature and delegates
- * event processing to the CommerceFullSyncService.
+ * event processing to the CommercefullSyncService.
  *
  * Usage with a local API server or Express-like handler:
  *
- *   const receiver = CommerceFullWebhookReceiver.getInstance();
+ *   const receiver = CommercefullWebhookReceiver.getInstance();
  *   receiver.setSyncService(syncService);
  *
  *   // In your route handler:
  *   const result = await receiver.handleRequest(rawBody, headers);
  *   // result.status is 200 or 401/400/500
  */
-export class CommerceFullWebhookReceiver {
-  private static instance: CommerceFullWebhookReceiver;
-  private syncService: CommerceFullSyncService | null = null;
-  private logger = LoggerFactory.getInstance().createLogger('CommerceFullWebhookReceiver');
+export class CommercefullWebhookReceiver {
+  private static instance: CommercefullWebhookReceiver;
+  private syncService: CommercefullSyncService | null = null;
+  private logger = LoggerFactory.getInstance().createLogger('CommercefullWebhookReceiver');
 
   private constructor() {}
 
-  static getInstance(): CommerceFullWebhookReceiver {
-    if (!CommerceFullWebhookReceiver.instance) {
-      CommerceFullWebhookReceiver.instance = new CommerceFullWebhookReceiver();
+  static getInstance(): CommercefullWebhookReceiver {
+    if (!CommercefullWebhookReceiver.instance) {
+      CommercefullWebhookReceiver.instance = new CommercefullWebhookReceiver();
     }
-    return CommerceFullWebhookReceiver.instance;
+    return CommercefullWebhookReceiver.instance;
   }
 
   /**
    * Set the sync service that owns the webhook secret and event listeners.
    */
-  setSyncService(service: CommerceFullSyncService): void {
+  setSyncService(service: CommercefullSyncService): void {
     this.syncService = service;
   }
 
@@ -66,7 +66,7 @@ export class CommerceFullWebhookReceiver {
     }
 
     // Parse body
-    let event: CommerceFullWebhookEvent;
+    let event: CommercefullWebhookEvent;
     try {
       const payload = JSON.parse(rawBody);
       event = {

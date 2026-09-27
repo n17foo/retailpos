@@ -4,29 +4,29 @@ import { TokenType } from '../../token/TokenServiceInterface';
 import { TokenInitializer } from '../../token/TokenInitializer';
 import { BaseApiClient, BaseApiClientConfig, AuthStrategy } from '../BaseApiClient';
 
-export interface CommerceFullConfig extends BaseApiClientConfig {
+export interface CommercefullConfig extends BaseApiClientConfig {
   apiKey?: string;
   apiSecret?: string;
 }
 
 /**
- * Shared HTTP client for all CommerceFull platform services.
+ * Shared HTTP client for all Commercefull platform services.
  * Handles authentication via token-based auth (access + refresh tokens).
  * All services share a single instance to reuse the auth session.
  */
-export class CommerceFullApiClient extends BaseApiClient<CommerceFullConfig> {
-  private static instance: CommerceFullApiClient;
+export class CommercefullApiClient extends BaseApiClient<CommercefullConfig> {
+  private static instance: CommercefullApiClient;
   private accessToken: string | null = null;
 
   private constructor() {
-    super('CommerceFullApiClient');
+    super('CommercefullApiClient');
   }
 
-  public static getInstance(): CommerceFullApiClient {
-    if (!CommerceFullApiClient.instance) {
-      CommerceFullApiClient.instance = new CommerceFullApiClient();
+  public static getInstance(): CommercefullApiClient {
+    if (!CommercefullApiClient.instance) {
+      CommercefullApiClient.instance = new CommercefullApiClient();
     }
-    return CommerceFullApiClient.instance;
+    return CommercefullApiClient.instance;
   }
 
   protected getAuthStrategy(): AuthStrategy {
@@ -46,7 +46,7 @@ export class CommerceFullApiClient extends BaseApiClient<CommerceFullConfig> {
   public async initialize(): Promise<boolean> {
     try {
       if (!this.config.storeUrl) {
-        this.logger.warn('Missing CommerceFull storeUrl');
+        this.logger.warn('Missing Commercefull storeUrl');
         return false;
       }
 
@@ -81,11 +81,11 @@ export class CommerceFullApiClient extends BaseApiClient<CommerceFullConfig> {
         return true;
       }
 
-      this.logger.warn('No credentials provided for CommerceFull');
+      this.logger.warn('No credentials provided for Commercefull');
       return false;
     } catch (error) {
       this.logger.error(
-        { message: 'Failed to initialize CommerceFull API client' },
+        { message: 'Failed to initialize Commercefull API client' },
         error instanceof Error ? error : new Error(String(error))
       );
       return false;

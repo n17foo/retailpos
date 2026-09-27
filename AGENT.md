@@ -6,7 +6,7 @@
 
 ## What this project is
 
-RetailPOS is a cross-platform point-of-sale application (React Native + Expo + Electron) that connects to 9 e-commerce platforms (Shopify, WooCommerce, Magento, BigCommerce, Sylius, Wix, PrestaShop, Squarespace, CommerceFull) plus a fully-offline mode. It supports basket management, checkout, payment terminals, barcode scanning, receipt printing, multi-register operation over a LAN, and role-based permissions.
+RetailPOS is a cross-platform point-of-sale application (React Native + Expo + Electron) that connects to 9 e-commerce platforms (Shopify, WooCommerce, Magento, BigCommerce, Sylius, Wix, PrestaShop, Squarespace, Commercefull) plus a fully-offline mode. It supports basket management, checkout, payment terminals, barcode scanning, receipt printing, multi-register operation over a LAN, and role-based permissions.
 
 ---
 

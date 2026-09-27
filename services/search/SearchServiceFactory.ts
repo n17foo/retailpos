@@ -8,7 +8,7 @@ import { WixSearchService } from './platforms/WixSearchService';
 import { SyliusSearchService } from './platforms/SyliusSearchService';
 import { MagentoSearchService } from './platforms/MagentoSearchService';
 import { OfflineSearchService } from './platforms/OfflineSearchService';
-import { CommerceFullSearchService } from './platforms/CommerceFullSearchService';
+import { CommercefullSearchService } from './platforms/CommercefullSearchService';
 
 /**
  * Factory for creating and managing search service instances.
@@ -103,10 +103,10 @@ export class SearchServiceFactory {
       platformServices.push(new OfflineSearchService() as unknown as PlatformSearchServiceInterface);
     }
 
-    // Create CommerceFull service if config is provided
+    // Create Commercefull service if config is provided
     if (platformConfigs.commercefull) {
-      const commerceFullConfig = platformConfigs.commercefull || {};
-      platformServices.push(new CommerceFullSearchService(commerceFullConfig));
+      const commercefullConfig = platformConfigs.commercefull || {};
+      platformServices.push(new CommercefullSearchService(commercefullConfig));
     }
 
     // Create Offline service if config is provided

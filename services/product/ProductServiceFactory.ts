@@ -7,7 +7,7 @@ import { SyliusProductService } from './platforms/SyliusProductService';
 import { WixProductService } from './platforms/WixProductService';
 import { PrestaShopProductService } from './platforms/PrestaShopProductService';
 import { SquarespaceProductService } from './platforms/SquarespaceProductService';
-import { CommerceFullProductService } from './platforms/CommerceFullProductService';
+import { CommercefullProductService } from './platforms/CommercefullProductService';
 import { CompositeProductService } from './platforms/CompositeProductService';
 import { OfflineProductService } from './platforms/OfflineProductService';
 import { PlatformProductConfig, PlatformProductServiceInterface } from './platforms/PlatformProductServiceInterface';
@@ -30,7 +30,7 @@ export class ProductServiceFactory {
   private wixService: WixProductService | null = null;
   private prestaShopService: PrestaShopProductService | null = null;
   private squarespaceService: SquarespaceProductService | null = null;
-  private commerceFullService: CommerceFullProductService | null = null;
+  private commercefullService: CommercefullProductService | null = null;
   private offlineService: OfflineProductService | null = null;
   private compositeService: CompositeProductService | null = null;
 
@@ -155,16 +155,16 @@ export class ProductServiceFactory {
         return this.squarespaceService;
 
       case ECommercePlatform.COMMERCEFULL:
-        if (!this.commerceFullService) {
-          this.commerceFullService = new CommerceFullProductService(config);
-          this.commerceFullService.initialize().catch(err => {
+        if (!this.commercefullService) {
+          this.commercefullService = new CommercefullProductService(config);
+          this.commercefullService.initialize().catch(err => {
             this.logger.error(
-              { message: 'Failed to initialize CommerceFull product service:' },
+              { message: 'Failed to initialize Commercefull product service:' },
               err instanceof Error ? err : new Error(String(err))
             );
           });
         }
-        return this.commerceFullService;
+        return this.commercefullService;
 
       case ECommercePlatform.OFFLINE:
         if (!this.offlineService) {
@@ -321,10 +321,10 @@ export class ProductServiceFactory {
         break;
 
       case ECommercePlatform.COMMERCEFULL:
-        this.commerceFullService = new CommerceFullProductService(config);
-        this.commerceFullService.initialize().catch(err => {
+        this.commercefullService = new CommercefullProductService(config);
+        this.commercefullService.initialize().catch(err => {
           this.logger.error(
-            { message: 'Failed to initialize CommerceFull product service with config:' },
+            { message: 'Failed to initialize Commercefull product service with config:' },
             err instanceof Error ? err : new Error(String(err))
           );
         });

@@ -7,7 +7,7 @@ import { SyliusInventoryService } from './platforms/SyliusInventoryService';
 import { WixInventoryService } from './platforms/WixInventoryService';
 import { PrestaShopInventoryService } from './platforms/PrestaShopInventoryService';
 import { SquarespaceInventoryService } from './platforms/SquarespaceInventoryService';
-import { CommerceFullInventoryService } from './platforms/CommerceFullInventoryService';
+import { CommercefullInventoryService } from './platforms/CommercefullInventoryService';
 import { OfflineInventoryService } from './platforms/OfflineInventoryService';
 import { CompositeInventoryService } from './platforms/CompositeInventoryService';
 import { PlatformInventoryConfig, PlatformInventoryServiceInterface } from './platforms/PlatformInventoryServiceInterface';
@@ -106,7 +106,7 @@ export class InventoryServiceFactory {
         break;
 
       case ECommercePlatform.COMMERCEFULL:
-        service = this.createCommerceFullService();
+        service = this.createCommercefullService();
         break;
 
       case ECommercePlatform.OFFLINE:
@@ -161,7 +161,7 @@ export class InventoryServiceFactory {
             service = this.createSquarespaceService();
             break;
           case ECommercePlatform.COMMERCEFULL:
-            service = this.createCommerceFullService();
+            service = this.createCommercefullService();
             break;
           case ECommercePlatform.OFFLINE:
             service = this.createOfflineService();
@@ -361,8 +361,8 @@ export class InventoryServiceFactory {
     return service;
   }
 
-  private createCommerceFullService(): InventoryServiceInterface {
-    const service = new CommerceFullInventoryService();
+  private createCommercefullService(): InventoryServiceInterface {
+    const service = new CommercefullInventoryService();
 
     const config: PlatformInventoryConfig = {
       storeUrl: process.env.COMMERCEFULL_STORE_URL,
@@ -372,7 +372,7 @@ export class InventoryServiceFactory {
 
     service.initialize(config).catch(err => {
       this.logger.error(
-        { message: 'Failed to initialize CommerceFull inventory service:' },
+        { message: 'Failed to initialize Commercefull inventory service:' },
         err instanceof Error ? err : new Error(String(err))
       );
     });
@@ -427,7 +427,7 @@ export class InventoryServiceFactory {
         break;
 
       case ECommercePlatform.COMMERCEFULL:
-        service = new CommerceFullInventoryService();
+        service = new CommercefullInventoryService();
         break;
 
       case ECommercePlatform.OFFLINE:

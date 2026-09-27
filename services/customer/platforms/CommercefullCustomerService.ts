@@ -1,32 +1,33 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
 import { CustomerSearchOptions, CustomerSearchResult, PlatformCustomer } from '../CustomerServiceInterface';
 import { BaseCustomerService } from './BaseCustomerService';
-import { CommerceFullApiClient, CommerceFullConfig } from '../../clients/commercefull/CommerceFullApiClient';
+import { CommercefullApiClient, CommercefullConfig } from '../../clients/commercefull/CommercefullApiClient';
 import { ECommercePlatform } from '../../../utils/platforms';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { toDollars } from '../../../utils/money';
 
 /**
- * CommerceFull platform implementation of the customer service.
+ * Commercefull platform implementation of the customer service.
  *
  * Endpoint mapping:
  *   GET /business/customers?search=...  → searchCustomers
  *   GET /business/customers/:id         → getCustomer
  */
-export class CommerceFullCustomerService extends BaseCustomerService {
+export class CommercefullCustomerService extends BaseCustomerService {
   private config: Record<string, any>;
-  private apiClient: CommerceFullApiClient;
+  private apiClient: CommercefullApiClient;
 
   constructor(config: Record<string, any> = {}) {
     super();
     this.config = config;
-    this.apiClient = CommerceFullApiClient.getInstance();
+    this.apiClient = CommercefullApiClient.getInstance();
     // Override the logger with a more specific name
-    this.logger = LoggerFactory.getInstance().createLogger('CommerceFullCustomerService');
+    this.logger = LoggerFactory.getInstance().createLogger('CommercefullCustomerService');
   }
 
   async initialize(): Promise<boolean> {
     try {
-      const clientConfig: CommerceFullConfig = {
+      const clientConfig: CommercefullConfig = {
         storeUrl: this.config.storeUrl,
         apiKey: this.config.apiKey,
         apiSecret: this.config.apiSecret,
@@ -41,7 +42,7 @@ export class CommerceFullCustomerService extends BaseCustomerService {
       return ok;
     } catch (error) {
       this.logger.error(
-        { message: 'Failed to initialize CommerceFull customer service' },
+        { message: 'Failed to initialize Commercefull customer service' },
         error instanceof Error ? error : new Error(String(error))
       );
       return false;
@@ -50,35 +51,55 @@ export class CommerceFullCustomerService extends BaseCustomerService {
 
   async searchCustomers(options: CustomerSearchOptions): Promise<CustomerSearchResult> {
     if (!this.isInitialized()) {
-      throw new Error('CommerceFull customer service not initialized');
+      throw new Error('Commercefull customer service not initialized');
     }
 
     try {
-      const params: Record<string, string> = {};
+      const limit = options.limit || 20;
+      const offset = options.cursor ? parseInt(options.cursor, 10) || 0 : 0;
+
+      const params: Record<string, string> = { limit: String(limit), offset: String(offset) };
       if (options.query) params.search = options.query;
-      if (options.limit) params.limit = String(options.limit);
-      if (options.cursor) params.page = options.cursor;
 
       const data = await this.apiClient.get<any>('/business/customers', params);
-      const customers: PlatformCustomer[] = (data.data || data.customers || data || []).map((c: any) => this.mapToCustomer(c));
+      // Response: { data: PaginatedResult<Customer> } where PaginatedResult
+      // is { data: Customer[], total, limit, offset, hasMore }.
+      const payload = data?.data || {};
+      const rows = Array.isArray(payload) ? payload : Array.isArray(payload.data) ? payload.data : payload.customers || [];
+      const customers: PlatformCustomer[] = rows.map((c: any) => this.mapToCustomer(c));
 
-      const pagination = data.pagination || data.meta || {};
+      const hasMore = payload.hasMore === true;
       return {
         customers,
-        hasMore: !!pagination.nextPage || !!pagination.hasMore,
-        nextCursor: pagination.nextPage ? String(pagination.nextPage) : undefined,
+        hasMore,
+        nextCursor: hasMore ? String(offset + limit) : undefined,
       };
     } catch (error) {
       this.logger.error(
-        { message: 'Error searching customers on CommerceFull' },
+        { message: 'Error searching customers on Commercefull' },
         error instanceof Error ? error : new Error(String(error))
       );
       return { customers: [], hasMore: false };
     }
   }
 
-  async getCustomer(_customerId: string): Promise<PlatformCustomer | null> {
-    return null;
+  async getCustomer(customerId: string): Promise<PlatformCustomer | null> {
+    if (!this.isInitialized()) {
+      throw new Error('Commercefull customer service not initialized');
+    }
+
+    try {
+      const data = await this.apiClient.get<any>(`/business/customers/${customerId}`);
+      const customer = data?.data || data;
+      if (!customer || !(customer.customerId || customer.id)) return null;
+      return this.mapToCustomer(customer);
+    } catch (error) {
+      this.logger.error(
+        { message: `Error fetching customer ${customerId} from Commercefull` },
+        error instanceof Error ? error : new Error(String(error))
+      );
+      return null;
+    }
   }
 
   private mapToCustomer(c: any): PlatformCustomer {
@@ -101,8 +122,8 @@ export class CommerceFullCustomerService extends BaseCustomerService {
       phone: c.phone || '',
       tags: c.tags || [],
       orderCount: c.orderCount,
-      totalSpent: c.totalSpent,
-      currency: c.currency,
+      totalSpent: c.totalSpentCents != null ? toDollars(c.totalSpentCents) : c.totalSpent,
+      currency: c.preferredCurrency || c.currency,
       note: c.note || c.notes || '',
       createdAt: c.createdAt ? new Date(c.createdAt) : undefined,
       updatedAt: c.updatedAt ? new Date(c.updatedAt) : undefined,

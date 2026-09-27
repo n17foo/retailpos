@@ -3,16 +3,16 @@ import { BaseTaxStrategy } from '../BaseTaxStrategy';
 import { NormalisedTaxCode } from '../types';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 
-const logger = LoggerFactory.getInstance().createLogger('CommerceFullTaxStrategy');
+const logger = LoggerFactory.getInstance().createLogger('CommercefullTaxStrategy');
 
 /**
- * CommerceFull Tax Strategy
+ * Commercefull Tax Strategy
  *
  * Supports inline rate parsing from tax code format: "code:type:rate"
  * Example: "standard:inclusive:20" → 20% inclusive tax
  * Spec: section 9.5, 9.7.4 - Inline rate parsing
  */
-export class CommerceFullTaxStrategy extends BaseTaxStrategy {
+export class CommercefullTaxStrategy extends BaseTaxStrategy {
   constructor() {
     super(ECommercePlatform.COMMERCEFULL);
   }
@@ -29,7 +29,7 @@ export class CommerceFullTaxStrategy extends BaseTaxStrategy {
 
       // Validate type
       if (type !== 'inclusive' && type !== 'exclusive' && type !== 'exempt') {
-        logger.warn({ message: 'Invalid tax type in CommerceFull tax code', taxCode, type });
+        logger.warn({ message: 'Invalid tax type in Commercefull tax code', taxCode, type });
         return super.normaliseTaxCode(taxCode);
       }
 
@@ -53,14 +53,14 @@ export class CommerceFullTaxStrategy extends BaseTaxStrategy {
       const rate = parseFloat(rateStr);
 
       if (isNaN(rate)) {
-        logger.warn({ message: 'Invalid rate in CommerceFull tax code', taxCode, rateStr });
+        logger.warn({ message: 'Invalid rate in Commercefull tax code', taxCode, rateStr });
         return null;
       }
 
       // Convert percentage to decimal if needed (assume percentage if > 1)
       const normalizedRate = rate > 1 ? rate / 100 : rate;
 
-      logger.debug({ message: 'Parsed inline CommerceFull tax rate', taxCode, rate: normalizedRate });
+      logger.debug({ message: 'Parsed inline Commercefull tax rate', taxCode, rate: normalizedRate });
       return normalizedRate;
     }
 

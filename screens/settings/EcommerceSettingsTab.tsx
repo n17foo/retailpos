@@ -27,7 +27,7 @@ const PLATFORM_NAMES: Record<string, string> = {
   wix: 'Wix',
   prestashop: 'PrestaShop',
   squarespace: 'Squarespace',
-  commercefull: 'CommerceFull',
+  commercefull: 'Commercefull',
   offline: 'Offline',
 };
 

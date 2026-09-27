@@ -120,7 +120,7 @@ Repositories abstract both SQLite (`OfflineOrderRepository`) and HTTP-to-server 
 
 ### Tax — Platform-Authoritative (ADR-009)
 
-For `native_draft` platforms (Shopify, Wix, CommerceFull), tax is calculated by the platform at `startCheckout()` time and overwrites local estimates. For all other platforms, local `TaxProfile` rates are authoritative.
+For `native_draft` platforms (Shopify, Wix, Commercefull), tax is calculated by the platform at `startCheckout()` time and overwrites local estimates. For all other platforms, local `TaxProfile` rates are authoritative.
 
 ---
 

@@ -2,13 +2,13 @@
 import { BasePlatformSyncService } from './BasePlatformSyncService';
 import { PlatformSyncConfig, PlatformSyncConfigRequirements } from './PlatformSyncServiceInterface';
 import { SyncOptions, SyncOperationResult, SyncEntityType } from '../SyncServiceInterface';
-import { CommerceFullApiClient, CommerceFullConfig } from '../../clients/commercefull/CommerceFullApiClient';
+import { CommercefullApiClient, CommercefullConfig } from '../../clients/commercefull/CommercefullApiClient';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 
 /**
- * Webhook event payload received from CommerceFull
+ * Webhook event payload received from Commercefull
  */
-export interface CommerceFullWebhookEvent {
+export interface CommercefullWebhookEvent {
   event: string;
   data: any;
   timestamp: string;
@@ -18,31 +18,31 @@ export interface CommerceFullWebhookEvent {
 /**
  * Listener callback for real-time webhook events
  */
-export type WebhookEventListener = (event: CommerceFullWebhookEvent) => void | Promise<void>;
+export type WebhookEventListener = (event: CommercefullWebhookEvent) => void | Promise<void>;
 
 /**
- * CommerceFull platform implementation of the sync service.
+ * Commercefull platform implementation of the sync service.
  *
  * Supports both pull-based sync and real-time push via webhooks:
  *   GET    /health                       → testConnection
  *   POST   /business/webhooks            → registerSyncWebhooks
  *   DELETE /business/webhooks/:id        → unregisterSyncWebhooks
  *   GET    /business/products            → syncProducts (pull)
- *   GET    /business/inventory           → syncInventory (pull)
+ *   GET    /business/inventory/items     → syncInventory (pull)
  *   GET    /business/orders              → syncOrders (pull)
  *   GET    /business/customers           → syncCustomers (pull)
  *   GET    /customer/categories          → syncCategories (pull)
  */
-export class CommerceFullSyncService extends BasePlatformSyncService {
-  private apiClient: CommerceFullApiClient;
+export class CommercefullSyncService extends BasePlatformSyncService {
+  private apiClient: CommercefullApiClient;
   private webhookEndpointId: string | null = null;
   private webhookSecret: string | null = null;
   private webhookListeners: Map<string, WebhookEventListener[]> = new Map();
 
   constructor() {
     super();
-    this.logger = LoggerFactory.getInstance().createLogger('CommerceFullSyncService');
-    this.apiClient = CommerceFullApiClient.getInstance();
+    this.logger = LoggerFactory.getInstance().createLogger('CommercefullSyncService');
+    this.apiClient = CommercefullApiClient.getInstance();
   }
 
   getConfigRequirements(): PlatformSyncConfigRequirements {
@@ -56,7 +56,7 @@ export class CommerceFullSyncService extends BasePlatformSyncService {
     try {
       this.config = { ...config };
 
-      const clientConfig: CommerceFullConfig = {
+      const clientConfig: CommercefullConfig = {
         storeUrl: config.storeUrl,
         apiKey: config.apiKey,
         apiSecret: config.apiSecret,
@@ -69,7 +69,7 @@ export class CommerceFullSyncService extends BasePlatformSyncService {
       return ok;
     } catch (error) {
       this.logger.error(
-        { message: 'Failed to initialize CommerceFull sync service' },
+        { message: 'Failed to initialize Commercefull sync service' },
         error instanceof Error ? error : new Error(String(error))
       );
       return false;
@@ -81,7 +81,7 @@ export class CommerceFullSyncService extends BasePlatformSyncService {
       await this.apiClient.get('/health');
       return true;
     } catch (error) {
-      this.logger.error({ message: 'CommerceFull connection test failed' }, error instanceof Error ? error : new Error(String(error)));
+      this.logger.error({ message: 'Commercefull connection test failed' }, error instanceof Error ? error : new Error(String(error)));
       return false;
     }
   }
@@ -91,7 +91,7 @@ export class CommerceFullSyncService extends BasePlatformSyncService {
   // ===========================================================================
 
   /**
-   * Register webhooks on CommerceFull for real-time event push.
+   * Register webhooks on Commercefull for real-time event push.
    * Creates a single webhook endpoint that subscribes to all sync-relevant events.
    */
   async registerSyncWebhooks(webhookUrl: string): Promise<boolean> {
@@ -117,12 +117,12 @@ export class CommerceFullSyncService extends BasePlatformSyncService {
       this.webhookSecret = result.secret;
 
       this.logger.info({
-        message: `Registered CommerceFull webhook: ${this.webhookEndpointId}`,
+        message: `Registered Commercefull webhook: ${this.webhookEndpointId}`,
       });
 
       return !!this.webhookEndpointId;
     } catch (error) {
-      this.logger.error({ message: 'Failed to register CommerceFull webhooks' }, error instanceof Error ? error : new Error(String(error)));
+      this.logger.error({ message: 'Failed to register Commercefull webhooks' }, error instanceof Error ? error : new Error(String(error)));
       return false;
     }
   }
@@ -138,14 +138,14 @@ export class CommerceFullSyncService extends BasePlatformSyncService {
     try {
       await this.apiClient.delete(`/business/webhooks/${this.webhookEndpointId}`);
       this.logger.info({
-        message: `Unregistered CommerceFull webhook: ${this.webhookEndpointId}`,
+        message: `Unregistered Commercefull webhook: ${this.webhookEndpointId}`,
       });
       this.webhookEndpointId = null;
       this.webhookSecret = null;
       return true;
     } catch (error) {
       this.logger.error(
-        { message: 'Failed to unregister CommerceFull webhooks' },
+        { message: 'Failed to unregister Commercefull webhooks' },
         error instanceof Error ? error : new Error(String(error))
       );
       return false;
@@ -192,10 +192,10 @@ export class CommerceFullSyncService extends BasePlatformSyncService {
   }
 
   /**
-   * Process an incoming webhook event from CommerceFull.
+   * Process an incoming webhook event from Commercefull.
    * Called by the webhook receiver endpoint when a POST is received.
    */
-  async handleWebhookEvent(event: CommerceFullWebhookEvent): Promise<void> {
+  async handleWebhookEvent(event: CommercefullWebhookEvent): Promise<void> {
     this.logger.info({
       message: `Received webhook event: ${event.event} (delivery: ${event.deliveryId})`,
     });
@@ -319,23 +319,23 @@ export class CommerceFullSyncService extends BasePlatformSyncService {
     switch (entity) {
       case SyncEntityType.PRODUCT:
         await this.apiClient.get('/business/products', { limit: '100' });
-        this.logger.info({ message: 'Synced products from CommerceFull' });
+        this.logger.info({ message: 'Synced products from Commercefull' });
         break;
       case SyncEntityType.INVENTORY:
-        await this.apiClient.get('/business/inventory');
-        this.logger.info({ message: 'Synced inventory from CommerceFull' });
+        await this.apiClient.get('/business/inventory/items', { limit: '100' });
+        this.logger.info({ message: 'Synced inventory from Commercefull' });
         break;
       case SyncEntityType.ORDER:
         await this.apiClient.get('/business/orders', { limit: '50' });
-        this.logger.info({ message: 'Synced orders from CommerceFull' });
+        this.logger.info({ message: 'Synced orders from Commercefull' });
         break;
       case SyncEntityType.CUSTOMER:
         await this.apiClient.get('/business/customers', { limit: '100' });
-        this.logger.info({ message: 'Synced customers from CommerceFull' });
+        this.logger.info({ message: 'Synced customers from Commercefull' });
         break;
       case SyncEntityType.CATEGORY:
         await this.apiClient.get('/customer/categories');
-        this.logger.info({ message: 'Synced categories from CommerceFull' });
+        this.logger.info({ message: 'Synced categories from Commercefull' });
         break;
       default:
         this.logger.warn({ message: `Unknown entity type for sync: ${entity}` });

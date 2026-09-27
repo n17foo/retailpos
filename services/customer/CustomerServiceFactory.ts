@@ -7,7 +7,7 @@ import { SyliusCustomerService } from './platforms/SyliusCustomerService';
 import { WixCustomerService } from './platforms/WixCustomerService';
 import { PrestaShopCustomerService } from './platforms/PrestaShopCustomerService';
 import { SquarespaceCustomerService } from './platforms/SquarespaceCustomerService';
-import { CommerceFullCustomerService } from './platforms/CommerceFullCustomerService';
+import { CommercefullCustomerService } from './platforms/CommercefullCustomerService';
 import { ECommercePlatform, isOnlinePlatform } from '../../utils/platforms';
 import { LoggerFactory } from '../logger/LoggerFactory';
 
@@ -72,7 +72,7 @@ export class CustomerServiceFactory {
         service = new SquarespaceCustomerService();
         break;
       case ECommercePlatform.COMMERCEFULL:
-        service = new CommerceFullCustomerService();
+        service = new CommercefullCustomerService();
         break;
       default:
         return null;

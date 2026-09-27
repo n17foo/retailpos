@@ -14,7 +14,7 @@ import { SyliusRefundService } from './platforms/syliusRefundService';
 import { WixRefundService } from './platforms/wixRefundService';
 import { PrestaShopRefundService } from './platforms/PrestaShopRefundService';
 import { SquarespaceRefundService } from './platforms/SquarespaceRefundService';
-import { CommerceFullRefundService } from './platforms/CommerceFullRefundService';
+import { CommercefullRefundService } from './platforms/CommercefullRefundService';
 import { OfflineRefundService } from './platforms/OfflineRefundService';
 
 export interface ReturnItem {
@@ -362,7 +362,7 @@ export class ReturnService {
         service = new SquarespaceRefundService();
         break;
       case ECommercePlatform.COMMERCEFULL:
-        service = new CommerceFullRefundService();
+        service = new CommercefullRefundService();
         break;
       default:
         service = this.offlineRefundService ?? new OfflineRefundService();

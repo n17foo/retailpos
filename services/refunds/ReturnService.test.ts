@@ -55,7 +55,7 @@ jest.mock('./platforms/syliusRefundService', () => ({ SyliusRefundService: jest.
 jest.mock('./platforms/wixRefundService', () => ({ WixRefundService: jest.fn() }));
 jest.mock('./platforms/PrestaShopRefundService', () => ({ PrestaShopRefundService: jest.fn() }));
 jest.mock('./platforms/SquarespaceRefundService', () => ({ SquarespaceRefundService: jest.fn() }));
-jest.mock('./platforms/CommerceFullRefundService', () => ({ CommerceFullRefundService: jest.fn() }));
+jest.mock('./platforms/CommercefullRefundService', () => ({ CommercefullRefundService: jest.fn() }));
 jest.mock('./platforms/OfflineRefundService', () => ({
   OfflineRefundService: jest.fn().mockImplementation(() => ({
     initialize: jest.fn().mockResolvedValue(undefined),

@@ -165,7 +165,7 @@ All requests include `x-shared-secret` header. The server validates this against
 
 **2.4.10** `GET /api/sync/events` — returns all events in `SyncEventBus` with `timestamp > since` (from query/body param).
 
-**2.4.11** `POST /api/webhooks/commercefull` — forwards the raw body and headers to `CommerceFullWebhookReceiver.handleRequest()`.
+**2.4.11** `POST /api/webhooks/commercefull` — forwards the raw body and headers to `CommercefullWebhookReceiver.handleRequest()`.
 
 ### 2.5 Client — Connection
 
@@ -288,7 +288,7 @@ The following requirements describe the intended behaviour once write endpoints 
 | 401 on bad shared secret                  | `LocalApiServer.handleRequest`                     | `services/localapi/LocalApiServer.ts`         |
 | 503 when not running                      | `LocalApiServer.handleRequest`                     | `services/localapi/LocalApiServer.ts`         |
 | All GET routes registered                 | `LocalApiServer.registerRoutes`                    | `services/localapi/LocalApiServer.ts`         |
-| CommerceFull webhook forwarding           | `LocalApiServer` POST `/api/webhooks/commercefull` | `services/localapi/LocalApiServer.ts`         |
+| Commercefull webhook forwarding           | `LocalApiServer` POST `/api/webhooks/commercefull` | `services/localapi/LocalApiServer.ts`         |
 | Subnet scan in batches of 20              | `LocalApiDiscovery.scanSubnet`                     | `services/localapi/LocalApiDiscovery.ts`      |
 | 2-second probe timeout                    | `LocalApiDiscovery.probeAddress`                   | `services/localapi/LocalApiDiscovery.ts`      |
 | `connectToServer` saves config + tests    | `LocalApiDiscovery.connectToServer`                | `services/localapi/LocalApiDiscovery.ts`      |
