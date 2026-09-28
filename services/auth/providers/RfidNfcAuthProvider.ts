@@ -1,6 +1,7 @@
 import { userRepository } from '../../../repositories/UserRepository';
 import { keyValueRepository } from '../../../repositories/KeyValueRepository';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
+import { hashCredential, verifyCredential, isHashedCredential } from '../../../utils/crypto';
 
 const RFID_KEY_PREFIX = 'auth.rfid.';
 const RFID_ENABLED_KEY = 'auth.rfid.enabled';
@@ -38,7 +39,11 @@ export class RfidNfcAuthProvider implements AuthMethodProvider {
 
       for (const user of users) {
         const storedBadgeId = await keyValueRepository.getObject<string>(RFID_KEY_PREFIX + user.id);
-        if (storedBadgeId && storedBadgeId === badgeId) {
+        if (storedBadgeId && verifyCredential(badgeId, storedBadgeId)) {
+          if (!isHashedCredential(storedBadgeId)) {
+            // Transparent migration: re-hash legacy plaintext badge ID on match
+            await keyValueRepository.setObject(RFID_KEY_PREFIX + user.id, hashCredential(badgeId)).catch(() => undefined);
+          }
           return { success: true, user };
         }
       }
@@ -51,7 +56,7 @@ export class RfidNfcAuthProvider implements AuthMethodProvider {
 
   async enroll(userId: string, credential: string): Promise<boolean> {
     try {
-      await keyValueRepository.setObject(RFID_KEY_PREFIX + userId, credential.trim().toUpperCase());
+      await keyValueRepository.setObject(RFID_KEY_PREFIX + userId, hashCredential(credential.trim().toUpperCase()));
       return true;
     } catch {
       return false;

@@ -1,6 +1,8 @@
 import { userRepository } from '../../../repositories/UserRepository';
 import { keyValueRepository } from '../../../repositories/KeyValueRepository';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
+import { AuthAttemptLimiter } from '../AuthAttemptLimiter';
+import { hashCredential, verifyCredential, isHashedCredential } from '../../../utils/crypto';
 
 const PASSWORD_KEY_PREFIX = 'auth.password.';
 
@@ -9,11 +11,14 @@ const PASSWORD_KEY_PREFIX = 'auth.password.';
  *
  * Users enter an alphanumeric password to log in.
  * More secure than PIN but slower for quick cashier switches.
- * Passwords are stored as JSON strings in key_value_store keyed by user ID.
+ * Passwords are stored salted+hashed in key_value_store keyed by user ID;
+ * legacy plaintext entries are re-hashed transparently on a successful login.
  */
 export class PasswordAuthProvider implements AuthMethodProvider {
   readonly type = 'password' as const;
   readonly info: AuthMethodInfo = AUTH_METHOD_INFO.password;
+
+  private limiter = new AuthAttemptLimiter();
 
   async isAvailable(): Promise<boolean> {
     // Password auth is always available — no hardware needed
@@ -25,26 +30,38 @@ export class PasswordAuthProvider implements AuthMethodProvider {
       return { success: false, error: 'Password is required.' };
     }
 
+    const remainingMs = this.limiter.getLockoutRemainingMs();
+    if (remainingMs > 0) {
+      return { success: false, error: `Too many failed attempts. Try again in ${Math.ceil(remainingMs / 1000)}s.` };
+    }
+
     try {
       // Look up all active users and check their stored passwords
       const users = await userRepository.findActive();
 
       for (const user of users) {
         const storedPassword = await keyValueRepository.getObject<string>(PASSWORD_KEY_PREFIX + user.id);
-        if (storedPassword && storedPassword === credential) {
+        if (storedPassword && verifyCredential(credential, storedPassword)) {
+          if (!isHashedCredential(storedPassword)) {
+            // Transparent migration: re-hash legacy plaintext password on match
+            await keyValueRepository.setObject(PASSWORD_KEY_PREFIX + user.id, hashCredential(credential)).catch(() => undefined);
+          }
+          this.limiter.recordResult(true);
           return { success: true, user };
         }
       }
 
+      this.limiter.recordResult(false);
       return { success: false, error: 'Invalid password. Please try again.' };
     } catch {
+      this.limiter.recordResult(false);
       return { success: false, error: 'Authentication failed. Please try again.' };
     }
   }
 
   async enroll(userId: string, credential: string): Promise<boolean> {
     try {
-      await keyValueRepository.setObject(PASSWORD_KEY_PREFIX + userId, credential);
+      await keyValueRepository.setObject(PASSWORD_KEY_PREFIX + userId, hashCredential(credential));
       return true;
     } catch {
       return false;

@@ -1,5 +1,6 @@
 import { db } from '../utils/db';
 import { generateUUID } from '../utils/uuid';
+import { hashPin, isHashedPin, verifyPin } from '../utils/crypto';
 
 export type UserRole = 'admin' | 'manager' | 'cashier';
 
@@ -49,7 +50,7 @@ export class UserRepository {
     await db.runAsync(
       `INSERT INTO users (id, name, email, pin, role, platform_user_id, is_active, created_at, updated_at) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, user.name, user.email || null, user.pin, user.role, user.platform_user_id || null, 1, now, now]
+      [id, user.name, user.email || null, hashPin(user.pin), user.role, user.platform_user_id || null, 1, now, now]
     );
 
     return id;
@@ -60,9 +61,24 @@ export class UserRepository {
     return result ? rowToUser(result) : null;
   }
 
+  /**
+   * Find the active user whose stored PIN matches `pin`.
+   * PINs are stored salted+hashed, so each candidate row must be verified
+   * individually (the users table is small — this is fine).
+   * Legacy plaintext rows are transparently upgraded to a hash on match.
+   */
   async findByPin(pin: string): Promise<User | null> {
-    const result = await db.getFirstAsync<UserRow>('SELECT * FROM users WHERE pin = ? AND is_active = 1', [pin]);
-    return result ? rowToUser(result) : null;
+    const users = await this.findActive();
+    for (const user of users) {
+      if (verifyPin(pin, user.pin)) {
+        if (!isHashedPin(user.pin)) {
+          // Transparent migration: re-hash legacy plaintext PIN on successful match
+          await this.updatePin(user.id, pin).catch(() => undefined);
+        }
+        return user;
+      }
+    }
+    return null;
   }
 
   async findByEmail(email: string): Promise<User | null> {
@@ -92,6 +108,8 @@ export class UserRepository {
       const value = data[key as keyof typeof data];
       // Convert boolean to integer for SQLite
       if (typeof value === 'boolean') return value ? 1 : 0;
+      // Never store a plaintext PIN via the generic update path
+      if (key === 'pin' && typeof value === 'string' && !isHashedPin(value)) return hashPin(value);
       return value;
     });
 
@@ -101,7 +119,7 @@ export class UserRepository {
 
   async updatePin(id: string, newPin: string): Promise<void> {
     const now = Date.now();
-    await db.runAsync('UPDATE users SET pin = ?, updated_at = ? WHERE id = ?', [newPin, now, id]);
+    await db.runAsync('UPDATE users SET pin = ?, updated_at = ? WHERE id = ?', [hashPin(newPin), now, id]);
   }
 
   async deactivate(id: string): Promise<void> {
@@ -119,13 +137,8 @@ export class UserRepository {
   }
 
   async isPinUnique(pin: string, excludeUserId?: string): Promise<boolean> {
-    const query = excludeUserId
-      ? 'SELECT COUNT(*) as count FROM users WHERE pin = ? AND id != ?'
-      : 'SELECT COUNT(*) as count FROM users WHERE pin = ?';
-    const params = excludeUserId ? [pin, excludeUserId] : [pin];
-
-    const result = await db.getFirstAsync<{ count: number }>(query, params);
-    return result?.count === 0;
+    const users = await this.findAll();
+    return !users.some(user => user.id !== excludeUserId && verifyPin(pin, user.pin));
   }
 
   async hasAdminUser(): Promise<boolean> {

@@ -150,12 +150,9 @@ export class InstoreApiTransport {
     } catch (error) {
       this.logger.error('Error handling HTTP request:', error instanceof Error ? error : new Error(String(error)));
 
-      // Send error response
+      // Send error response — don't leak internal error details to the LAN
       try {
-        const errorResponse = {
-          error: 'Internal server error',
-          message: error instanceof Error ? error.message : 'Unknown error',
-        };
+        const errorResponse = { error: 'Internal server error' };
         httpBridge.respond(request.requestId, 500, 'application/json', JSON.stringify(errorResponse));
       } catch (responseError) {
         this.logger.error(

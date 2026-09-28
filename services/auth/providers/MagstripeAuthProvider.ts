@@ -2,6 +2,7 @@ import { userRepository } from '../../../repositories/UserRepository';
 import { keyValueRepository } from '../../../repositories/KeyValueRepository';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
 import { cardReaderDetection } from '../CardReaderDetection';
+import { hashCredential, verifyCredential, isHashedCredential } from '../../../utils/crypto';
 
 const MAGSTRIPE_KEY_PREFIX = 'auth.magstripe.';
 const MAGSTRIPE_ENABLED_KEY = 'auth.magstripe.enabled';
@@ -64,7 +65,11 @@ export class MagstripeAuthProvider implements AuthMethodProvider {
 
       for (const user of users) {
         const storedCardId = await keyValueRepository.getObject<string>(MAGSTRIPE_KEY_PREFIX + user.id);
-        if (storedCardId && storedCardId === employeeId) {
+        if (storedCardId && verifyCredential(employeeId, storedCardId)) {
+          if (!isHashedCredential(storedCardId)) {
+            // Transparent migration: re-hash legacy plaintext card ID on match
+            await keyValueRepository.setObject(MAGSTRIPE_KEY_PREFIX + user.id, hashCredential(employeeId)).catch(() => undefined);
+          }
           return { success: true, user };
         }
       }
@@ -84,7 +89,7 @@ export class MagstripeAuthProvider implements AuthMethodProvider {
         return false;
       }
 
-      await keyValueRepository.setObject(MAGSTRIPE_KEY_PREFIX + userId, employeeId);
+      await keyValueRepository.setObject(MAGSTRIPE_KEY_PREFIX + userId, hashCredential(employeeId));
       return true;
     } catch {
       return false;

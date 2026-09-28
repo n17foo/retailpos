@@ -2,6 +2,7 @@ import { userRepository } from '../../../repositories/UserRepository';
 import { instoreApiConfig } from '../../instoreapi/InstoreApiConfig';
 import { instoreApiClient } from '../../clients/instoreapi/InstoreApiClient';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
+import { AuthAttemptLimiter } from '../AuthAttemptLimiter';
 
 /**
  * PIN-based authentication provider.
@@ -15,6 +16,9 @@ export class PinAuthProvider implements AuthMethodProvider {
   readonly type = 'pin' as const;
   readonly info: AuthMethodInfo = AUTH_METHOD_INFO.pin;
 
+  // Brute-force protection: lock after 5 consecutive failures (30s → 15min cap)
+  private limiter = new AuthAttemptLimiter();
+
   async isAvailable(): Promise<boolean> {
     // PIN is always available — no hardware or platform requirements
     return true;
@@ -25,15 +29,21 @@ export class PinAuthProvider implements AuthMethodProvider {
       return { success: false, error: 'PIN is required' };
     }
 
+    const remainingMs = this.limiter.getLockoutRemainingMs();
+    if (remainingMs > 0) {
+      return { success: false, error: `Too many failed attempts. Try again in ${Math.ceil(remainingMs / 1000)}s.` };
+    }
+
     try {
       // In client mode, verify against the store-api (centralised user management)
-      if (instoreApiConfig.isClient) {
-        return this.authenticateViaStoreApi(credential);
-      }
+      const result = instoreApiConfig.isClient
+        ? await this.authenticateViaStoreApi(credential)
+        : await this.authenticateLocally(credential);
 
-      // Local mode (standalone or server) — verify against local SQLite
-      return this.authenticateLocally(credential);
+      this.limiter.recordResult(result.success);
+      return result;
     } catch {
+      this.limiter.recordResult(false);
       return { success: false, error: 'Authentication failed. Please try again.' };
     }
   }

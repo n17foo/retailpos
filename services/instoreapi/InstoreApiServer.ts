@@ -5,11 +5,13 @@ import { OrderItemRepository, CreateOrderItemInput } from '../../repositories/Or
 import { ProductRepository } from '../../repositories/ProductRepository';
 import { taxProfileRepository } from '../../repositories/TaxProfileRepository';
 import { returnRepository, CreateReturnInput } from '../../repositories/ReturnRepository';
+import { userRepository } from '../../repositories/UserRepository';
 import { syncEventBus } from './sync/SyncEventBus';
 import { CommercefullWebhookReceiver } from '../clients/commercefull/CommercefullWebhookReceiver';
 import { offlineProductService } from '../product/platforms/OfflineProductService';
 import { offlineCategoryService } from '../category/platforms/OfflineCategoryService';
 import { instoreApiTransport } from './InstoreApiTransport';
+import { randomHex, timingSafeEqual } from '../../utils/crypto';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
@@ -37,6 +39,13 @@ export class InstoreApiServer {
   private orderItemRepo = new OrderItemRepository();
   private productRepo = new ProductRepository();
 
+  // Server-side brute-force guard for /api/users/verify-pin: a client holding
+  // the shared secret could otherwise enumerate the PIN space over the LAN.
+  private static readonly PIN_MAX_FAILURES = 10;
+  private static readonly PIN_LOCKOUT_MS = 60_000;
+  private pinFailures = 0;
+  private pinLockedUntil = 0;
+
   private constructor() {
     this.registerRoutes();
   }
@@ -56,6 +65,17 @@ export class InstoreApiServer {
     if (!instoreApiConfig.isServer) {
       this.logger.warn('Cannot start server — not in server mode');
       return;
+    }
+
+    // Never run the LAN API unauthenticated: if no shared secret is
+    // configured, generate one now and persist it. The secret is surfaced in
+    // Settings → Instore API so the operator can copy it to client registers.
+    if (!instoreApiConfig.current.sharedSecret) {
+      const generated = `instore-${randomHex(16)}`;
+      await instoreApiConfig.save({ sharedSecret: generated });
+      this.logger.warn(
+        'No shared secret configured — generated one automatically. Copy it from Settings → Instore API to client registers.'
+      );
     }
 
     this.running = true;
@@ -98,10 +118,19 @@ export class InstoreApiServer {
       return { status: 503, body: { error: 'Server not running' } };
     }
 
-    // Authenticate via shared secret
-    const secret = instoreApiConfig.current.sharedSecret;
-    if (secret && headers?.['x-shared-secret'] !== secret) {
-      return { status: 401, body: { error: 'Unauthorized' } };
+    // Authenticate via shared secret. Two exemptions:
+    // - /api/health only exposes register presence and must stay reachable so
+    //   client registers can discover the server before they have the secret.
+    // - /api/webhooks/commercefull can't send our LAN secret — it
+    //   authenticates via the HMAC signature verified in the receiver.
+    const cleanPath = path.split('?')[0];
+    const isUnauthenticatedRoute = cleanPath === '/api/webhooks/commercefull' || cleanPath === '/api/health';
+    if (!isUnauthenticatedRoute) {
+      const secret = instoreApiConfig.current.sharedSecret;
+      const provided = headers?.['x-shared-secret'] ?? '';
+      if (!secret || !timingSafeEqual(provided, secret)) {
+        return { status: 401, body: { error: 'Unauthorized' } };
+      }
     }
 
     // Match route
@@ -192,6 +221,49 @@ export class InstoreApiServer {
       const since = parseInt(String(b?.since || '0'), 10) || 0;
       const events = syncEventBus.getEventsSince(since);
       return { status: 200, body: { events } };
+    });
+
+    // ── Users (PIN verify for client registers — never expose PIN values) ──
+    this.route('GET', '/api/users', async () => {
+      const rows = await userRepository.findActive();
+      return {
+        status: 200,
+        body: { users: rows.map(u => ({ id: u.id, name: u.name, role: u.role, is_active: u.is_active })) },
+      };
+    });
+
+    this.route('POST', '/api/users/verify-pin', async (_params, body) => {
+      if (Date.now() < this.pinLockedUntil) {
+        return { status: 429, body: { error: 'Too many attempts. Try again later.' } };
+      }
+      const b = body as { pin?: unknown } | undefined;
+      const pin = typeof b?.pin === 'string' ? b.pin : '';
+      const user = pin ? await userRepository.findByPin(pin) : null;
+      if (!user) {
+        this.pinFailures++;
+        if (this.pinFailures >= InstoreApiServer.PIN_MAX_FAILURES) {
+          this.pinFailures = 0;
+          this.pinLockedUntil = Date.now() + InstoreApiServer.PIN_LOCKOUT_MS;
+          this.logger.warn('PIN verify rate limit hit — locking endpoint for 60s');
+        }
+        return { status: 401, body: { error: 'Invalid PIN' } };
+      }
+      this.pinFailures = 0;
+      return { status: 200, body: { user: { id: user.id, name: user.name, role: user.role } } };
+    });
+
+    // ── Full state snapshot (WebSocket snapshot_needed flow) ─────────
+    this.route('GET', '/api/snapshot', async () => {
+      const [orders, products, categories, taxProfiles] = await Promise.all([
+        orderRepository.findAll(),
+        this.productRepo.findAll(),
+        offlineCategoryService.getCategories(),
+        taxProfileRepository.findActive(),
+      ]);
+      return {
+        status: 200,
+        body: { snapshot_version: Date.now(), orders, products, categories, tax_profiles: taxProfiles },
+      };
     });
 
     // ── Webhook Receiver (Commercefull real-time push) ────────────────

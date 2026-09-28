@@ -4,6 +4,7 @@ import { PlatformSyncConfig, PlatformSyncConfigRequirements } from './PlatformSy
 import { SyncOptions, SyncOperationResult, SyncEntityType } from '../SyncServiceInterface';
 import { CommercefullApiClient, CommercefullConfig } from '../../clients/commercefull/CommercefullApiClient';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { hmacSha256Hex, timingSafeEqual } from '../../../utils/crypto';
 
 /**
  * Webhook event payload received from Commercefull
@@ -251,16 +252,12 @@ export class CommercefullSyncService extends BasePlatformSyncService {
       return false;
     }
 
-    try {
-      // Dynamic import to avoid bundling issues on React Native
-
-      const { createHmac } = require('crypto');
-      const expected = createHmac('sha256', this.webhookSecret).update(body).digest('hex');
-      return expected === signature;
-    } catch {
-      this.logger.warn({ message: 'crypto module not available — skipping signature verification' });
-      return true;
-    }
+    // Pure-TS HMAC-SHA256 — works on React Native where Node's crypto module
+    // is unavailable. Never skip verification when the runtime lacks crypto.
+    const expected = hmacSha256Hex(this.webhookSecret, body);
+    // Tolerate a 'sha256=' prefix (same convention as the platform's own adapters)
+    const provided = signature.startsWith('sha256=') ? signature.slice(7) : signature;
+    return timingSafeEqual(expected, provided);
   }
 
   // ===========================================================================

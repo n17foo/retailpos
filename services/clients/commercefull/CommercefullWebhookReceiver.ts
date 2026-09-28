@@ -55,14 +55,25 @@ export class CommercefullWebhookReceiver {
       return { status: 500, body: { success: false, error: 'Webhook receiver not configured' } };
     }
 
-    // Verify HMAC signature
+    // Verify HMAC signature — always required. Without a shared webhook
+    // secret there is nothing to verify against, so refuse the event rather
+    // than process unauthenticated input.
+    const secret = this.syncService.getWebhookSecret();
+    if (!secret) {
+      this.logger.error({ message: 'Webhook received but no webhook secret is configured' });
+      return { status: 503, body: { success: false, error: 'Webhook secret not configured' } };
+    }
+
     const signature = headers['x-webhook-signature'];
-    if (signature) {
-      const valid = this.syncService.verifyWebhookSignature(rawBody, signature);
-      if (!valid) {
-        this.logger.warn({ message: 'Webhook signature verification failed' });
-        return { status: 401, body: { success: false, error: 'Invalid signature' } };
-      }
+    if (!signature) {
+      this.logger.warn({ message: 'Webhook rejected — missing signature header' });
+      return { status: 401, body: { success: false, error: 'Missing signature' } };
+    }
+
+    const valid = this.syncService.verifyWebhookSignature(rawBody, signature);
+    if (!valid) {
+      this.logger.warn({ message: 'Webhook signature verification failed' });
+      return { status: 401, body: { success: false, error: 'Invalid signature' } };
     }
 
     // Parse body

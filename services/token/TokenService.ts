@@ -1,6 +1,7 @@
 import { TokenServiceInterface, TokenType, TokenInfo, TokenProviderFunction } from './TokenServiceInterface';
 import { LoggerFactory } from '../logger/LoggerFactory';
 import { keyValueRepository } from '../../repositories/KeyValueRepository';
+import { secretsServiceFactory } from '../secrets/SecretsService';
 
 /**
  * TokenService implementation that uses SQLite for persistent token storage
@@ -37,8 +38,17 @@ export class TokenService implements TokenServiceInterface {
         token,
         expiresAt: expiresIn ? Date.now() + expiresIn * 1000 : undefined,
       };
+      const serialized = JSON.stringify(tokenInfo);
 
-      await keyValueRepository.setItem(key, tokenInfo);
+      // Prefer the OS keychain/keystore; fall back to the SQLite KV store on
+      // platforms where secure storage is unavailable (web, desktop).
+      const stored = await secretsServiceFactory.getService().storeSecret(key, serialized);
+      if (stored) {
+        // Remove any stale plaintext copy left in the KV store
+        await keyValueRepository.removeItem(key);
+      } else {
+        await keyValueRepository.setItem(key, serialized);
+      }
 
       this.logger.info(`Token stored for platform: ${platform}, type: ${tokenType}`);
       return true;
@@ -126,7 +136,9 @@ export class TokenService implements TokenServiceInterface {
     try {
       const keys = Object.values(TokenType).map(type => this.getStorageKey(platform, type as TokenType));
 
+      const secrets = secretsServiceFactory.getService();
       for (const key of keys) {
+        await secrets.deleteSecret(key);
         await keyValueRepository.removeItem(key);
       }
 
@@ -143,6 +155,7 @@ export class TokenService implements TokenServiceInterface {
     try {
       const key = this.getStorageKey(platform, tokenType);
 
+      await secretsServiceFactory.getService().deleteSecret(key);
       await keyValueRepository.removeItem(key);
 
       this.logger.info(`Token cleared for platform: ${platform}, type: ${tokenType}`);
@@ -163,9 +176,25 @@ export class TokenService implements TokenServiceInterface {
    * Helper to get token from storage
    */
   private async getTokenFromStorage(platform: string, tokenType: TokenType): Promise<TokenInfo | null> {
+    const key = this.getStorageKey(platform, tokenType);
     try {
-      const key = this.getStorageKey(platform, tokenType);
-      return await keyValueRepository.getObject<TokenInfo>(key);
+      // Keychain first
+      const secured = await secretsServiceFactory.getService().getSecret(key);
+      if (secured) {
+        return JSON.parse(secured) as TokenInfo;
+      }
+
+      // Fall back to the legacy plaintext KV location, then migrate it into
+      // the keychain so the plaintext copy is not left behind.
+      const legacy = await keyValueRepository.getObject<TokenInfo>(key);
+      if (legacy) {
+        const migrated = await secretsServiceFactory.getService().storeSecret(key, JSON.stringify(legacy));
+        if (migrated) {
+          await keyValueRepository.removeItem(key);
+          this.logger.info(`Migrated token for ${platform} (${tokenType}) into secure storage`);
+        }
+      }
+      return legacy;
     } catch (error) {
       this.logger.error(
         { message: `Error reading token from storage for ${platform}` },

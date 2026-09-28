@@ -79,9 +79,17 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
 
-  // Open external links in default browser
+  // Open external links in default browser — http/https only, so a renderer
+  // can't hand a file:// or custom-scheme URL to the OS shell.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    try {
+      const protocol = new URL(url).protocol;
+      if (protocol === 'https:' || protocol === 'http:') {
+        shell.openExternal(url);
+      }
+    } catch {
+      // Malformed URL — deny silently
+    }
     return { action: 'deny' };
   });
 
@@ -363,7 +371,6 @@ function registerIpcHandlers() {
 app.whenReady().then(() => {
   // Enable Cross-Origin Isolation headers globally for SharedArrayBuffer (required by expo-sqlite on web)
   session.defaultSession.webRequest.onHeadersReceived({ urls: ['*://*/*'] }, (details, callback) => {
-    console.log('[Main Process] Intercepting headers for:', details.url);
     const responseHeaders = {
       ...details.responseHeaders,
       'Cross-Origin-Opener-Policy': ['same-origin'],
