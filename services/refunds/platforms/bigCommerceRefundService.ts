@@ -1,8 +1,7 @@
 import { PlatformRefundServiceInterface, PlatformCredentials } from './PlatformRefundServiceInterface';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 import { ECommercePlatform } from '../../../utils/platforms';
-import { SecretsServiceFactory } from '../../secrets/SecretsService';
-import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
+import { getPlatformCredentials } from '../../config/PlatformCredentialsResolver';
 import { RefundData, RefundResult, RefundRecord } from '../RefundService';
 import { withTokenRefresh } from '../../token/TokenUtils';
 import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
@@ -16,11 +15,9 @@ export class BigCommerceRefundService implements PlatformRefundServiceInterface 
   private initialized: boolean = false;
   private refundHistory: Map<string, RefundRecord[]> = new Map();
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
-  private secretsService: SecretsServiceInterface;
 
   constructor() {
     this.logger = LoggerFactory.getInstance().createLogger('BigCommerceRefundService');
-    this.secretsService = SecretsServiceFactory.getInstance().getService();
   }
 
   /**
@@ -61,13 +58,13 @@ export class BigCommerceRefundService implements PlatformRefundServiceInterface 
    */
   private async getBigCommerceCredentials(): Promise<PlatformCredentials | null> {
     try {
-      const credentials = await this.secretsService.getSecret('bigcommerce_api_credentials');
+      const credentials = await getPlatformCredentials(ECommercePlatform.BIGCOMMERCE);
       if (!credentials) {
-        this.logger.error({ message: 'BigCommerce API credentials not found in secrets store' });
+        this.logger.error({ message: 'BigCommerce API credentials not configured' });
         return null;
       }
 
-      return JSON.parse(credentials);
+      return credentials;
     } catch (error) {
       this.logger.error({ message: 'Error retrieving BigCommerce credentials' }, error instanceof Error ? error : new Error(String(error)));
       return null;

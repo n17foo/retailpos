@@ -1,7 +1,8 @@
 import { TokenServiceFactory } from './TokenServiceFactory';
 import { TokenType } from './TokenServiceInterface';
-import { ECommercePlatform } from '../../utils/platforms';
+import { ECommercePlatform, isOnlinePlatform } from '../../utils/platforms';
 import { LoggerFactory } from '../logger/LoggerFactory';
+import { EcommerceSettingsStorage } from '../config/EcommerceSettingsStorage';
 
 const logger = LoggerFactory.getInstance().createLogger('TokenUtils');
 
@@ -92,6 +93,45 @@ export async function clearPlatformTokens(platform: ECommercePlatform): Promise<
     await tokenService.clearPlatformTokens(platform);
   } catch (error) {
     logger.error({ message: `Error clearing tokens for platform: ${platform}` }, error instanceof Error ? error : new Error(String(error)));
+  }
+}
+
+/**
+ * Result of a platform token warm-up attempt.
+ */
+export interface PlatformTokenWarmupResult {
+  /** The platform a token was attempted for, or null for offline/unconfigured. */
+  platform: ECommercePlatform | null;
+  /** Whether an access token was acquired. */
+  acquired: boolean;
+}
+
+/**
+ * Warm up the configured platform's access token using the locally stored
+ * credentials. Intended to run after a staff member authenticates (PIN,
+ * biometric, magstripe, …) so the first platform API call doesn't pay the
+ * credential-resolution and token-exchange cost mid-interaction.
+ *
+ * The platform credential itself remains a device identity — token reads are
+ * not gated on the staff session, so background sync and multi-register peers
+ * keep working while the register is locked.
+ *
+ * @returns Which platform was warmed and whether a token was acquired
+ */
+export async function warmUpPlatformToken(): Promise<PlatformTokenWarmupResult> {
+  try {
+    const settings = await EcommerceSettingsStorage.load<{ platform?: string }>();
+    const platform = Object.values(ECommercePlatform).find(p => p === settings?.platform?.toLowerCase()) ?? null;
+
+    if (!platform || !isOnlinePlatform(platform)) {
+      return { platform: null, acquired: false };
+    }
+
+    const token = await getPlatformToken(platform, TokenType.ACCESS);
+    return { platform, acquired: token !== null };
+  } catch (error) {
+    logger.error({ message: 'Error warming up platform token' }, error instanceof Error ? error : new Error(String(error)));
+    return { platform: null, acquired: false };
   }
 }
 

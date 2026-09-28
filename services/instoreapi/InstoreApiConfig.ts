@@ -1,5 +1,5 @@
-import { keyValueRepository } from '../../repositories/KeyValueRepository';
 import { LoggerFactory } from '../logger/LoggerFactory';
+import { ProtectedValueStore } from '../config/ProtectedValueStore';
 
 export type InstoreApiMode = 'standalone' | 'server' | 'client';
 
@@ -21,7 +21,12 @@ const DEFAULTS: InstoreApiSettings = {
   registerName: 'Register 1',
 };
 
-const KV_KEY = 'instoreapi.settings';
+const settingsStore = new ProtectedValueStore({
+  kvKey: 'instoreapi.settings',
+  secretKey: 'config:instoreapi.settings',
+  storageModeKey: 'instoreapi.settings.storageMode',
+  logContext: 'InstoreApiConfigStorage',
+});
 
 /**
  * Configuration for the local shared API.
@@ -46,7 +51,7 @@ export class InstoreApiConfig {
 
   async load(): Promise<InstoreApiSettings> {
     try {
-      const raw = await keyValueRepository.getItem(KV_KEY);
+      const raw = await settingsStore.load();
       if (raw) {
         this.settings = { ...DEFAULTS, ...JSON.parse(raw) };
       }
@@ -59,7 +64,7 @@ export class InstoreApiConfig {
 
   async save(updates: Partial<InstoreApiSettings>): Promise<void> {
     this.settings = { ...this.settings, ...updates };
-    await keyValueRepository.setItem(KV_KEY, JSON.stringify(this.settings));
+    await settingsStore.save(JSON.stringify(this.settings));
   }
 
   get current(): InstoreApiSettings {

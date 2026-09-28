@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useMe
 import { StripeTerminalProvider, useStripeTerminal } from '@stripe/stripe-terminal-react-native';
 import { keyValueRepository } from '../repositories/KeyValueRepository';
 import { useLogger } from '../hooks/useLogger';
+import { PaymentSettingsStorage } from '../services/config/PaymentSettingsStorage';
 
 // Define types based on Stripe Terminal SDK (incomplete type definitions)
 interface Reader {
@@ -67,7 +68,7 @@ export const StripeTerminalBridgeProvider: React.FC<{ children: ReactNode }> = (
   // Token provider function
   const fetchTokenProvider = async () => {
     try {
-      const apiKey = (await keyValueRepository.getItem('stripe_nfc_apiKey')) || '';
+      const apiKey = (await PaymentSettingsStorage.getStripeNfcApiKey()) || '';
       const locationId = (await keyValueRepository.getItem('stripe_nfc_merchantId')) || '';
       const useDirectApi = (await keyValueRepository.getItem('stripe_nfc_useDirectApi')) === 'true';
 
@@ -355,7 +356,7 @@ export const StripeTerminalBridgeProvider: React.FC<{ children: ReactNode }> = (
 
             if (useDirectApi) {
               // Direct API - use API key
-              const apiKey = (await keyValueRepository.getItem('stripe_nfc_apiKey')) || '';
+              const apiKey = (await PaymentSettingsStorage.getStripeNfcApiKey()) || '';
               if (!apiKey) {
                 throw new Error('Stripe API key not configured');
               }
@@ -522,7 +523,7 @@ export const StripeTerminalBridgeProvider: React.FC<{ children: ReactNode }> = (
 
             // The Stripe Terminal SDK requires a backend call to first retrieve the payment intent
             // before cancelling, as the terminal itself may not have the full intent details
-            const apiKey = (await keyValueRepository.getItem('stripe_nfc_apiKey')) || '';
+            const apiKey = (await PaymentSettingsStorage.getStripeNfcApiKey()) || '';
             if (!apiKey) {
               throw new Error('Stripe API key not configured');
             }
@@ -556,7 +557,7 @@ export const StripeTerminalBridgeProvider: React.FC<{ children: ReactNode }> = (
           // Note: Refunds are typically handled through the Stripe API, not the Terminal SDK
           // This would be implemented by calling your backend which calls the Stripe Refunds API
           try {
-            const apiKey = (await keyValueRepository.getItem('stripe_nfc_apiKey')) || '';
+            const apiKey = (await PaymentSettingsStorage.getStripeNfcApiKey()) || '';
             if (!apiKey) {
               throw new Error('Stripe API key not configured');
             }

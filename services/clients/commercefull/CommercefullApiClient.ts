@@ -29,15 +29,49 @@ export class CommercefullApiClient extends BaseApiClient<CommercefullConfig> {
     return CommercefullApiClient.instance;
   }
 
-  protected getAuthStrategy(): AuthStrategy {
-    if (this.accessToken) {
-      return { type: 'bearer', token: this.accessToken };
+  protected async getAuthStrategy(): Promise<AuthStrategy> {
+    // Resolve the current token on every request so refreshed tokens
+    // propagate without re-initialising the client.
+    const token = (await getPlatformToken(ECommercePlatform.COMMERCEFULL, TokenType.ACCESS)) || this.accessToken;
+    if (token) {
+      this.accessToken = token;
+      return { type: 'bearer', token };
     }
     return { type: 'none' };
   }
 
   protected buildApiUrl(path: string): string {
     return `${this.normalizeUrl(this.config.storeUrl || '')}${path}`;
+  }
+
+  /**
+   * Exchange apiKey/apiSecret for a bearer token at
+   * POST {storeUrl}/business/auth/token.
+   *
+   * Uses a raw fetch rather than `request()` — the token endpoint is
+   * unauthenticated and must not re-enter `getAuthStrategy()`.
+   */
+  public async fetchAccessToken(storeUrl: string, apiKey: string, apiSecret: string): Promise<{ token: string; expiresIn?: number }> {
+    const url = `${this.normalizeUrl(storeUrl)}/business/auth/token`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: apiKey, password: apiSecret }),
+    });
+    if (!response.ok) {
+      throw new Error(`Commercefull auth failed: ${response.status}`);
+    }
+    const data = (await response.json()) as {
+      accessToken?: string;
+      token?: string;
+      expiresIn?: number;
+      expires_in?: number;
+    };
+    const token = data.accessToken || data.token;
+    if (!token) {
+      throw new Error('Commercefull auth response missing token');
+    }
+    return { token, expiresIn: data.expiresIn ?? data.expires_in };
   }
 
   /**
@@ -65,13 +99,10 @@ export class CommercefullApiClient extends BaseApiClient<CommercefullConfig> {
 
       // Fallback: authenticate with apiKey/apiSecret
       if (this.config.apiKey && this.config.apiSecret) {
-        const data = await this.request<{ accessToken?: string; token?: string }>('POST', `${this.config.storeUrl}/business/auth/token`, {
-          email: this.config.apiKey,
-          password: this.config.apiSecret,
-        });
-        this.accessToken = data.accessToken || data.token || null;
-        this.initialized = !!this.accessToken;
-        return this.initialized;
+        const { token } = await this.fetchAccessToken(this.config.storeUrl, this.config.apiKey, this.config.apiSecret);
+        this.accessToken = token;
+        this.initialized = true;
+        return true;
       }
 
       // Direct token in apiKey field

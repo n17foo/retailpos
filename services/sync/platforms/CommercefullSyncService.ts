@@ -201,45 +201,33 @@ export class CommercefullSyncService extends BasePlatformSyncService {
       message: `Received webhook event: ${event.event} (delivery: ${event.deliveryId})`,
     });
 
-    // Notify specific event listeners
-    const specificListeners = this.webhookListeners.get(event.event) || [];
-    for (const listener of specificListeners) {
-      try {
-        await listener(event);
-      } catch (error) {
-        this.logger.error(
-          { message: `Error in webhook listener for ${event.event}` },
-          error instanceof Error ? error : new Error(String(error))
-        );
+    let listenerFailures = 0;
+    const notify = async (listeners: WebhookEventListener[], context: string) => {
+      for (const listener of listeners) {
+        try {
+          await listener(event);
+        } catch (error) {
+          listenerFailures++;
+          this.logger.error(
+            { message: `Error in ${context} webhook listener for ${event.event}` },
+            error instanceof Error ? error : new Error(String(error))
+          );
+        }
       }
-    }
+    };
+
+    // Notify specific event listeners
+    await notify(this.webhookListeners.get(event.event) || [], 'event');
 
     // Notify wildcard listeners
-    const wildcardListeners = this.webhookListeners.get('*') || [];
-    for (const listener of wildcardListeners) {
-      try {
-        await listener(event);
-      } catch (error) {
-        this.logger.error(
-          { message: `Error in wildcard webhook listener for ${event.event}` },
-          error instanceof Error ? error : new Error(String(error))
-        );
-      }
-    }
+    await notify(this.webhookListeners.get('*') || [], 'wildcard');
 
     // Notify category listeners (e.g. "product.*" matches "product.created")
     const category = event.event.split('.')[0];
-    const categoryWildcard = `${category}.*`;
-    const categoryListeners = this.webhookListeners.get(categoryWildcard) || [];
-    for (const listener of categoryListeners) {
-      try {
-        await listener(event);
-      } catch (error) {
-        this.logger.error(
-          { message: `Error in category webhook listener for ${categoryWildcard}` },
-          error instanceof Error ? error : new Error(String(error))
-        );
-      }
+    await notify(this.webhookListeners.get(`${category}.*`) || [], `category ${category}.*`);
+
+    if (listenerFailures > 0) {
+      throw new Error(`Webhook processing failed for ${listenerFailures} listener(s)`);
     }
   }
 
@@ -256,8 +244,9 @@ export class CommercefullSyncService extends BasePlatformSyncService {
     // is unavailable. Never skip verification when the runtime lacks crypto.
     const expected = hmacSha256Hex(this.webhookSecret, body);
     // Tolerate a 'sha256=' prefix (same convention as the platform's own adapters)
-    const provided = signature.startsWith('sha256=') ? signature.slice(7) : signature;
-    return timingSafeEqual(expected, provided);
+    const normalized = signature.trim().toLowerCase();
+    const provided = normalized.startsWith('sha256=') ? normalized.slice(7) : normalized;
+    return /^[0-9a-f]{64}$/.test(provided) && timingSafeEqual(expected, provided);
   }
 
   // ===========================================================================

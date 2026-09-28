@@ -1,8 +1,8 @@
 import { PlatformRefundServiceInterface, PlatformCredentials } from './PlatformRefundServiceInterface';
 import { RefundData, RefundResult, RefundRecord } from '../RefundService';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { SecretsServiceFactory } from '../../secrets/SecretsService';
-import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
+import { getPlatformCredentials } from '../../config/PlatformCredentialsResolver';
+import { ECommercePlatform } from '../../../utils/platforms';
 import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
 
 /**
@@ -14,11 +14,9 @@ export class MagentoRefundService implements PlatformRefundServiceInterface {
   private initialized: boolean = false;
   private refundHistory: Map<string, RefundRecord[]> = new Map();
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
-  private secretsService: SecretsServiceInterface;
 
   constructor() {
     this.logger = LoggerFactory.getInstance().createLogger('MagentoRefundService');
-    this.secretsService = SecretsServiceFactory.getInstance().getService();
   }
 
   /**
@@ -53,14 +51,13 @@ export class MagentoRefundService implements PlatformRefundServiceInterface {
    */
   private async getMagentoCredentials(): Promise<PlatformCredentials | null> {
     try {
-      // Get credentials from secrets service - keep for compatibility with endpoint URLs
-      const credentials = await this.secretsService.getSecret('magento_api_credentials');
+      const credentials = await getPlatformCredentials(ECommercePlatform.MAGENTO);
       if (!credentials) {
-        this.logger.error({ message: 'Magento API credentials not found in secrets store' });
+        this.logger.error({ message: 'Magento API credentials not configured' });
         return null;
       }
 
-      return JSON.parse(credentials);
+      return credentials;
     } catch (error) {
       this.logger.error({ message: 'Error retrieving Magento credentials' }, error instanceof Error ? error : new Error(String(error)));
       return null;

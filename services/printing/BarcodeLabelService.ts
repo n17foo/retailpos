@@ -10,6 +10,7 @@
 import { PrinterServiceFactory } from '../printer/PrinterServiceFactory';
 import { LoggerFactory } from '../logger/LoggerFactory';
 import { auditLogService } from '../audit/AuditLogService';
+import { toCsv } from '../../utils/csv';
 
 export interface LabelData {
   productId: string;
@@ -116,7 +117,7 @@ export class BarcodeLabelService {
       label.quantity.toString(),
     ]);
 
-    const csvContent = [headers, ...rows].map(row => row.map(field => `"${field.replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csvContent = toCsv(headers, rows);
 
     await auditLogService.log('barcode_labels:exported', {
       details: `Exported ${labels.length} barcode labels to CSV`,

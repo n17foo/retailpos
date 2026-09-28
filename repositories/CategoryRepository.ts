@@ -1,5 +1,20 @@
 import { db } from '../utils/db';
 import { generateUUID } from '../utils/uuid';
+import { buildUpdateAssignments } from '../utils/sql';
+
+const CATEGORY_UPDATE_COLUMNS = [
+  'name',
+  'description',
+  'parent_id',
+  'image_url',
+  'position',
+  'product_count',
+  'platform',
+  'platform_id',
+  'level',
+  'path',
+  'status',
+] as const;
 
 export interface Category {
   id: string;
@@ -120,13 +135,9 @@ export class CategoryRepository {
   }
 
   async update(id: string, data: Partial<Category>): Promise<void> {
-    const now = Date.now();
-    const fields = Object.keys(data).filter(key => key !== 'id' && key !== 'created_at');
-    if (fields.length === 0) return;
-
-    const values = fields.map(key => data[key as keyof typeof data] as string | number | boolean);
-    const statement = `UPDATE categories SET ${fields.map(field => `${field} = ?`).join(', ')}, updated_at = ? WHERE id = ?`;
-    await db.runAsync(statement, [...values, now, id] as (string | number | boolean)[]);
+    const { assignments, values } = buildUpdateAssignments(data, CATEGORY_UPDATE_COLUMNS);
+    if (assignments.length === 0) return;
+    await db.runAsync(`UPDATE categories SET ${assignments.join(', ')}, updated_at = ? WHERE id = ?`, [...values, Date.now(), id]);
   }
 
   async delete(id: string): Promise<void> {

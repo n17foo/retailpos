@@ -13,14 +13,14 @@ import { auditLogService } from '../services/audit/AuditLogService';
 import { useTranslate } from '../hooks/useTranslate';
 
 interface LoginScreenProps {
-  onLogin: (credential: string, user?: User) => void;
+  onLogin: (user: User) => void;
 }
 
 const PIN_LENGTH = 6;
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const { t } = useTranslate();
-  const [activeMethod, setActiveMethod] = useState<AuthMethodType>(authConfig.primaryMethod);
+  const [activeMethod, setActiveMethod] = useState<AuthMethodType>('pin');
   const [availableMethods, setAvailableMethods] = useState<AuthMethodProvider[]>([]);
   const [pin, setPin] = useState('');
   const [password, setPassword] = useState('');
@@ -57,15 +57,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   }, [shake]);
 
   const handleAuthResult = useCallback(
-    (credential: string, result: { success: boolean; user?: User; error?: string }) => {
+    (result: { success: boolean; user?: User; error?: string }) => {
       setIsLoading(false);
-      if (result.success) {
+      if (result.success && result.user) {
         auditLogService.log('auth:login', {
-          userId: result.user?.id,
-          userName: result.user?.name,
+          userId: result.user.id,
+          userName: result.user.name,
           details: activeMethod,
         });
-        onLogin(credential, result.user);
+        onLogin(result.user);
       } else {
         auditLogService.log('auth:failed', {
           details: `method=${activeMethod} error=${result.error ?? 'unknown'}`,
@@ -83,7 +83,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     setIsLoading(true);
     setError(null);
     authService.authenticate('biometric').then(result => {
-      handleAuthResult('biometric', result);
+      handleAuthResult(result);
     });
   }, [handleAuthResult]);
 
@@ -115,7 +115,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         setIsLoading(true);
         setError(null);
         authService.authenticate('pin', newPin).then(result => {
-          handleAuthResult(newPin, result);
+          handleAuthResult(result);
           if (!result.success) setPin('');
         });
       }
@@ -140,7 +140,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     setIsLoading(true);
     setError(null);
     authService.authenticate('password', password).then(result => {
-      handleAuthResult(password, result);
+      handleAuthResult(result);
       if (!result.success) setPassword('');
     });
   }, [password, handleAuthResult, t]);
@@ -153,23 +153,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
       setIsLoading(true);
       setError(null);
       authService.authenticate(activeMethod, cardData).then(result => {
-        handleAuthResult(cardData, result);
+        handleAuthResult(result);
         setWaitingForSwipe(true);
       });
     },
     [activeMethod, handleAuthResult]
   );
-
-  // ── Platform auth handler ─────────────────────────────────────────
-
-  const handlePlatformAuth = useCallback(() => {
-    setIsLoading(true);
-    setError(null);
-    // Platform auth validates the existing token — no credential needed
-    authService.authenticate('platform_auth').then(result => {
-      handleAuthResult('platform_auth', result);
-    });
-  }, [handleAuthResult]);
 
   // ── Method switcher ─────────────────────────────────────────────────
 
@@ -261,17 +250,6 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             </View>
             <TextInput style={styles.hiddenInput} autoFocus onChangeText={handleCardInput} value="" blurOnSubmit={false} />
             <Text style={styles.waitingText}>{waitingForSwipe ? t('login.waitingForTap') : t('common.ready')}</Text>
-          </>
-        );
-
-      case 'platform_auth':
-        return (
-          <>
-            <Text style={styles.authTitle}>{t('login.platformLogin')}</Text>
-            <Text style={styles.authDescription}>{t('login.platformLoginDescription')}</Text>
-            <TouchableOpacity style={styles.submitButton} onPress={handlePlatformAuth}>
-              <Text style={styles.submitButtonText}>{t('login.logInViaPlatform')}</Text>
-            </TouchableOpacity>
           </>
         );
 

@@ -2,9 +2,11 @@ import { userRepository } from '../../../repositories/UserRepository';
 import { keyValueRepository } from '../../../repositories/KeyValueRepository';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
 import { hashCredential, verifyCredential, isHashedCredential } from '../../../utils/crypto';
+import { AuthAttemptLimiter } from '../AuthAttemptLimiter';
 
 const RFID_KEY_PREFIX = 'auth.rfid.';
 const RFID_ENABLED_KEY = 'auth.rfid.enabled';
+const MAX_BADGE_ID_LENGTH = 1024;
 
 /**
  * RFID / NFC badge authentication provider.
@@ -18,6 +20,7 @@ const RFID_ENABLED_KEY = 'auth.rfid.enabled';
 export class RfidNfcAuthProvider implements AuthMethodProvider {
   readonly type = 'rfid_nfc' as const;
   readonly info: AuthMethodInfo = AUTH_METHOD_INFO.rfid_nfc;
+  private limiter = new AuthAttemptLimiter();
 
   async isAvailable(): Promise<boolean> {
     // RFID/NFC availability is user-configured (they tell us they have a reader)
@@ -29,6 +32,14 @@ export class RfidNfcAuthProvider implements AuthMethodProvider {
   async authenticate(credential?: string): Promise<AuthResult> {
     if (!credential) {
       return { success: false, error: 'Please tap your employee badge.' };
+    }
+    const remainingMs = this.limiter.getLockoutRemainingMs();
+    if (remainingMs > 0) {
+      return { success: false, error: `Too many failed attempts. Try again in ${Math.ceil(remainingMs / 1000)}s.` };
+    }
+    if (credential.length > MAX_BADGE_ID_LENGTH) {
+      this.limiter.recordResult(false);
+      return { success: false, error: 'Badge not recognized. Please try again or use another login method.' };
     }
 
     try {
@@ -44,17 +55,21 @@ export class RfidNfcAuthProvider implements AuthMethodProvider {
             // Transparent migration: re-hash legacy plaintext badge ID on match
             await keyValueRepository.setObject(RFID_KEY_PREFIX + user.id, hashCredential(badgeId)).catch(() => undefined);
           }
+          this.limiter.recordResult(true);
           return { success: true, user };
         }
       }
 
+      this.limiter.recordResult(false);
       return { success: false, error: 'Badge not recognized. Please try again or use another login method.' };
     } catch {
+      this.limiter.recordResult(false);
       return { success: false, error: 'Badge authentication failed. Please try again.' };
     }
   }
 
   async enroll(userId: string, credential: string): Promise<boolean> {
+    if (!credential.trim() || credential.length > MAX_BADGE_ID_LENGTH) return false;
     try {
       await keyValueRepository.setObject(RFID_KEY_PREFIX + userId, hashCredential(credential.trim().toUpperCase()));
       return true;

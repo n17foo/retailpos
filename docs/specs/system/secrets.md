@@ -22,11 +22,13 @@ The service follows a factory pattern with automatic selection between real keyc
 
 ### Storage Backends
 
-| Backend                    | Platform       | Description                                                 | Status         |
-| -------------------------- | -------------- | ----------------------------------------------------------- | -------------- |
-| Keychain Services          | iOS            | Native iOS secure storage using `react-native-keychain`     | ✅ Implemented |
-| EncryptedSharedPreferences | Android        | Native Android secure storage using `react-native-keychain` | ✅ Implemented |
-| Memory (Mock)              | All (dev/test) | In-memory storage for Expo Go and testing                   | ✅ Implemented |
+| Backend                    | Platform       | Description                                                                   | Status         |
+| -------------------------- | -------------- | ----------------------------------------------------------------------------- | -------------- |
+| Keychain Services          | iOS            | Native iOS secure storage using `react-native-keychain`                       | ✅ Implemented |
+| EncryptedSharedPreferences | Android        | Native Android secure storage using `react-native-keychain`                   | ✅ Implemented |
+| Electron `safeStorage`     | Desktop        | OS-encrypted secrets via main-process IPC; only ciphertext is persisted       | ✅ Implemented |
+| Browser                    | Web            | Plaintext only when `ALLOW_PLAINTEXT_SECRET_FALLBACK=true` (dev escape hatch) | ✅ Implemented |
+| Memory (Mock)              | All (dev/test) | In-memory storage for Expo Go and testing, requires `USE_MOCK_SECRETS=true`   | ✅ Implemented |
 
 ### Secret Keys
 
@@ -43,12 +45,14 @@ The system defines a comprehensive enum of secret keys for all supported platfor
 
 ### Key Defaults
 
-| Field                | Default                        | Source                                      |
-| -------------------- | ------------------------------ | ------------------------------------------- |
-| Service identifier   | Secret key name                | `KeychainSecretsService.storeSecret`        |
-| Access group (iOS)   | `'com.commercefull.retailpos'` | `KeychainSecretsService` platform check     |
-| Mock service enabled | `USE_MOCK_SECRETS` env var     | `SecretsServiceFactory` constructor         |
-| Initialization check | Expo Go detection              | `KeychainSecretsService.initializeKeychain` |
+| Field                  | Default                                          | Source                                      |
+| ---------------------- | ------------------------------------------------ | ------------------------------------------- |
+| Service identifier     | Secret key name                                  | `KeychainSecretsService.storeSecret`        |
+| Keychain accessibility | `AccessibleAfterFirstUnlockThisDeviceOnly`       | `KeychainSecretsService.keychainOptions`    |
+| Keychain access group  | None — secrets are never shared with other apps  | `KeychainSecretsService.keychainOptions`    |
+| Mock service enabled   | `USE_MOCK_SECRETS === 'true'` env var            | `SecretsServiceFactory` constructor         |
+| Initialization check   | Expo Go detection                                | `KeychainSecretsService.initializeKeychain` |
+| Plaintext KV fallback  | Forbidden on production iOS/Android and Electron | `ProtectedValueStore`, `TokenService`       |
 
 ---
 
@@ -120,11 +124,11 @@ The system defines a comprehensive enum of secret keys for all supported platfor
 
 **2.5.2** When `storeSecret()` is called and `initialized` is `true`, the system shall call `this.keychain.setGenericPassword(key, value, options)`.
 
-**2.5.3** When `setGenericPassword()` is called, the system shall pass `{ service: key, accessGroup: ... }` as options.
+**2.5.3** When `setGenericPassword()` is called, the system shall pass `{ service: key, accessible: ACCESSIBLE.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY }` as options.
 
-**2.5.4** When `Platform.OS` is `'ios'`, the system shall set `accessGroup` to `'com.commercefull.retailpos'`.
+**2.5.4** The system shall not pass an `accessGroup` on any platform — secrets are never shared with other apps or app groups.
 
-**2.5.5** When `Platform.OS` is not `'ios'`, the system shall set `accessGroup` to `undefined`.
+**2.5.5** The `THIS_DEVICE_ONLY` accessibility variant shall be used so secrets never migrate through backups or to other devices.
 
 **2.5.6** When `setGenericPassword()` resolves successfully, the system shall return `true`.
 
@@ -150,11 +154,7 @@ The system defines a comprehensive enum of secret keys for all supported platfor
 
 **2.7.1** When `getSecret(key)` is called on `KeychainSecretsService` and `initialized` is `false`, the system shall log an error message `'Cannot get secret: Keychain not initialized'` and return `null`.
 
-**2.7.2** When `getSecret()` is called and `initialized` is `true`, the system shall call `this.keychain.getGenericPassword({ service: key, accessGroup: ... })`.
-
-**2.7.3** When `Platform.OS` is `'ios'`, the system shall set `accessGroup` to `'com.commercefull.retailpos'`.
-
-**2.7.4** When `Platform.OS` is not `'ios'`, the system shall set `accessGroup` to `undefined`.
+**2.7.2** When `getSecret()` is called and `initialized` is `true`, the system shall call `this.keychain.getGenericPassword({ service: key })` — retrieval options carry no `accessGroup`.
 
 **2.7.5** When `getGenericPassword()` returns credentials, the system shall return `credentials.password`.
 
@@ -166,11 +166,7 @@ The system defines a comprehensive enum of secret keys for all supported platfor
 
 **2.8.1** When `deleteSecret(key)` is called on `KeychainSecretsService` and `initialized` is `false`, the system shall log an error message `'Cannot delete secret: Keychain not initialized'` and return `false`.
 
-**2.8.2** When `deleteSecret()` is called and `initialized` is `true`, the system shall call `this.keychain.resetGenericPassword({ service: key, accessGroup: ... })`.
-
-**2.8.3** When `Platform.OS` is `'ios'`, the system shall set `accessGroup` to `'com.commercefull.retailpos'`.
-
-**2.8.4** When `Platform.OS` is not `'ios'`, the system shall set `accessGroup` to `undefined`.
+**2.8.2** When `deleteSecret()` is called and `initialized` is `true`, the system shall call `this.keychain.resetGenericPassword({ service: key })`.
 
 **2.8.5** When `resetGenericPassword()` resolves successfully, the system shall return `true`.
 
@@ -200,9 +196,9 @@ The system defines a comprehensive enum of secret keys for all supported platfor
 
 ## 3. State-Driven Requirements
 
-**3.1** While `USE_MOCK_SECRETS` is `true`, the system shall use `MemorySecretsService` for all secret operations.
+**3.1** While `USE_MOCK_SECRETS === 'true'` (exact match — any other populated value is ignored), the system shall use `MemorySecretsService` for all secret operations.
 
-**3.2** While `USE_MOCK_SECRETS` is `false` and not running in Expo Go, the system shall use `KeychainSecretsService` for all secret operations.
+**3.2** While `USE_MOCK_SECRETS` is not `'true'`, the system shall select the runtime backend: `ElectronSecretsService` under Electron, `BrowserSecretsService` on web, and `KeychainSecretsService` on native mobile (outside Expo Go).
 
 **3.3** While running in Expo Go, the system shall not attempt to load the native keychain module and shall set `initialized` to `false`.
 
@@ -210,15 +206,15 @@ The system defines a comprehensive enum of secret keys for all supported platfor
 
 **3.5** While `KeychainSecretsService.initialized` is `true`, the system shall use the native keychain module for all secret operations.
 
-**3.6** While `Platform.OS` is `'ios'`, the system shall include `accessGroup: 'com.commercefull.retailpos'` in all keychain operations.
+**3.6** While `KeychainSecretsService` is active, all keychain operations shall use `ACCESSIBLE.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` for storage and no `accessGroup` — secrets are device-bound and never shared.
 
-**3.7** While `Platform.OS` is not `'ios'`, the system shall omit `accessGroup` from keychain operations.
+**3.7** While running on Electron, the system shall use `ElectronSecretsService` (main-process `safeStorage` via IPC, ciphertext-only persistence). While running in a browser without the explicit `ALLOW_PLAINTEXT_SECRET_FALLBACK` opt-in, plaintext persistence shall be refused.
 
 ---
 
 ## 4. Optional Feature Requirements
 
-**4.1** Where `accessGroup` is provided on iOS, the system shall use it to enable keychain sharing between apps in the same app group.
+**4.1** Where keychain sharing is ever required in the future, an `accessGroup` matching the app's bundle identifier must be declared in the iOS entitlements — the app currently configures none, and secrets are intentionally device-only.
 
 **4.2** Where a secret key is defined in `SecretKeys` enum, the system shall use the enum value as the service identifier.
 
@@ -274,9 +270,9 @@ The system defines a comprehensive enum of secret keys for all supported platfor
 
 ## 6. Complex Requirements
 
-**6.1** When `storeSecret()` is called on `KeychainSecretsService`, the system shall check initialization, build platform-specific options (including `accessGroup` on iOS), call `setGenericPassword()`, catch any errors, log the result, and return success/failure — the caller never sees exceptions.
+**6.1** When `storeSecret()` is called on `KeychainSecretsService`, the system shall check initialization, build the keychain options (`service` + `THIS_DEVICE_ONLY` accessibility, no `accessGroup`), call `setGenericPassword()`, catch any errors, log the result, and return success/failure — the caller never sees exceptions.
 
-**6.2** When `getSecret()` is called on `KeychainSecretsService`, the system shall check initialization, build platform-specific options, call `getGenericPassword()`, extract the password from credentials, catch any errors, log the result, and return the value or `null` — the caller never sees exceptions.
+**6.2** When `getSecret()` is called on `KeychainSecretsService`, the system shall check initialization, call `getGenericPassword({ service: key })`, extract the password from credentials, catch any errors, log the result, and return the value or `null` — the caller never sees exceptions.
 
 **6.3** When `storeSecrets()` is called, the system shall check initialization, log the batch size, create an array of `storeSecret()` promises, execute them in parallel with `Promise.all()`, catch any errors, log the result, and return without throwing — partial failures are logged but do not propagate.
 
@@ -334,7 +330,7 @@ Admin configures Shopify API key
     → If !initialized: log error, return false
     → options = {
         service: 'SHOPIFY_API_KEY',
-        accessGroup: Platform.OS === 'ios' ? 'com.commercefull.retailpos' : undefined
+        accessible: ACCESSIBLE.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY  // no accessGroup
       }
     → Try:
       → await this.keychain.setGenericPassword('SHOPIFY_API_KEY', 'sk_live_...', options)
@@ -350,10 +346,7 @@ Admin configures Shopify API key
 System retrieves Shopify API key
   → secretsService.getSecret('SHOPIFY_API_KEY')
     → If !initialized: log error, return null
-    → options = {
-        service: 'SHOPIFY_API_KEY',
-        accessGroup: Platform.OS === 'ios' ? 'com.commercefull.retailpos' : undefined
-      }
+    → options = { service: 'SHOPIFY_API_KEY' }  // no accessGroup
     → Try:
       → credentials = await this.keychain.getGenericPassword(options)
       → If credentials: return credentials.password
@@ -391,10 +384,7 @@ Onboarding stores multiple Shopify credentials
 Admin removes Shopify integration
   → secretsService.deleteSecret('SHOPIFY_API_KEY')
     → If !initialized: log error, return false
-    → options = {
-        service: 'SHOPIFY_API_KEY',
-        accessGroup: Platform.OS === 'ios' ? 'com.commercefull.retailpos' : undefined
-      }
+    → options = { service: 'SHOPIFY_API_KEY' }  // no accessGroup
     → Try:
       → await this.keychain.resetGenericPassword(options)
       → return true

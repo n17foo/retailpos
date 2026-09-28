@@ -176,7 +176,7 @@ export class BigCommerceCategoryService extends BaseCategoryService {
   /**
    * Create authorization headers for BigCommerce API
    */
-  private getAuthHeaders(): Record<string, string> {
+  private getAuthHeaders(): Promise<Record<string, string>> {
     return this.apiClient['buildHeaders']();
   }
 }

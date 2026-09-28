@@ -1,5 +1,8 @@
 import { BaseApiClient, AuthStrategy, BaseApiClientConfig } from '../BaseApiClient';
 import { MAGENTO_API_VERSION } from '../../config/apiVersions';
+import { ECommercePlatform } from '../../../utils/platforms';
+import { getPlatformToken } from '../../token/TokenUtils';
+import { TokenType } from '../../token/TokenServiceInterface';
 
 /**
  * Magento-specific API client configuration.
@@ -55,11 +58,9 @@ export class MagentoApiClient extends BaseApiClient<MagentoConfig> {
     return this.config.apiVersion || MAGENTO_API_VERSION;
   }
 
-  protected getAuthStrategy(): AuthStrategy {
-    if (this.config.accessToken) {
-      return { type: 'bearer', token: this.config.accessToken };
-    }
-    return { type: 'none' };
+  protected async getAuthStrategy(): Promise<AuthStrategy> {
+    const token = (await getPlatformToken(ECommercePlatform.MAGENTO, TokenType.ACCESS)) || this.config.accessToken;
+    return token ? { type: 'bearer', token } : { type: 'none' };
   }
 
   protected buildApiUrl(path: string): string {
@@ -74,11 +75,21 @@ export class MagentoApiClient extends BaseApiClient<MagentoConfig> {
 
   /**
    * Authenticate with Magento admin credentials and return an access token.
-   * Uses the unauthenticated token endpoint directly.
+   * Uses the unauthenticated token endpoint via a raw fetch — deliberately
+   * not routed through `request()` so token acquisition never depends on
+   * (or recursively triggers) `getAuthStrategy()`.
    */
   public async fetchAdminToken(apiUrl: string, username: string, password: string): Promise<string> {
     const url = `${this.normalizeUrl(apiUrl)}/rest/V1/integration/admin/token`;
-    const token = await this.request<string>('POST', url, { username, password });
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!response.ok) {
+      throw new Error(`Magento token request failed: ${response.status}`);
+    }
+    const token = (await response.json()) as unknown;
     if (typeof token !== 'string') {
       throw new Error('Invalid token response from Magento API');
     }

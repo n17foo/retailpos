@@ -403,6 +403,34 @@ Cashier cancels
 
 ---
 
+## 6. Hardening Additions (Round 3)
+
+**6.1** When `resolve(userId, action)` finds the user but `is_active` is false, the system shall deny everything — deactivated staff, including admins, retain no permissions.
+
+**6.2** When a user belongs to multiple permission sets and any set explicitly denies an action, the system shall deny the action — a deny always wins over a grant in another set.
+
+**6.3** Cached permission results shall expire after 60 seconds so permission changes take effect even if explicit invalidation is missed.
+
+**6.4** Screens that perform sensitive actions shall guard themselves with `PermissionGate` (or an equivalent `PermissionService.can` check) rather than relying on menu visibility — Settings, Users, PermissionSets, Reports, SyncQueue, Customers, CustomerProfile, and all procurement/inventory-configuration screens are gated in `MoreNavigator`.
+
+**6.5** Credential-bearing settings tabs (Auth, Payment, E-commerce, Multi-register) shall require `settings:edit` (admin-only) via `SettingsTabComposer`; an undefined role resolves as cashier.
+
+**6.6** User management (`useUsers`) shall check `user:create` / `user:edit` / `user:delete` at the data boundary. The only unauthenticated creation path is onboarding creating the first admin, and only while no active admin exists.
+
+**6.7** The system shall refuse to demote, deactivate, or delete the last active admin (`UserRepository`).
+
+| Requirement (summary)                   | Component / Service              | Source File                                  |
+| --------------------------------------- | -------------------------------- | -------------------------------------------- |
+| Deactivated users denied everything     | `PermissionService.resolve`      | `services/permissions/PermissionService.ts`  |
+| Deny wins over grant across sets        | `PermissionService.resolve`      | `services/permissions/PermissionService.ts`  |
+| Permission cache expires after 60 s     | `PermissionService.can`          | `services/permissions/PermissionService.ts`  |
+| Screen-level permission gate            | `PermissionGate` in navigators   | `components/PermissionGate.tsx`              |
+| Admin-only credential settings tabs     | `SettingsTabComposer` role-aware | `services/navigation/SettingsTabComposer.ts` |
+| Data-boundary checks in user management | `useUsers`                       | `hooks/useUsers.ts`                          |
+| Last active admin cannot be removed     | `UserRepository` guards          | `repositories/UserRepository.ts`             |
+
+---
+
 **Document Metadata**:
 
 - **Author**: Kiro AI Agent

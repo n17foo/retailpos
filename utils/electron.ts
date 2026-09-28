@@ -131,6 +131,14 @@ export interface ElectronAPI {
   paymentCancel: () => Promise<void>;
   /** Disconnect from reader */
   paymentDisconnect: () => Promise<void>;
+
+  // ── OS-protected secret storage ─────────────────────────────
+  secureStorage: {
+    isAvailable: () => Promise<boolean>;
+    get: (key: string) => Promise<string | null>;
+    set: (key: string, value: string) => Promise<boolean>;
+    delete: (key: string) => Promise<boolean>;
+  };
 }
 
 /** Printer connection descriptor passed to Electron IPC */

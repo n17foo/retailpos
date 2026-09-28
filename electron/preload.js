@@ -45,6 +45,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   paymentCollect: request => ipcRenderer.invoke('payment-collect', request),
   paymentCancel: () => ipcRenderer.invoke('payment-cancel'),
   paymentDisconnect: () => ipcRenderer.invoke('payment-disconnect'),
+
+  // ── OS-protected secret storage ───────────────────────────────────────────
+  secureStorage: {
+    isAvailable: () => ipcRenderer.invoke('secure-storage-available'),
+    get: key => ipcRenderer.invoke('secure-storage-get', key),
+    set: (key, value) => ipcRenderer.invoke('secure-storage-set', key, value),
+    delete: key => ipcRenderer.invoke('secure-storage-delete', key),
+  },
 });
 
 // Expose a top-level flag for the isElectron() utility in utils/electron.ts

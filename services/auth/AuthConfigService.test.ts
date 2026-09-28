@@ -110,6 +110,18 @@ describe('AuthConfigService', () => {
       await svc.load();
       expect(svc.isLoaded).toBe(true);
     });
+
+    it('removes disabled platform login from persisted configuration', async () => {
+      kv = makeMockKv({
+        'auth.primaryMethod': 'platform_auth',
+        'auth.allowedMethods': ['pin', 'platform_auth'],
+      });
+      svc = new AuthConfigService(kv);
+      await svc.load();
+
+      expect(svc.primaryMethod).toBe('pin');
+      expect(svc.allowedMethods).not.toContain('platform_auth');
+    });
   });
 
   // ── 2.1.2 setPrimaryMethod ──────────────────────────────────────────

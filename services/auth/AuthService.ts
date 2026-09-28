@@ -1,4 +1,4 @@
-import { AuthMethodProvider, AuthMethodType, AuthResult } from './AuthMethodInterface';
+import { AUTH_METHOD_INFO, AuthMethodProvider, AuthMethodType, AuthResult } from './AuthMethodInterface';
 import { AuthConfigService, authConfig } from './AuthConfigService';
 import { PinAuthProvider } from './providers/PinAuthProvider';
 import { BiometricAuthProvider } from './providers/BiometricAuthProvider';
@@ -90,22 +90,28 @@ export class AuthService {
     if (!provider) {
       return { success: false, error: `Authentication method '${method}' is not available.` };
     }
+    if (method !== 'pin' && !this.config.allowedMethods.includes(method)) {
+      return { success: false, error: `${provider.info.label} is not enabled.` };
+    }
+    if (!AUTH_METHOD_INFO[method].supportedModes.includes(this.config.authMode)) {
+      return { success: false, error: `${provider.info.label} is not available in the current mode.` };
+    }
 
     const isAvail = await provider.isAvailable();
     if (!isAvail) {
       return { success: false, error: `${provider.info.label} is not available on this device.` };
     }
 
-    return provider.authenticate(credential);
-  }
-
-  /** Authenticate using the primary method, falling back to PIN on failure */
-  async authenticateWithPrimary(credential?: string): Promise<AuthResult> {
-    const result = await this.authenticate(this.config.primaryMethod, credential);
-    if (!result.success && this.config.primaryMethod !== 'pin') {
-      return this.authenticate('pin', credential);
+    const result = await provider.authenticate(credential);
+    if (result.success && (!result.user?.id || !result.user.is_active)) {
+      return { success: false, error: 'Authentication did not resolve to an active staff user.' };
     }
     return result;
+  }
+
+  /** Authenticate using the primary method without replaying its credential to another provider */
+  async authenticateWithPrimary(credential?: string): Promise<AuthResult> {
+    return this.authenticate(this.config.primaryMethod, credential);
   }
 }
 

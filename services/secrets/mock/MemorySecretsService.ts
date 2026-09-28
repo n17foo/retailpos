@@ -25,6 +25,14 @@ export class MemorySecretsService implements SecretsServiceInterface {
     return MemorySecretsService.instance;
   }
 
+  public async isAvailable(): Promise<boolean> {
+    return true;
+  }
+
+  public allowsPlaintextFallback(): boolean {
+    return true;
+  }
+
   /**
    * Stores a secret value in memory (not secure, only for development)
    * @param key The identifier for the secret

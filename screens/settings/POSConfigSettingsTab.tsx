@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Switch, Alert, ActivityIndicator } from 'react-native';
-import { posConfig } from '../../services/config/POSConfigService';
+import { posConfig, DEFAULT_AUTO_LOCK_MINUTES } from '../../services/config/POSConfigService';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../utils/theme';
 import { getCurrencyOptions } from '../../utils/currency';
 import { useTranslate } from '../../hooks/useTranslate';
@@ -16,6 +16,7 @@ const POSConfigSettingsTab: React.FC = () => {
   const [currencySymbol, setCurrencySymbol] = useState('£');
   const [maxSyncRetries, setMaxSyncRetries] = useState('3');
   const [drawerOpenOnCash, setDrawerOpenOnCash] = useState(true);
+  const [autoLockMinutes, setAutoLockMinutes] = useState(String(DEFAULT_AUTO_LOCK_MINUTES));
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
@@ -39,6 +40,7 @@ const POSConfigSettingsTab: React.FC = () => {
     if (cfg.currencySymbol) setCurrencySymbol(cfg.currencySymbol);
     if (cfg.maxSyncRetries !== undefined) setMaxSyncRetries(String(cfg.maxSyncRetries));
     if (cfg.drawerOpenOnCash !== undefined) setDrawerOpenOnCash(cfg.drawerOpenOnCash);
+    setAutoLockMinutes(String(cfg.autoLockMinutes ?? DEFAULT_AUTO_LOCK_MINUTES));
 
     // Load loyalty and store credit settings
     (async () => {
@@ -72,6 +74,11 @@ const POSConfigSettingsTab: React.FC = () => {
     const rate = parseFloat(taxRate);
     if (isNaN(rate) || rate < 0 || rate > 100) {
       Alert.alert(t('common.invalid'), t('settings.posConfig.taxRateInvalid'));
+      return;
+    }
+    const lockMinutes = Number(autoLockMinutes);
+    if (!Number.isInteger(lockMinutes) || lockMinutes < 0 || lockMinutes > 480) {
+      Alert.alert(t('common.invalid'), 'Auto-lock must be a whole number of minutes between 0 and 480');
       return;
     }
 
@@ -115,6 +122,7 @@ const POSConfigSettingsTab: React.FC = () => {
         currencySymbol,
         maxSyncRetries: parseInt(maxSyncRetries, 10) || 3,
         drawerOpenOnCash,
+        autoLockMinutes: lockMinutes,
       });
 
       // Save loyalty settings
@@ -231,6 +239,17 @@ const POSConfigSettingsTab: React.FC = () => {
             thumbColor={drawerOpenOnCash ? lightColors.primary : lightColors.textSecondary}
           />
         </View>
+
+        <Text style={styles.label}>Auto-lock after inactivity (minutes)</Text>
+        <TextInput
+          style={styles.input}
+          value={autoLockMinutes}
+          onChangeText={markDirty(setAutoLockMinutes)}
+          placeholder={String(DEFAULT_AUTO_LOCK_MINUTES)}
+          placeholderTextColor={lightColors.textSecondary}
+          keyboardType="number-pad"
+        />
+        <Text style={styles.helpText}>Locks the register and requires sign-in after this many idle minutes. Set 0 to disable.</Text>
       </View>
 
       {/* Loyalty Program */}

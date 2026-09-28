@@ -3,6 +3,7 @@ import { keyValueRepository } from '../repositories/KeyValueRepository';
 import { PaymentProvider } from '../services/payment/PaymentServiceFactory';
 import { usePayment } from './usePayment';
 import { useLogger } from '../hooks/useLogger';
+import { PaymentSettingsStorage } from '../services/config/PaymentSettingsStorage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -112,7 +113,7 @@ export const usePaymentSettings = () => {
   const loadSettings = useCallback(async () => {
     try {
       setIsLoading(true);
-      const saved = await keyValueRepository.getObject<PaymentSettings>('paymentSettings');
+      const saved = await PaymentSettingsStorage.load<PaymentSettings>();
       if (saved) {
         setPaymentSettings({ ...DEFAULT_PAYMENT_SETTINGS, ...saved });
         logger.info('Payment settings loaded');
@@ -137,7 +138,8 @@ export const usePaymentSettings = () => {
       try {
         setIsLoading(true);
         setSaveStatus('saving');
-        await keyValueRepository.setItem('paymentSettings', settings);
+        await PaymentSettingsStorage.save(settings);
+        await PaymentSettingsStorage.saveStripeNfcApiKey(settings.stripe_nfc.apiKey);
         setPaymentSettings(settings);
         await setPaymentProvider(settings.provider);
         setSaveStatus('saved');
@@ -180,7 +182,7 @@ export const usePaymentSettings = () => {
         switch (provider) {
           case PaymentProvider.STRIPE_NFC: {
             // Persist settings so the service can read them, then run the test.
-            await keyValueRepository.setItem('stripe_nfc_apiKey', paymentSettings.stripe_nfc.apiKey);
+            await PaymentSettingsStorage.saveStripeNfcApiKey(paymentSettings.stripe_nfc.apiKey);
             await keyValueRepository.setItem('stripe_nfc_publishableKey', paymentSettings.stripe_nfc.publishableKey ?? '');
             await keyValueRepository.setItem('stripe_nfc_merchantId', paymentSettings.stripe_nfc.merchantId);
             await keyValueRepository.setItem('stripe_nfc_backendUrl', paymentSettings.stripe_nfc.backendUrl);

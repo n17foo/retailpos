@@ -29,9 +29,7 @@ const AuthMethodSettingsTab: React.FC = () => {
       for (const method of applicableMethods) {
         const provider = authService.getProvider(method);
         if (provider) {
-          if (method === 'pin' || method === 'password' || method === 'platform_auth') {
-            result[method] = true;
-          } else if (method === 'biometric') {
+          if (method === 'biometric') {
             result[method] = await provider.isAvailable();
           } else {
             result[method] = true;
@@ -51,8 +49,8 @@ const AuthMethodSettingsTab: React.FC = () => {
   }, [loadConfig]);
 
   const toggleMethod = (method: AuthMethodType) => {
-    // PIN (offline default) and platform_auth (online default) cannot be disabled
-    if (method === 'pin' || method === 'platform_auth') return;
+    // PIN is the offline default and cannot be disabled
+    if (method === 'pin') return;
 
     setEnabledMethods(prev => {
       const next = new Set(prev);
@@ -126,8 +124,7 @@ const AuthMethodSettingsTab: React.FC = () => {
         const isAvailable = availability[method] ?? false;
         const isPrimary = primaryMethod === method;
         const isPin = method === 'pin';
-        const isPlatformAuth = method === 'platform_auth';
-        const isAlwaysOn = isPin || isPlatformAuth;
+        const isAlwaysOn = isPin;
 
         return (
           <View key={method} style={[styles.methodCard, !isAvailable && styles.methodCardDisabled]}>

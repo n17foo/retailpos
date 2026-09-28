@@ -182,6 +182,31 @@ describe('ReturnService.processReturn', () => {
     expect(result.success).toBe(true);
   });
 
+  it('rejects a refund larger than the order total', async () => {
+    const service = getService();
+
+    const result = await service.processReturn({
+      ...baseInput,
+      items: [{ productId: 'prod-1', productName: 'Widget', quantity: 1, refundAmount: 500 }],
+    });
+
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/exceeds the amount paid/);
+    expect(mockReturnRepo.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects negative return quantities', async () => {
+    const service = getService();
+
+    const result = await service.processReturn({
+      ...baseInput,
+      items: [{ productId: 'prod-1', productName: 'Widget', quantity: -1, refundAmount: 1 }],
+    });
+
+    expect(result.success).toBe(false);
+    expect(mockReturnRepo.create).not.toHaveBeenCalled();
+  });
+
   // ── Return creation ───────────────────────────────────────────────────
 
   it('creates one return record per item', async () => {

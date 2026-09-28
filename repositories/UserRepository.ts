@@ -1,6 +1,8 @@
 import { db } from '../utils/db';
 import { generateUUID } from '../utils/uuid';
 import { hashPin, isHashedPin, verifyPin } from '../utils/crypto';
+import { validatePinFormat } from '../utils/userPin.utils';
+import { buildUpdateAssignments } from '../utils/sql';
 
 export type UserRole = 'admin' | 'manager' | 'cashier';
 
@@ -8,7 +10,6 @@ export interface User {
   id: string;
   name: string;
   email?: string | null;
-  pin: string; // 6-digit PIN, stored hashed
   role: UserRole;
   platform_user_id?: string | null; // Link to e-commerce platform user
   is_active: boolean;
@@ -30,9 +31,24 @@ interface UserRow {
 }
 
 const rowToUser = (row: UserRow): User => ({
-  ...row,
+  id: row.id,
+  name: row.name,
+  email: row.email,
+  role: row.role,
+  platform_user_id: row.platform_user_id,
   is_active: row.is_active === 1,
+  created_at: row.created_at,
+  updated_at: row.updated_at,
 });
+
+const USER_ROLES: readonly UserRole[] = ['admin', 'manager', 'cashier'];
+const USER_UPDATE_COLUMNS = ['name', 'email', 'role', 'platform_user_id', 'is_active'] as const;
+
+function assertValidRole(role: unknown): asserts role is UserRole {
+  if (!USER_ROLES.includes(role as UserRole)) {
+    throw new Error('Invalid user role');
+  }
+}
 
 export interface CreateUserInput {
   name: string;
@@ -44,6 +60,10 @@ export interface CreateUserInput {
 
 export class UserRepository {
   async create(user: CreateUserInput): Promise<string> {
+    const validation = validatePinFormat(user.pin);
+    if (!validation.isValid) throw new Error(validation.error);
+    assertValidRole(user.role);
+
     const now = Date.now();
     const id = generateUUID();
 
@@ -68,14 +88,16 @@ export class UserRepository {
    * Legacy plaintext rows are transparently upgraded to a hash on match.
    */
   async findByPin(pin: string): Promise<User | null> {
-    const users = await this.findActive();
-    for (const user of users) {
-      if (verifyPin(pin, user.pin)) {
-        if (!isHashedPin(user.pin)) {
+    if (!validatePinFormat(pin).isValid) return null;
+
+    const rows = await db.getAllAsync<UserRow>('SELECT * FROM users WHERE is_active = 1 ORDER BY name ASC');
+    for (const row of rows) {
+      if (verifyPin(pin, row.pin)) {
+        if (!isHashedPin(row.pin)) {
           // Transparent migration: re-hash legacy plaintext PIN on successful match
-          await this.updatePin(user.id, pin).catch(() => undefined);
+          await this.updatePin(row.id, pin).catch(() => undefined);
         }
-        return user;
+        return rowToUser(row);
       }
     }
     return null;
@@ -102,27 +124,26 @@ export class UserRepository {
   }
 
   async update(id: string, data: Partial<Omit<User, 'id' | 'created_at' | 'updated_at'>>): Promise<void> {
-    const now = Date.now();
-    const fields = Object.keys(data);
-    const values = fields.map(key => {
-      const value = data[key as keyof typeof data];
-      // Convert boolean to integer for SQLite
-      if (typeof value === 'boolean') return value ? 1 : 0;
-      // Never store a plaintext PIN via the generic update path
-      if (key === 'pin' && typeof value === 'string' && !isHashedPin(value)) return hashPin(value);
-      return value;
-    });
+    if (data.role !== undefined) assertValidRole(data.role);
+    const { assignments, values } = buildUpdateAssignments(data, USER_UPDATE_COLUMNS);
+    if (assignments.length === 0) return;
 
-    const statement = `UPDATE users SET ${fields.map(field => `${field} = ?`).join(', ')}, updated_at = ? WHERE id = ?`;
-    await db.runAsync(statement, [...values, now, id] as (string | number | boolean)[]);
+    if ((data.role !== undefined && data.role !== 'admin') || data.is_active === false) {
+      await this.assertNotLastActiveAdmin(id);
+    }
+    await db.runAsync(`UPDATE users SET ${assignments.join(', ')}, updated_at = ? WHERE id = ?`, [...values, Date.now(), id]);
   }
 
   async updatePin(id: string, newPin: string): Promise<void> {
+    const validation = validatePinFormat(newPin);
+    if (!validation.isValid) throw new Error(validation.error);
+
     const now = Date.now();
     await db.runAsync('UPDATE users SET pin = ?, updated_at = ? WHERE id = ?', [hashPin(newPin), now, id]);
   }
 
   async deactivate(id: string): Promise<void> {
+    await this.assertNotLastActiveAdmin(id);
     const now = Date.now();
     await db.runAsync('UPDATE users SET is_active = 0, updated_at = ? WHERE id = ?', [now, id]);
   }
@@ -133,12 +154,26 @@ export class UserRepository {
   }
 
   async delete(id: string): Promise<void> {
+    await this.assertNotLastActiveAdmin(id);
     await db.runAsync('DELETE FROM users WHERE id = ?', [id]);
   }
 
+  /** Prevent lock-out: the final active admin cannot be demoted, deactivated, or deleted. */
+  private async assertNotLastActiveAdmin(id: string): Promise<void> {
+    const target = await db.getFirstAsync<Pick<UserRow, 'role' | 'is_active'>>('SELECT role, is_active FROM users WHERE id = ?', [id]);
+    if (target?.role !== 'admin' || target.is_active !== 1) return;
+    const result = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM users WHERE role = ? AND is_active = 1', [
+      'admin',
+    ]);
+    if ((result?.count ?? 0) <= 1) {
+      throw new Error('At least one active admin account is required');
+    }
+  }
+
   async isPinUnique(pin: string, excludeUserId?: string): Promise<boolean> {
-    const users = await this.findAll();
-    return !users.some(user => user.id !== excludeUserId && verifyPin(pin, user.pin));
+    if (!validatePinFormat(pin).isValid) return false;
+    const rows = await db.getAllAsync<UserRow>('SELECT * FROM users');
+    return !rows.some(row => row.id !== excludeUserId && verifyPin(pin, row.pin));
   }
 
   async hasAdminUser(): Promise<boolean> {

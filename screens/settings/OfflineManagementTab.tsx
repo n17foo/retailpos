@@ -4,12 +4,17 @@ import ProductManagementTab from './ProductManagementTab';
 import CategoryManagementTab from './CategoryManagementTab';
 import UsersSettingsTab from './UsersSettingsTab';
 import { useTranslate } from '../../hooks/useTranslate';
+import { useAuthContext } from '../../contexts/AuthProvider';
+import { PermissionGate } from '../../components/PermissionGate';
+import { permissionService } from '../../services/permissions/PermissionService';
 import { elevation, lightColors, semanticColors } from '../../utils/theme';
 
 type OfflineSection = 'overview' | 'products' | 'categories' | 'users';
 
 const OfflineManagementTab: React.FC = () => {
   const { t } = useTranslate();
+  const { user } = useAuthContext();
+  const canManageUsers = permissionService.canByRole(user?.role, 'user:edit');
   const [activeSection, setActiveSection] = useState<OfflineSection>('overview');
 
   const renderOverview = () => (
@@ -30,11 +35,13 @@ const OfflineManagementTab: React.FC = () => {
           <Text style={styles.menuDescription}>{t('settings.offline.categoriesDescription')}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuCard} onPress={() => setActiveSection('users')}>
-          <Text style={styles.menuIcon}>👥</Text>
-          <Text style={styles.menuTitle}>{t('settings.offline.users')}</Text>
-          <Text style={styles.menuDescription}>{t('settings.offline.usersDescription')}</Text>
-        </TouchableOpacity>
+        {canManageUsers && (
+          <TouchableOpacity style={styles.menuCard} onPress={() => setActiveSection('users')}>
+            <Text style={styles.menuIcon}>👥</Text>
+            <Text style={styles.menuTitle}>{t('settings.offline.users')}</Text>
+            <Text style={styles.menuDescription}>{t('settings.offline.usersDescription')}</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.infoBox}>
@@ -57,7 +64,11 @@ const OfflineManagementTab: React.FC = () => {
       {activeSection === 'overview' && renderOverview()}
       {activeSection === 'products' && <ProductManagementTab />}
       {activeSection === 'categories' && <CategoryManagementTab />}
-      {activeSection === 'users' && <UsersSettingsTab />}
+      {activeSection === 'users' && (
+        <PermissionGate action="user:edit">
+          <UsersSettingsTab />
+        </PermissionGate>
+      )}
     </View>
   );
 };

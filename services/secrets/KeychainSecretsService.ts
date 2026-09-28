@@ -17,11 +17,27 @@ export class KeychainSecretsService implements SecretsServiceInterface {
   private static instance: KeychainSecretsService;
   private keychain: ReactNativeKeychain | null = null;
   private initialized: boolean = false;
+  private readonly ready: Promise<void>;
   private logger = LoggerFactory.getInstance().createLogger('KeychainSecretsService');
+
+  /**
+   * react-native-keychain `ACCESSIBLE.AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY`.
+   * Secrets are readable whenever the device is unlocked (required for
+   * background sync), never leave the device through backups or keychain
+   * sharing, and are wiped on a device restore to different hardware.
+   * Declared as a literal because the module is loaded lazily.
+   */
+  private static readonly ACCESSIBLE_THIS_DEVICE_ONLY = 'AccessibleAfterFirstUnlockThisDeviceOnly';
+
+  private keychainOptions(key: string): Record<string, string> {
+    // No accessGroup: sharing groups require a matching entitlement, and
+    // secrets must not be shared with other apps anyway.
+    return { service: key, accessible: KeychainSecretsService.ACCESSIBLE_THIS_DEVICE_ONLY };
+  }
 
   private constructor() {
     // We'll dynamically import keychain to avoid loading native modules in Expo Go
-    this.initializeKeychain();
+    this.ready = this.initializeKeychain();
   }
 
   /**
@@ -60,6 +76,17 @@ export class KeychainSecretsService implements SecretsServiceInterface {
     }
   }
 
+  public async isAvailable(): Promise<boolean> {
+    await this.ready;
+    return this.initialized && this.keychain !== null;
+  }
+
+  public allowsPlaintextFallback(): boolean {
+    // Development runtimes (notably Expo Go) may lack the native keychain.
+    // Production iOS/Android builds must not fall back to SQLite for secrets.
+    return (Platform.OS === 'ios' || Platform.OS === 'android') && typeof __DEV__ !== 'undefined' && __DEV__;
+  }
+
   /**
    * Stores a secret value securely using the keychain
    * @param key The identifier for the secret
@@ -67,17 +94,14 @@ export class KeychainSecretsService implements SecretsServiceInterface {
    * @returns A promise that resolves to true if successful
    */
   public async storeSecret(key: string, value: string): Promise<boolean> {
-    if (!this.initialized || !this.keychain) {
+    if (!(await this.isAvailable()) || !this.keychain) {
       this.logger.error('Cannot store secret: Keychain not initialized');
       return false;
     }
 
     try {
       // Store the secret in the device's secure storage
-      await this.keychain.setGenericPassword(key, value, {
-        service: key,
-        accessGroup: Platform.OS === 'ios' ? 'com.commercefull.retailpos' : undefined,
-      });
+      await this.keychain.setGenericPassword(key, value, this.keychainOptions(key));
       return true;
     } catch (error) {
       this.logger.error({ message: 'Error storing secret' }, error instanceof Error ? error : new Error(String(error)));
@@ -91,7 +115,7 @@ export class KeychainSecretsService implements SecretsServiceInterface {
    * @returns A promise that resolves when all secrets are stored
    */
   public async storeSecrets(secrets: Record<string, string>): Promise<void> {
-    if (!this.initialized || !this.keychain) {
+    if (!(await this.isAvailable()) || !this.keychain) {
       this.logger.error('Cannot store secrets: Keychain not initialized');
       return;
     }
@@ -113,17 +137,14 @@ export class KeychainSecretsService implements SecretsServiceInterface {
    * @returns The secret value, or null if not found or error occurred
    */
   public async getSecret(key: string): Promise<string | null> {
-    if (!this.initialized || !this.keychain) {
+    if (!(await this.isAvailable()) || !this.keychain) {
       this.logger.error('Cannot get secret: Keychain not initialized');
       return null;
     }
 
     try {
       // Retrieve the secret from the device's secure storage
-      const credentials = await this.keychain.getGenericPassword({
-        service: key,
-        accessGroup: Platform.OS === 'ios' ? 'com.commercefull.retailpos' : undefined,
-      });
+      const credentials = await this.keychain.getGenericPassword(this.keychainOptions(key));
 
       if (credentials) {
         return credentials.password;
@@ -141,17 +162,14 @@ export class KeychainSecretsService implements SecretsServiceInterface {
    * @returns A promise that resolves to true if successful
    */
   public async deleteSecret(key: string): Promise<boolean> {
-    if (!this.initialized || !this.keychain) {
+    if (!(await this.isAvailable()) || !this.keychain) {
       this.logger.error('Cannot delete secret: Keychain not initialized');
       return false;
     }
 
     try {
       // Delete the secret from the device's secure storage
-      await this.keychain.resetGenericPassword({
-        service: key,
-        accessGroup: Platform.OS === 'ios' ? 'com.commercefull.retailpos' : undefined,
-      });
+      await this.keychain.resetGenericPassword(this.keychainOptions(key));
       return true;
     } catch (error) {
       this.logger.error({ message: 'Error deleting secret' }, error instanceof Error ? error : new Error(String(error)));

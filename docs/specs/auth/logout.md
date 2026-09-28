@@ -50,6 +50,8 @@ User taps "Logout" in More menu
 
 **2.4** When the `Auth` stack renders, the system shall show `LoginScreen` (or the onboarding flow if `!isOnboarded`, but that state is unaffected by logout).
 
+**2.5** When an authenticated session has been idle for `pos.autoLockMinutes` minutes (default `DEFAULT_AUTO_LOCK_MINUTES = 5`; `0` disables), the system shall call `onLogout` with reason `'Session locked after inactivity'`. Touches captured at the root navigator and web/Electron `keydown` events count as activity; time in the background counts towards the idle period, so returning to an unattended register requires re-login.
+
 ---
 
 ## 3. State-Driven Requirements
@@ -82,3 +84,5 @@ User taps "Logout" in More menu
 | `handleLogout` clears user + isAuthenticated         | `RootNavigator.handleLogout` → `setUser(null)` + `setIsAuthenticated(false)` | `navigation/RootNavigator.tsx`                                    |
 | Auth stack rendered when `isAuthenticated === false` | `RootNavigator` conditional stack render                                     | `navigation/RootNavigator.tsx`                                    |
 | `user` and `isAuthenticated` state in context        | `AuthProvider` useState                                                      | `contexts/AuthProvider.tsx`                                       |
+| Auto-lock after inactivity                           | `useInactivityLock` + root touch capture                                     | `hooks/useInactivityLock.ts`, `navigation/RootNavigator.tsx`      |
+| Idle timeout setting (`pos.autoLockMinutes`)         | `POSConfigService` / `AUTO_LOCK_TIMEOUT_MS`                                  | `services/config/POSConfigService.ts`                             |

@@ -7,7 +7,7 @@ const logger = LoggerFactory.getInstance().createLogger('dbSchema');
  * Current database schema version.
  * Bump this number and add a migration block whenever the schema changes.
  */
-export const LATEST_DB_VERSION = 9;
+export const LATEST_DB_VERSION = 10;
 
 /**
  * Initialise (or migrate) the database schema.
@@ -692,6 +692,30 @@ async function migrateDatabase(db: SQLiteDatabase, fromVersion: number, toVersio
       }
 
       logger.info('v9 snapshot fields added to order_items.');
+    }
+
+    // ── v10 – Durable webhook delivery/idempotency records ────────────
+    if (fromVersion < 10) {
+      logger.info('Applying v10: creating webhook delivery tracking…');
+
+      await db.runAsync(`
+        CREATE TABLE IF NOT EXISTS webhook_deliveries (
+          provider          TEXT NOT NULL,
+          delivery_id       TEXT NOT NULL,
+          status            TEXT NOT NULL
+                            CHECK(status IN ('processing','completed','failed')),
+          first_received_at INTEGER NOT NULL,
+          last_received_at  INTEGER NOT NULL,
+          completed_at      INTEGER,
+          attempt_count     INTEGER NOT NULL DEFAULT 1,
+          expires_at        INTEGER NOT NULL,
+          PRIMARY KEY (provider, delivery_id)
+        );
+      `);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_expiry ON webhook_deliveries(expires_at);`);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status ON webhook_deliveries(status);`);
+
+      logger.info('v10 webhook delivery tracking created.');
     }
 
     // Stamp the version

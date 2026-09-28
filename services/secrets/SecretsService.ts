@@ -1,6 +1,10 @@
+import { Platform } from 'react-native';
 import { SecretsServiceInterface } from './SecretsServiceInterface';
 import { KeychainSecretsService } from './KeychainSecretsService';
+import { ElectronSecretsService } from './ElectronSecretsService';
+import { BrowserSecretsService } from './BrowserSecretsService';
 import { MemorySecretsService } from './mock/MemorySecretsService';
+import { isElectron } from '../../utils/electron';
 import { USE_MOCK_SECRETS } from '@env';
 import { LoggerFactory } from '../logger/LoggerFactory';
 
@@ -15,15 +19,20 @@ export class SecretsServiceFactory {
   private constructor() {
     const logger = LoggerFactory.getInstance().createLogger('SecretsServiceFactory');
     logger.debug('USE_MOCK_SECRETS', USE_MOCK_SECRETS);
-    // Initialize the appropriate service based on the USE_MOCK_SECRETS flag
-    if (USE_MOCK_SECRETS) {
+    // Initialize the appropriate service based on the explicit mock flag and runtime.
+    if (USE_MOCK_SECRETS === 'true') {
       // Use mock service for Expo Go or testing
       this.currentService = MemorySecretsService.getInstance();
       logger.debug('Using MemorySecretsService (mock)');
-    } else {
-      // Use real keychain service for production
+    } else if (isElectron()) {
+      this.currentService = ElectronSecretsService.getInstance();
+      logger.debug('Using ElectronSecretsService');
+    } else if (Platform.OS === 'ios' || Platform.OS === 'android') {
       this.currentService = KeychainSecretsService.getInstance();
       logger.debug('Using KeychainSecretsService');
+    } else {
+      this.currentService = BrowserSecretsService.getInstance();
+      logger.debug('Using BrowserSecretsService');
     }
   }
 

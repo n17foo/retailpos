@@ -28,7 +28,8 @@
     "logIn": "Iniciar sesión",
     "loggingIn": "Iniciando sesión...",
     "validationError": "Error de validación",
-    "failure": "Fallo"
+    "failure": "Fallo",
+    "accessDenied": "No tienes permiso para acceder a esta pantalla."
   },
   "welcome": {
     "title": "Bienvenido a RetailPOS",

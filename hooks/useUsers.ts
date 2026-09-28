@@ -2,6 +2,10 @@ import { useState, useCallback, useEffect } from 'react';
 import { userRepository, User, UserRole, CreateUserInput } from '../repositories/UserRepository';
 import { useLogger } from './useLogger';
 import { validatePinFormat } from '../utils/userPin.utils';
+import { useAuthContext } from '../contexts/AuthProvider';
+import { permissionService } from '../services/permissions/PermissionService';
+
+type UserManagementAction = 'user:create' | 'user:edit' | 'user:delete';
 
 interface UseUsersReturn {
   users: User[];
@@ -24,6 +28,24 @@ export const useUsers = (): UseUsersReturn => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const logger = useLogger('useUsers');
+  const { user: actor } = useAuthContext();
+
+  /**
+   * Enforce user-management permissions at the data boundary, not only in
+   * navigation. The single unauthenticated exception is onboarding creating
+   * the first admin when no active admin exists yet.
+   */
+  const authorize = useCallback(
+    async (action: UserManagementAction): Promise<void> => {
+      if (actor?.id) {
+        if (await permissionService.can(actor.id, action)) return;
+      } else if (action === 'user:create' && !(await userRepository.hasAdminUser())) {
+        return;
+      }
+      throw new Error('You do not have permission to manage users');
+    },
+    [actor?.id]
+  );
 
   const loadUsers = useCallback(async () => {
     setIsLoading(true);
@@ -44,6 +66,11 @@ export const useUsers = (): UseUsersReturn => {
       setIsLoading(true);
       setError(null);
       try {
+        await authorize('user:create');
+        if (!actor?.id && input.role !== 'admin') {
+          throw new Error('The first account must be an admin');
+        }
+
         // Check PIN uniqueness
         const isUnique = await userRepository.isPinUnique(input.pin);
         if (!isUnique) {
@@ -61,7 +88,7 @@ export const useUsers = (): UseUsersReturn => {
         setIsLoading(false);
       }
     },
-    [loadUsers]
+    [loadUsers, authorize, actor?.id]
   );
 
   const updateUser = useCallback(
@@ -69,7 +96,9 @@ export const useUsers = (): UseUsersReturn => {
       setIsLoading(true);
       setError(null);
       try {
+        await authorize('user:edit');
         await userRepository.update(id, data);
+        permissionService.invalidateCache(id);
         await loadUsers();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to update user');
@@ -78,7 +107,7 @@ export const useUsers = (): UseUsersReturn => {
         setIsLoading(false);
       }
     },
-    [loadUsers]
+    [loadUsers, authorize]
   );
 
   const updatePin = useCallback(
@@ -86,6 +115,8 @@ export const useUsers = (): UseUsersReturn => {
       setIsLoading(true);
       setError(null);
       try {
+        await authorize('user:edit');
+
         // Validate PIN format
         const pinValidation = validatePinFormat(newPin);
         if (!pinValidation.isValid) {
@@ -108,7 +139,7 @@ export const useUsers = (): UseUsersReturn => {
         setIsLoading(false);
       }
     },
-    [loadUsers]
+    [loadUsers, authorize]
   );
 
   const deleteUser = useCallback(
@@ -116,7 +147,9 @@ export const useUsers = (): UseUsersReturn => {
       setIsLoading(true);
       setError(null);
       try {
+        await authorize('user:delete');
         await userRepository.delete(id);
+        permissionService.invalidateCache(id);
         await loadUsers();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to delete user');
@@ -125,7 +158,7 @@ export const useUsers = (): UseUsersReturn => {
         setIsLoading(false);
       }
     },
-    [loadUsers]
+    [loadUsers, authorize]
   );
 
   const deactivateUser = useCallback(
@@ -133,7 +166,9 @@ export const useUsers = (): UseUsersReturn => {
       setIsLoading(true);
       setError(null);
       try {
+        await authorize('user:edit');
         await userRepository.deactivate(id);
+        permissionService.invalidateCache(id);
         await loadUsers();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to deactivate user');
@@ -142,7 +177,7 @@ export const useUsers = (): UseUsersReturn => {
         setIsLoading(false);
       }
     },
-    [loadUsers]
+    [loadUsers, authorize]
   );
 
   const activateUser = useCallback(
@@ -150,7 +185,9 @@ export const useUsers = (): UseUsersReturn => {
       setIsLoading(true);
       setError(null);
       try {
+        await authorize('user:edit');
         await userRepository.activate(id);
+        permissionService.invalidateCache(id);
         await loadUsers();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to activate user');
@@ -159,7 +196,7 @@ export const useUsers = (): UseUsersReturn => {
         setIsLoading(false);
       }
     },
-    [loadUsers]
+    [loadUsers, authorize]
   );
 
   const validatePin = useCallback(

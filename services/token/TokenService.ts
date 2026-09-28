@@ -12,10 +12,11 @@ export class TokenService implements TokenServiceInterface {
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
   private tokenProviders: Map<string, TokenProviderFunction> = new Map();
   private tokenRefreshPromises: Map<string, Promise<string | null>> = new Map();
+  private tokenCache: Map<string, TokenInfo> = new Map();
 
   private constructor() {
     this.logger = LoggerFactory.getInstance().createLogger('TokenService');
-    this.logger.info('TokenService initialized with SQLite storage');
+    this.logger.info('TokenService initialized with platform secure storage');
   }
 
   /**
@@ -40,14 +41,20 @@ export class TokenService implements TokenServiceInterface {
       };
       const serialized = JSON.stringify(tokenInfo);
 
-      // Prefer the OS keychain/keystore; fall back to the SQLite KV store on
-      // platforms where secure storage is unavailable (web, desktop).
-      const stored = await secretsServiceFactory.getService().storeSecret(key, serialized);
+      const secrets = secretsServiceFactory.getService();
+      const stored = (await secrets.isAvailable()) && (await secrets.storeSecret(key, serialized));
       if (stored) {
+        this.tokenCache.set(key, tokenInfo);
         // Remove any stale plaintext copy left in the KV store
         await keyValueRepository.removeItem(key);
-      } else {
+      } else if (secrets.allowsPlaintextFallback()) {
+        await secrets.deleteSecret(key);
         await keyValueRepository.setItem(key, serialized);
+        this.tokenCache.set(key, tokenInfo);
+        this.logger.warn(`Secure storage unavailable; token for ${platform} (${tokenType}) used the explicit plaintext fallback`);
+      } else {
+        this.logger.error({ message: `Secure storage unavailable; refusing to persist token for ${platform} (${tokenType})` });
+        return false;
       }
 
       this.logger.info(`Token stored for platform: ${platform}, type: ${tokenType}`);
@@ -95,8 +102,7 @@ export class TokenService implements TokenServiceInterface {
         }
       }
 
-      // If no provider or provider failed, return existing token even if expired
-      return tokenInfo?.token || null;
+      return tokenInfo?.token && (!tokenInfo.expiresAt || tokenInfo.expiresAt > Date.now()) ? tokenInfo.token : null;
     } catch (error) {
       this.logger.error({ message: `Error retrieving token for ${platform}` }, error instanceof Error ? error : new Error(String(error)));
       return null;
@@ -140,6 +146,7 @@ export class TokenService implements TokenServiceInterface {
       for (const key of keys) {
         await secrets.deleteSecret(key);
         await keyValueRepository.removeItem(key);
+        this.tokenCache.delete(key);
       }
 
       this.logger.info(`All tokens cleared for platform: ${platform}`);
@@ -157,6 +164,7 @@ export class TokenService implements TokenServiceInterface {
 
       await secretsServiceFactory.getService().deleteSecret(key);
       await keyValueRepository.removeItem(key);
+      this.tokenCache.delete(key);
 
       this.logger.info(`Token cleared for platform: ${platform}, type: ${tokenType}`);
     } catch (error) {
@@ -177,23 +185,43 @@ export class TokenService implements TokenServiceInterface {
    */
   private async getTokenFromStorage(platform: string, tokenType: TokenType): Promise<TokenInfo | null> {
     const key = this.getStorageKey(platform, tokenType);
+    const cached = this.tokenCache.get(key);
+    if (cached) {
+      return cached;
+    }
     try {
-      // Keychain first
-      const secured = await secretsServiceFactory.getService().getSecret(key);
-      if (secured) {
-        return JSON.parse(secured) as TokenInfo;
-      }
-
-      // Fall back to the legacy plaintext KV location, then migrate it into
-      // the keychain so the plaintext copy is not left behind.
-      const legacy = await keyValueRepository.getObject<TokenInfo>(key);
-      if (legacy) {
-        const migrated = await secretsServiceFactory.getService().storeSecret(key, JSON.stringify(legacy));
-        if (migrated) {
-          await keyValueRepository.removeItem(key);
-          this.logger.info(`Migrated token for ${platform} (${tokenType}) into secure storage`);
+      const secrets = secretsServiceFactory.getService();
+      const secureAvailable = await secrets.isAvailable();
+      if (secureAvailable) {
+        const secured = await secrets.getSecret(key);
+        if (secured) {
+          const parsed = JSON.parse(secured) as TokenInfo;
+          this.tokenCache.set(key, parsed);
+          return parsed;
         }
       }
+
+      // Read the legacy plaintext KV location only to migrate it into secure
+      // storage, or when this runtime explicitly permits that fallback.
+      const legacy = await keyValueRepository.getObject<TokenInfo>(key);
+      if (!legacy) return null;
+
+      if (secureAvailable && (await secrets.storeSecret(key, JSON.stringify(legacy)))) {
+        await keyValueRepository.removeItem(key);
+        this.tokenCache.set(key, legacy);
+        this.logger.info(`Migrated token for ${platform} (${tokenType}) into secure storage`);
+        return legacy;
+      }
+
+      if (!secrets.allowsPlaintextFallback()) {
+        this.logger.error({
+          message: `Refusing to read plaintext token for ${platform} (${tokenType}) on a platform without secure storage`,
+        });
+        await keyValueRepository.removeItem(key);
+        return null;
+      }
+
+      this.tokenCache.set(key, legacy);
       return legacy;
     } catch (error) {
       this.logger.error(

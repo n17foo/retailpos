@@ -91,12 +91,18 @@ export class ShopifyApiClient extends BaseApiClient<ShopifyConfig> {
 
   // ── BaseApiClient contract ─────────────────────────────────────────
 
-  protected getAuthStrategy(): AuthStrategy {
-    if (!this.accessToken) return { type: 'none' };
-    return {
-      type: 'header',
-      headers: { 'X-Shopify-Access-Token': this.accessToken },
-    };
+  protected async getAuthStrategy(): Promise<AuthStrategy> {
+    // Resolve the current token on every request so refreshed tokens
+    // propagate without re-initialising the client.
+    const token = (await getPlatformToken(ECommercePlatform.SHOPIFY, TokenType.ACCESS)) || this.accessToken;
+    if (token) {
+      this.accessToken = token;
+      return {
+        type: 'header',
+        headers: { 'X-Shopify-Access-Token': token },
+      };
+    }
+    return { type: 'none' };
   }
 
   protected buildApiUrl(path: string): string {

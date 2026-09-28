@@ -152,3 +152,21 @@ describe('POSConfigService', () => {
     });
   });
 });
+
+describe('AUTO_LOCK_TIMEOUT_MS', () => {
+  it('defaults to five minutes and honours an explicit value, including 0 to disable', async () => {
+    const { AUTO_LOCK_TIMEOUT_MS, DEFAULT_AUTO_LOCK_MINUTES, posConfig } = await import('./POSConfigService');
+    const values = posConfig.values as { autoLockMinutes?: number };
+
+    delete values.autoLockMinutes;
+    expect(DEFAULT_AUTO_LOCK_MINUTES).toBe(5);
+    expect(AUTO_LOCK_TIMEOUT_MS()).toBe(5 * 60_000);
+
+    values.autoLockMinutes = 0;
+    expect(AUTO_LOCK_TIMEOUT_MS()).toBe(0);
+
+    values.autoLockMinutes = -3;
+    expect(AUTO_LOCK_TIMEOUT_MS()).toBe(5 * 60_000);
+    delete values.autoLockMinutes;
+  });
+});

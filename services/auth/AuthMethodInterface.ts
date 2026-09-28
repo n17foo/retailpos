@@ -128,12 +128,11 @@ export const AUTH_METHOD_INFO: Record<AuthMethodType, AuthMethodInfo> = {
   platform_auth: {
     type: 'platform_auth',
     label: 'Platform Login',
-    description:
-      'Authenticate using your e-commerce platform credentials (e.g. Shopify, WooCommerce). Requires an active internet connection.',
+    description: 'Unavailable until a platform integration can verify a per-user staff identity.',
     icon: '🌐',
     requiresHardware: false,
-    requiresPlatformSupport: false,
-    supportedModes: ['online'],
+    requiresPlatformSupport: true,
+    supportedModes: [],
   },
 };
 

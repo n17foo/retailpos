@@ -4,6 +4,7 @@
  */
 
 export const USE_MOCK_SECRETS = 'true';
+export const ALLOW_PLAINTEXT_SECRET_FALLBACK = 'false';
 export const SHOPIFY_STORE_URL = 'test-store.myshopify.com';
 export const SHOPIFY_ACCESS_TOKEN = 'test-token';
 export const WOOCOMMERCE_STORE_URL = 'https://test-store.com';
@@ -26,6 +27,7 @@ export const WIX_STORE_URL = 'wix-store-url';
 
 export default {
   USE_MOCK_SECRETS,
+  ALLOW_PLAINTEXT_SECRET_FALLBACK,
   SHOPIFY_STORE_URL,
   SHOPIFY_ACCESS_TOKEN,
   WOOCOMMERCE_STORE_URL,

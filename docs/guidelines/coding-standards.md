@@ -42,7 +42,7 @@ const user: any = { ... };
 | Constants    | SCREAMING_SNAKE_CASE      | `DEFAULT_PAGE_SIZE`         |
 | Functions    | camelCase                 | `fetchProducts`             |
 
-**Never prefix interfaces with `I`**. Interface is plain noun (`OrderRepository`); SQLite class is `Offline[Entity]Repository`; HTTP class is `LocalApi[Entity]Repository`.
+**Never prefix interfaces with `I`**. Interface is plain noun (`OrderRepository`); SQLite class is `Offline[Entity]Repository`; HTTP class is `InstoreApi[Entity]Repository`.
 
 ---
 
@@ -152,7 +152,7 @@ const bad = 9.99 * 3; // 29.970000000000002
 3. Export class `Offline[Entity]Repository implements [Entity]Repository`
 4. Export singleton `export const [entity]Repository = new Offline[Entity]Repository()`
 5. Export factory `export function get[Entity]Repository(): [Entity]Repository`
-6. If multi-register: create `LocalApi[Entity]Repository`
+6. If multi-register: create `InstoreApi[Entity]Repository`
 
 ### Add Platform
 

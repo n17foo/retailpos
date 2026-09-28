@@ -4,7 +4,7 @@ import { RefundData, RefundResult, RefundRecord } from '../RefundService';
  * Parsed platform API credentials retrieved from the secrets store
  */
 export interface PlatformCredentials {
-  apiUrl: string;
+  apiUrl?: string;
   apiKey?: string;
   apiSecret?: string;
   accessToken?: string;

@@ -4,6 +4,7 @@ import { keyValueRepository } from '../repositories/KeyValueRepository';
 import { useLogger } from '../hooks/useLogger';
 import { ECommercePlatform, DEFAULT_PLATFORM } from '../utils/platforms';
 import { ServiceConfigBridge } from '../services/config/ServiceConfigBridge';
+import { EcommerceSettingsStorage } from '../services/config/EcommerceSettingsStorage';
 
 export interface ECommerceSettings {
   enabled: boolean;
@@ -159,7 +160,7 @@ export const useEcommerceSettings = () => {
     try {
       setIsLoading(true);
       logger.info({ message: 'Loading e-commerce settings' });
-      const settings = await keyValueRepository.getObject<ECommerceSettings>('ecommerceSettings');
+      const settings = await EcommerceSettingsStorage.load<ECommerceSettings>();
       if (settings) {
         setEcommerceSettings(settings);
         originalSettings.current = { ...settings };
@@ -225,7 +226,7 @@ export const useEcommerceSettings = () => {
       logger.info({ message: 'Testing e-commerce connection', platform: ecommerceSettings.platform });
 
       // First save the current settings so they're available to the bridge
-      await keyValueRepository.setObject<ECommerceSettings>('ecommerceSettings', ecommerceSettings);
+      await EcommerceSettingsStorage.save(ecommerceSettings);
 
       // Configure services from storage
       const configBridge = ServiceConfigBridge.getInstance();
@@ -256,7 +257,7 @@ export const useEcommerceSettings = () => {
   const saveSettings = useCallback(async () => {
     try {
       logger.info({ message: 'Saving e-commerce settings' });
-      await keyValueRepository.setObject<ECommerceSettings>('ecommerceSettings', ecommerceSettings);
+      await EcommerceSettingsStorage.save(ecommerceSettings);
       setHasUnsavedChanges(false);
 
       // Update platform state when saving settings

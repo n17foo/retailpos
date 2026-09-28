@@ -57,13 +57,14 @@ utils/              # money.ts, theme.ts, platforms.ts, platformCapabilities.ts,
 | `auth/`          | Pluggable multi-method auth (PIN, biometric, magstripe, …)                                                         |
 | `basket/`        | BasketService — cart CRUD only                                                                                     |
 | `checkout/`      | CheckoutService — startCheckout, completePayment, order queries                                                    |
-| `config/`        | POSConfigService + ServiceConfigBridge                                                                             |
+| `clients/`       | Shared platform API clients (BaseApiClient + per-platform auth strategies)                                         |
+| `config/`        | POSConfigService + ServiceConfigBridge + EcommerceSettingsStorage + PlatformCredentialsResolver                    |
 | `customer/`      | Customer lookup — 10 platforms + factory                                                                           |
 | `discount/`      | Coupon / discount validation — 10 platforms + factory                                                              |
 | `drawer/`        | CashDrawer peripheral (decoupled from printer)                                                                     |
 | `giftcard/`      | Gift card — 10 platforms + factory                                                                                 |
 | `inventory/`     | Inventory read / write — 10 platforms + factory                                                                    |
-| `localapi/`      | Multi-register LAN API (server / client / discovery / sync / WebSocket / payment orchestration)                    |
+| `instoreapi/`    | Multi-register LAN API (server / client / discovery / sync / WebSocket / payment orchestration)                    |
 | `logger/`        | LoggerFactory + pluggable LogTransport                                                                             |
 | `notifications/` | NotificationService singleton + Toast                                                                              |
 | `order/`         | Order domain — 10 platforms + factory                                                                              |
@@ -75,8 +76,10 @@ utils/              # money.ts, theme.ts, platforms.ts, platformCapabilities.ts,
 | `returns/`       | ReturnService — returns + refunds, 10 platform adapters                                                            |
 | `scanner/`       | Barcode scanning — camera, BT, USB, QR hardware, Electron                                                          |
 | `search/`        | Product search — 10 platforms + factory                                                                            |
+| `secrets/`       | SecretsService — Keychain / Electron safeStorage / Browser / Memory backends                                       |
 | `sync/`          | OrderSyncService + BackgroundSyncService (exponential backoff)                                                     |
 | `tax/`           | TaxProfileService + TaxServiceFactory (strategy pattern)                                                           |
+| `token/`         | TokenService + per-platform providers — platform token acquisition, refresh, login warm-up                         |
 
 ---
 

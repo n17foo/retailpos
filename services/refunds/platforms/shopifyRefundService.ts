@@ -1,8 +1,8 @@
 import { PlatformCredentials } from './PlatformRefundServiceInterface';
 import { BaseRefundService } from './BaseRefundService';
 import { RefundData, RefundResult, RefundRecord } from '../RefundService';
-import { SecretsServiceFactory } from '../../secrets/SecretsService';
-import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
+import { getPlatformCredentials } from '../../config/PlatformCredentialsResolver';
+import { ECommercePlatform } from '../../../utils/platforms';
 import { ShopifyApiClient } from '../../clients/shopify/ShopifyApiClient';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 
@@ -12,14 +12,12 @@ import { LoggerFactory } from '../../logger/LoggerFactory';
  */
 export class ShopifyRefundService extends BaseRefundService {
   private refundHistory: Map<string, RefundRecord[]> = new Map();
-  private secretsService: SecretsServiceInterface;
   private apiClient = ShopifyApiClient.getInstance();
 
   constructor() {
     super();
     // Override the logger with a more specific name
     this.logger = LoggerFactory.getInstance().createLogger('ShopifyRefundService');
-    this.secretsService = SecretsServiceFactory.getInstance().getService();
   }
 
   /**
@@ -55,13 +53,13 @@ export class ShopifyRefundService extends BaseRefundService {
    */
   private async getShopifyCredentials(): Promise<PlatformCredentials | null> {
     try {
-      const credentials = await this.secretsService.getSecret('shopify_api_credentials');
+      const credentials = await getPlatformCredentials(ECommercePlatform.SHOPIFY);
       if (!credentials) {
-        this.logger.error({ message: 'Shopify API credentials not found in secrets store' });
+        this.logger.error({ message: 'Shopify API credentials not configured' });
         return null;
       }
 
-      return JSON.parse(credentials);
+      return credentials;
     } catch (error) {
       this.logger.error({ message: 'Error retrieving Shopify credentials' }, error instanceof Error ? error : new Error(String(error)));
       return null;

@@ -233,6 +233,8 @@ Legend:
 
 **6.3** When `getReturnableItems(orderId)` is called, the system shall load all `order_items` for the order and subtract already-completed or approved return quantities per item, returning only items with `returnableQuantity > 0` — this prevents over-returning.
 
+**6.4** When a return is processed — via `ReturnService.processReturn` or the LAN `POST /api/returns` route — `validateReturnRequest` shall enforce: the order is `paid`/`synced`, every item belongs to the order, quantities are positive integers not exceeding the remaining returnable quantity per line (counting earlier completed/approved returns), refund amounts are finite and non-negative, and the cumulative refund never exceeds the order total (integer-cent comparison).
+
 ---
 
 ## 7. Component Traceability
@@ -254,6 +256,8 @@ Legend:
 | `Return Processed` notification                                   | `RefundService.processReturn` → `notificationService.notify`    | `services/refunds/RefundService.ts`                            |
 | Refund history query                                              | `RefundService.getRefundHistory`                                | `services/refunds/RefundService.ts`                            |
 | Returnable items calculation (over-return guard)                  | `RefundService.getReturnableItems`                              | `services/refunds/RefundService.ts`                            |
+| Return integrity validation (quantity/refund caps)                | `validateReturnRequest`                                         | `services/refunds/returnValidation.ts`                         |
+| LAN return route applies the same validation                      | `POST /api/returns`                                             | `services/instoreapi/InstoreApiServer.ts`                      |
 | `PlatformRefundServiceInterface` contract                         | `PlatformRefundServiceInterface`                                | `services/refunds/platforms/PlatformRefundServiceInterface.ts` |
 | Shopify refund via `orders/{id}/refunds.json`                     | `ShopifyRefundService.processRefund`                            | `services/refunds/platforms/shopifyRefundService.ts`           |
 | Offline refund persisted to `keyValueRepository`                  | `OfflineRefundService.processRefund`                            | `services/refunds/platforms/OfflineRefundService.ts`           |

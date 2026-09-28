@@ -37,7 +37,7 @@ export const Linking = {
 
 export const AppState = {
   currentState: 'active',
-  addEventListener: jest.fn(),
+  addEventListener: jest.fn(() => ({ remove: jest.fn() })),
   removeEventListener: jest.fn(),
 };
 

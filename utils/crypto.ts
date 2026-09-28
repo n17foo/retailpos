@@ -198,7 +198,7 @@ export function hashPin(pin: string): string {
 }
 
 export function isHashedPin(stored: string): boolean {
-  return stored.startsWith(`${PIN_HASH_PREFIX}$`);
+  return /^v1\$[0-9a-f]{32}\$[0-9a-f]{64}$/.test(stored);
 }
 
 /**
@@ -209,7 +209,7 @@ export function isHashedPin(stored: string): boolean {
 export function verifyPin(pin: string, stored: string): boolean {
   if (!stored) return false;
   if (!isHashedPin(stored)) {
-    return timingSafeEqual(pin, stored);
+    return stored.startsWith(`${PIN_HASH_PREFIX}$`) ? false : timingSafeEqual(pin, stored);
   }
   const [, salt, expected] = stored.split('$');
   if (!salt || !expected) return false;

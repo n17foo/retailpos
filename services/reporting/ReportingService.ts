@@ -1,5 +1,6 @@
 import { orderRepository } from '../../repositories/OrderRepository';
 import { LoggerFactory } from '../logger/LoggerFactory';
+import { toCsv } from '../../utils/csv';
 
 export interface SalesSummary {
   totalOrders: number;
@@ -186,24 +187,21 @@ export class ReportingService {
   async exportOrdersCsv(from: number, to: number): Promise<string> {
     const orders = await orderRepository.findByDateRange(from, to);
 
-    const header = 'Order ID,Date,Status,Subtotal,Tax,Discount,Total,Payment Method,Cashier,Sync Status\n';
-    const rows = orders.map(o => {
-      const date = new Date(o.created_at).toISOString();
-      return [
-        o.id,
-        date,
-        o.status,
-        o.subtotal.toFixed(2),
-        o.tax.toFixed(2),
-        (o.discount_amount || 0).toFixed(2),
-        o.total.toFixed(2),
-        o.payment_method || '',
-        o.cashier_name || '',
-        o.sync_status,
-      ].join(',');
-    });
+    const header = ['Order ID', 'Date', 'Status', 'Subtotal', 'Tax', 'Discount', 'Total', 'Payment Method', 'Cashier', 'Sync Status'];
+    const rows = orders.map(o => [
+      o.id,
+      new Date(o.created_at).toISOString(),
+      o.status,
+      o.subtotal.toFixed(2),
+      o.tax.toFixed(2),
+      (o.discount_amount || 0).toFixed(2),
+      o.total.toFixed(2),
+      o.payment_method || '',
+      o.cashier_name || '',
+      o.sync_status,
+    ]);
 
-    return header + rows.join('\n');
+    return toCsv(header, rows);
   }
 }
 

@@ -10,6 +10,9 @@ import { instoreApiConfig } from './InstoreApiConfig';
 import { instoreApiServer } from './InstoreApiServer';
 import { LoggerFactory } from '../logger/LoggerFactory';
 
+const MAX_REQUEST_BODY_LENGTH = 1024 * 1024;
+const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE'] as const;
+
 // Import react-native-http-bridge only on native platforms
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let httpBridge: any = null;
@@ -113,18 +116,33 @@ export class InstoreApiTransport {
     try {
       const { requestId, method, url, headers, data } = request;
 
-      // Parse URL and extract path
+      // Parse URL and extract path. The query string stays part of the path
+      // because it is covered by the request signature.
       const urlObj = new URL(url, 'http://localhost');
-      const path = urlObj.pathname;
+      const path = urlObj.pathname + urlObj.search;
+      const rawBody = typeof data === 'string' ? data : '';
+
+      if (!HTTP_METHODS.includes(method)) {
+        httpBridge.respond(requestId, 405, 'application/json', JSON.stringify({ error: 'Method not allowed' }));
+        return;
+      }
+      if (typeof data === 'string' && data.length > MAX_REQUEST_BODY_LENGTH) {
+        httpBridge.respond(requestId, 413, 'application/json', JSON.stringify({ error: 'Request body too large' }));
+        return;
+      }
 
       // Parse request body
       let body: unknown = undefined;
       if (data && method !== 'GET') {
-        try {
-          body = JSON.parse(data);
-        } catch {
-          // If JSON parsing fails, use raw data
+        if (path === '/api/webhooks/commercefull') {
           body = data;
+        } else {
+          try {
+            body = JSON.parse(data);
+          } catch {
+            httpBridge.respond(requestId, 400, 'application/json', JSON.stringify({ error: 'Invalid JSON body' }));
+            return;
+          }
         }
       }
 
@@ -139,9 +157,10 @@ export class InstoreApiTransport {
         }
       }
 
-      // Call the server logic
+      // Call the server logic — rawBody is passed so signature verification
+      // covers the exact bytes on the wire, not a re-serialized object.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response = await instoreApiServer.handleRequest(method as any, path, body, headers);
+      const response = await instoreApiServer.handleRequest(method as any, path, body, headers, rawBody);
 
       // Send response back through the bridge
       httpBridge.respond(requestId, response.status, 'application/json', JSON.stringify(response.body));

@@ -3,6 +3,7 @@ import { instoreApiConfig } from '../../instoreapi/InstoreApiConfig';
 import { instoreApiClient } from '../../clients/instoreapi/InstoreApiClient';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
 import { AuthAttemptLimiter } from '../AuthAttemptLimiter';
+import { validatePinFormat } from '../../../utils/userPin.utils';
 
 /**
  * PIN-based authentication provider.
@@ -16,7 +17,7 @@ export class PinAuthProvider implements AuthMethodProvider {
   readonly type = 'pin' as const;
   readonly info: AuthMethodInfo = AUTH_METHOD_INFO.pin;
 
-  // Brute-force protection: lock after 5 consecutive failures (30s → 15min cap)
+  // Brute-force protection: lock after 5 recent failures (30s → 15min cap)
   private limiter = new AuthAttemptLimiter();
 
   async isAvailable(): Promise<boolean> {
@@ -32,6 +33,10 @@ export class PinAuthProvider implements AuthMethodProvider {
     const remainingMs = this.limiter.getLockoutRemainingMs();
     if (remainingMs > 0) {
       return { success: false, error: `Too many failed attempts. Try again in ${Math.ceil(remainingMs / 1000)}s.` };
+    }
+    if (!validatePinFormat(credential).isValid) {
+      this.limiter.recordResult(false);
+      return { success: false, error: 'Invalid PIN. Please try again.' };
     }
 
     try {
@@ -64,20 +69,12 @@ export class PinAuthProvider implements AuthMethodProvider {
 
   async isEnrolled(userId: string): Promise<boolean> {
     const user = await userRepository.findById(userId);
-    return user !== null && !!user.pin;
+    return user !== null;
   }
 
   // ── Private ─────────────────────────────────────────────────────────
 
   private async authenticateLocally(credential: string): Promise<AuthResult> {
-    // Check if there are any users in the system
-    const hasUsers = await userRepository.hasAdminUser();
-
-    if (!hasUsers) {
-      // No users exist — allow any PIN for initial setup
-      return { success: true };
-    }
-
     const user = await userRepository.findByPin(credential);
     if (user) {
       return { success: true, user };
@@ -95,7 +92,6 @@ export class PinAuthProvider implements AuthMethodProvider {
           id: user.id,
           name: user.name,
           role: user.role as 'admin' | 'manager' | 'cashier',
-          pin: '', // never store the PIN from the server
           is_active: true,
           created_at: 0,
           updated_at: 0,

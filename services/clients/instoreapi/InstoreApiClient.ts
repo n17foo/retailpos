@@ -1,5 +1,6 @@
 import { instoreApiConfig } from '../../instoreapi/InstoreApiConfig';
 import { LoggerFactory } from '../../logger/LoggerFactory';
+import { SIGNATURE_HEADERS, signRequest } from '../../instoreapi/requestSigning';
 import { OrderRow, CreateOrderInput } from '../../../repositories/OrderRepository';
 import { OrderItemRow, CreateOrderItemInput } from '../../../repositories/OrderItemRepository';
 import { Product } from '../../../repositories/ProductRepository';
@@ -40,10 +41,13 @@ export class InstoreApiClient {
     return this.connected;
   }
 
-  /** Test the connection to the server */
+  /**
+   * Test the connection to the server via the authenticated /api/session
+   * route — /api/health is unauthenticated and cannot detect a wrong secret.
+   */
   async testConnection(): Promise<{ ok: boolean; registerName?: string; error?: string }> {
     try {
-      const result = await this.get<InstoreApiHealthResponse>('/api/health');
+      const result = await this.get<InstoreApiHealthResponse>('/api/session');
       this.connected = result.ok === true;
       return { ok: true, registerName: result.registerName };
     } catch (error) {
@@ -55,9 +59,13 @@ export class InstoreApiClient {
     }
   }
 
-  async probeHealth(baseUrl: string, secret?: string, timeoutMs: number = 2000): Promise<InstoreApiHealthResponse | null> {
+  /**
+   * Probe a server's health endpoint during discovery. Unauthenticated by
+   * design — the secret must not be sent to every address on the subnet.
+   */
+  async probeHealth(baseUrl: string, timeoutMs: number = 2000): Promise<InstoreApiHealthResponse | null> {
     try {
-      return await this.getFromBaseUrl<InstoreApiHealthResponse>(baseUrl, '/api/health', undefined, secret, timeoutMs);
+      return await this.getFromBaseUrl<InstoreApiHealthResponse>(baseUrl, '/api/health', undefined, timeoutMs);
     } catch {
       return null;
     }
@@ -237,45 +245,38 @@ export class InstoreApiClient {
   }
 
   // ── Generic HTTP helpers ──────────────────────────────────────────
-
-  private get headers(): Record<string, string> {
-    const h: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-Register-Id': instoreApiConfig.current.registerId,
-    };
-    const secret = instoreApiConfig.current.sharedSecret;
-    if (secret) {
-      h['x-shared-secret'] = secret;
-    }
-    return h;
-  }
+  //
+  // Every request is signed with the shared secret via HMAC — the secret
+  // itself is never transmitted. `pathWithQuery` must be exactly what the
+  // server receives (path plus query string) so the signature verifies.
 
   private get baseUrl(): string {
     return instoreApiConfig.baseUrl;
   }
 
-  private buildHeaders(secretOverride?: string): Record<string, string> {
-    const h: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-Register-Id': instoreApiConfig.current.registerId,
-    };
-    const secret = secretOverride ?? instoreApiConfig.current.sharedSecret;
+  private buildSignedHeaders(method: string, pathWithQuery: string, rawBody: string): Record<string, string> {
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
+    const secret = instoreApiConfig.current.sharedSecret;
     if (secret) {
-      h['x-shared-secret'] = secret;
+      const { timestamp, nonce, signature } = signRequest(secret, method, pathWithQuery, rawBody);
+      h[SIGNATURE_HEADERS.register] = instoreApiConfig.current.registerId;
+      h[SIGNATURE_HEADERS.timestamp] = timestamp;
+      h[SIGNATURE_HEADERS.nonce] = nonce;
+      h[SIGNATURE_HEADERS.signature] = signature;
     }
     return h;
   }
 
   private async get<T>(path: string, queryParams?: Record<string, string>): Promise<T> {
-    let url = `${this.baseUrl}${path}`;
+    let pathWithQuery = path;
     if (queryParams) {
       const qs = new URLSearchParams(queryParams).toString();
-      url += `?${qs}`;
+      pathWithQuery += `?${qs}`;
     }
 
-    const response = await fetch(url, {
+    const response = await fetch(`${this.baseUrl}${pathWithQuery}`, {
       method: 'GET',
-      headers: this.headers,
+      headers: this.buildSignedHeaders('GET', pathWithQuery, ''),
     });
 
     if (!response.ok) {
@@ -286,26 +287,20 @@ export class InstoreApiClient {
     return response.json();
   }
 
-  private async getFromBaseUrl<T>(
-    baseUrl: string,
-    path: string,
-    queryParams?: Record<string, string>,
-    secretOverride?: string,
-    timeoutMs?: number
-  ): Promise<T> {
-    let url = `${baseUrl.replace(/\/$/, '')}${path}`;
+  private async getFromBaseUrl<T>(baseUrl: string, path: string, queryParams?: Record<string, string>, timeoutMs?: number): Promise<T> {
+    let pathWithQuery = path;
     if (queryParams) {
       const qs = new URLSearchParams(queryParams).toString();
-      url += `?${qs}`;
+      pathWithQuery += `?${qs}`;
     }
 
     const controller = timeoutMs ? new AbortController() : undefined;
     const timeout = timeoutMs ? setTimeout(() => controller?.abort(), timeoutMs) : undefined;
 
     try {
-      const response = await fetch(url, {
+      const response = await fetch(`${baseUrl.replace(/\/$/, '')}${pathWithQuery}`, {
         method: 'GET',
-        headers: this.buildHeaders(secretOverride),
+        headers: { 'Content-Type': 'application/json' },
         signal: controller?.signal,
       });
 
@@ -323,10 +318,11 @@ export class InstoreApiClient {
   }
 
   private async post<T>(path: string, body: unknown): Promise<T> {
+    const rawBody = JSON.stringify(body);
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
-      headers: this.headers,
-      body: JSON.stringify(body),
+      headers: this.buildSignedHeaders('POST', path, rawBody),
+      body: rawBody,
     });
 
     if (!response.ok) {
@@ -338,10 +334,11 @@ export class InstoreApiClient {
   }
 
   private async put<T>(path: string, body: unknown): Promise<T> {
+    const rawBody = JSON.stringify(body);
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: 'PUT',
-      headers: this.headers,
-      body: JSON.stringify(body),
+      headers: this.buildSignedHeaders('PUT', path, rawBody),
+      body: rawBody,
     });
 
     if (!response.ok) {
@@ -355,7 +352,7 @@ export class InstoreApiClient {
   private async delete(path: string): Promise<void> {
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: 'DELETE',
-      headers: this.headers,
+      headers: this.buildSignedHeaders('DELETE', path, ''),
     });
 
     if (!response.ok) {

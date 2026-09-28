@@ -3,7 +3,7 @@
 > **System**: RetailPOS – Settings Tab Content
 > **Actor**: Manager, Admin
 > **Date**: 2026-05-09
-> **Source**: `screens/settings/GenericSettingsTab.tsx`, `screens/settings/POSConfigSettingsTab.tsx`, `screens/settings/AuthMethodSettingsTab.tsx`, `screens/settings/PaymentSettingsTab.tsx`, `screens/settings/EcommerceSettingsTab.tsx`, `screens/settings/OfflineManagementTab.tsx`, `screens/settings/LocalApiSettingsTab.tsx`, `screens/settings/PrinterSettingsTab.tsx`, `screens/settings/ScannerSettingsTab.tsx`, `screens/settings/ReceiptSettingsTab.tsx`, `screens/settings/ThemeSettingsTab.tsx`
+> **Source**: `screens/settings/GenericSettingsTab.tsx`, `screens/settings/POSConfigSettingsTab.tsx`, `screens/settings/AuthMethodSettingsTab.tsx`, `screens/settings/PaymentSettingsTab.tsx`, `screens/settings/EcommerceSettingsTab.tsx`, `screens/settings/OfflineManagementTab.tsx`, `screens/settings/InstoreApiSettingsTab.tsx`, `screens/settings/PrinterSettingsTab.tsx`, `screens/settings/ScannerSettingsTab.tsx`, `screens/settings/ReceiptSettingsTab.tsx`, `screens/settings/ThemeSettingsTab.tsx`
 
 ---
 
@@ -217,11 +217,11 @@ Cross-references to other specs:
 
 ---
 
-## Tab 10 — Multi-Register (`LocalApiSettingsTab`)
+## Tab 10 — Multi-Register (`InstoreApiSettingsTab`)
 
 **Purpose**: Configure the local API for multi-register setups. Three modes: standalone (no networking), server (this register hosts the API), client (this register connects to another register's API).
 
-**10.1** When `LocalApiSettingsTab` mounts, the system shall call `localApiConfig.load()` and populate mode, port, shared secret, register name, and server address.
+**10.1** When `InstoreApiSettingsTab` mounts, the system shall call `instoreApiConfig.load()` and populate mode, port, shared secret, register name, and server address.
 
 **10.2** The mode selector shall render three cards: Standalone, Server, Client. The active mode shall render with a primary-colour border.
 
@@ -231,13 +231,13 @@ Cross-references to other specs:
 
 **10.5** When mode is `client`, the system shall additionally show the server address field, a "Test Connection" button, a "Scan Network" button, and the discovered servers list.
 
-**10.6** When the user taps "Test Connection", the system shall call `localApiClient.testConnection()` and update `connectionStatus` to `'connected'` or `'failed'`.
+**10.6** When the user taps "Test Connection", the system shall call `instoreApiClient.testConnection()` and update `connectionStatus` to `'connected'` or `'failed'`.
 
-**10.7** When the user taps "Scan Network", the system shall call `localApiDiscovery.scanSubnet()` with a progress callback, update `scanProgress` (0–100%), and populate `discoveredServers` on completion.
+**10.7** When the user taps "Scan Network", the system shall call `instoreApiDiscovery.scanSubnet()` with a progress callback, update `scanProgress` (0–100%), and populate `discoveredServers` on completion.
 
 **10.8** When the user taps a discovered server, the system shall set `serverAddress` and `port` from the server entry, save the config, switch mode to `client`, and test the connection.
 
-**10.9** When the user taps Save, the system shall call `localApiConfig.save(config)`. If mode is `server`, it shall also call `localApiServer.start()`. If mode is `client` or `standalone`, it shall call `localApiServer.stop()`.
+**10.9** When the user taps Save, the system shall call `instoreApiConfig.save(config)`. If mode is `server`, it shall also call `instoreApiServer.start()`. If mode is `client` or `standalone`, it shall call `instoreApiServer.stop()`.
 
 ---
 
@@ -284,7 +284,7 @@ Cross-references to other specs:
 
 **E.3** `EcommerceSettingsTab` — the API key field maps to different platform-specific fields depending on the selected platform. Switching platforms does not clear previously entered credentials for other platforms.
 
-**E.4** `LocalApiSettingsTab` — if `localApiDiscovery.scanSubnet()` finds no servers, an alert is shown: "No servers found on the local network."
+**E.4** `InstoreApiSettingsTab` — if `instoreApiDiscovery.scanSubnet()` finds no servers, an alert is shown: "No servers found on the local network."
 
 **E.5** `OfflineManagementTab` — the sub-tabs (`ProductManagementTab`, `CategoryManagementTab`, `UsersSettingsTab`) manage their own state independently. Navigating back to the overview does not reset their state.
 
@@ -292,25 +292,25 @@ Cross-references to other specs:
 
 ## Component Traceability
 
-| Tab            | Key action                                            | Source File                                  |
-| -------------- | ----------------------------------------------------- | -------------------------------------------- |
-| General        | `changeLanguage(code)`                                | `screens/settings/GenericSettingsTab.tsx`    |
-| POS Config     | `posConfig.updateAll(values)`                         | `screens/settings/POSConfigSettingsTab.tsx`  |
-| POS Config     | Tax rate validation (0–100)                           | `screens/settings/POSConfigSettingsTab.tsx`  |
-| Auth           | `authConfig.setAllowedMethods` + `setPrimaryMethod`   | `screens/settings/AuthMethodSettingsTab.tsx` |
-| Auth           | `setHardwareAvailable` on magstripe/RFID              | `screens/settings/AuthMethodSettingsTab.tsx` |
-| Payment        | `saveSettings(paymentSettings)`                       | `screens/settings/PaymentSettingsTab.tsx`    |
-| Payment        | `testConnection(provider)`                            | `screens/settings/PaymentSettingsTab.tsx`    |
-| E-commerce     | `saveChanges()` → `ServiceConfigBridge`               | `screens/settings/EcommerceSettingsTab.tsx`  |
-| E-commerce     | `testEcommerceConnection()`                           | `screens/settings/EcommerceSettingsTab.tsx`  |
-| E-commerce     | `CapabilitySummaryPanel` reads `platformCapabilities` | `screens/settings/EcommerceSettingsTab.tsx`  |
-| Offline        | Sub-navigator: products / categories / users          | `screens/settings/OfflineManagementTab.tsx`  |
-| Receipt        | `receiptConfigService.updateConfig`                   | `screens/settings/ReceiptSettingsTab.tsx`    |
-| Printer        | `printerService.connectToPrinter` / `testConnection`  | `screens/settings/PrinterSettingsTab.tsx`    |
-| Scanner        | `saveSettings` to `keyValueRepository`                | `screens/settings/ScannerSettingsTab.tsx`    |
-| Multi-Register | `localApiConfig.save` + `localApiServer.start/stop`   | `screens/settings/LocalApiSettingsTab.tsx`   |
-| Multi-Register | `localApiDiscovery.scanSubnet` with progress          | `screens/settings/LocalApiSettingsTab.tsx`   |
-| Multi-Register | `localApiClient.testConnection`                       | `screens/settings/LocalApiSettingsTab.tsx`   |
-| Theme          | `useTheme().setTheme(id)` → persists to `app.theme`   | `screens/settings/ThemeSettingsTab.tsx`      |
-| Theme          | `ThemeProvider` context re-renders entire UI          | `contexts/ThemeProvider.tsx`                 |
-| Theme          | Preset registry + `ThemeColors` type                  | `utils/themes.ts`                            |
+| Tab            | Key action                                              | Source File                                  |
+| -------------- | ------------------------------------------------------- | -------------------------------------------- |
+| General        | `changeLanguage(code)`                                  | `screens/settings/GenericSettingsTab.tsx`    |
+| POS Config     | `posConfig.updateAll(values)`                           | `screens/settings/POSConfigSettingsTab.tsx`  |
+| POS Config     | Tax rate validation (0–100)                             | `screens/settings/POSConfigSettingsTab.tsx`  |
+| Auth           | `authConfig.setAllowedMethods` + `setPrimaryMethod`     | `screens/settings/AuthMethodSettingsTab.tsx` |
+| Auth           | `setHardwareAvailable` on magstripe/RFID                | `screens/settings/AuthMethodSettingsTab.tsx` |
+| Payment        | `saveSettings(paymentSettings)`                         | `screens/settings/PaymentSettingsTab.tsx`    |
+| Payment        | `testConnection(provider)`                              | `screens/settings/PaymentSettingsTab.tsx`    |
+| E-commerce     | `saveChanges()` → `ServiceConfigBridge`                 | `screens/settings/EcommerceSettingsTab.tsx`  |
+| E-commerce     | `testEcommerceConnection()`                             | `screens/settings/EcommerceSettingsTab.tsx`  |
+| E-commerce     | `CapabilitySummaryPanel` reads `platformCapabilities`   | `screens/settings/EcommerceSettingsTab.tsx`  |
+| Offline        | Sub-navigator: products / categories / users            | `screens/settings/OfflineManagementTab.tsx`  |
+| Receipt        | `receiptConfigService.updateConfig`                     | `screens/settings/ReceiptSettingsTab.tsx`    |
+| Printer        | `printerService.connectToPrinter` / `testConnection`    | `screens/settings/PrinterSettingsTab.tsx`    |
+| Scanner        | `saveSettings` to `keyValueRepository`                  | `screens/settings/ScannerSettingsTab.tsx`    |
+| Multi-Register | `instoreApiConfig.save` + `instoreApiServer.start/stop` | `screens/settings/InstoreApiSettingsTab.tsx` |
+| Multi-Register | `instoreApiDiscovery.scanSubnet` with progress          | `screens/settings/InstoreApiSettingsTab.tsx` |
+| Multi-Register | `instoreApiClient.testConnection`                       | `screens/settings/InstoreApiSettingsTab.tsx` |
+| Theme          | `useTheme().setTheme(id)` → persists to `app.theme`     | `screens/settings/ThemeSettingsTab.tsx`      |
+| Theme          | `ThemeProvider` context re-renders entire UI            | `contexts/ThemeProvider.tsx`                 |
+| Theme          | Preset registry + `ThemeColors` type                    | `utils/themes.ts`                            |

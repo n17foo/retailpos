@@ -85,6 +85,7 @@ const PermissionSetsScreen: React.FC = () => {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          if (!(await canManageSets())) return;
           await permissionRepository.deleteSet(set.id);
           permissionService.invalidateAll();
           await auditLogService.log('permission_set:deleted', {
@@ -98,8 +99,15 @@ const PermissionSetsScreen: React.FC = () => {
     ]);
   };
 
+  const canManageSets = async (): Promise<boolean> => {
+    if (user?.id && (await permissionService.can(user.id, 'user:edit'))) return true;
+    Alert.alert('Permission Sets', 'Only administrators can manage permission sets.');
+    return false;
+  };
+
   const handleSave = async () => {
     if (!editName.trim()) return;
+    if (!(await canManageSets())) return;
     setSaving(true);
     try {
       let setId: string;

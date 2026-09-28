@@ -1,8 +1,8 @@
 import { PlatformRefundServiceInterface, PlatformCredentials } from './PlatformRefundServiceInterface';
 import { RefundData, RefundResult, RefundRecord } from '../RefundService';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { SecretsServiceFactory } from '../../secrets/SecretsService';
-import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
+import { getPlatformCredentials } from '../../config/PlatformCredentialsResolver';
+import { ECommercePlatform } from '../../../utils/platforms';
 import { SyliusApiClient } from '../../clients/sylius/SyliusApiClient';
 
 interface SyliusRefundResponse {
@@ -19,11 +19,9 @@ export class SyliusRefundService implements PlatformRefundServiceInterface {
   private initialized: boolean = false;
   private refundHistory: Map<string, RefundRecord[]> = new Map();
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
-  private secretsService: SecretsServiceInterface;
 
   constructor() {
     this.logger = LoggerFactory.getInstance().createLogger('SyliusRefundService');
-    this.secretsService = SecretsServiceFactory.getInstance().getService();
   }
 
   /**
@@ -56,13 +54,13 @@ export class SyliusRefundService implements PlatformRefundServiceInterface {
    */
   private async getSyliusCredentials(): Promise<PlatformCredentials | null> {
     try {
-      const credentials = await this.secretsService.getSecret('sylius_api_credentials');
+      const credentials = await getPlatformCredentials(ECommercePlatform.SYLIUS);
       if (!credentials) {
-        this.logger.error({ message: 'Sylius API credentials not found in secrets store' });
+        this.logger.error({ message: 'Sylius API credentials not configured' });
         return null;
       }
 
-      return JSON.parse(credentials);
+      return credentials;
     } catch (error) {
       this.logger.error({ message: 'Error retrieving Sylius credentials' }, error instanceof Error ? error : new Error(String(error)));
       return null;

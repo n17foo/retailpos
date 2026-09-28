@@ -22,8 +22,13 @@ export class PermissionService {
   private static instance: PermissionService;
   private logger = LoggerFactory.getInstance().createLogger('PermissionService');
 
-  /** In-memory cache: userId → Map<actionKey, boolean> */
-  private cache = new Map<string, Map<string, boolean>>();
+  /**
+   * In-memory cache: userId → Map<actionKey, decision>. Entries expire so role
+   * changes or deactivations made elsewhere (e.g. on the server register)
+   * take effect without an app restart.
+   */
+  private cache = new Map<string, Map<string, { allowed: boolean; expiresAt: number }>>();
+  private static readonly CACHE_TTL_MS = 60_000;
 
   private constructor() {}
 
@@ -41,8 +46,9 @@ export class PermissionService {
   async can(userId: string, action: string): Promise<boolean> {
     try {
       // Check cache first
+      const now = Date.now();
       const cached = this.cache.get(userId)?.get(action);
-      if (cached !== undefined) return cached;
+      if (cached && cached.expiresAt > now) return cached.allowed;
 
       const result = await this.resolve(userId, action);
 
@@ -50,7 +56,7 @@ export class PermissionService {
       if (!this.cache.has(userId)) {
         this.cache.set(userId, new Map());
       }
-      this.cache.get(userId)!.set(action, result);
+      this.cache.get(userId)!.set(action, { allowed: result, expiresAt: now + PermissionService.CACHE_TTL_MS });
 
       return result;
     } catch (err) {
@@ -90,26 +96,24 @@ export class PermissionService {
   private async resolve(userId: string, action: string): Promise<boolean> {
     // 1. Load user role
     const user = await userRepository.findById(userId);
-    if (!user) return false;
+    // Deactivated staff retain no privileges, including admins.
+    if (!user || !user.is_active) return false;
 
     // 2. Admin bypass
     if (user.role === 'admin') return true;
 
-    // 3. Check permission set overrides
-    const overrides = await permissionRepository.findOverridesForUser(userId);
-    for (const override of overrides) {
-      if (override.actionKey === action) {
-        // Enforce ceiling: cannot grant admin-only actions to non-admin
-        if (override.granted) {
-          const def = ACTION_MAP.get(action);
-          if (def && def.defaultMinRole === 'admin' && (user.role as string) !== 'admin') {
-            this.logger.warn(`Override grants admin-only action '${action}' to non-admin user ${userId} — ceiling enforced`);
-            return false;
-          }
-          return true;
-        }
+    // 3. Check permission set overrides. A user may belong to several sets;
+    // an explicit deny in any set wins over a grant in another.
+    const matching = (await permissionRepository.findOverridesForUser(userId)).filter(o => o.actionKey === action);
+    if (matching.length > 0) {
+      if (matching.some(o => !o.granted)) return false;
+      // Enforce ceiling: cannot grant admin-only actions to non-admin
+      const def = ACTION_MAP.get(action);
+      if (def && def.defaultMinRole === 'admin') {
+        this.logger.warn(`Override grants admin-only action '${action}' to non-admin user ${userId} — ceiling enforced`);
         return false;
       }
+      return true;
     }
 
     // 4. Fall back to action registry default

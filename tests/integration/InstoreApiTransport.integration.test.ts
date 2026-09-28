@@ -9,6 +9,21 @@ import { Platform } from 'react-native';
 import { instoreApiConfig } from '../../services/instoreapi/InstoreApiConfig';
 import { instoreApiServer } from '../../services/instoreapi/InstoreApiServer';
 import { instoreApiTransport } from '../../services/instoreapi/InstoreApiTransport';
+import { CommercefullWebhookReceiver } from '../../services/clients/commercefull/CommercefullWebhookReceiver';
+import { SIGNATURE_HEADERS, signRequest } from '../../services/instoreapi/requestSigning';
+
+const TEST_SECRET = 'test-secret';
+
+/** Build the HMAC signature headers a real client would send. */
+function signedHeaders(method: string, pathWithQuery: string, rawBody = '', secret = TEST_SECRET): Record<string, string> {
+  const { timestamp, nonce, signature } = signRequest(secret, method, pathWithQuery, rawBody);
+  return {
+    [SIGNATURE_HEADERS.register]: 'test-register',
+    [SIGNATURE_HEADERS.timestamp]: timestamp,
+    [SIGNATURE_HEADERS.nonce]: nonce,
+    [SIGNATURE_HEADERS.signature]: signature,
+  };
+}
 
 // Mock react-native-http-bridge for testing
 jest.mock('react-native-http-bridge', () => ({
@@ -161,7 +176,7 @@ describe('HTTP Request Handling', () => {
       requestId: 'test-123',
       method: 'GET',
       url: 'http://localhost:8787/api/health',
-      headers: { 'x-shared-secret': 'test-secret' },
+      headers: {},
       data: null,
     };
   });
@@ -191,36 +206,85 @@ describe('HTTP Request Handling', () => {
     expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 200, 'application/json', expect.stringContaining('"ok":true'));
   });
 
-  it('should handle authentication failure', async () => {
+  it('should reject the legacy shared-secret header', async () => {
     await instoreApiServer.start();
     const callback = httpBridge.start.mock.calls[0][2];
 
-    // Request without proper secret
+    // Legacy auth is gone — a correct secret in the old header must still 401
     const unauthRequest = {
       ...mockRequest,
-      headers: { 'x-shared-secret': 'wrong-secret' },
+      url: 'http://localhost:8787/api/users',
+      headers: { 'x-shared-secret': TEST_SECRET },
     };
 
     await callback(unauthRequest);
-
-    // Wait for async operations to complete
     await new Promise(resolve => setImmediate(resolve));
 
     expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 401, 'application/json', expect.stringContaining('"error":"Unauthorized"'));
+  });
+
+  it('should accept a validly signed request', async () => {
+    await instoreApiServer.start();
+    const callback = httpBridge.start.mock.calls[0][2];
+
+    await callback({
+      ...mockRequest,
+      url: 'http://localhost:8787/api/session',
+      headers: signedHeaders('GET', '/api/session'),
+    });
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 200, 'application/json', expect.stringContaining('"ok":true'));
+  });
+
+  it('should reject a signature computed with the wrong secret', async () => {
+    await instoreApiServer.start();
+    const callback = httpBridge.start.mock.calls[0][2];
+
+    await callback({
+      ...mockRequest,
+      url: 'http://localhost:8787/api/session',
+      headers: signedHeaders('GET', '/api/session', '', 'wrong-secret'),
+    });
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 401, 'application/json', expect.stringContaining('"error":"Unauthorized"'));
+  });
+
+  it('should reject a replayed nonce', async () => {
+    await instoreApiServer.start();
+    const callback = httpBridge.start.mock.calls[0][2];
+
+    const request = {
+      ...mockRequest,
+      url: 'http://localhost:8787/api/session',
+      headers: signedHeaders('GET', '/api/session'),
+    };
+
+    await callback({ ...request, requestId: 'first' });
+    await new Promise(resolve => setImmediate(resolve));
+    expect(httpBridge.respond).toHaveBeenCalledWith('first', 200, 'application/json', expect.stringContaining('"ok":true'));
+
+    // Same signature headers — identical nonce must be rejected as replay
+    await callback({ ...request, requestId: 'second' });
+    await new Promise(resolve => setImmediate(resolve));
+    expect(httpBridge.respond).toHaveBeenCalledWith('second', 401, 'application/json', expect.stringContaining('"error":"Unauthorized"'));
   });
 
   it('should handle JSON parsing for POST requests', async () => {
     await instoreApiServer.start();
     const callback = httpBridge.start.mock.calls[0][2];
 
+    const rawBody = JSON.stringify({
+      order: { id: 'test-order', subtotal: 10.0, tax: 0, total: 10.0 },
+      items: [],
+    });
     const postRequest = {
       ...mockRequest,
       method: 'POST',
       url: 'http://localhost:8787/api/orders',
-      data: JSON.stringify({
-        order: { id: 'test-order', total: 10.0 },
-        items: [],
-      }),
+      headers: signedHeaders('POST', '/api/orders', rawBody),
+      data: rawBody,
     };
 
     await callback(postRequest);
@@ -232,6 +296,70 @@ describe('HTTP Request Handling', () => {
     expect(httpBridge.respond).toHaveBeenCalled();
   });
 
+  it('should reject an order with invalid fields', async () => {
+    await instoreApiServer.start();
+    const callback = httpBridge.start.mock.calls[0][2];
+
+    const rawBody = JSON.stringify({ order: { id: 'x' }, items: [] });
+    await callback({
+      ...mockRequest,
+      method: 'POST',
+      url: 'http://localhost:8787/api/orders',
+      headers: signedHeaders('POST', '/api/orders', rawBody),
+      data: rawBody,
+    });
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 400, 'application/json', expect.stringContaining('error'));
+  });
+
+  it('should reject a tampered signed body', async () => {
+    await instoreApiServer.start();
+    const callback = httpBridge.start.mock.calls[0][2];
+
+    const signed = signedHeaders('POST', '/api/orders', '{"order":{"id":"a"},"items":[]}');
+    await callback({
+      ...mockRequest,
+      method: 'POST',
+      url: 'http://localhost:8787/api/orders',
+      headers: signed,
+      data: '{"order":{"id":"b"},"items":[]}',
+    });
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 401, 'application/json', expect.stringContaining('"error":"Unauthorized"'));
+  });
+
+  it('should preserve the exact signed webhook body', async () => {
+    await instoreApiServer.start();
+    const callback = httpBridge.start.mock.calls[0][2];
+    const rawBody = '{ "event": "product.updated", "data": { "id": "p1" } }';
+    const receiver = CommercefullWebhookReceiver.getInstance();
+    const handler = jest.spyOn(receiver, 'handleRequest').mockResolvedValue({ status: 200, body: { success: true } });
+
+    await callback({
+      ...mockRequest,
+      method: 'POST',
+      url: 'http://localhost:8787/api/webhooks/commercefull',
+      headers: { 'X-Webhook-Signature': 'signature' },
+      data: rawBody,
+    });
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(handler).toHaveBeenCalledWith(rawBody, { 'x-webhook-signature': 'signature' });
+    handler.mockRestore();
+  });
+
+  it('should reject oversized request bodies', async () => {
+    await instoreApiServer.start();
+    const callback = httpBridge.start.mock.calls[0][2];
+
+    await callback({ ...mockRequest, method: 'POST', url: 'http://localhost:8787/api/orders', data: 'x'.repeat(1024 * 1024 + 1) });
+    await new Promise(resolve => setImmediate(resolve));
+
+    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 413, 'application/json', expect.stringContaining('too large'));
+  });
+
   it('should handle query parameters for GET requests', async () => {
     await instoreApiServer.start();
     const callback = httpBridge.start.mock.calls[0][2];
@@ -239,6 +367,7 @@ describe('HTTP Request Handling', () => {
     const getWithQuery = {
       ...mockRequest,
       url: 'http://localhost:8787/api/sync/events?since=1234567890',
+      headers: signedHeaders('GET', '/api/sync/events?since=1234567890'),
     };
 
     await callback(getWithQuery);
@@ -247,5 +376,20 @@ describe('HTTP Request Handling', () => {
     await new Promise(resolve => setImmediate(resolve));
 
     expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 200, 'application/json', expect.stringContaining('"events"'));
+  });
+
+  it('should route /api/orders/unsynced to the literal route', async () => {
+    await instoreApiServer.start();
+    const callback = httpBridge.start.mock.calls[0][2];
+
+    await callback({
+      ...mockRequest,
+      url: 'http://localhost:8787/api/orders/unsynced',
+      headers: signedHeaders('GET', '/api/orders/unsynced'),
+    });
+    await new Promise(resolve => setImmediate(resolve));
+
+    // Must reach findUnsynced (200 + orders array), not /api/orders/:id (404)
+    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 200, 'application/json', expect.stringContaining('"orders"'));
   });
 });

@@ -11,6 +11,7 @@ import { getPlatformCapabilities } from '../utils/platformCapabilities';
 import { useEcommerceSettings } from '../hooks/useEcommerceSettings';
 import { setupProgressService } from '../services/setup/SetupProgressService';
 import { useTheme } from '../contexts/ThemeProvider';
+import { PermissionGate } from '../components/PermissionGate';
 import type { ECommercePlatform } from '../utils/platforms';
 
 const SettingsScreen = lazy(() => import('../screens/SettingsScreen'));
@@ -205,14 +206,18 @@ export const MoreNavigator: React.FC<MoreNavigatorProps> = ({ userRole, onLogout
       <Stack.Screen name="Settings" options={{ title: 'Settings' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <SettingsScreen />
+            <PermissionGate action="settings:view">
+              <SettingsScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>
       <Stack.Screen name="Users" options={{ title: 'User Management' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <UsersScreen />
+            <PermissionGate action="user:edit">
+              <UsersScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>
@@ -240,14 +245,18 @@ export const MoreNavigator: React.FC<MoreNavigatorProps> = ({ userRole, onLogout
       <Stack.Screen name="SyncQueue" options={{ title: 'Sync Queue' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <SyncQueueScreen />
+            <PermissionGate action="sync:retry">
+              <SyncQueueScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>
       <Stack.Screen name="Reports" options={{ title: 'Reports' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <ReportingScreen />
+            <PermissionGate action="report:view">
+              <ReportingScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>
@@ -268,70 +277,90 @@ export const MoreNavigator: React.FC<MoreNavigatorProps> = ({ userRole, onLogout
       <Stack.Screen name="PermissionSets" options={{ title: 'Permission Sets' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <PermissionSetsScreen />
+            <PermissionGate action="user:edit">
+              <PermissionSetsScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>
       <Stack.Screen name="Customers" options={{ title: 'Customers' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <CustomersScreen />
+            <PermissionGate action="customer:edit">
+              <CustomersScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>
       <Stack.Screen name="CustomerProfile" options={{ title: 'Customer Profile' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <CustomerProfileScreen />
+            <PermissionGate action="customer:edit">
+              <CustomerProfileScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>
       <Stack.Screen name="Vendors" options={{ title: 'Vendors' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <VendorsScreen />
+            <PermissionGate action="purchase_order:create">
+              <VendorsScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>
       <Stack.Screen name="PurchaseOrders" options={{ title: 'Purchase Orders' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <PurchaseOrdersScreen />
+            <PermissionGate action="purchase_order:create">
+              <PurchaseOrdersScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>
       <Stack.Screen name="InventoryCount" options={{ title: 'Inventory Count' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <InventoryCountScreen />
+            <PermissionGate action="inventory:count">
+              <InventoryCountScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>
       <Stack.Screen name="Procurement" options={{ title: 'Procurement' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <ProcurementScreen />
+            <PermissionGate action="inventory:adjust">
+              <ProcurementScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>
       <Stack.Screen name="TransferOrders" options={{ title: 'Transfer Orders' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <TransferOrdersScreen />
+            <PermissionGate action="inventory:adjust">
+              <TransferOrdersScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>
       <Stack.Screen name="VendorReturns" options={{ title: 'Vendor Returns' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <VendorReturnsScreen />
+            <PermissionGate action="inventory:adjust">
+              <VendorReturnsScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>
       <Stack.Screen name="ReorderPointConfig" options={{ title: 'Reorder Points' }}>
         {() => (
           <Suspense fallback={<LazyFallback />}>
-            <ReorderPointConfigScreen />
+            <PermissionGate action="inventory:adjust">
+              <ReorderPointConfigScreen />
+            </PermissionGate>
           </Suspense>
         )}
       </Stack.Screen>

@@ -4,6 +4,17 @@
  */
 export interface SecretsServiceInterface {
   /**
+   * Whether this backend can persist secrets in OS-protected storage.
+   */
+  isAvailable(): Promise<boolean>;
+
+  /**
+   * Whether the current runtime permits the legacy plaintext key-value fallback.
+   * Production mobile and Electron builds do not permit it.
+   */
+  allowsPlaintextFallback(): boolean;
+
+  /**
    * Stores a secret value securely
    * @param key The identifier for the secret
    * @param value The secret value to store

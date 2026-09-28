@@ -46,13 +46,16 @@ const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
   // Compose tabs dynamically based on selected platform capabilities
   const platform = (ecommerceSettings.platform ?? 'offline') as ECommercePlatform;
   const capabilities = useMemo(() => getPlatformCapabilities(platform), [platform]);
-  const composedTabs = useMemo(() => composeSettingsTabs({ platform, capabilities }), [platform, capabilities]);
+  const composedTabs = useMemo(
+    () => composeSettingsTabs({ userRole: user?.role, platform, capabilities }),
+    [user?.role, platform, capabilities]
+  );
 
   // Filter out hidden tabs (spec requirement: settings.md §2.2.2.a, §5.12-5.14)
   const visibleTabs = useMemo(() => composedTabs.filter(tab => tab.status !== 'hidden'), [composedTabs]);
 
-  // Settings are restricted to admin and manager roles
-  if (user?.role === 'cashier') {
+  // Settings are restricted to admin and manager roles (undefined role = cashier)
+  if (!user?.role || user.role === 'cashier' || visibleTabs.length === 0) {
     return (
       <View style={[styles.accessDenied, { backgroundColor: colors.background }]}>
         <Text style={[styles.accessDeniedText, { color: colors.textSecondary }]}>
@@ -80,7 +83,9 @@ const SettingsScreen: FC<SettingsScreenProps> = ({ onGoBack }) => {
   };
 
   const renderTabContent = () => {
-    switch (activeTab) {
+    // Never render a tab the composer withheld for this role/platform
+    if (!activeTabDef || activeTabDef.status !== 'enabled') return null;
+    switch (activeTabDef.key) {
       case 'payment':
         return <PaymentSettingsTab />;
       case 'hardware':

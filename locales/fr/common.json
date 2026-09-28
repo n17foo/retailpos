@@ -28,7 +28,8 @@
     "logIn": "Se connecter",
     "loggingIn": "Connexion...",
     "validationError": "Erreur de validation",
-    "failure": "Échec"
+    "failure": "Échec",
+    "accessDenied": "Vous n'avez pas l'autorisation d'accéder à cet écran."
   },
   "welcome": {
     "title": "Bienvenue sur RetailPOS",

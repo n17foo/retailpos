@@ -4,6 +4,7 @@ import { keyValueRepository } from '../../repositories/KeyValueRepository';
 import { StripeTerminalBridgeManager } from '../../contexts/StripeTerminalBridge';
 import { LoggerFactory } from '../logger/LoggerFactory';
 import { StripeApiClient } from '../clients/stripe/StripeApiClient';
+import { PaymentSettingsStorage } from '../config/PaymentSettingsStorage';
 
 /**
  * Implementation of Stripe NFC Tap to Pay service
@@ -426,7 +427,7 @@ export class StripeNfcService implements PaymentServiceInterface {
    * Configure the Stripe API client with current settings.
    */
   private async configureStripeClient(): Promise<StripeApiClient> {
-    const apiKey = await keyValueRepository.getItem('stripe_nfc_apiKey');
+    const apiKey = await PaymentSettingsStorage.getStripeNfcApiKey();
     if (!apiKey) {
       throw new Error('Stripe API key not configured');
     }

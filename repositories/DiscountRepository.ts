@@ -1,5 +1,19 @@
 import { db } from '../utils/db';
 import { DiscountCode } from '../services/discount/DiscountServiceInterface';
+import { buildUpdateAssignments } from '../utils/sql';
+
+const DISCOUNT_UPDATE_COLUMNS = [
+  'type',
+  'value',
+  'description',
+  'minimum_purchase',
+  'maximum_discount',
+  'starts_at',
+  'expires_at',
+  'usage_limit',
+  'usage_count',
+  'active',
+] as const;
 
 export interface DiscountRow {
   code: string;
@@ -89,25 +103,12 @@ export class DiscountRepository {
   }
 
   async update(code: string, updates: Partial<Omit<DiscountRow, 'code' | 'created_at'>>): Promise<void> {
-    const fields: string[] = [];
-    const values: (string | number | null)[] = [];
-
-    Object.entries(updates).forEach(([key, value]) => {
-      if (key !== 'code' && key !== 'created_at') {
-        fields.push(`${key} = ?`);
-        values.push(value as string | number | null);
-      }
-    });
-
-    if (fields.length === 0) {
+    const { assignments, values } = buildUpdateAssignments(updates, DISCOUNT_UPDATE_COLUMNS, ['code', 'created_at', 'updated_at']);
+    if (assignments.length === 0) {
       return;
     }
 
-    fields.push('updated_at = ?');
-    values.push(Date.now());
-    values.push(code);
-
-    await db.runAsync(`UPDATE discounts SET ${fields.join(', ')} WHERE code = ?`, values);
+    await db.runAsync(`UPDATE discounts SET ${assignments.join(', ')}, updated_at = ? WHERE code = ?`, [...values, Date.now(), code]);
   }
 
   async incrementUsageCount(code: string): Promise<void> {

@@ -10,11 +10,17 @@ export interface POSConfig {
   storePhone: string;
   currencySymbol: string;
   drawerOpenOnCash: boolean;
+  /** Idle minutes before the register locks and requires re-authentication. 0 disables. */
+  autoLockMinutes?: number;
 }
+
+/** Security default applied until an admin configures autoLockMinutes. */
+export const DEFAULT_AUTO_LOCK_MINUTES = 5;
 
 // ── Settings keys in the database ───────────────────────────────────
 
 export const SETTINGS_KEYS: Record<keyof POSConfig, string> = {
+  autoLockMinutes: 'pos.autoLockMinutes',
   taxRate: 'pos.taxRate',
   maxSyncRetries: 'pos.maxSyncRetries',
   storeName: 'pos.storeName',
@@ -109,6 +115,13 @@ export class POSConfigService {
 }
 
 export const posConfig = POSConfigService.getInstance();
+
+/** Effective auto-lock timeout in milliseconds (0 = disabled). */
+export function AUTO_LOCK_TIMEOUT_MS(): number {
+  const minutes = posConfig.values.autoLockMinutes;
+  const effective = typeof minutes === 'number' && Number.isFinite(minutes) && minutes >= 0 ? minutes : DEFAULT_AUTO_LOCK_MINUTES;
+  return effective * 60_000;
+}
 
 export function MAX_SYNC_RETRIES(): number {
   return posConfig.values.maxSyncRetries;

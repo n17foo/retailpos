@@ -3,7 +3,7 @@
 > **System**: RetailPOS – Multi-Register Local API
 > **Actor**: Manager, Admin, System
 > **Date**: 2026-04-13
-> **Source**: `services/localapi/LocalApiConfig.ts`, `services/localapi/LocalApiServer.ts`, `services/localapi/LocalApiDiscovery.ts`, `services/localapi/sync/SyncEventBus.ts`, `services/localapi/sync/SyncEventTypes.ts`, `services/localapi/sync/SyncPoller.ts`, `services/clients/localapi/LocalApiClient.ts`, `screens/settings/LocalApiSettingsTab.tsx`
+> **Source**: `services/instoreapi/InstoreApiConfig.ts`, `services/instoreapi/InstoreApiServer.ts`, `services/instoreapi/InstoreApiTransport.ts`, `services/instoreapi/InstoreApiDiscovery.ts`, `services/instoreapi/sync/SyncEventBus.ts`, `services/instoreapi/sync/SyncPoller.ts`, `services/clients/instoreapi/InstoreApiClient.ts`, `screens/settings/InstoreApiSettingsTab.tsx`
 
 ---
 
@@ -22,22 +22,26 @@ In `client` mode a register is a **dummy interface**:
 
 ### Current Implementation State
 
-The architecture is a lightweight HTTP server running inside the React Native app. Because React Native cannot run a traditional Node.js HTTP server, `LocalApiServer` provides the **route logic layer** only — the actual transport binding (HTTP listener) is expected to be provided by a native module or Electron IPC in the main process.
+The architecture is a lightweight HTTP server running inside the React Native app. Because React Native cannot run a traditional Node.js HTTP server, `InstoreApiTransport` binds the listener via `react-native-http-bridge` on native builds and forwards each request (method, path with query, headers, raw body) to `InstoreApiServer.handleRequest()`, which owns the route logic. On web/standalone builds the transport is a no-op.
 
 **What is implemented:**
 
-- Route logic for all read endpoints (orders, products, tax profiles, returns, sync events)
-- `LocalApiClient` HTTP client for all read operations
+- Route logic for order, product, category, tax profile, return, user, snapshot, and sync-event endpoints
+- `InstoreApiClient` HTTP client and `InstoreApiTransport` HTTP listener
 - `SyncEventBus` + `SyncPoller` for real-time event propagation
-- `LocalApiDiscovery` for subnet scanning
-- Configuration persistence
+- `InstoreApiDiscovery` for subnet scanning
+- Secure configuration persistence
+- Commercefull webhook forwarding with signed raw-body verification
 
 **What is not yet implemented (gaps):**
 
-- Write endpoints on the server (POST orders, PUT order status, POST returns)
-- Client-side service overrides that route writes to the server instead of local SQLite
-- HTTP transport layer (actual listener)
-- SyncEventBus consumer handlers
+- Shift API routes and repository support
+- Encrypted transport or mutual TLS inside the app
+- Per-register credentials, revocation, and scoped route authorization
+
+### Production Network Requirement
+
+The LAN transport is plaintext HTTP. HMAC request signing keeps the shared secret off the wire and prevents replay, but it does not encrypt traffic — a passive network observer can still read business data. Production multi-register deployments must run on a trusted, isolated register VLAN or inside an encrypted overlay such as WireGuard or Tailscale. Do not expose the register port to guest Wi-Fi or untrusted LAN clients.
 
 ### Modes
 
@@ -52,18 +56,19 @@ The architecture is a lightweight HTTP server running inside the React Native ap
 ```
 Server register                          Client register(s) — thin interface
 ─────────────────────────────────────    ─────────────────────────────────────
-LocalApiServer (route logic)             LocalApiClient (HTTP fetch)
+InstoreApiServer (route logic)             InstoreApiClient (HTTP fetch)
   ├── GET  /api/health                     ├── testConnection()
   ├── GET  /api/orders[/:id]               ├── getOrders() / getOrder()
   ├── GET  /api/orders/unsynced            ├── getUnsyncedOrders()
   ├── GET  /api/products[/:id]             ├── getProducts() / getProduct()
   ├── GET  /api/tax-profiles               ├── getTaxProfiles()
   ├── GET  /api/returns[/order/:id]        ├── getReturns() / getReturnsByOrder()
-  ├── GET  /api/sync/events                ├── getSyncEvents(since)
-  │                                        │
-  ├── POST /api/orders          ← GAP      ├── createOrder()          ← GAP
-  ├── PUT  /api/orders/:id      ← GAP      ├── updateOrderStatus()    ← GAP
-  └── POST /api/returns         ← GAP      └── createReturn()         ← GAP
+  ├── GET  /api/session                    ├── getSyncEvents(since)
+  ├── GET  /api/sync/events                ├── createOrder()
+  ├── POST /api/orders                     ├── updateOrderStatus()
+  ├── PUT  /api/orders/:id/status          ├── updateOrderPayment()
+  ├── PUT  /api/orders/:id/payment         ├── createReturn()
+  └── POST /api/returns                    └── verifyPin()
 
 SQLite (single source of truth)          No local SQLite for business data
   └── orders, products, returns,           └── local config + session only
@@ -91,21 +96,25 @@ SyncEventBus (in-process)                SyncEventBus (in-process)
 
 ### Authentication
 
-All requests include `x-shared-secret` header. The server validates this against `localApiConfig.current.sharedSecret`. If the secret is empty, authentication is skipped.
+Requests are authenticated with an HMAC-SHA256 signature (`services/instoreapi/requestSigning.ts`). The client sends `x-instore-register`, `x-instore-timestamp`, `x-instore-nonce`, and `x-instore-signature` headers; the signature covers `METHOD \n PATH?QUERY \n TIMESTAMP \n NONCE \n sha256(rawBody)`. The server verifies the signature with the shared secret, rejects timestamps outside a ±5-minute window, and rejects reused nonces via an in-memory replay cache. The shared secret itself is never transmitted, and the legacy `x-shared-secret` header is not accepted.
+
+Two routes are exempt: `GET /api/health` (unauthenticated by design so clients can discover the server before holding the secret — it exposes presence only) and `POST /api/webhooks/commercefull` (authenticated by the Commercefull HMAC signature instead).
+
+If no shared secret is configured when the server starts, one is generated (`instore-<32 hex>`) and shown in Settings → Instore API. All registers must run a version that signs requests — mixed-version deployments cannot authenticate.
 
 ---
 
 ## 1. Ubiquitous Requirements
 
-**1.1** `LocalApiConfig`, `LocalApiServer`, `LocalApiClient`, `LocalApiDiscovery`, `SyncEventBus`, and `SyncPoller` shall each be singletons.
+**1.1** `InstoreApiConfig`, `InstoreApiServer`, `InstoreApiClient`, `InstoreApiDiscovery`, `SyncEventBus`, and `SyncPoller` shall each be singletons.
 
 **1.2** The default mode shall be `standalone` — no networking is active unless explicitly configured.
 
-**1.3** All settings shall be persisted to `keyValueRepository` under the key `'localapi.settings'` and loaded via `localApiConfig.load()` at app startup.
+**1.3** All settings shall be persisted through `ProtectedValueStore` (secure storage first, KV key `'instoreapi.settings'`) and loaded via `instoreApiConfig.load()` at app startup — the shared secret never sits in plaintext SQLite on platforms with secure storage.
 
-**1.4** When `sharedSecret` is non-empty, every request to the server shall include `x-shared-secret` in the request headers, and the server shall reject requests with a mismatched or missing secret with HTTP 401.
+**1.4** When `sharedSecret` is non-empty, every request to the server shall carry valid `x-instore-timestamp`, `x-instore-nonce`, and `x-instore-signature` headers (HMAC-SHA256 of the canonical payload), and the server shall reject requests with a missing, malformed, stale, replayed, or mismatched signature with HTTP 401.
 
-**1.5** Every request shall include `X-Register-Id` in the request headers so the server can identify which register made the request.
+**1.5** Every request shall include `x-instore-register` in the signature headers so the server can attribute the request to a register.
 
 **1.6** `SyncPoller` shall only run in `client` mode — it shall refuse to start in `standalone` or `server` mode.
 
@@ -115,27 +124,27 @@ All requests include `x-shared-secret` header. The server validates this against
 
 ### 2.1 Configuration
 
-**2.1.1** When `localApiConfig.load()` is called, the system shall read the persisted settings from `keyValueRepository`, merge with defaults (`mode: 'standalone'`, `port: 8787`, `registerName: 'Register 1'`), and return the merged settings.
+**2.1.1** When `instoreApiConfig.load()` is called, the system shall read the persisted settings from `keyValueRepository`, merge with defaults (`mode: 'standalone'`, `port: 8787`, `registerName: 'Register 1'`), and return the merged settings.
 
-**2.1.2** When `localApiConfig.save(updates)` is called, the system shall merge the updates into the current settings and persist the result to `keyValueRepository`.
+**2.1.2** When `instoreApiConfig.save(updates)` is called, the system shall merge the updates into the current settings and persist the result to `keyValueRepository`.
 
-**2.1.3** When `LocalApiSettingsTab` saves in `server` mode, the system shall call `localApiServer.start()`.
+**2.1.3** When `InstoreApiSettingsTab` saves in `server` mode, the system shall call `instoreApiServer.start()`.
 
-**2.1.4** When `LocalApiSettingsTab` saves in `client` or `standalone` mode, the system shall call `localApiServer.stop()`.
+**2.1.4** When `InstoreApiSettingsTab` saves in `client` or `standalone` mode, the system shall call `instoreApiServer.stop()`.
 
 ### 2.2 Server — Lifecycle
 
-**2.2.1** When `localApiServer.start()` is called and `localApiConfig.isServer` is `true`, the system shall set `running = true` and log the port.
+**2.2.1** When `instoreApiServer.start()` is called and `instoreApiConfig.isServer` is `true`, the system shall set `running = true` and log the port.
 
-**2.2.2** When `localApiServer.start()` is called and `localApiConfig.isServer` is `false`, the system shall log a warning and not start.
+**2.2.2** When `instoreApiServer.start()` is called and `instoreApiConfig.isServer` is `false`, the system shall log a warning and not start.
 
-**2.2.3** When `localApiServer.stop()` is called, the system shall set `running = false`.
+**2.2.3** When `instoreApiServer.stop()` is called, the system shall set `running = false`.
 
 ### 2.3 Server — Request Handling
 
-**2.3.1** When `localApiServer.handleRequest(method, path, body, headers)` is called and `running` is `false`, the system shall return `{ status: 503, body: { error: 'Server not running' } }`.
+**2.3.1** When `instoreApiServer.handleRequest(method, path, body, headers)` is called and `running` is `false`, the system shall return `{ status: 503, body: { error: 'Server not running' } }`.
 
-**2.3.2** When `sharedSecret` is set and the request's `x-shared-secret` header does not match, the system shall return `{ status: 401, body: { error: 'Unauthorized' } }`.
+**2.3.2** When the request is not an exempt route (`/api/health`, `/api/webhooks/commercefull`) and its signature headers are missing, malformed, stale (±5 min), replayed, or computed with the wrong secret, the system shall return `{ status: 401, body: { error: 'Unauthorized' } }`. The legacy `x-shared-secret` header shall be ignored.
 
 **2.3.3** When a matching route is found, the system shall call the route handler and return its response.
 
@@ -167,17 +176,27 @@ All requests include `x-shared-secret` header. The server validates this against
 
 **2.4.11** `POST /api/webhooks/commercefull` — forwards the raw body and headers to `CommercefullWebhookReceiver.handleRequest()`.
 
+**2.4.12** `GET /api/session` — authenticated connection-test route; returns `{ ok: true, registerId, registerName }` only when the request signature is valid. Existence of this route is what makes `testConnection()` meaningful.
+
+**2.4.13** `GET /api/users` — returns `id`, `name`, `role`, `is_active` for all users; PIN hashes and other credential fields are never included.
+
+**2.4.14** `POST /api/users/verify-pin` — verifies a PIN against server-side credentials (used for client-mode login); rate-limited to 10 failures per rolling minute, globally.
+
+**2.4.15** `GET /api/snapshot` — returns a full data snapshot for client-mode initial population.
+
+**2.4.16** `GET /api/categories` — returns all categories.
+
 ### 2.5 Client — Connection
 
-**2.5.1** When `localApiClient.testConnection()` is called, the system shall call `GET /api/health` on the configured server URL and set `connected = true` on success or `false` on failure.
+**2.5.1** When `instoreApiClient.testConnection()` is called, the system shall call the authenticated `GET /api/session` route on the configured server URL and set `connected = true` on success or `false` on failure — an unauthenticated health probe cannot detect a wrong secret.
 
-**2.5.2** When `localApiClient.probeHealth(baseUrl, secret, timeoutMs)` is called, the system shall attempt `GET /api/health` with a timeout and return the health response or `null` on failure.
+**2.5.2** When `instoreApiClient.probeHealth(baseUrl, timeoutMs)` is called, the system shall attempt an unauthenticated `GET /api/health` with a timeout and return the health response or `null` on failure. Discovery probes shall never send the shared secret.
 
 **2.5.3** When any client request fails (non-2xx or network error), the system shall throw an error with the server's error message or a generic message.
 
 ### 2.6 Discovery — Subnet Scan
 
-**2.6.1** When `localApiDiscovery.scanSubnet(subnetPrefix?, onProgress?)` is called, the system shall scan IPs `{prefix}.1` through `{prefix}.254` on the configured port in batches of 20, calling `probeHealth` on each address with a 2-second timeout.
+**2.6.1** When `instoreApiDiscovery.scanSubnet(subnetPrefix?, onProgress?)` is called, the system shall scan IPs `{prefix}.1` through `{prefix}.254` on the configured port in batches of 20, calling `probeHealth` on each address with a 2-second timeout.
 
 **2.6.2** When `probeAddress` returns a non-null result, the system shall add the server to the `discovered` list.
 
@@ -185,13 +204,13 @@ All requests include `x-shared-secret` header. The server validates this against
 
 **2.6.4** When `scanSubnet` is already running, subsequent calls shall return an empty array immediately.
 
-**2.6.5** When `localApiDiscovery.connectToServer(server)` is called, the system shall save the server address and port to `localApiConfig`, then call `localApiClient.testConnection()` and return the result.
+**2.6.5** When `instoreApiDiscovery.connectToServer(server)` is called, the system shall save the server address and port to `instoreApiConfig`, then call `instoreApiClient.testConnection()` and return the result.
 
 ### 2.7 Sync Event Bus
 
 **2.7.1** When `syncEventBus.emit(type, payload)` is called, the system shall create a `SyncEvent` with a unique ID, the current `registerId`, `registerName`, and `timestamp`, append it to `recentEvents` (capped at 500), and dispatch it to all registered handlers.
 
-**2.7.2** When `syncEventBus.receive(event)` is called with an event from a different register (`event.registerId !== localApiConfig.current.registerId`), the system shall dispatch it to all registered handlers without storing it in `recentEvents`.
+**2.7.2** When `syncEventBus.receive(event)` is called with an event from a different register (`event.registerId !== instoreApiConfig.current.registerId`), the system shall dispatch it to all registered handlers without storing it in `recentEvents`.
 
 **2.7.3** When `syncEventBus.receive(event)` is called with an event from the same register, the system shall silently discard it — no re-dispatch.
 
@@ -211,98 +230,95 @@ All requests include `x-shared-secret` header. The server validates this against
 
 **2.8.5** When `consecutiveErrors` resets to 0 (successful poll), the system shall resume the normal poll interval.
 
-### 2.9 Intended — Write Endpoints (not yet implemented)
+### 2.9 Server — Write Endpoints
 
-The following requirements describe the intended behaviour once write endpoints are added. They are included here to guide implementation.
+All write endpoints validate their payloads before touching repositories — type, bounds, and field allowlists are enforced server-side so a malformed or hostile LAN client cannot write invalid rows.
 
-**2.9.1** `POST /api/orders` — the server shall accept a `CreateOrderInput` body, call `orderRepository.create()`, emit `syncEventBus.emit('order:created', order)`, and return the created order row.
+**2.9.1** `POST /api/orders` — the server shall accept a `CreateOrderInput` body (validating shape, amounts, and the item array), call `orderRepository.create()`, emit `syncEventBus.emit('order:created', order)`, and return the created order row.
 
-**2.9.2** `PUT /api/orders/:id/status` — the server shall accept a `{ status }` body, call `orderRepository.updateStatus()`, emit `syncEventBus.emit('order:updated', { id, status })`, and return the updated row.
+**2.9.2** `PUT /api/orders/:id/status` — the server shall accept a `{ status }` body restricted to `pending | processing | paid | synced | failed | cancelled`, call `orderRepository.updateStatus()`, emit `syncEventBus.emit('order:updated', { id, status })`, and return the updated row.
 
-**2.9.3** `PUT /api/orders/:id/payment` — the server shall accept `{ paymentMethod, transactionId }`, call `orderRepository.updatePayment()`, emit `syncEventBus.emit('order:paid', { id })`, and return the updated row.
+**2.9.3** `PUT /api/orders/:id/payment` — the server shall accept `{ paymentMethod, transactionId }` (bounded strings), call `orderRepository.updatePayment()`, emit `syncEventBus.emit('order:paid', { id })`, and return the updated row.
 
-**2.9.4** `POST /api/returns` — the server shall accept a `CreateReturnInput` body, call `returnRepository.create()`, emit `syncEventBus.emit('return:created', returnRow)`, and return the created return ID.
+**2.9.4** `POST /api/returns` — the server shall accept a `CreateReturnInput` body, run `validateReturnRequest` (paid/synced order, per-line quantity caps, cumulative refund ≤ order total), call `returnRepository.create()`, emit `syncEventBus.emit('return:created', returnRow)`, and return the created return ID.
 
-### 2.10 Intended — Client-Mode Service Overrides (not yet implemented)
+**2.9.5** `POST /api/categories`, `PUT /api/categories/:id`, `DELETE /api/categories/:id` — category write routes with field allowlists and size limits.
 
-**2.10.1** When `localApiConfig.isClient` is `true`, `CheckoutService.startCheckout()` shall call `localApiClient.createOrder(input)` instead of `orderRepository.create()` — the order is written to the server's SQLite, not the client's.
+**2.9.6** `POST /api/products`, `PUT /api/products/:id`, `DELETE /api/products/:id` — product write routes with field allowlists and size limits.
 
-**2.10.2** When `localApiConfig.isClient` is `true`, `CheckoutService.completePayment()` shall call `localApiClient.updateOrderPayment(orderId, paymentMethod, transactionId)` instead of `orderRepository.updatePayment()`.
+### 2.10 Client-Mode Repository Injection
 
-**2.10.3** When `localApiConfig.isClient` is `true`, `RefundService.processReturn()` shall call `localApiClient.createReturn(input)` instead of `returnRepository.create()`.
+Client registers route data access through HTTP repositories selected by the repository factory — when `instoreApiConfig.isClient` is `true`, `OrderRepository` resolves to `InstoreApiOrderRepository` and the return repository resolves to `InstoreApiReturnRepository`, which call `InstoreApiClient` instead of local SQLite (ADR-003).
 
-**2.10.4** When `localApiConfig.isClient` is `true`, `useProducts` and `useCategories` shall fetch data from `localApiClient.getProducts()` and `localApiClient.getTaxProfiles()` instead of local SQLite repositories.
+**2.10.1** When `instoreApiConfig.isClient` is `true`, order creation and payment writes go to the server's `POST /api/orders` and `PUT /api/orders/:id/payment` — the order is written to the server's SQLite, not the client's.
+
+**2.10.2** When `instoreApiConfig.isClient` is `true`, returns are written via `POST /api/returns` and validated server-side as well as locally.
+
+**2.10.3** When `instoreApiConfig.isClient` is `true`, `useProducts` and `useCategories` shall fetch data from `instoreApiClient.getProducts()` and `instoreApiClient.getTaxProfiles()` instead of local SQLite repositories.
 
 ---
 
 ## 3. State-Driven Requirements
 
-**3.1** While `localApiConfig.isServer` is `true`, `localApiServer.start()` is valid and `SyncPoller` shall not run.
+**3.1** While `instoreApiConfig.isServer` is `true`, `instoreApiServer.start()` is valid and `SyncPoller` shall not run.
 
-**3.2** While `localApiConfig.isClient` is `true`, `SyncPoller` shall run and `LocalApiServer` shall not be started.
+**3.2** While `instoreApiConfig.isClient` is `true`, `SyncPoller` shall run and `InstoreApiServer` shall not be started.
 
-**3.3** While `localApiConfig.isStandalone` is `true`, neither `LocalApiServer` nor `SyncPoller` shall be active.
+**3.3** While `instoreApiConfig.isStandalone` is `true`, neither `InstoreApiServer` nor `SyncPoller` shall be active.
 
-**3.4** While `localApiServer.isRunning` is `false`, all `handleRequest` calls shall return 503.
+**3.4** While `instoreApiServer.isRunning` is `false`, all `handleRequest` calls shall return 503.
 
-**3.5** While `localApiDiscovery.isScanning` is `true`, subsequent `scanSubnet` calls shall return an empty array immediately.
+**3.5** While `instoreApiDiscovery.isScanning` is `true`, subsequent `scanSubnet` calls shall return an empty array immediately.
 
-**3.6** While `localApiClient.isConnected` is `false`, client data-fetch methods will throw on network failure — callers must handle errors gracefully.
+**3.6** While `instoreApiClient.isConnected` is `false`, client data-fetch methods will throw on network failure — callers must handle errors gracefully.
 
 ---
 
 ## 4. Known Gaps
 
-**4.1** **No transport layer** — `LocalApiServer` provides route logic only. There is no actual HTTP listener in the current codebase. A native module (e.g. `react-native-http-bridge`) or Electron IPC handler in the main process must call `localApiServer.handleRequest()` for the server to be reachable by other devices. Without this, `server` mode is non-functional on mobile/tablet.
+**4.1** **No shift API** — `InstoreApiServer` has no `/api/shifts*` routes and there is no `ShiftRepository`, so client-mode shift management is non-functional.
 
-**4.2** **No write endpoints** — the server exposes only `GET` routes. The intended design requires client registers to write orders and returns to the server. The following endpoints need to be added to `LocalApiServer` and `LocalApiClient`:
+**4.2** **No basket sharing** — the basket is local to each register. A customer's in-progress order on one register cannot be transferred to another register via the local API.
 
-- `POST /api/orders` — create a new order on the server
-- `PUT /api/orders/:id/status` — update order status (processing, paid, cancelled)
-- `PUT /api/orders/:id/payment` — record payment (completes the order)
-- `POST /api/returns` — record a return on the server
+**4.3** **Subnet scan is hardcoded to `192.168.1.x`** — the default prefix is `192.168.1`. Networks using `10.x.x.x` or `172.16.x.x` require the caller to pass the correct `subnetPrefix`. There is no automatic subnet detection.
 
-**4.3** **No client-side service overrides** — when a register is in `client` mode, `CheckoutService`, `BasketService`, and `RefundService` still write to local SQLite. They need to detect `localApiConfig.isClient` and route writes through `LocalApiClient` instead. This is the core wiring needed to make client registers truly thin.
+**4.4** **No mDNS/Bonjour** — discovery relies on brute-force subnet scanning (254 probes). On larger networks this is slow. The code comments note mDNS as a future improvement.
 
-**4.4** **No basket sharing** — the basket is local to each register. A customer's in-progress order on one register cannot be transferred to another register via the local API.
+**4.5** **SyncEventBus events are not acted upon** — `SyncPoller` delivers events to `SyncEventBus`, but no service currently subscribes to `syncEventBus.on(type, handler)` to update local state (e.g. refresh product cache when `product:updated` arrives). The event infrastructure is in place but the consumer side is not wired.
 
-**4.5** **Subnet scan is hardcoded to `192.168.1.x`** — the default prefix is `192.168.1`. Networks using `10.x.x.x` or `172.16.x.x` require the caller to pass the correct `subnetPrefix`. There is no automatic subnet detection.
-
-**4.6** **No mDNS/Bonjour** — discovery relies on brute-force subnet scanning (254 probes). On larger networks this is slow. The code comments note mDNS as a future improvement.
-
-**4.7** **SyncEventBus events are not acted upon** — `SyncPoller` delivers events to `SyncEventBus`, but no service currently subscribes to `syncEventBus.on(type, handler)` to update local state (e.g. refresh product cache when `product:updated` arrives). The event infrastructure is in place but the consumer side is not wired.
-
-**4.8** **No authentication beyond shared secret** — there is no per-register certificate, token rotation, or TLS. The shared secret is transmitted in plain HTTP headers. This is acceptable for a trusted LAN but not for untrusted networks.
+**4.6** **One shared secret authorizes all routes** — requests are HMAC-signed (the secret is never transmitted and replays are rejected), but any register holding the secret can invoke every route, and the protocol has no per-register identity, scoping, revocation, or rotation. Per-register credentials and encrypted transport (TLS/overlay) remain architectural work.
 
 ---
 
 ## 5. Component Traceability
 
-| Requirement (summary)                     | Component / Service                                | Source File                                   |
-| ----------------------------------------- | -------------------------------------------------- | --------------------------------------------- |
-| Mode: standalone / server / client        | `LocalApiConfig`                                   | `services/localapi/LocalApiConfig.ts`         |
-| Settings persisted to KV store            | `LocalApiConfig.save` / `load`                     | `services/localapi/LocalApiConfig.ts`         |
-| `baseUrl` computed from mode              | `LocalApiConfig.baseUrl`                           | `services/localapi/LocalApiConfig.ts`         |
-| Server start/stop                         | `LocalApiServer.start` / `stop`                    | `services/localapi/LocalApiServer.ts`         |
-| Route matching with `:param` segments     | `LocalApiServer.matchPath`                         | `services/localapi/LocalApiServer.ts`         |
-| 401 on bad shared secret                  | `LocalApiServer.handleRequest`                     | `services/localapi/LocalApiServer.ts`         |
-| 503 when not running                      | `LocalApiServer.handleRequest`                     | `services/localapi/LocalApiServer.ts`         |
-| All GET routes registered                 | `LocalApiServer.registerRoutes`                    | `services/localapi/LocalApiServer.ts`         |
-| Commercefull webhook forwarding           | `LocalApiServer` POST `/api/webhooks/commercefull` | `services/localapi/LocalApiServer.ts`         |
-| Subnet scan in batches of 20              | `LocalApiDiscovery.scanSubnet`                     | `services/localapi/LocalApiDiscovery.ts`      |
-| 2-second probe timeout                    | `LocalApiDiscovery.probeAddress`                   | `services/localapi/LocalApiDiscovery.ts`      |
-| `connectToServer` saves config + tests    | `LocalApiDiscovery.connectToServer`                | `services/localapi/LocalApiDiscovery.ts`      |
-| `testConnection` → `GET /api/health`      | `LocalApiClient.testConnection`                    | `services/clients/localapi/LocalApiClient.ts` |
-| `X-Register-Id` header on all requests    | `LocalApiClient.headers`                           | `services/clients/localapi/LocalApiClient.ts` |
-| `getSyncEvents(since)`                    | `LocalApiClient.getSyncEvents`                     | `services/clients/localapi/LocalApiClient.ts` |
-| Event stored in `recentEvents` (cap 500)  | `SyncEventBus.emit`                                | `services/localapi/sync/SyncEventBus.ts`      |
-| Own-register events not re-dispatched     | `SyncEventBus.receive`                             | `services/localapi/sync/SyncEventBus.ts`      |
-| `getEventsSince(ts)` for polling endpoint | `SyncEventBus.getEventsSince`                      | `services/localapi/sync/SyncEventBus.ts`      |
-| Handler errors caught, dispatch continues | `SyncEventBus.dispatch`                            | `services/localapi/sync/SyncEventBus.ts`      |
-| Poll every 3s, starts 1 min back          | `SyncPoller.start`                                 | `services/localapi/sync/SyncPoller.ts`        |
-| Exponential backoff on poll errors        | `SyncPoller.schedulePoll`                          | `services/localapi/sync/SyncPoller.ts`        |
-| Max backoff 30s                           | `SyncPoller.MAX_BACKOFF_MS`                        | `services/localapi/sync/SyncPoller.ts`        |
-| Client-mode only guard                    | `SyncPoller.start`                                 | `services/localapi/sync/SyncPoller.ts`        |
-| Settings UI: mode / port / secret / name  | `LocalApiSettingsTab`                              | `screens/settings/LocalApiSettingsTab.tsx`    |
-| Scan network button with progress         | `LocalApiSettingsTab.handleScan`                   | `screens/settings/LocalApiSettingsTab.tsx`    |
-| Select discovered server → auto-connect   | `LocalApiSettingsTab.handleSelectServer`           | `screens/settings/LocalApiSettingsTab.tsx`    |
+| Requirement (summary)                     | Component / Service                                  | Source File                                       |
+| ----------------------------------------- | ---------------------------------------------------- | ------------------------------------------------- |
+| Mode: standalone / server / client        | `InstoreApiConfig`                                   | `services/instoreapi/InstoreApiConfig.ts`         |
+| Settings persisted to KV store            | `InstoreApiConfig.save` / `load`                     | `services/instoreapi/InstoreApiConfig.ts`         |
+| `baseUrl` computed from mode              | `InstoreApiConfig.baseUrl`                           | `services/instoreapi/InstoreApiConfig.ts`         |
+| Server start/stop                         | `InstoreApiServer.start` / `stop`                    | `services/instoreapi/InstoreApiServer.ts`         |
+| Route matching with `:param` segments     | `InstoreApiServer.matchPath`                         | `services/instoreapi/InstoreApiServer.ts`         |
+| 401 on bad/missing/replayed signature     | `InstoreApiServer.handleRequest`                     | `services/instoreapi/InstoreApiServer.ts`         |
+| HMAC sign/verify helpers                  | `signRequest` / `verifySignedRequest`                | `services/instoreapi/requestSigning.ts`           |
+| HTTP listener binding                     | `InstoreApiTransport` (`react-native-http-bridge`)   | `services/instoreapi/InstoreApiTransport.ts`      |
+| 503 when not running                      | `InstoreApiServer.handleRequest`                     | `services/instoreapi/InstoreApiServer.ts`         |
+| All GET routes registered                 | `InstoreApiServer.registerRoutes`                    | `services/instoreapi/InstoreApiServer.ts`         |
+| Commercefull webhook forwarding           | `InstoreApiServer` POST `/api/webhooks/commercefull` | `services/instoreapi/InstoreApiServer.ts`         |
+| Subnet scan in batches of 20              | `InstoreApiDiscovery.scanSubnet`                     | `services/instoreapi/InstoreApiDiscovery.ts`      |
+| 2-second probe timeout                    | `InstoreApiDiscovery.probeAddress`                   | `services/instoreapi/InstoreApiDiscovery.ts`      |
+| `connectToServer` saves config + tests    | `InstoreApiDiscovery.connectToServer`                | `services/instoreapi/InstoreApiDiscovery.ts`      |
+| `testConnection` → `GET /api/session`     | `InstoreApiClient.testConnection`                    | `services/clients/instoreapi/InstoreApiClient.ts` |
+| Signed request headers on all requests    | `InstoreApiClient.buildSignedHeaders`                | `services/instoreapi/requestSigning.ts`           |
+| `getSyncEvents(since)`                    | `InstoreApiClient.getSyncEvents`                     | `services/clients/instoreapi/InstoreApiClient.ts` |
+| Event stored in `recentEvents` (cap 500)  | `SyncEventBus.emit`                                  | `services/instoreapi/sync/SyncEventBus.ts`        |
+| Own-register events not re-dispatched     | `SyncEventBus.receive`                               | `services/instoreapi/sync/SyncEventBus.ts`        |
+| `getEventsSince(ts)` for polling endpoint | `SyncEventBus.getEventsSince`                        | `services/instoreapi/sync/SyncEventBus.ts`        |
+| Handler errors caught, dispatch continues | `SyncEventBus.dispatch`                              | `services/instoreapi/sync/SyncEventBus.ts`        |
+| Poll every 3s, starts 1 min back          | `SyncPoller.start`                                   | `services/instoreapi/sync/SyncPoller.ts`          |
+| Exponential backoff on poll errors        | `SyncPoller.schedulePoll`                            | `services/instoreapi/sync/SyncPoller.ts`          |
+| Max backoff 30s                           | `SyncPoller.MAX_BACKOFF_MS`                          | `services/instoreapi/sync/SyncPoller.ts`          |
+| Client-mode only guard                    | `SyncPoller.start`                                   | `services/instoreapi/sync/SyncPoller.ts`          |
+| Settings UI: mode / port / secret / name  | `InstoreApiSettingsTab`                              | `screens/settings/InstoreApiSettingsTab.tsx`      |
+| Scan network button with progress         | `InstoreApiSettingsTab.handleScan`                   | `screens/settings/InstoreApiSettingsTab.tsx`      |
+| Select discovered server → auto-connect   | `InstoreApiSettingsTab.handleSelectServer`           | `screens/settings/InstoreApiSettingsTab.tsx`      |

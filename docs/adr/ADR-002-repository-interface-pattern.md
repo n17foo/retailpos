@@ -13,9 +13,9 @@ The project needed to support two data backends — SQLite for offline/server mo
 The interface takes the plain name (e.g. `OrderRepository`). Implementations are named by their transport:
 
 - `OfflineOrderRepository` — SQLite-backed implementation
-- `LocalApiOrderRepository` — HTTP-backed implementation for client registers
+- `InstoreApiOrderRepository` — HTTP-backed implementation for client registers
 
-Each repository file exports the interface, the offline singleton, and a `getOrderRepository()` factory function that checks `localApiConfig.isClient` and returns the appropriate implementation. No `I`-prefix on interfaces.
+Each repository file exports the interface, the offline singleton, and a `getOrderRepository()` factory function that checks `instoreApiConfig.isClient` and returns the appropriate implementation. No `I`-prefix on interfaces.
 
 ## Consequences
 

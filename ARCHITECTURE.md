@@ -112,7 +112,7 @@ All business data is written to local SQLite first. Checkout never blocks on a n
 
 ### Repository Mode Switching (ADR-003)
 
-Repositories abstract both SQLite (`OfflineOrderRepository`) and HTTP-to-server (`LocalApiOrderRepository`) behind the same interface. A factory function (`getOrderRepository()`) returns the correct implementation based on `localApiConfig.isClient`. Services are unaware of the mode.
+Repositories abstract both SQLite (`OfflineOrderRepository`) and HTTP-to-server (`InstoreApiOrderRepository`) behind the same interface. A factory function (`getOrderRepository()`) returns the correct implementation based on `instoreApiConfig.isClient`. Services are unaware of the mode.
 
 ### Platform Capability Model
 

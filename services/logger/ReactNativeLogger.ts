@@ -1,5 +1,6 @@
 import { logger, consoleTransport } from 'react-native-logs';
 import { LoggerInterface, LogLevel, LogPayload, LogTransport, LogEntry } from './LoggerInterface';
+import { redactLogMetadata } from './redaction';
 
 export class ReactNativeLogger implements LoggerInterface {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- react-native-logs returns untyped logger instance
@@ -141,7 +142,9 @@ export class ReactNativeLogger implements LoggerInterface {
       context: this.context,
       message,
       error,
-      metadata,
+      // Strip credentials/tokens from metadata before it reaches external
+      // transports — a leaked API key in a log pipeline is still a leak.
+      metadata: metadata ? (redactLogMetadata(metadata) as Record<string, unknown>) : undefined,
       timestamp: new Date(),
     };
 

@@ -1,8 +1,8 @@
 import { ECommercePlatform } from '../../utils/platforms';
 import { LoggerFactory } from '../logger/LoggerFactory';
-import { keyValueRepository } from '../../repositories/KeyValueRepository';
 import { SHOPIFY_API_VERSION, COMMERCEFULL_API_VERSION } from './apiVersions';
 import { platformCapabilityService } from '../platform/PlatformCapabilityService';
+import { EcommerceSettingsStorage } from './EcommerceSettingsStorage';
 
 // NOTE: Factory imports are lazy-loaded inside methods to break require cycles.
 // The cycle was: ServiceConfigBridge → factory → platform service → ServiceConfigBridge
@@ -95,7 +95,7 @@ export class ServiceConfigBridge {
     try {
       this.logger.info('Loading e-commerce settings from storage');
 
-      const settings = await keyValueRepository.getObject<StoredECommerceSettings>('ecommerceSettings');
+      const settings = await EcommerceSettingsStorage.load<StoredECommerceSettings>();
 
       if (!settings) {
         this.logger.warn('No e-commerce settings found in storage');

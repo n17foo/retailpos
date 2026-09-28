@@ -20,10 +20,9 @@ import {
   getUnavailableReason,
 } from '../../utils/platformCapabilities';
 import { getPlatformDisplayName } from '../../utils/platforms';
-import { keyValueRepository } from '../../repositories/KeyValueRepository';
 import { LoggerFactory } from '../logger/LoggerFactory';
+import { EcommerceSettingsStorage } from '../config/EcommerceSettingsStorage';
 
-const ECOMMERCE_SETTINGS_KEY = 'ecommerceSettings';
 type CapabilityFeature = Exclude<keyof PlatformCapabilities, 'basketMode'>;
 
 export class PlatformCapabilityService {
@@ -52,7 +51,7 @@ export class PlatformCapabilityService {
   public async loadFromStorage(): Promise<void> {
     this.isLoading = true;
     try {
-      const settings = await keyValueRepository.getObject<{ platform?: string }>(ECOMMERCE_SETTINGS_KEY);
+      const settings = await EcommerceSettingsStorage.load<{ platform?: string }>();
       const platform = (settings?.platform ?? ECommercePlatform.OFFLINE) as ECommercePlatform;
       this.cachedPlatform = platform;
       this.logger.info({ message: `Platform capability loaded: ${platform}` });

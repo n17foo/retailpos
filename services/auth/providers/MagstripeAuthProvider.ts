@@ -3,10 +3,12 @@ import { keyValueRepository } from '../../../repositories/KeyValueRepository';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
 import { cardReaderDetection } from '../CardReaderDetection';
 import { hashCredential, verifyCredential, isHashedCredential } from '../../../utils/crypto';
+import { AuthAttemptLimiter } from '../AuthAttemptLimiter';
 
 const MAGSTRIPE_KEY_PREFIX = 'auth.magstripe.';
 const MAGSTRIPE_ENABLED_KEY = 'auth.magstripe.enabled';
 const MAGSTRIPE_AUTO_DETECT_KEY = 'auth.magstripe.autoDetect';
+const MAX_CARD_DATA_LENGTH = 4096;
 
 /**
  * Magnetic stripe card authentication provider.
@@ -23,6 +25,7 @@ const MAGSTRIPE_AUTO_DETECT_KEY = 'auth.magstripe.autoDetect';
 export class MagstripeAuthProvider implements AuthMethodProvider {
   readonly type = 'magstripe' as const;
   readonly info: AuthMethodInfo = AUTH_METHOD_INFO.magstripe;
+  private limiter = new AuthAttemptLimiter();
 
   async isAvailable(): Promise<boolean> {
     // Check if auto-detection is enabled
@@ -51,12 +54,21 @@ export class MagstripeAuthProvider implements AuthMethodProvider {
     if (!credential) {
       return { success: false, error: 'Please swipe your employee card.' };
     }
+    const remainingMs = this.limiter.getLockoutRemainingMs();
+    if (remainingMs > 0) {
+      return { success: false, error: `Too many failed attempts. Try again in ${Math.ceil(remainingMs / 1000)}s.` };
+    }
+    if (credential.length > MAX_CARD_DATA_LENGTH) {
+      this.limiter.recordResult(false);
+      return { success: false, error: 'Invalid card data. Please try again.' };
+    }
 
     try {
       // Parse and validate card data
       const employeeId = cardReaderDetection.extractEmployeeId(credential);
 
       if (!employeeId) {
+        this.limiter.recordResult(false);
         return { success: false, error: 'Invalid card data. Please try again.' };
       }
 
@@ -70,17 +82,21 @@ export class MagstripeAuthProvider implements AuthMethodProvider {
             // Transparent migration: re-hash legacy plaintext card ID on match
             await keyValueRepository.setObject(MAGSTRIPE_KEY_PREFIX + user.id, hashCredential(employeeId)).catch(() => undefined);
           }
+          this.limiter.recordResult(true);
           return { success: true, user };
         }
       }
 
+      this.limiter.recordResult(false);
       return { success: false, error: 'Card not recognized. Please try again or use another login method.' };
     } catch {
+      this.limiter.recordResult(false);
       return { success: false, error: 'Card authentication failed. Please try again.' };
     }
   }
 
   async enroll(userId: string, credential: string): Promise<boolean> {
+    if (!credential || credential.length > MAX_CARD_DATA_LENGTH) return false;
     try {
       // Extract employee ID from card data
       const employeeId = cardReaderDetection.extractEmployeeId(credential);

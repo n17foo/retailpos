@@ -1,8 +1,8 @@
 import { PlatformRefundServiceInterface, PlatformCredentials } from './PlatformRefundServiceInterface';
 import { RefundData, RefundResult, RefundRecord } from '../RefundService';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { SecretsServiceFactory } from '../../secrets/SecretsService';
-import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
+import { getPlatformCredentials } from '../../config/PlatformCredentialsResolver';
+import { ECommercePlatform } from '../../../utils/platforms';
 import { SquarespaceApiClient } from '../../clients/squarespace/SquarespaceApiClient';
 
 /**
@@ -14,11 +14,6 @@ export class SquarespaceRefundService implements PlatformRefundServiceInterface 
   private initialized: boolean = false;
   private refundHistory: Map<string, RefundRecord[]> = new Map();
   private logger = LoggerFactory.getInstance().createLogger('SquarespaceRefundService');
-  private secretsService: SecretsServiceInterface;
-
-  constructor() {
-    this.secretsService = SecretsServiceFactory.getInstance().getService();
-  }
 
   /**
    * Initialize the Squarespace refund service
@@ -48,12 +43,12 @@ export class SquarespaceRefundService implements PlatformRefundServiceInterface 
    */
   private async getSquarespaceCredentials(): Promise<PlatformCredentials | null> {
     try {
-      const credentials = await this.secretsService.getSecret('squarespace_api_credentials');
+      const credentials = await getPlatformCredentials(ECommercePlatform.SQUARESPACE);
       if (!credentials) {
-        this.logger.error({ message: 'Squarespace API credentials not found in secrets store' });
+        this.logger.error({ message: 'Squarespace API credentials not configured' });
         return null;
       }
-      return JSON.parse(credentials);
+      return credentials;
     } catch (error) {
       this.logger.error({ message: 'Error retrieving Squarespace credentials' }, error instanceof Error ? error : new Error(String(error)));
       return null;

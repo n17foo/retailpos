@@ -28,7 +28,8 @@
     "logIn": "Anmelden",
     "loggingIn": "Anmeldung...",
     "validationError": "Validierungsfehler",
-    "failure": "Fehlgeschlagen"
+    "failure": "Fehlgeschlagen",
+    "accessDenied": "Sie haben keine Berechtigung, diesen Bildschirm zu öffnen."
   },
   "welcome": {
     "title": "Willkommen bei RetailPOS",

@@ -8,7 +8,7 @@ import { User } from '../repositories/UserRepository';
 const Stack = createNativeStackNavigator<AuthStackParamList>();
 
 interface AuthNavigatorProps {
-  onLogin: (pin: string, user?: User) => void;
+  onLogin: (user: User) => void;
   showOnboarding: boolean;
 }
 

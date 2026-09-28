@@ -57,6 +57,8 @@ const HEARTBEAT_TIMEOUT_MS = 30_000;
 const MAX_RECONNECT_ATTEMPTS = 10;
 const BACKOFF_BASE_MS = 1_000;
 const BACKOFF_CAP_MS = 30_000;
+const MAX_WS_MESSAGE_BYTES = 1024 * 1024;
+const MAX_DEDUPE_KEY_LENGTH = 256;
 
 // ─── StoreApiWebSocket ────────────────────────────────────────────────────────
 
@@ -199,12 +201,32 @@ export class StoreApiWebSocket extends EventEmitter {
     this.resetHeartbeatTimer();
   }
 
+  /**
+   * Handle an incoming frame. Note the HELLO handshake itself is
+   * unauthenticated — this client implements the external store-api protocol,
+   * which defines no per-message auth. Messages are only data events; treat
+   * anything malformed, oversized, or non-object as noise and drop it.
+   */
   private handleMessage(raw: unknown): void {
     let msg: ServerMessage;
     try {
-      msg = typeof raw === 'string' ? JSON.parse(raw) : (raw as ServerMessage);
+      if (typeof raw === 'string') {
+        if (raw.length > MAX_WS_MESSAGE_BYTES) {
+          this.logger.warn('Dropping oversized WebSocket message');
+          return;
+        }
+        msg = JSON.parse(raw);
+      } else {
+        this.logger.warn('Dropping non-text WebSocket message');
+        return;
+      }
     } catch {
       this.logger.warn('Failed to parse WebSocket message');
+      return;
+    }
+
+    if (!msg || typeof msg !== 'object' || Array.isArray(msg) || typeof msg.type !== 'string') {
+      this.logger.warn('Dropping malformed WebSocket message');
       return;
     }
 
@@ -243,7 +265,7 @@ export class StoreApiWebSocket extends EventEmitter {
 
   private handleDataMessage(msg: ServerMessage): void {
     // Deduplicate by dedupe_key
-    if (msg.dedupe_key) {
+    if (typeof msg.dedupe_key === 'string' && msg.dedupe_key.length > 0 && msg.dedupe_key.length <= MAX_DEDUPE_KEY_LENGTH) {
       if (this.processedDedupeKeys.has(msg.dedupe_key)) {
         // Already processed, just ack
         if (msg.server_seq) this.ack(msg.server_seq);

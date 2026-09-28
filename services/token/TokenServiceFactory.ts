@@ -2,8 +2,7 @@ import { TokenService } from './TokenService';
 import { TokenServiceInterface, TokenType } from './TokenServiceInterface';
 import { LoggerFactory } from '../logger/LoggerFactory';
 import { ECommercePlatform } from '../../utils/platforms';
-import { MagentoApiClient } from '../clients/magento/MagentoApiClient';
-import { SecretsServiceFactory } from '../secrets/SecretsService';
+import { getPlatformCredentials, PlatformCredentials } from '../config/PlatformCredentialsResolver';
 
 /**
  * Factory for managing TokenService instances
@@ -54,23 +53,49 @@ export class TokenServiceFactory {
           this.setupMagentoTokenProvider();
           break;
         case ECommercePlatform.SHOPIFY:
-          this.setupShopifyTokenProvider();
+          this.registerStaticTokenProvider(
+            ECommercePlatform.SHOPIFY,
+            credentials => credentials.accessToken || credentials.apiKey,
+            'Shopify access token is not configured'
+          );
           break;
         case ECommercePlatform.BIGCOMMERCE:
-          this.setupBigCommerceTokenProvider();
+          this.registerStaticTokenProvider(
+            ECommercePlatform.BIGCOMMERCE,
+            credentials => credentials.accessToken,
+            'BigCommerce access token is not configured'
+          );
           break;
         case ECommercePlatform.WOOCOMMERCE:
-          this.setupWooCommerceTokenProvider();
+          this.registerStaticTokenProvider(
+            ECommercePlatform.WOOCOMMERCE,
+            credentials => credentials.apiKey,
+            'WooCommerce consumer key is not configured'
+          );
           break;
         case ECommercePlatform.SYLIUS:
           this.setupSyliusTokenProvider();
           break;
         case ECommercePlatform.WIX:
-          this.setupWixTokenProvider();
+          this.registerStaticTokenProvider(ECommercePlatform.WIX, credentials => credentials.apiKey, 'Wix API key is not configured');
           break;
-        // These platforms use API key authentication and don't need token providers
         case ECommercePlatform.PRESTASHOP:
+          this.registerStaticTokenProvider(
+            ECommercePlatform.PRESTASHOP,
+            credentials => credentials.apiKey,
+            'PrestaShop API key is not configured'
+          );
+          break;
         case ECommercePlatform.SQUARESPACE:
+          this.registerStaticTokenProvider(
+            ECommercePlatform.SQUARESPACE,
+            credentials => credentials.apiKey,
+            'Squarespace API key is not configured'
+          );
+          break;
+        case ECommercePlatform.COMMERCEFULL:
+          this.setupCommercefullTokenProvider();
+          break;
         case ECommercePlatform.OFFLINE:
           this.logger.info(`Platform ${platform} does not require token management`);
           return false;
@@ -92,36 +117,55 @@ export class TokenServiceFactory {
   }
 
   /**
+   * Register a provider for platforms whose credential is a long-lived key or
+   * token (Shopify Admin API token, BigCommerce/WooCommerce/Wix/PrestaShop/
+   * Squarespace keys). These never expire, so the stored credential is
+   * returned directly — no fabricated or exchanged tokens.
+   */
+  private registerStaticTokenProvider(
+    platform: ECommercePlatform,
+    resolveToken: (credentials: PlatformCredentials) => string | undefined,
+    missingMessage: string
+  ): void {
+    this.service.registerTokenProvider(platform, async () => {
+      try {
+        const credentials = await getPlatformCredentials(platform);
+        const token = credentials ? resolveToken(credentials) : undefined;
+        if (!token) {
+          throw new Error(missingMessage);
+        }
+        return { token };
+      } catch (error) {
+        this.logger.error({ message: `Failed to obtain ${platform} token` }, error instanceof Error ? error : new Error(String(error)));
+        throw error;
+      }
+    });
+  }
+
+  /**
    * Setup Magento token provider.
-   * Reads credentials from secrets store first, falls back to env vars.
+   * Prefers the configured integration access token (non-expiring). If only
+   * admin username/password are available (legacy secret or env vars), it
+   * exchanges them for an admin token via the Magento token endpoint.
    */
   private setupMagentoTokenProvider(): void {
     this.service.registerTokenProvider(ECommercePlatform.MAGENTO, async (_platform, tokenType) => {
-      const secretsService = SecretsServiceFactory.getInstance().getService();
-
       try {
-        let username: string | undefined;
-        let password: string | undefined;
-        let apiUrl: string | undefined;
+        const credentials = await getPlatformCredentials(ECommercePlatform.MAGENTO);
 
-        // Try secrets store first
-        const credentials = await secretsService.getSecret('magento_api_credentials');
-        if (credentials) {
-          const parsed = JSON.parse(credentials);
-          username = parsed.username;
-          password = parsed.password;
-          apiUrl = parsed.apiUrl;
+        if (credentials?.accessToken) {
+          return { token: credentials.accessToken };
         }
 
-        // Fall back to environment variables
-        username = username || process.env.MAGENTO_USERNAME;
-        password = password || process.env.MAGENTO_PASSWORD;
-        apiUrl = apiUrl || process.env.MAGENTO_STORE_URL;
+        const username = credentials?.username || process.env.MAGENTO_USERNAME;
+        const password = credentials?.password || process.env.MAGENTO_PASSWORD;
+        const apiUrl = credentials?.apiUrl || credentials?.storeUrl || process.env.MAGENTO_STORE_URL;
 
         if (!username || !password || !apiUrl) {
-          throw new Error('Magento credentials not found in secrets store or environment variables');
+          throw new Error('Magento credentials not found in settings, secrets store, or environment variables');
         }
 
+        const { MagentoApiClient } = require('../clients/magento/MagentoApiClient');
         const token = await MagentoApiClient.getInstance().fetchAdminToken(apiUrl, username, password);
 
         const expiresAt =
@@ -138,107 +182,45 @@ export class TokenServiceFactory {
   }
 
   /**
-   * Setup Shopify token provider
-   */
-  private setupShopifyTokenProvider(): void {
-    this.service.registerTokenProvider(ECommercePlatform.SHOPIFY, async (_platform, tokenType) => {
-      const secretsService = SecretsServiceFactory.getInstance().getService();
-
-      try {
-        const credentials = await secretsService.getSecret('shopify_api_credentials');
-        if (!credentials) {
-          throw new Error('Shopify API credentials not found');
-        }
-
-        return {
-          token: `shopify-${tokenType}-${Date.now()}`,
-          expiresAt: Date.now() + 24 * 3600 * 1000,
-        };
-      } catch (error) {
-        this.logger.error({ message: 'Failed to obtain Shopify token' }, error instanceof Error ? error : new Error(String(error)));
-        throw error;
-      }
-    });
-  }
-
-  /**
-   * Setup BigCommerce token provider
-   */
-  private setupBigCommerceTokenProvider(): void {
-    this.service.registerTokenProvider(ECommercePlatform.BIGCOMMERCE, async (_platform, tokenType) => {
-      const secretsService = SecretsServiceFactory.getInstance().getService();
-
-      try {
-        const credentials = await secretsService.getSecret('bigcommerce_api_credentials');
-        if (!credentials) {
-          throw new Error('BigCommerce API credentials not found');
-        }
-
-        return {
-          token: `bigcommerce-${tokenType}-${Date.now()}`,
-          expiresAt: Date.now() + 7 * 24 * 3600 * 1000,
-        };
-      } catch (error) {
-        this.logger.error({ message: 'Failed to obtain BigCommerce token' }, error instanceof Error ? error : new Error(String(error)));
-        throw error;
-      }
-    });
-  }
-
-  /**
-   * Setup WooCommerce token provider
-   */
-  private setupWooCommerceTokenProvider(): void {
-    this.service.registerTokenProvider(ECommercePlatform.WOOCOMMERCE, async (_platform, _tokenType) => {
-      const secretsService = SecretsServiceFactory.getInstance().getService();
-
-      try {
-        const credentials = await secretsService.getSecret('woocommerce_api_credentials');
-        if (!credentials) {
-          throw new Error('WooCommerce API credentials not found');
-        }
-
-        return { token: JSON.parse(credentials).consumerKey, expiresAt: undefined };
-      } catch (error) {
-        this.logger.error({ message: 'Failed to obtain WooCommerce token' }, error instanceof Error ? error : new Error(String(error)));
-        throw error;
-      }
-    });
-  }
-
-  /**
    * Setup Sylius token provider.
-   * Calls the Sylius shop authentication-token endpoint to get a real JWT.
-   * Falls back to env var SYLIUS_ACCESS_TOKEN if credentials aren't available.
+   * Prefers a configured API token, then the SYLIUS_ACCESS_TOKEN env var, and
+   * finally exchanges email/password for a JWT at the shop authentication-token
+   * endpoint (credentials from the legacy secret or env vars).
    */
   private setupSyliusTokenProvider(): void {
     this.service.registerTokenProvider(ECommercePlatform.SYLIUS, async (_platform, _tokenType) => {
-      const secretsService = SecretsServiceFactory.getInstance().getService();
-
       try {
-        // 1. Try a pre-stored access token from env (set by fetch-credentials.sh)
+        const credentials = await getPlatformCredentials(ECommercePlatform.SYLIUS);
+
+        // 1. A configured API token is used as-is
+        if (credentials?.apiToken || credentials?.accessToken) {
+          return { token: (credentials.apiToken || credentials.accessToken) as string };
+        }
+
+        // 2. Pre-stored access token from env (set by fetch-credentials.sh)
         const envToken = process.env.SYLIUS_ACCESS_TOKEN;
         if (envToken) {
           return { token: envToken, expiresAt: Date.now() + 3600 * 1000 };
         }
 
-        // 2. Try credentials from secrets store
-        const credentials = await secretsService.getSecret('sylius_api_credentials');
-        if (credentials) {
-          const { email, password, storeUrl } = JSON.parse(credentials);
-          const baseUrl = (storeUrl || process.env.SYLIUS_API_URL || '').replace(/\/+$/, '');
-          const response = await fetch(`${baseUrl}/api/v2/shop/authentication-token`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
-          });
-          if (!response.ok) throw new Error(`Sylius auth failed: ${response.status}`);
-          const data = (await response.json()) as { token?: string };
-          if (!data.token) throw new Error('Sylius auth response missing token');
-          return { token: data.token, expiresAt: Date.now() + 3600 * 1000 };
+        // 3. Exchange email/password for a shop JWT
+        const email = credentials?.email || process.env.SYLIUS_EMAIL;
+        const password = credentials?.password || process.env.SYLIUS_PASSWORD;
+        const baseUrl = (credentials?.storeUrl || credentials?.apiUrl || process.env.SYLIUS_API_URL || '').replace(/\/+$/, '');
+
+        if (!email || !password || !baseUrl) {
+          throw new Error('Sylius credentials not found in settings, secrets store, or environment variables');
         }
 
-        throw new Error('Sylius credentials not found in secrets store or SYLIUS_ACCESS_TOKEN env var');
+        const response = await fetch(`${baseUrl}/api/v2/shop/authentication-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        if (!response.ok) throw new Error(`Sylius auth failed: ${response.status}`);
+        const data = (await response.json()) as { token?: string };
+        if (!data.token) throw new Error('Sylius auth response missing token');
+        return { token: data.token, expiresAt: Date.now() + 3600 * 1000 };
       } catch (error) {
         this.logger.error({ message: 'Failed to obtain Sylius token' }, error instanceof Error ? error : new Error(String(error)));
         throw error;
@@ -247,24 +229,33 @@ export class TokenServiceFactory {
   }
 
   /**
-   * Setup Wix token provider
+   * Setup Commercefull token provider.
+   * Exchanges the configured apiKey/apiSecret for a bearer token at
+   * POST {storeUrl}/business/auth/token. A lone apiKey is treated as a
+   * pre-issued static token.
    */
-  private setupWixTokenProvider(): void {
-    this.service.registerTokenProvider(ECommercePlatform.WIX, async (_platform, tokenType) => {
-      const secretsService = SecretsServiceFactory.getInstance().getService();
-
+  private setupCommercefullTokenProvider(): void {
+    this.service.registerTokenProvider(ECommercePlatform.COMMERCEFULL, async () => {
       try {
-        const credentials = await secretsService.getSecret('wix_api_credentials');
-        if (!credentials) {
-          throw new Error('Wix API credentials not found');
+        const credentials = await getPlatformCredentials(ECommercePlatform.COMMERCEFULL);
+
+        if (credentials?.apiKey && credentials?.apiSecret && credentials?.storeUrl) {
+          const { CommercefullApiClient } = require('../clients/commercefull/CommercefullApiClient');
+          const { token, expiresIn } = await CommercefullApiClient.getInstance().fetchAccessToken(
+            credentials.storeUrl,
+            credentials.apiKey,
+            credentials.apiSecret
+          );
+          return { token, expiresAt: Date.now() + (expiresIn ?? 3600) * 1000 };
         }
 
-        return {
-          token: `wix-${tokenType}-${Date.now()}`,
-          expiresAt: Date.now() + 24 * 3600 * 1000,
-        };
+        if (credentials?.apiKey) {
+          return { token: credentials.apiKey };
+        }
+
+        throw new Error('Commercefull credentials are not configured');
       } catch (error) {
-        this.logger.error({ message: 'Failed to obtain Wix token' }, error instanceof Error ? error : new Error(String(error)));
+        this.logger.error({ message: 'Failed to obtain Commercefull token' }, error instanceof Error ? error : new Error(String(error)));
         throw error;
       }
     });

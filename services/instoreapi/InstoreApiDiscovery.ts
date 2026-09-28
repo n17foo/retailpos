@@ -45,7 +45,6 @@ export class InstoreApiDiscovery {
     this.scanning = true;
 
     const port = instoreApiConfig.current.port;
-    const secret = instoreApiConfig.current.sharedSecret;
     const discovered: DiscoveredServer[] = [];
 
     // Determine subnet to scan
@@ -63,7 +62,7 @@ export class InstoreApiDiscovery {
       for (let i = start; i < Math.min(start + BATCH_SIZE, 255); i++) {
         const address = `${prefix}.${i}`;
         promises.push(
-          this.probeAddress(address, port, secret)
+          this.probeAddress(address, port)
             .then(result => {
               if (result) {
                 discovered.push(result);
@@ -91,10 +90,12 @@ export class InstoreApiDiscovery {
   /**
    * Probe a single address for the health endpoint.
    * Uses a short timeout to avoid blocking on unresponsive IPs.
+   * Never sends the shared secret — /api/health is unauthenticated so
+   * probing arbitrary subnet addresses can't leak credentials.
    */
-  async probeAddress(address: string, port: number, secret?: string): Promise<DiscoveredServer | null> {
+  async probeAddress(address: string, port: number): Promise<DiscoveredServer | null> {
     try {
-      const data = await instoreApiClient.probeHealth(`http://${address}:${port}`, secret, 2000);
+      const data = await instoreApiClient.probeHealth(`http://${address}:${port}`, 2000);
       if (!data || data.ok !== true) return null;
 
       return {

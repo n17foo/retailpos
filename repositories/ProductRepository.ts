@@ -1,5 +1,8 @@
 import { db } from '../utils/db';
 import { generateUUID } from '../utils/uuid';
+import { buildUpdateAssignments } from '../utils/sql';
+
+const PRODUCT_UPDATE_COLUMNS = ['name', 'description', 'price', 'sku', 'barcode', 'category_id', 'stock'] as const;
 
 export interface Product {
   id: string;
@@ -45,12 +48,9 @@ export class ProductRepository {
   }
 
   async update(id: string, data: Partial<Product>): Promise<void> {
-    const now = Date.now();
-    const fields = Object.keys(data).filter(key => key !== 'id');
-    const values = fields.map(key => data[key as keyof typeof data] as string | number | boolean);
-    const statement = `UPDATE products SET ${fields.map(field => `${field} = ?`).join(', ')}, updated_at = ? WHERE id = ?`;
-
-    await db.runAsync(statement, [...values, now, id] as (string | number | boolean)[]);
+    const { assignments, values } = buildUpdateAssignments(data, PRODUCT_UPDATE_COLUMNS);
+    if (assignments.length === 0) return;
+    await db.runAsync(`UPDATE products SET ${assignments.join(', ')}, updated_at = ? WHERE id = ?`, [...values, Date.now(), id]);
   }
 
   async delete(id: string): Promise<void> {

@@ -38,6 +38,8 @@ export interface ComposedSettingsTab {
 interface TabDefinition {
   translationKey: string;
   icon: string;
+  /** Additional action required beyond settings:view (e.g. credential-bearing tabs) */
+  requiredAction?: string;
   /** Tabs without a capabilityKey are always shown (core tabs) */
   capabilityKey?: CapabilityFeatureKey;
   requiresAdapterReady?: boolean;
@@ -55,10 +57,12 @@ const TAB_DEFINITIONS: Record<SettingsTabKey, TabDefinition> = {
   auth: {
     translationKey: 'settings.tabs.authentication',
     icon: '🔐',
+    requiredAction: 'settings:edit',
   },
   payment: {
     translationKey: 'settings.tabs.payment',
     icon: '💳',
+    requiredAction: 'settings:edit',
   },
   hardware: {
     translationKey: 'settings.tabs.hardware',
@@ -71,6 +75,7 @@ const TAB_DEFINITIONS: Record<SettingsTabKey, TabDefinition> = {
   ecommerce: {
     translationKey: 'settings.tabs.ecommerce',
     icon: '🛒',
+    requiredAction: 'settings:edit',
   },
   offline: {
     translationKey: 'settings.tabs.offline',
@@ -83,6 +88,7 @@ const TAB_DEFINITIONS: Record<SettingsTabKey, TabDefinition> = {
   multiregister: {
     translationKey: 'settings.tabs.multiRegister',
     icon: '🔗',
+    requiredAction: 'settings:edit',
   },
   theme: {
     translationKey: 'settings.tabs.theme',
@@ -137,6 +143,10 @@ export function composeSettingsTabs(input: SettingsTabComposerInput): ComposedSe
 
   for (const key of TAB_ORDER) {
     const def = TAB_DEFINITIONS[key];
+
+    // Credential-bearing tabs (payment keys, platform tokens, auth methods,
+    // LAN secret) are admin-only per the action registry's settings:edit.
+    if (def.requiredAction && !permissionService.canByRole(userRole, def.requiredAction)) continue;
 
     if (!def.capabilityKey) {
       // Core tab — always shown (if user has settings:view permission)

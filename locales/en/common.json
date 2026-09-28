@@ -28,7 +28,8 @@
     "logIn": "Log In",
     "loggingIn": "Logging in...",
     "validationError": "Validation Error",
-    "failure": "Failure"
+    "failure": "Failure",
+    "accessDenied": "You do not have permission to access this screen."
   },
   "welcome": {
     "title": "Welcome to RetailPOS",

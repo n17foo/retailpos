@@ -1,4 +1,5 @@
 import { keyValueRepository } from '../../repositories/KeyValueRepository';
+import { EcommerceSettingsStorage } from '../config/EcommerceSettingsStorage';
 import { LocalOrder } from '../basket/BasketServiceInterface';
 import { receiptConfigService } from './ReceiptConfigService';
 import { addMoney, multiplyMoney, roundMoney, subtractMoney, sumMoney } from '../../utils/money';
@@ -219,7 +220,7 @@ export class DailyReportService {
 
   async getCurrencySymbolFromSettings(): Promise<string> {
     try {
-      const settings = await keyValueRepository.getObject<{ offline?: { currency?: string } }>('ecommerceSettings');
+      const settings = await EcommerceSettingsStorage.load<{ offline?: { currency?: string } }>();
       return getCurrencySymbol(settings?.offline?.currency || 'GBP');
     } catch {
       return '£';

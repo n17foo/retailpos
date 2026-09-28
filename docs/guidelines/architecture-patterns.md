@@ -104,8 +104,8 @@ export const orderRepository = new OfflineOrderRepository();
 
 // 4. Factory — mode-aware routing
 export function getOrderRepository(): OrderRepository {
-  return localApiConfig.isClient
-    ? new LocalApiOrderRepository() // HTTP to server
+  return instoreApiConfig.isClient
+    ? new InstoreApiOrderRepository() // HTTP to server
     : orderRepository; // local SQLite
 }
 ```
@@ -113,7 +113,7 @@ export function getOrderRepository(): OrderRepository {
 **Rules**:
 
 - Interface is plain noun (`OrderRepository`), not `IOrderRepository`
-- SQLite class: `Offline[Entity]Repository`; HTTP class: `LocalApi[Entity]Repository`
+- SQLite class: `Offline[Entity]Repository`; HTTP class: `InstoreApi[Entity]Repository`
 - Services receive interface type — no knowledge of implementation
 - `BasketServiceFactory.buildContainer()` calls all `get[Entity]Repository()` at startup
 

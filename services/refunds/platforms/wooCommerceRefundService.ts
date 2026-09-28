@@ -1,8 +1,8 @@
 import { PlatformRefundServiceInterface, PlatformCredentials } from './PlatformRefundServiceInterface';
 import { RefundData, RefundResult, RefundRecord } from '../RefundService';
 import { LoggerFactory } from '../../logger/LoggerFactory';
-import { SecretsServiceFactory } from '../../secrets/SecretsService';
-import { SecretsServiceInterface } from '../../secrets/SecretsServiceInterface';
+import { getPlatformCredentials } from '../../config/PlatformCredentialsResolver';
+import { ECommercePlatform } from '../../../utils/platforms';
 import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
 
 /**
@@ -14,11 +14,9 @@ export class WooCommerceRefundService implements PlatformRefundServiceInterface 
   private initialized: boolean = false;
   private refundHistory: Map<string, RefundRecord[]> = new Map();
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
-  private secretsService: SecretsServiceInterface;
 
   constructor() {
     this.logger = LoggerFactory.getInstance().createLogger('WooCommerceRefundService');
-    this.secretsService = SecretsServiceFactory.getInstance().getService();
   }
 
   /**
@@ -54,13 +52,13 @@ export class WooCommerceRefundService implements PlatformRefundServiceInterface 
    */
   private async getWooCommerceCredentials(): Promise<PlatformCredentials | null> {
     try {
-      const credentials = await this.secretsService.getSecret('woocommerce_api_credentials');
+      const credentials = await getPlatformCredentials(ECommercePlatform.WOOCOMMERCE);
       if (!credentials) {
-        this.logger.error({ message: 'WooCommerce API credentials not found in secrets store' });
+        this.logger.error({ message: 'WooCommerce API credentials not configured' });
         return null;
       }
 
-      return JSON.parse(credentials);
+      return credentials;
     } catch (error) {
       this.logger.error({ message: 'Error retrieving WooCommerce credentials' }, error instanceof Error ? error : new Error(String(error)));
       return null;

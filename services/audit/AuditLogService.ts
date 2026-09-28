@@ -1,5 +1,6 @@
 import { keyValueRepository } from '../../repositories/KeyValueRepository';
 import { LoggerFactory } from '../logger/LoggerFactory';
+import { toCsv } from '../../utils/csv';
 
 export type AuditAction =
   | 'order:created'
@@ -20,6 +21,7 @@ export type AuditAction =
   | 'auth:login'
   | 'auth:logout'
   | 'auth:failed'
+  | 'auth:platform_token'
   | 'settings:changed'
   | 'shift:opened'
   | 'shift:closed'
@@ -185,12 +187,17 @@ export class AuditLogService {
   /** Export as CSV string */
   async exportCsv(): Promise<string> {
     await this.ensureLoaded();
-    const header = 'ID,Action,User ID,User Name,Register ID,Details,Timestamp\n';
-    const rows = this.entries.map(e => {
-      const ts = new Date(e.timestamp).toISOString();
-      return [e.id, e.action, e.userId || '', e.userName || '', e.registerId || '', (e.details || '').replace(/,/g, ';'), ts].join(',');
-    });
-    return header + rows.join('\n');
+    const header = ['ID', 'Action', 'User ID', 'User Name', 'Register ID', 'Details', 'Timestamp'];
+    const rows = this.entries.map(e => [
+      e.id,
+      e.action,
+      e.userId || '',
+      e.userName || '',
+      e.registerId || '',
+      e.details || '',
+      new Date(e.timestamp).toISOString(),
+    ]);
+    return toCsv(header, rows);
   }
 }
 

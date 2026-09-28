@@ -2,7 +2,6 @@ import React, { Dispatch, ReactNode, SetStateAction, createContext, useContext, 
 
 export interface AuthUser {
   username: string;
-  pin?: string;
   id?: string;
   role?: 'admin' | 'manager' | 'cashier';
 }

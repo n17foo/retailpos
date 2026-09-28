@@ -11,6 +11,7 @@ declare module '@env' {
 
   // Secrets related environment variables
   export const USE_MOCK_SECRETS: string;
+  export const ALLOW_PLAINTEXT_SECRET_FALLBACK: string;
 
   // Printers related environment variables
   export const USE_MOCK_PRINTERS: string;

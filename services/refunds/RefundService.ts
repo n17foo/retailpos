@@ -16,6 +16,8 @@ import { PrestaShopRefundService } from './platforms/PrestaShopRefundService';
 import { SquarespaceRefundService } from './platforms/SquarespaceRefundService';
 import { CommercefullRefundService } from './platforms/CommercefullRefundService';
 import { OfflineRefundService } from './platforms/OfflineRefundService';
+import { validateReturnRequest } from './returnValidation';
+import { addMoney } from '../../utils/money';
 
 export interface ReturnItem {
   id: string;
@@ -157,8 +159,18 @@ export class ReturnService {
       if (!order) {
         return { success: false, returnIds: [], totalRefund: 0, error: 'Order not found' };
       }
-      if (order.status !== 'paid' && order.status !== 'synced') {
-        return { success: false, returnIds: [], totalRefund: 0, error: 'Order must be paid before processing a return' };
+      const [orderItems, existingReturns] = await Promise.all([
+        this.orderItemRepo.findByOrderId(input.orderId),
+        this.returnRepo.findByOrderId(input.orderId),
+      ]);
+      const validationError = validateReturnRequest(input.items, {
+        orderStatus: order.status,
+        orderTotal: order.total,
+        orderItems: orderItems ?? [],
+        existingReturns: existingReturns ?? [],
+      });
+      if (validationError) {
+        return { success: false, returnIds: [], totalRefund: 0, error: validationError };
       }
 
       const returnIds: string[] = [];
@@ -181,7 +193,7 @@ export class ReturnService {
         id = await this.returnRepo.create(returnInput);
         await this.returnRepo.updateStatus(id, 'completed', input.processedBy);
         returnIds.push(id);
-        totalRefund += item.refundAmount;
+        totalRefund = addMoney(totalRefund, item.refundAmount);
       }
 
       this.logger.info(`Processed return for order ${input.orderId}: ${returnIds.length} item(s), refund ${totalRefund.toFixed(2)}`);

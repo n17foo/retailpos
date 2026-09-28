@@ -41,8 +41,11 @@ export abstract class BaseApiClient<TConfig extends BaseApiClientConfig = BaseAp
 
   /**
    * Return the authentication strategy for this client.
+   * May be async so implementations can resolve the current token from
+   * TokenService at request time (refreshed tokens then propagate without
+   * re-initialising the client).
    */
-  protected abstract getAuthStrategy(): AuthStrategy;
+  protected abstract getAuthStrategy(): AuthStrategy | Promise<AuthStrategy>;
 
   /**
    * Build the full API URL for a given resource path.
@@ -122,7 +125,7 @@ export abstract class BaseApiClient<TConfig extends BaseApiClientConfig = BaseAp
   }
 
   protected async requestWithHeaders<T>(method: string, url: string, body?: unknown): Promise<{ data: T; headers: Headers }> {
-    const headers = this.buildHeaders();
+    const headers = await this.buildHeaders();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 30_000);
 
@@ -158,13 +161,13 @@ export abstract class BaseApiClient<TConfig extends BaseApiClientConfig = BaseAp
     }
   }
 
-  protected buildHeaders(): Record<string, string> {
+  protected async buildHeaders(): Promise<Record<string, string>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
     };
 
-    const auth = this.getAuthStrategy();
+    const auth = await this.getAuthStrategy();
 
     switch (auth.type) {
       case 'bearer':

@@ -3,7 +3,7 @@
 > **System**: RetailPOS – Offline Operation & Multi-Register Data Flow
 > **Actor**: Cashier, Manager, Admin, System
 > **Date**: 2026-04-13
-> **Source**: `services/localapi/LocalApiConfig.ts`, `services/localapi/LocalApiServer.ts`, `services/localapi/LocalApiDiscovery.ts`, `services/localapi/sync/SyncEventBus.ts`, `services/localapi/sync/SyncPoller.ts`, `services/clients/localapi/LocalApiClient.ts`, `repositories/IOrderRepository.ts`, `repositories/IReturnRepository.ts`, `repositories/LocalApiOrderRepository.ts`, `repositories/LocalApiReturnRepository.ts`, `services/checkout/CheckoutService.ts`, `services/refunds/RefundService.ts`, `services/basket/BasketServiceFactory.ts`, `App.tsx`
+> **Source**: `services/instoreapi/InstoreApiConfig.ts`, `services/instoreapi/InstoreApiServer.ts`, `services/instoreapi/InstoreApiDiscovery.ts`, `services/instoreapi/sync/SyncEventBus.ts`, `services/instoreapi/sync/SyncPoller.ts`, `services/clients/instoreapi/InstoreApiClient.ts`, `repositories/OrderRepository.ts`, `repositories/ReturnRepository.ts`, `repositories/InstoreApiOrderRepository.ts`, `repositories/InstoreApiReturnRepository.ts`, `services/checkout/CheckoutService.ts`, `services/refunds/RefundService.ts`, `services/basket/BasketServiceFactory.ts`, `App.tsx`
 
 ---
 
@@ -30,13 +30,13 @@ The mode routing decision is made at the **repository layer**, not the service l
 ```
 OrderRepository (interface in OrderRepository.ts)
   ├── OfflineOrderRepository  — SQLite, standalone/server mode
-  └── LocalApiOrderRepository — HTTP to server, client mode
+  └── InstoreApiOrderRepository — HTTP to server, client mode
 
 ReturnRepository (interface in ReturnRepository.ts)
   ├── OfflineReturnRepository  — SQLite, standalone/server mode
-  └── LocalApiReturnRepository — HTTP to server, client mode
+  └── InstoreApiReturnRepository — HTTP to server, client mode
 
-getOrderRepository()  → checks localApiConfig.isClient, returns right implementation
+getOrderRepository()  → checks instoreApiConfig.isClient, returns right implementation
 getReturnRepository() → same pattern
 
 BasketServiceFactory.buildContainer()
@@ -46,12 +46,12 @@ BasketServiceFactory.buildContainer()
 
 ### Repository Naming Convention
 
-| Interface          | SQLite implementation     | Client implementation      |
-| ------------------ | ------------------------- | -------------------------- |
-| `OrderRepository`  | `OfflineOrderRepository`  | `LocalApiOrderRepository`  |
-| `ReturnRepository` | `OfflineReturnRepository` | `LocalApiReturnRepository` |
+| Interface          | SQLite implementation     | Client implementation        |
+| ------------------ | ------------------------- | ---------------------------- |
+| `OrderRepository`  | `OfflineOrderRepository`  | `InstoreApiOrderRepository`  |
+| `ReturnRepository` | `OfflineReturnRepository` | `InstoreApiReturnRepository` |
 
-The interface takes the plain name. The SQLite class is prefixed `Offline`. The HTTP class is prefixed `LocalApi`. No `I`-prefix on interfaces.
+The interface takes the plain name. The SQLite class is prefixed `Offline`. The HTTP class is prefixed `InstoreApi`. No `I`-prefix on interfaces.
 
 ### What changes per mode
 
@@ -60,10 +60,10 @@ The interface takes the plain name. The SQLite class is prefixed `Offline`. The 
 | Load products (Offline tab)   | `offlineProductService` → SQLite             | `offlineProductService` → SQLite (server manages its own data)  |
 | Load categories (Offline tab) | `offlineCategoryService` → SQLite            | `offlineCategoryService` → SQLite (server manages its own data) |
 | Load products (Order screen)  | `ProductServiceFactory` → platform or SQLite | `ProductServiceFactory` → platform or SQLite                    |
-| Create order                  | `OrderRepository.createWithItems()` → SQLite | `LocalApiOrderRepository.createWithItems()` → HTTP              |
-| Complete payment              | `OrderRepository.updatePayment()` → SQLite   | `LocalApiOrderRepository.updatePayment()` → HTTP                |
-| Create return                 | `ReturnRepository.create()` → SQLite         | `LocalApiReturnRepository.create()` → HTTP                      |
-| Load order history            | `OrderRepository.findByDateRange()` → SQLite | `LocalApiOrderRepository.findByDateRange()` → HTTP              |
+| Create order                  | `OrderRepository.createWithItems()` → SQLite | `InstoreApiOrderRepository.createWithItems()` → HTTP            |
+| Complete payment              | `OrderRepository.updatePayment()` → SQLite   | `InstoreApiOrderRepository.updatePayment()` → HTTP              |
+| Create return                 | `ReturnRepository.create()` → SQLite         | `InstoreApiReturnRepository.create()` → HTTP                    |
+| Load order history            | `OrderRepository.findByDateRange()` → SQLite | `InstoreApiOrderRepository.findByDateRange()` → HTTP            |
 
 ### useOfflineProducts and useOfflineCategories
 
@@ -75,11 +75,11 @@ Client registers do not manage products directly. They read products through the
 
 ## 1. Ubiquitous Requirements
 
-**1.1** `localApiConfig.load()` shall be called at app startup before any data operation. The loaded mode determines all subsequent routing decisions.
+**1.1** `instoreApiConfig.load()` shall be called at app startup before any data operation. The loaded mode determines all subsequent routing decisions.
 
 **1.2** In `standalone` and `server` modes, all business data reads and writes shall go directly to local SQLite repositories — no HTTP calls are made for business data.
 
-**1.3** In `client` mode, all business data reads and writes shall go through `LocalApiClient` — local SQLite repositories are not used for business data.
+**1.3** In `client` mode, all business data reads and writes shall go through `InstoreApiClient` — local SQLite repositories are not used for business data.
 
 **1.4** The mode routing decision shall be made at the **repository layer** via `BasketServiceFactory` — UI components and services shall not need to know the current mode.
 
@@ -111,11 +111,11 @@ Client registers do not manage products directly. They read products through the
 
 ### 2.3 Client Mode — Checkout
 
-**2.3.1** When `CheckoutService.startCheckout()` is called in `client` mode, the system shall call `orderRepo.createWithItems(orderInput, lineItems)` which (via `LocalApiOrderRepository`) calls `localApiClient.createOrder(order, items)` to write the order to the server's SQLite.
+**2.3.1** When `CheckoutService.startCheckout()` is called in `client` mode, the system shall call `orderRepo.createWithItems(orderInput, lineItems)` which (via `InstoreApiOrderRepository`) calls `instoreApiClient.createOrder(order, items)` to write the order to the server's SQLite.
 
-**2.3.2** When `CheckoutService.completePayment()` is called in `client` mode, the system shall call `orderRepo.updatePayment()` which (via `LocalApiOrderRepository`) calls `localApiClient.updateOrderPayment()`.
+**2.3.2** When `CheckoutService.completePayment()` is called in `client` mode, the system shall call `orderRepo.updatePayment()` which (via `InstoreApiOrderRepository`) calls `instoreApiClient.updateOrderPayment()`.
 
-**2.3.3** When `CheckoutService.cancelOrder()` is called in `client` mode, the system shall call `orderRepo.updateStatus(orderId, 'cancelled')` which (via `LocalApiOrderRepository`) calls `localApiClient.updateOrderStatus()`.
+**2.3.3** When `CheckoutService.cancelOrder()` is called in `client` mode, the system shall call `orderRepo.updateStatus(orderId, 'cancelled')` which (via `InstoreApiOrderRepository`) calls `instoreApiClient.updateOrderStatus()`.
 
 ### 2.4 Standalone / Server Mode — Returns
 
@@ -123,7 +123,7 @@ Client registers do not manage products directly. They read products through the
 
 ### 2.5 Client Mode — Returns
 
-**2.5.1** When `RefundService.processReturn()` is called in `client` mode, the system shall call `returnRepo.create()` which (via `LocalApiReturnRepository`) calls `localApiClient.createReturn()` to write the return to the server's SQLite.
+**2.5.1** When `RefundService.processReturn()` is called in `client` mode, the system shall call `returnRepo.create()` which (via `InstoreApiReturnRepository`) calls `instoreApiClient.createReturn()` to write the return to the server's SQLite.
 
 ### 2.6 Server — Write Endpoints (to be implemented)
 
@@ -149,29 +149,29 @@ Client registers do not manage products directly. They read products through the
 
 ### 2.7 Client — Write Methods (to be implemented)
 
-**2.7.1** `LocalApiClient.createOrder(input, items)` → `POST /api/orders`
+**2.7.1** `InstoreApiClient.createOrder(input, items)` → `POST /api/orders`
 
-**2.7.2** `LocalApiClient.updateOrderStatus(id, status)` → `PUT /api/orders/:id/status`
+**2.7.2** `InstoreApiClient.updateOrderStatus(id, status)` → `PUT /api/orders/:id/status`
 
-**2.7.3** `LocalApiClient.updateOrderPayment(id, method, txId)` → `PUT /api/orders/:id/payment`
+**2.7.3** `InstoreApiClient.updateOrderPayment(id, method, txId)` → `PUT /api/orders/:id/payment`
 
-**2.7.4** `LocalApiClient.createReturn(input)` → `POST /api/returns`
+**2.7.4** `InstoreApiClient.createReturn(input)` → `POST /api/returns`
 
-**2.7.5** `LocalApiClient.createProduct(data)` → `POST /api/products`
+**2.7.5** `InstoreApiClient.createProduct(data)` → `POST /api/products`
 
-**2.7.6** `LocalApiClient.updateProduct(id, data)` → `PUT /api/products/:id`
+**2.7.6** `InstoreApiClient.updateProduct(id, data)` → `PUT /api/products/:id`
 
-**2.7.7** `LocalApiClient.deleteProduct(id)` → `DELETE /api/products/:id`
+**2.7.7** `InstoreApiClient.deleteProduct(id)` → `DELETE /api/products/:id`
 
-**2.7.8** `LocalApiClient.createCategory(data)` → `POST /api/categories`
+**2.7.8** `InstoreApiClient.createCategory(data)` → `POST /api/categories`
 
-**2.7.9** `LocalApiClient.updateCategory(id, data)` → `PUT /api/categories/:id`
+**2.7.9** `InstoreApiClient.updateCategory(id, data)` → `PUT /api/categories/:id`
 
-**2.7.10** `LocalApiClient.deleteCategory(id)` → `DELETE /api/categories/:id`
+**2.7.10** `InstoreApiClient.deleteCategory(id)` → `DELETE /api/categories/:id`
 
 ### 2.8 SyncPoller Lifecycle
 
-**2.8.1** When `App.tsx` initialises and `localApiConfig.isClient` is `true`, the system shall call `syncPoller.start()`.
+**2.8.1** When `App.tsx` initialises and `instoreApiConfig.isClient` is `true`, the system shall call `syncPoller.start()`.
 
 **2.8.2** When `App.tsx` unmounts or the mode changes to non-client, the system shall call `syncPoller.stop()`.
 
@@ -181,31 +181,27 @@ Client registers do not manage products directly. They read products through the
 
 ## 3. State-Driven Requirements
 
-**3.1** While `localApiConfig.isStandalone` is `true`, all data operations use local SQLite. No HTTP calls are made for business data. No sync events are emitted.
+**3.1** While `instoreApiConfig.isStandalone` is `true`, all data operations use local SQLite. No HTTP calls are made for business data. No sync events are emitted.
 
-**3.2** While `localApiConfig.isServer` is `true`, all data operations use local SQLite AND sync events are emitted after each write so connected clients stay current.
+**3.2** While `instoreApiConfig.isServer` is `true`, all data operations use local SQLite AND sync events are emitted after each write so connected clients stay current.
 
-**3.3** While `localApiConfig.isClient` is `true`, all data operations use `LocalApiClient` (via `LocalApiOrderRepository` / `LocalApiReturnRepository`). Local SQLite repositories are bypassed for business data. `SyncPoller` runs.
+**3.3** While `instoreApiConfig.isClient` is `true`, all data operations use `InstoreApiClient` (via `InstoreApiOrderRepository` / `InstoreApiReturnRepository`). Local SQLite repositories are bypassed for business data. `SyncPoller` runs.
 
-**3.4** While `localApiClient.isConnected` is `false` in client mode, data operations will fail — the UI shall surface connection errors and allow the cashier to retry.
+**3.4** While `instoreApiClient.isConnected` is `false` in client mode, data operations will fail — the UI shall surface connection errors and allow the cashier to retry.
 
 **3.5** While `SyncPoller` is running and the server is unreachable, it shall apply exponential backoff (up to 30s) and continue retrying silently after the first 3 errors.
 
 ---
 
-## 4. Implementation Gaps (work required)
+## 4. Implementation Gaps
 
-The following are not yet implemented and are required to complete the multi-register data flow:
+The write endpoints, client write methods, HTTP transport (`InstoreApiTransport` via `react-native-http-bridge`), `GET /api/categories`, and `SyncPoller` startup in `App.tsx` are all implemented. Remaining gaps:
 
-**4.1** **Server write endpoints** — `LocalApiServer` has no `POST`/`PUT`/`DELETE` routes. All 10 routes in section 2.6 need to be added.
+**4.1** **No client-mode write queue** — if the server is unreachable, client transactions fail rather than queue locally (see 5.1.2).
 
-**4.2** **Client write methods** — `LocalApiClient` has no write methods. All 10 methods in section 2.7 need to be added.
+**4.2** **No shift API** — there are no `/api/shifts*` routes and no `ShiftRepository`; client-mode shift management is non-functional.
 
-**4.3** **`SyncPoller` not started** — `App.tsx` does not start `syncPoller` in client mode. This needs to be wired.
-
-**4.4** **No HTTP transport** — `LocalApiServer` has route logic but no actual HTTP listener. A native module or Electron IPC handler must call `localApiServer.handleRequest()`. Without this, server mode is non-functional on mobile/tablet.
-
-**4.5** **`GET /api/categories` missing** — `LocalApiServer` has no category read endpoint. `LocalApiClient` has no `getCategories()` method. Both need to be added alongside the write endpoints.
+**4.3** **SyncEventBus has no consumers** — polled events are dispatched but no service subscribes to update local state.
 
 ---
 
@@ -221,11 +217,11 @@ The following are not yet implemented and are required to complete the multi-reg
 
 ### 5.2 Mode Switching at Runtime
 
-**5.2.1** When the admin changes the mode in `LocalApiSettingsTab` and saves, the system shall call `localApiConfig.save(updates)` to persist the new mode.
+**5.2.1** When the admin changes the mode in `InstoreApiSettingsTab` and saves, the system shall call `instoreApiConfig.save(updates)` to persist the new mode.
 
-**5.2.2** When mode changes to `server`, the system shall call `localApiServer.start()`.
+**5.2.2** When mode changes to `server`, the system shall call `instoreApiServer.start()`.
 
-**5.2.3** When mode changes to `client` or `standalone`, the system shall call `localApiServer.stop()` and, if switching away from `client`, call `syncPoller.stop()`.
+**5.2.3** When mode changes to `client` or `standalone`, the system shall call `instoreApiServer.stop()` and, if switching away from `client`, call `syncPoller.stop()`.
 
 **5.2.4** `BasketServiceFactory` caches its container — after a mode change, `BasketServiceFactory.reset()` must be called so the next `getServices()` call rebuilds the container with the new repository implementations.
 
@@ -245,27 +241,27 @@ The `docs/features/offline.md` feature doc contains two inaccuracies vs the actu
 
 **Flow 4 inaccuracy** — The feature doc says "Order created on client → SyncEventBus publishes event → Event sent to server via HTTP POST." This is incorrect. In the actual design:
 
-- Client registers write orders directly to the server via `LocalApiOrderRepository` (HTTP PUT/POST)
+- Client registers write orders directly to the server via `InstoreApiOrderRepository` (HTTP PUT/POST)
 - The server emits sync events to `SyncEventBus` after each write
 - Other client registers poll `GET /api/sync/events` to receive those events
 - There is no client→server event POST — data writes are the events
 
 **Flow 5 inaccuracy** — The feature doc says "Continues operating — all data in local SQLite, orders created locally." In client mode, there is no local SQLite fallback. If the server is unreachable, the client cannot create orders. The local SQLite is only used for config and session state in client mode.
 
-| File                                       | Change                                                                                    |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| `repositories/IOrderRepository.ts`         | New — interface extracted from `OrderRepository`                                          |
-| `repositories/IReturnRepository.ts`        | New — interface extracted from `ReturnRepository`                                         |
-| `repositories/LocalApiOrderRepository.ts`  | New — `IOrderRepository` impl delegating to `LocalApiClient`                              |
-| `repositories/LocalApiReturnRepository.ts` | New — `IReturnRepository` impl delegating to `LocalApiClient`                             |
-| `repositories/OrderRepository.ts`          | Implements `IOrderRepository`; adds `createWithItems()`                                   |
-| `repositories/ReturnRepository.ts`         | Implements `IReturnRepository`                                                            |
-| `services/checkout/CheckoutService.ts`     | Uses `IOrderRepository`; no `localApiConfig` checks                                       |
-| `services/refunds/RefundService.ts`        | Uses `IReturnRepository` via `returnRepo` field; `setReturnRepository()` for injection    |
-| `services/basket/BasketServiceFactory.ts`  | Selects `LocalApiOrderRepository` or `OrderRepository` based on mode; injects return repo |
-| `services/sync/OrderSyncService.ts`        | Uses `IOrderRepository`                                                                   |
-| `hooks/useOfflineProducts.ts`              | Reverted — always uses `offlineProductService` (server/standalone only)                   |
-| `hooks/useOfflineCategories.ts`            | Reverted — always uses `offlineCategoryService` (server/standalone only)                  |
+| File                                         | Change                                                                                |
+| -------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `repositories/OrderRepository.ts`            | Exports the `OrderRepository` interface and the mode-aware factory                    |
+| `repositories/ReturnRepository.ts`           | Exports the `ReturnRepository` interface                                              |
+| `repositories/InstoreApiOrderRepository.ts`  | `OrderRepository` impl delegating to `InstoreApiClient`                               |
+| `repositories/InstoreApiReturnRepository.ts` | `ReturnRepository` impl delegating to `InstoreApiClient`                              |
+| `repositories/OfflineOrderRepository.ts`     | SQLite implementation for standalone/server mode                                      |
+| `repositories/OfflineReturnRepository.ts`    | SQLite implementation for standalone/server mode                                      |
+| `services/checkout/CheckoutService.ts`       | Uses `OrderRepository`; no `instoreApiConfig` checks                                  |
+| `services/refunds/RefundService.ts`          | Uses `ReturnRepository` via `returnRepo` field; `setReturnRepository()` for injection |
+| `services/basket/BasketServiceFactory.ts`    | Selects `InstoreApiOrderRepository` or `OfflineOrderRepository` based on mode         |
+| `services/sync/OrderSyncService.ts`          | Uses `OrderRepository`                                                                |
+| `hooks/useOfflineProducts.ts`                | Reverted — always uses `offlineProductService` (server/standalone only)               |
+| `hooks/useOfflineCategories.ts`              | Reverted — always uses `offlineCategoryService` (server/standalone only)              |
 
 No changes needed to UI components — the routing is entirely in the repository layer.
 
@@ -273,38 +269,38 @@ No changes needed to UI components — the routing is entirely in the repository
 
 ## 7. Files Changed
 
-| File                                       | Change                                                                                |
-| ------------------------------------------ | ------------------------------------------------------------------------------------- |
-| `repositories/OrderRepository.ts`          | Interface + types + singleton + `getOrderRepository()` factory                        |
-| `repositories/OfflineOrderRepository.ts`   | SQLite implementation of `OrderRepository`                                            |
-| `repositories/LocalApiOrderRepository.ts`  | HTTP implementation of `OrderRepository`                                              |
-| `repositories/ReturnRepository.ts`         | Interface + types + singleton + `getReturnRepository()` factory                       |
-| `repositories/OfflineReturnRepository.ts`  | SQLite implementation of `ReturnRepository`                                           |
-| `repositories/LocalApiReturnRepository.ts` | HTTP implementation of `ReturnRepository`                                             |
-| `services/checkout/CheckoutService.ts`     | Uses `OrderRepository` interface; no mode checks                                      |
-| `services/refunds/RefundService.ts`        | Uses `ReturnRepository` via `returnRepo` field; `setReturnRepository()` for injection |
-| `services/basket/BasketServiceFactory.ts`  | Calls `getOrderRepository()` and `getReturnRepository()` at wiring time               |
-| `services/sync/OrderSyncService.ts`        | Uses `OrderRepository` interface                                                      |
-| `hooks/useOfflineProducts.ts`              | Always uses `offlineProductService` (server/standalone only)                          |
-| `hooks/useOfflineCategories.ts`            | Always uses `offlineCategoryService` (server/standalone only)                         |
-| `App.tsx`                                  | Starts `syncPoller` when `localApiConfig.isClient`                                    |
+| File                                         | Change                                                                                |
+| -------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `repositories/OrderRepository.ts`            | Interface + types + singleton + `getOrderRepository()` factory                        |
+| `repositories/OfflineOrderRepository.ts`     | SQLite implementation of `OrderRepository`                                            |
+| `repositories/InstoreApiOrderRepository.ts`  | HTTP implementation of `OrderRepository`                                              |
+| `repositories/ReturnRepository.ts`           | Interface + types + singleton + `getReturnRepository()` factory                       |
+| `repositories/OfflineReturnRepository.ts`    | SQLite implementation of `ReturnRepository`                                           |
+| `repositories/InstoreApiReturnRepository.ts` | HTTP implementation of `ReturnRepository`                                             |
+| `services/checkout/CheckoutService.ts`       | Uses `OrderRepository` interface; no mode checks                                      |
+| `services/refunds/RefundService.ts`          | Uses `ReturnRepository` via `returnRepo` field; `setReturnRepository()` for injection |
+| `services/basket/BasketServiceFactory.ts`    | Calls `getOrderRepository()` and `getReturnRepository()` at wiring time               |
+| `services/sync/OrderSyncService.ts`          | Uses `OrderRepository` interface                                                      |
+| `hooks/useOfflineProducts.ts`                | Always uses `offlineProductService` (server/standalone only)                          |
+| `hooks/useOfflineCategories.ts`              | Always uses `offlineCategoryService` (server/standalone only)                         |
+| `App.tsx`                                    | Starts `syncPoller` when `instoreApiConfig.isClient`                                  |
 
 ---
 
 ## 8. Component Traceability
 
 | -------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Mode loaded at startup | `localApiConfig.load()` | `services/localapi/LocalApiConfig.ts` |
+| Mode loaded at startup | `instoreApiConfig.load()` | `services/instoreapi/InstoreApiConfig.ts` |
 | Repository selected at wiring time | `BasketServiceFactory.buildContainer()` | `services/basket/BasketServiceFactory.ts` |
 | Standalone/server: orders written to SQLite | `CheckoutService` → `OfflineOrderRepository.createWithItems()` | `repositories/OrderRepository.ts` |
-| Client: orders written to server | `CheckoutService` → `LocalApiOrderRepository.createWithItems()` | `repositories/LocalApiOrderRepository.ts` |
+| Client: orders written to server | `CheckoutService` → `InstoreApiOrderRepository.createWithItems()` | `repositories/InstoreApiOrderRepository.ts` |
 | Standalone/server: returns written to SQLite | `RefundService` → `OfflineReturnRepository` | `repositories/ReturnRepository.ts` |
-| Client: returns written to server | `RefundService` → `LocalApiReturnRepository` | `repositories/LocalApiReturnRepository.ts` |
+| Client: returns written to server | `RefundService` → `InstoreApiReturnRepository` | `repositories/InstoreApiReturnRepository.ts` |
 | Factory functions select right impl | `getOrderRepository()` / `getReturnRepository()` | `repositories/OrderRepository.ts`, `repositories/ReturnRepository.ts` |
-| Server: emit sync event after write | `syncEventBus.emit()` in each write path | `services/localapi/sync/SyncEventBus.ts` |
+| Server: emit sync event after write | `syncEventBus.emit()` in each write path | `services/instoreapi/sync/SyncEventBus.ts` |
 | Offline tab product management | `useOfflineProducts` → `offlineProductService` (server/standalone only) | `hooks/useOfflineProducts.ts` |
 | Offline tab category management | `useOfflineCategories` → `offlineCategoryService` (server/standalone only) | `hooks/useOfflineCategories.ts` |
 | Order screen products (all modes) | `useProducts` → `ProductServiceFactory` | `hooks/useProducts.ts` |
-| SyncPoller started in client mode | `App.tsx` → `syncPoller.start()` ← GAP | `App.tsx` |
-| Server write routes | `LocalApiServer.registerRoutes()` ← GAP | `services/localapi/LocalApiServer.ts` |
-| Client write methods | `LocalApiClient` ← GAP | `services/clients/localapi/LocalApiClient.ts` |
+| SyncPoller started in client mode | `App.tsx` → `syncPoller.start()` | `App.tsx` |
+| Server write routes | `InstoreApiServer.registerRoutes()` | `services/instoreapi/InstoreApiServer.ts` |
+| Client write methods | `InstoreApiClient` | `services/clients/instoreapi/InstoreApiClient.ts` |

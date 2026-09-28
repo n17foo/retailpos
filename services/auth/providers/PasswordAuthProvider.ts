@@ -5,6 +5,7 @@ import { AuthAttemptLimiter } from '../AuthAttemptLimiter';
 import { hashCredential, verifyCredential, isHashedCredential } from '../../../utils/crypto';
 
 const PASSWORD_KEY_PREFIX = 'auth.password.';
+const MAX_PASSWORD_LENGTH = 1024;
 
 /**
  * Password-based authentication provider.
@@ -29,10 +30,13 @@ export class PasswordAuthProvider implements AuthMethodProvider {
     if (!credential) {
       return { success: false, error: 'Password is required.' };
     }
-
     const remainingMs = this.limiter.getLockoutRemainingMs();
     if (remainingMs > 0) {
       return { success: false, error: `Too many failed attempts. Try again in ${Math.ceil(remainingMs / 1000)}s.` };
+    }
+    if (credential.length > MAX_PASSWORD_LENGTH) {
+      this.limiter.recordResult(false);
+      return { success: false, error: 'Invalid password. Please try again.' };
     }
 
     try {
@@ -60,6 +64,7 @@ export class PasswordAuthProvider implements AuthMethodProvider {
   }
 
   async enroll(userId: string, credential: string): Promise<boolean> {
+    if (!credential || credential.length > MAX_PASSWORD_LENGTH) return false;
     try {
       await keyValueRepository.setObject(PASSWORD_KEY_PREFIX + userId, hashCredential(credential));
       return true;

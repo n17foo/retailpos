@@ -1,5 +1,8 @@
 import { BaseApiClient, AuthStrategy, BaseApiClientConfig } from '../BaseApiClient';
 import { SYLIUS_API_VERSION } from '../../config/apiVersions';
+import { ECommercePlatform } from '../../../utils/platforms';
+import { getPlatformToken } from '../../token/TokenUtils';
+import { TokenType } from '../../token/TokenServiceInterface';
 
 /**
  * Sylius-specific API client configuration.
@@ -55,11 +58,9 @@ export class SyliusApiClient extends BaseApiClient<SyliusConfig> {
     return this.config.apiVersion || SYLIUS_API_VERSION;
   }
 
-  protected getAuthStrategy(): AuthStrategy {
-    if (this.config.accessToken) {
-      return { type: 'bearer', token: this.config.accessToken };
-    }
-    return { type: 'none' };
+  protected async getAuthStrategy(): Promise<AuthStrategy> {
+    const token = (await getPlatformToken(ECommercePlatform.SYLIUS, TokenType.ACCESS)) || this.config.accessToken;
+    return token ? { type: 'bearer', token } : { type: 'none' };
   }
 
   protected buildApiUrl(path: string): string {

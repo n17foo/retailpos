@@ -49,13 +49,13 @@ export class AuthConfigService {
       const storedAllowed = await this.kv.getObject<AuthMethodType[]>(KEYS.allowedMethods);
       const storedMode = await this.kv.getObject<AuthMode>(KEYS.authMode);
 
-      if (storedPrimary && ALL_AUTH_METHODS.includes(storedPrimary)) {
+      if (storedPrimary && ALL_AUTH_METHODS.includes(storedPrimary) && storedPrimary !== 'platform_auth') {
         this.primary = storedPrimary;
       }
 
       if (storedAllowed && Array.isArray(storedAllowed)) {
-        // Ensure PIN is always in the allowed list
-        const valid = storedAllowed.filter(m => ALL_AUTH_METHODS.includes(m));
+        // Ensure PIN is always in the allowed list and exclude disabled methods
+        const valid = storedAllowed.filter(m => ALL_AUTH_METHODS.includes(m) && m !== 'platform_auth');
         this.allowed = valid.includes('pin') ? valid : ['pin', ...valid];
       }
 
@@ -99,6 +99,9 @@ export class AuthConfigService {
 
   /** Set the primary auth method */
   async setPrimaryMethod(method: AuthMethodType): Promise<void> {
+    if (method === 'platform_auth') {
+      method = 'pin';
+    }
     this.primary = method;
     // Ensure primary is also in allowed
     if (!this.allowed.includes(method)) {
@@ -110,8 +113,9 @@ export class AuthConfigService {
 
   /** Set the full list of allowed auth methods */
   async setAllowedMethods(methods: AuthMethodType[]): Promise<void> {
+    const selectable = methods.filter(method => method !== 'platform_auth');
     // PIN is always required
-    const withPin = methods.includes('pin') ? methods : ['pin' as AuthMethodType, ...methods];
+    const withPin = selectable.includes('pin') ? selectable : ['pin' as AuthMethodType, ...selectable];
     this.allowed = withPin;
     await this.kv.setObject(KEYS.allowedMethods, this.allowed);
 
@@ -123,6 +127,7 @@ export class AuthConfigService {
 
   /** Enable a single auth method */
   async enableMethod(method: AuthMethodType): Promise<void> {
+    if (method === 'platform_auth') return;
     if (!this.allowed.includes(method)) {
       this.allowed.push(method);
       await this.kv.setObject(KEYS.allowedMethods, this.allowed);
