@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
-import { Order } from '../OrderServiceInterface';
+import { Order, TaxQuote } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { BigCommerceApiClient } from '../../clients/bigcommerce/BigCommerceApiClient';
@@ -81,6 +81,39 @@ export class BigCommerceOrderService extends BaseOrderService {
     } catch (error) {
       this.logger.error({ message: 'Error creating order on BigCommerce' }, error instanceof Error ? error : new Error(String(error)));
       throw error;
+    }
+  }
+
+  /**
+   * Ask BigCommerce to calculate tax for the basket: create a cart, read its checkout totals, delete the cart.
+   * The checkout reports `subtotal_ex_tax`, `tax_total` and `cart.tax_included`; tax follows the store's tax rules
+   * and the checkout's address.
+   * Docs: POST /v3/carts, GET /v3/checkouts/{cartId} (taxTotal / tax_total), DELETE /v3/carts/{cartId}
+   */
+  async quoteTax(order: Order): Promise<TaxQuote> {
+    if (!this.isInitialized()) {
+      throw new Error('BigCommerce order service not initialized');
+    }
+
+    const created = await this.apiClient.post<any>('carts', {
+      line_items: order.lineItems.map(item => ({
+        quantity: item.quantity,
+        product_id: Number(item.productId),
+        // Products without variants carry a synthetic, non-numeric variant id
+        variant_id: item.variantId && /^\d+$/.test(item.variantId) ? Number(item.variantId) : undefined,
+      })),
+    });
+    const cartId: string = created.data.id;
+
+    try {
+      const checkout = (await this.apiClient.get<any>(`checkouts/${cartId}`)).data;
+      return {
+        subtotal: Number(checkout.subtotal_ex_tax ?? 0),
+        tax: Number(checkout.tax_total ?? 0),
+        taxIncluded: checkout.cart?.tax_included === true,
+      };
+    } finally {
+      await this.apiClient.delete(`carts/${cartId}`).catch(() => undefined);
     }
   }
 

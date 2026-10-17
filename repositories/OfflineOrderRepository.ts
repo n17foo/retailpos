@@ -13,10 +13,10 @@ export class OfflineOrderRepository implements OrderRepository {
     await db.runAsync(
       `INSERT INTO orders (
         id, platform, platform_order_id, subtotal, tax, total,
-        discount_amount, discount_code, customer_email, customer_name, note,
+        discount_amount, discount_code, customer_email, customer_name, note, sale_mode,
         cashier_id, cashier_name, register_id,
         status, sync_status, payments_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.id,
         input.platform,
@@ -29,6 +29,7 @@ export class OfflineOrderRepository implements OrderRepository {
         input.customerEmail,
         input.customerName,
         input.note,
+        input.saleMode ?? null,
         input.cashierId,
         input.cashierName,
         input.registerId ?? null,

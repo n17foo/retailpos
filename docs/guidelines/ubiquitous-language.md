@@ -60,13 +60,13 @@
 
 ## Platform & Capability
 
-**Platform** — E-commerce backend or `offline`. Enum: `shopify`, `woocommerce`, `bigcommerce`, `magento`, `sylius`, `wix`, `prestashop`, `squarespace`, `commercefull`, `offline`
+**Platform** — E-commerce backend or `offline`. Enum: `shopify`, `woocommerce`, `bigcommerce`, `magento`, `sylius`, `wix`, `prestashop`, `commercefull`, `offline`
 
 **Basket Mode**:
 
 - `native_draft` — Platform creates mutable draft at checkout; tax is platform-authoritative (Shopify, Wix, Commercefull)
 - `remote_cart` — No platform call at checkout; POS basket local-authoritative; sync creates order (WooCommerce, Magento, BigCommerce, Sylius, PrestaShop)
-- `local_only` — Fully local basket; order imported post-payment (Squarespace, Offline)
+- `local_only` — Fully local basket; order imported post-payment (Offline)
 
 **Capability Level**: `supported` (stable API), `custom` (adapter required), `not_recommended` (hidden/disabled)
 
@@ -96,21 +96,15 @@
 
 ## Tax
 
-**TaxProfile** — Named tax config in SQLite. Fields: `id`, `name`, `rate` (0–1), `isDefault`. Three defaults: Standard (20%), Reduced (5%), Zero (0%).
+**TaxProfile** — Merchant-defined named tax config in SQLite (offline catalogue only). Fields: `id`, `name`, `rate` (0–1), `isDefault`. None are created automatically.
 
 **taxProfileId** — Reference from offline product to `TaxProfile`. Rate resolved at add-to-cart.
 
-**taxCode** — Platform-supplied tax class string (e.g. `'reduced-rate'`). Resolved to local `TaxProfile` by name match.
+**taxRate** — Decimal (0–1) stored on `BasketItem` for offline items only. Online items carry none; the platform calculates tax at checkout.
 
-**taxRate** — Resolved decimal (0–1) stored on `BasketItem`. Captured once at add-to-cart, never re-resolved.
+**TaxQuote** — Platform-calculated tax for a basket (`subtotal` net, `tax`, `taxIncluded`) from a temporary cart/quote; the POS applies its effective rate to the discounted amount.
 
-**TaxCalculationType**: `'inclusive'` (tax inside price), `'exclusive'` (tax added), `'exempt'` (no tax)
-
-**Rate Resolution Pipeline**: 1) Normalize tax code 2) Exempt fast-path 3) Live platform rate 4) Local profile fallback 5) Default profile
-
-**Zero-Rate Platform** — Platform with no public tax API (Shopify, BigCommerce, Wix, PrestaShop, Squarespace). Returns 0%.
-
-**Platform-Authoritative Tax** — For `native_draft`, platform draft values overwrite local estimates at `startCheckout()`.
+**Platform-Authoritative Tax** — Online platforms own tax: draft order totals (`native_draft`) or a `TaxQuote` (`remote_cart`) at `startCheckout()`. Checkout stops if the platform cannot return it.
 
 ---
 
@@ -193,8 +187,6 @@
 **Factory Pattern** — Interface → Factory (singleton) → Platform implementations → Offline fallback (ADR-005)
 
 **Repository Pattern** — Repositories own SQLite access. Services never call DB directly (ADR-002, ADR-003)
-
-**Strategy Pattern** — Tax calculation: `TaxServiceFactory` holds one `TaxStrategy` per platform
 
 **KV Store** — String key → JSON value in SQLite. Config, flags, session data, audit log.
 

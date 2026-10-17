@@ -19,6 +19,7 @@ import { useTranslate } from './hooks/useTranslate';
 import { lightColors } from './utils/theme';
 import { queueManager } from './services/queue/QueueManager';
 import { backgroundSyncService } from './services/sync/BackgroundSyncService';
+import { loyaltyExpiryJob } from './services/jobs/LoyaltyExpiryJob';
 import { posConfig } from './services/config/POSConfigService';
 import { authConfig } from './services/auth/AuthConfigService';
 import { instoreApiConfig } from './services/instoreapi/InstoreApiConfig';
@@ -30,8 +31,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import { NotificationProvider, useNotifications } from './contexts/NotificationProvider';
 import Toast from './components/Toast';
 import { ManagerApprovalModal } from './components/ManagerApprovalModal';
-import { PanelStateProvider } from './contexts/PanelStateProvider';
-//import { StripeTerminalBridgeProvider } from './contexts/StripeTerminalBridge';
+import { StripeTerminalBridgeProvider } from './contexts/StripeTerminalBridge';
 
 const AppContent = () => {
   const { changeLanguage } = useTranslate();
@@ -159,10 +159,14 @@ const AppContent = () => {
     // Start background sync service for retrying failed order syncs
     backgroundSyncService.start(300000); // Check every 5 minutes
 
+    // Start loyalty points expiry job (runs on foreground transitions, ≥24h apart)
+    loyaltyExpiryJob.start();
+
     // Cleanup
     return () => {
       isMounted = false;
       backgroundSyncService.stop();
+      loyaltyExpiryJob.stop();
       queueManager.dispose();
       syncPoller.stop();
       storeApiConnectionManager.stop().catch(() => {}); // Don't throw on cleanup
@@ -176,8 +180,8 @@ const AppContent = () => {
       <ErrorBoundary>
         <NotificationProvider>
           <OnboardingProvider>
-            <AuthProvider>
-              <PanelStateProvider>
+            <StripeTerminalBridgeProvider>
+              <AuthProvider>
                 <BasketStateProvider>
                   <BasketActionsProvider>
                     <CheckoutProvider>
@@ -191,8 +195,8 @@ const AppContent = () => {
                     </CheckoutProvider>
                   </BasketActionsProvider>
                 </BasketStateProvider>
-              </PanelStateProvider>
-            </AuthProvider>
+              </AuthProvider>
+            </StripeTerminalBridgeProvider>
           </OnboardingProvider>
           <AppToast />
           <ManagerApprovalModal />

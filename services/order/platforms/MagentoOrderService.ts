@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
-import { Order } from '../OrderServiceInterface';
+import { Order, TaxQuote } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { MagentoApiClient } from '../../clients/magento/MagentoApiClient';
@@ -94,6 +94,43 @@ export class MagentoOrderService extends BaseOrderService {
       this.logger.error({ message: 'Error creating order on Magento' }, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
+  }
+
+  /**
+   * Ask Magento to calculate tax for the basket using a guest quote (cart) and read its totals.
+   * Totals report the net `subtotal` and the calculated `tax_amount`; each item reports `price` (excl. tax) and
+   * `price_incl_tax`, which tells whether catalogue prices include tax. Tax follows the quote's address, or the
+   * store's "Default Tax Destination Calculation" when the quote has none. Guest quotes expire on their own;
+   * Magento has no endpoint to delete one.
+   * Docs: GET /V1/guest-carts/:cartId/totals (TotalsInterface)
+   */
+  async quoteTax(order: Order): Promise<TaxQuote> {
+    if (!this.isInitialized()) {
+      throw new Error('Magento order service not initialized');
+    }
+
+    const cartId = await this.apiClient.post<string>('guest-carts', {});
+    for (const item of order.lineItems) {
+      await this.apiClient.post(`guest-carts/${cartId}/items`, {
+        cartItem: { sku: item.sku, qty: item.quantity, quote_id: cartId },
+      });
+    }
+
+    const totals = await this.apiClient.get<any>(`guest-carts/${cartId}/totals`);
+    const items: any[] = totals.items || [];
+    const closerToGross = items.filter((totalsItem, index) => {
+      const posPrice = order.lineItems[index]?.price ?? totalsItem.price;
+      return (
+        totalsItem.price_incl_tax !== totalsItem.price &&
+        Math.abs(totalsItem.price_incl_tax - posPrice) < Math.abs(totalsItem.price - posPrice)
+      );
+    }).length;
+
+    return {
+      subtotal: Number(totals.subtotal ?? 0),
+      tax: Number(totals.tax_amount ?? 0),
+      taxIncluded: items.length > 0 && closerToGross > items.length / 2,
+    };
   }
 
   /**

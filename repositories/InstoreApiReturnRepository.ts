@@ -26,7 +26,9 @@ export class InstoreApiReturnRepository implements ReturnRepository {
     // Status is set by the server on create — no-op on client
   }
 
-  async delete(_id: string): Promise<void> {
-    // not needed on client
+  async delete(id: string): Promise<void> {
+    // Exchange compensation runs wherever the cashier confirmed — forward the
+    // delete to the server that owns the rows
+    await instoreApiClient.deleteReturn(id);
   }
 }

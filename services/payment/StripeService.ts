@@ -88,7 +88,7 @@ export class StripeService implements PaymentServiceInterface {
       // Process payment via the bridge
       const result = await bridgeManager.processPayment({
         amount: request.amount,
-        currency: request.currency || 'usd',
+        currency: request.currency?.toLowerCase(),
         description: `Order ${request.orderId || request.reference}`,
         metadata: {
           reference: request.reference,

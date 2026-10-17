@@ -6,7 +6,6 @@ import { MagentoProductService } from './platforms/MagentoProductService';
 import { SyliusProductService } from './platforms/SyliusProductService';
 import { WixProductService } from './platforms/WixProductService';
 import { PrestaShopProductService } from './platforms/PrestaShopProductService';
-import { SquarespaceProductService } from './platforms/SquarespaceProductService';
 import { CommercefullProductService } from './platforms/CommercefullProductService';
 import { CompositeProductService } from './platforms/CompositeProductService';
 import { OfflineProductService } from './platforms/OfflineProductService';
@@ -29,7 +28,6 @@ export class ProductServiceFactory {
   private syliusService: SyliusProductService | null = null;
   private wixService: WixProductService | null = null;
   private prestaShopService: PrestaShopProductService | null = null;
-  private squarespaceService: SquarespaceProductService | null = null;
   private commercefullService: CommercefullProductService | null = null;
   private offlineService: OfflineProductService | null = null;
   private compositeService: CompositeProductService | null = null;
@@ -141,18 +139,6 @@ export class ProductServiceFactory {
           });
         }
         return this.prestaShopService;
-
-      case ECommercePlatform.SQUARESPACE:
-        if (!this.squarespaceService) {
-          this.squarespaceService = new SquarespaceProductService(config);
-          this.squarespaceService.initialize().catch(err => {
-            this.logger.error(
-              { message: 'Failed to initialize Squarespace product service:' },
-              err instanceof Error ? err : new Error(String(err))
-            );
-          });
-        }
-        return this.squarespaceService;
 
       case ECommercePlatform.COMMERCEFULL:
         if (!this.commercefullService) {
@@ -305,16 +291,6 @@ export class ProductServiceFactory {
         this.prestaShopService.initialize().catch(err => {
           this.logger.error(
             { message: 'Failed to initialize PrestaShop product service with config:' },
-            err instanceof Error ? err : new Error(String(err))
-          );
-        });
-        break;
-
-      case ECommercePlatform.SQUARESPACE:
-        this.squarespaceService = new SquarespaceProductService(config);
-        this.squarespaceService.initialize().catch(err => {
-          this.logger.error(
-            { message: 'Failed to initialize Squarespace product service with config:' },
             err instanceof Error ? err : new Error(String(err))
           );
         });

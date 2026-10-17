@@ -1,6 +1,7 @@
 import { KdsServiceInterface, KdsConnectionConfig } from './KdsServiceInterface';
 import { NoOpKdsService } from './NoOpKdsService';
 import { HttpKdsService } from './HttpKdsService';
+import { RetryingKdsService } from './RetryingKdsService';
 import { LoggerFactory } from '../logger/LoggerFactory';
 import { keyValueRepository } from '../../repositories/KeyValueRepository';
 import { KdsVendorType, KDS_VENDOR_PRESETS } from './KdsVendorPresets';
@@ -119,7 +120,8 @@ export class KdsServiceFactory {
 
     switch (settings.type) {
       case 'http':
-        this.currentService = new HttpKdsService();
+        // Wrap so failed tickets persist and replay instead of being lost
+        this.currentService = new RetryingKdsService(new HttpKdsService());
         break;
       default:
         this.logger.warn({ message: `KDS type '${settings.type}' not yet implemented, using no-op` });

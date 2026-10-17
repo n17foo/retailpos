@@ -6,7 +6,6 @@ export enum ECommercePlatform {
   SYLIUS = 'sylius',
   WIX = 'wix',
   PRESTASHOP = 'prestashop',
-  SQUARESPACE = 'squarespace',
   COMMERCEFULL = 'commercefull',
   OFFLINE = 'offline', // Offline mode - all data managed locally via SQLite
 }
@@ -28,7 +27,6 @@ const ONLINE_PLATFORMS: ReadonlySet<ECommercePlatform> = new Set([
   ECommercePlatform.SYLIUS,
   ECommercePlatform.WIX,
   ECommercePlatform.PRESTASHOP,
-  ECommercePlatform.SQUARESPACE,
   ECommercePlatform.COMMERCEFULL,
 ]);
 
@@ -50,7 +48,6 @@ export const PLATFORM_DISPLAY_NAMES: Readonly<Record<ECommercePlatform, string>>
   [ECommercePlatform.SYLIUS]: 'Sylius',
   [ECommercePlatform.WIX]: 'Wix',
   [ECommercePlatform.PRESTASHOP]: 'PrestaShop',
-  [ECommercePlatform.SQUARESPACE]: 'Squarespace',
   [ECommercePlatform.COMMERCEFULL]: 'Commercefull',
   [ECommercePlatform.OFFLINE]: 'Offline Mode',
 };

@@ -1,16 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { ECommercePlatform } from '../utils/platforms';
 import { ProductServiceFactory } from '../services/product/ProductServiceFactory';
-import {
-  getDefaultVariant,
-  toProductSummary,
-  UnifiedProduct,
-  UnifiedProductQueryOptions,
-  UnifiedProductSummary,
-} from '../services/product/types';
+import { toProductSummary, UnifiedProduct, UnifiedProductQueryOptions, UnifiedProductSummary } from '../services/product/types';
 import { mapToUnifiedProducts } from '../services/product/mappers';
+import { toDisplayProduct } from '../services/product/displayProduct';
 import { syncEventBus } from '../services/instoreapi/sync/SyncEventBus';
 import { instoreApiConfig } from '../services/instoreapi/InstoreApiConfig';
+import type { CategoryFilter } from '../utils/categoryFilter';
+import { useActivePlatform } from './useActivePlatform';
 
 /**
  * Hook state interface
@@ -56,42 +53,48 @@ interface UseUnifiedProductsReturn extends UseUnifiedProductsState {
 
 /**
  * Hook for managing unified products
- * Fetches products from the configured platform and converts them to unified format
+ * Fetches products from the configured platform and converts them to unified format.
+ * When no platform is given, the persisted e-commerce platform is used (offline catalogue otherwise).
+ *
+ * `initialOptions` must be referentially stable (memoise it): a change triggers a fresh page-1 fetch.
  */
-export const useUnifiedProducts = (platform?: ECommercePlatform, initialOptions?: UnifiedProductQueryOptions): UseUnifiedProductsReturn => {
+export const useUnifiedProducts = (
+  platform?: ECommercePlatform | null,
+  initialOptions?: UnifiedProductQueryOptions
+): UseUnifiedProductsReturn => {
+  const { platform: activePlatform, isResolved } = useActivePlatform(platform);
   const [products, setProducts] = useState<UnifiedProduct[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
-  const [currentOptions, setCurrentOptions] = useState<UnifiedProductQueryOptions>(initialOptions || { page: 1, limit: 50 });
 
-  // Compute product summaries from full products
-  const productSummaries = useMemo(() => {
-    return products.map(toProductSummary);
-  }, [products]);
+  // Options + cursor of the latest request live in a ref so fetchProducts stays referentially stable
+  // (state here would re-create the callback after every fetch and re-trigger the fetch effect).
+  const optionsRef = useRef<UnifiedProductQueryOptions>(initialOptions || { page: 1, limit: 50 });
+  const requestIdRef = useRef(0);
 
-  // Check if there are more pages
+  const productSummaries = useMemo(() => products.map(toProductSummary), [products]);
+
   const hasMore = currentPage < totalPages;
 
-  // Fetch products from the service
   const fetchProducts = useCallback(
     async (options?: UnifiedProductQueryOptions) => {
+      const requestId = ++requestIdRef.current;
       setIsLoading(true);
       setError(null);
 
       try {
-        const service = ProductServiceFactory.getInstance().getService(platform || ECommercePlatform.OFFLINE);
+        const service = ProductServiceFactory.getInstance().getService(activePlatform || ECommercePlatform.OFFLINE);
 
         if (!service) {
           throw new Error('Product service not available');
         }
 
-        const queryOptions = options || currentOptions;
+        const queryOptions = options || optionsRef.current;
 
-        // Convert unified options to service options
-        const serviceOptions = {
+        const result = await service.getProducts({
           page: queryOptions.page || 1,
           limit: queryOptions.limit || 50,
           category: queryOptions.categoryId,
@@ -99,103 +102,81 @@ export const useUnifiedProducts = (platform?: ECommercePlatform, initialOptions?
           ids: queryOptions.ids,
           includeOutOfStock: queryOptions.includeOutOfStock,
           cursor: queryOptions.cursor,
-        };
+        });
 
-        const result = await service.getProducts(serviceOptions);
+        // A newer request superseded this one (e.g. quick category switching)
+        if (requestId !== requestIdRef.current) return;
 
-        // Determine the platform for mapping
-        const mappingPlatform = platform || ECommercePlatform.OFFLINE;
+        const unifiedProducts = mapToUnifiedProducts(result.products, activePlatform || ECommercePlatform.OFFLINE);
 
-        // Map to unified products
-        const unifiedProducts = mapToUnifiedProducts(result.products, mappingPlatform);
-
-        // Update state
-        if (queryOptions.page === 1) {
+        if ((queryOptions.page || 1) === 1) {
           setProducts(unifiedProducts);
         } else {
-          // Append for pagination
           setProducts(prev => [...prev, ...unifiedProducts]);
         }
 
         setCurrentPage(result.pagination.currentPage);
         setTotalPages(result.pagination.totalPages);
         setTotalItems(result.pagination.totalItems);
-        // Persist cursor for next loadMore() call (Shopify cursor-based pagination)
-        setCurrentOptions({
-          ...queryOptions,
-          cursor: result.pagination.nextCursor,
-        });
+        // Persist cursor for the next loadMore() call (Shopify cursor-based pagination)
+        optionsRef.current = { ...queryOptions, cursor: result.pagination.nextCursor };
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch products');
+        if (requestId === requestIdRef.current) {
+          setError(err instanceof Error ? err.message : 'Failed to fetch products');
+        }
       } finally {
-        setIsLoading(false);
+        if (requestId === requestIdRef.current) {
+          setIsLoading(false);
+        }
       }
     },
-    [platform, currentOptions]
+    [activePlatform]
   );
 
-  // Load more products (next page)
   const loadMore = useCallback(async () => {
     if (isLoading || !hasMore) return;
 
     await fetchProducts({
-      ...currentOptions,
+      ...optionsRef.current,
       page: currentPage + 1,
     });
-  }, [isLoading, hasMore, currentOptions, currentPage, fetchProducts]);
+  }, [isLoading, hasMore, currentPage, fetchProducts]);
 
-  // Refresh products (reset to page 1)
   const refresh = useCallback(async () => {
     await fetchProducts({
-      ...currentOptions,
+      ...optionsRef.current,
       page: 1,
+      cursor: undefined,
     });
-  }, [currentOptions, fetchProducts]);
+  }, [fetchProducts]);
 
-  // Get a single product by ID
-  const getProductById = useCallback(
-    (id: string): UnifiedProduct | undefined => {
-      return products.find(p => p.id === id);
-    },
-    [products]
-  );
+  const getProductById = useCallback((id: string): UnifiedProduct | undefined => products.find(p => p.id === id), [products]);
 
-  // Get product summary by ID
   const getProductSummaryById = useCallback(
-    (id: string): UnifiedProductSummary | undefined => {
-      return productSummaries.find(p => p.id === id);
-    },
+    (id: string): UnifiedProductSummary | undefined => productSummaries.find(p => p.id === id),
     [productSummaries]
   );
 
-  // Search products
   const searchProducts = useCallback(
     async (query: string) => {
-      await fetchProducts({
-        ...currentOptions,
-        search: query,
-        page: 1,
-      });
+      await fetchProducts({ ...optionsRef.current, search: query, page: 1, cursor: undefined });
     },
-    [currentOptions, fetchProducts]
+    [fetchProducts]
   );
 
-  // Filter by category
   const filterByCategory = useCallback(
     async (categoryId: string | null) => {
-      await fetchProducts({
-        ...currentOptions,
-        categoryId: categoryId || undefined,
-        page: 1,
-      });
+      await fetchProducts({ ...optionsRef.current, categoryId: categoryId || undefined, page: 1, cursor: undefined });
     },
-    [currentOptions, fetchProducts]
+    [fetchProducts]
   );
 
-  // Fetch products on mount and when initialOptions change
+  // Fetch on mount, once the platform is known, and whenever the platform or initialOptions change
   useEffect(() => {
+    if (!isResolved) return;
+    optionsRef.current = initialOptions || { page: 1, limit: 50 };
     fetchProducts(initialOptions);
-  }, [fetchProducts, initialOptions]);
+  }, [fetchProducts, initialOptions, isResolved]);
 
   // Subscribe to sync events for real-time updates (spec: multi-register.md §2.7.1-2.7.5)
   useEffect(() => {
@@ -203,12 +184,10 @@ export const useUnifiedProducts = (platform?: ECommercePlatform, initialOptions?
       return; // Only client registers need to listen for server events
     }
 
-    // Refresh product list when products are updated on other registers
     const unsubscribeProductUpdated = syncEventBus.on('product:updated', () => {
       refresh();
     });
 
-    // Refresh when inventory is updated (affects stock levels)
     const unsubscribeInventoryUpdated = syncEventBus.on('inventory:updated', () => {
       refresh();
     });
@@ -238,56 +217,49 @@ export const useUnifiedProducts = (platform?: ECommercePlatform, initialOptions?
   };
 };
 
+/** Pages fetched at most while a client-side category filter looks for enough matches */
+const MAX_FILTER_PAGES = 10;
+/** Matches wanted before auto-paging stops */
+const MIN_FILTERED_RESULTS = 24;
+
 /**
  * Helper hook to get display-ready product data
- * Returns products in a format ready for ProductGrid
+ * Returns products in a format ready for ProductGrid.
  *
- * Uses backend/service filtering by category name (productType)
+ * Category filtering is delegated to the platform service when it can filter exactly, and otherwise
+ * done on the client across the whole sub-category tree (loading further pages until enough match).
  */
-export const useProductsForDisplay = (platform?: ECommercePlatform, categoryId?: string | null, categoryName?: string | null) => {
-  // Memoize options to prevent unnecessary re-fetches
+export const useProductsForDisplay = (platform?: ECommercePlatform | null, categoryFilter?: CategoryFilter | null) => {
+  const serviceCategory = categoryFilter?.serviceCategory;
+
   const options = useMemo(
     () => ({
       page: 1,
       limit: 100,
-      // Pass category name for service-level filtering (mock service uses productType)
-      categoryId: categoryName || undefined,
+      // Out-of-stock products stay visible (greyed out) so cashiers see why they cannot be sold
+      includeOutOfStock: true,
+      categoryId: serviceCategory,
     }),
-    [categoryName]
+    [serviceCategory]
   );
 
-  const { products, productSummaries, isLoading, error, refresh, hasMore, loadMore } = useUnifiedProducts(platform, options);
+  const { products, productSummaries, isLoading, error, currentPage, refresh, hasMore, loadMore } = useUnifiedProducts(platform, options);
 
-  // Convert to display format expected by ProductGrid
-  const displayProducts = useMemo(() => {
-    return products.map(product => {
-      const defaultVariant = getDefaultVariant(product);
-      const primaryImage = product.images.find(img => img.isPrimary) || product.images[0];
+  const needsClientFilter = !!categoryFilter && !categoryFilter.serviceCategory;
 
-      return {
-        id: product.id,
-        platformId: product.platformId,
-        name: product.title,
-        price: defaultVariant?.price || 0,
-        image: primaryImage?.url ? { uri: primaryImage.url } : null,
-        categoryId: product.categoryIds[0] || product.productType || '',
-        categoryName: product.productType,
-        description: product.description,
-        sku: defaultVariant?.sku,
-        barcode: defaultVariant?.barcode,
-        stock: defaultVariant?.inventoryQuantity || 0,
-        isEcommerceProduct: product.platform !== ECommercePlatform.OFFLINE,
-        variantId: defaultVariant?.id,
-        platform: product.platform,
-        // Include variants/options so ProductGrid can open VariantPicker
-        variants: product.variants.length > 1 ? product.variants : undefined,
-        options: product.options.length > 0 ? product.options : undefined,
-        // Tax resolution fields
-        taxProfileId: product.taxProfileId,
-        taxCode: product.taxCode ?? defaultVariant?.taxCode,
-      };
-    });
-  }, [products]);
+  const visibleProducts = useMemo(
+    () => (needsClientFilter && categoryFilter ? products.filter(categoryFilter.matches) : products),
+    [products, needsClientFilter, categoryFilter]
+  );
+
+  // Client-side filtering can leave a page nearly empty: keep paging (bounded) until enough products match
+  useEffect(() => {
+    if (needsClientFilter && !isLoading && hasMore && visibleProducts.length < MIN_FILTERED_RESULTS && currentPage < MAX_FILTER_PAGES) {
+      loadMore();
+    }
+  }, [needsClientFilter, isLoading, hasMore, visibleProducts.length, currentPage, loadMore]);
+
+  const displayProducts = useMemo(() => visibleProducts.map(toDisplayProduct), [visibleProducts]);
 
   return {
     products: displayProducts,

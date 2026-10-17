@@ -259,7 +259,7 @@ export class StripeNfcService implements PaymentServiceInterface {
       // Prepare payment request with proper metadata
       const paymentRequest = {
         amount: request.amount,
-        currency: request.currency || 'usd',
+        currency: request.currency?.toLowerCase(),
         description: request.reference ? `Order ${request.reference}` : 'RetailPOS Payment',
         metadata: {
           reference: request.reference || '',

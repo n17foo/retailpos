@@ -31,7 +31,7 @@ export interface HardwareStatus {
   };
   display: {
     connected: boolean;
-    type?: 'websocket' | 'serial' | 'electron' | 'none';
+    type?: 'websocket' | 'none';
     lastChecked?: number;
   };
 }

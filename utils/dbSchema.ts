@@ -7,7 +7,7 @@ const logger = LoggerFactory.getInstance().createLogger('dbSchema');
  * Current database schema version.
  * Bump this number and add a migration block whenever the schema changes.
  */
-export const LATEST_DB_VERSION = 10;
+export const LATEST_DB_VERSION = 11;
 
 /**
  * Initialise (or migrate) the database schema.
@@ -716,6 +716,20 @@ async function migrateDatabase(db: SQLiteDatabase, fromVersion: number, toVersio
       await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_webhook_deliveries_status ON webhook_deliveries(status);`);
 
       logger.info('v10 webhook delivery tracking created.');
+    }
+
+    // ── v11 – Sale mode on baskets + orders (spec 6.36) ───────────────
+    if (fromVersion < 11) {
+      logger.info('Applying v11: adding sale_mode to baskets and orders…');
+
+      for (const table of ['baskets', 'orders'] as const) {
+        const col = await db.getFirstAsync<{ cid: number }>(`SELECT cid FROM pragma_table_info('${table}') WHERE name = 'sale_mode'`);
+        if (!col) {
+          await db.runAsync(`ALTER TABLE ${table} ADD COLUMN sale_mode TEXT`);
+        }
+      }
+
+      logger.info('v11 sale_mode columns added.');
     }
 
     // Stamp the version

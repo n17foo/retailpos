@@ -26,6 +26,8 @@ export interface FinaliseResult {
   success: boolean;
   adjustedLines: number;
   totalVariance: number;
+  /** True when platform corrections failed and were queued for retry */
+  platformSyncPending?: boolean;
   error?: string;
 }
 
@@ -92,15 +94,22 @@ export class InventoryCountService {
         })
         .filter((u): u is NonNullable<typeof u> => u !== null);
 
-      // Push corrections to platform
+      // Push corrections to platform — failures are persisted to the pending
+      // inventory queue by RetryingInventoryService and replayed later, so
+      // they're surfaced as platformSyncPending rather than failing the count
+      let platformSyncPending = false;
       const capabilities = getPlatformCapabilities(platform);
       if (adjustments.length > 0 && capabilities.inventory !== 'not_recommended') {
         const inventoryService = InventoryServiceFactory.getInstance().getService(platform);
-        await inventoryService.updateInventory(adjustments).catch(err => {
+        try {
+          const result = await inventoryService.updateInventory(adjustments);
+          platformSyncPending = result.failed > 0;
+        } catch (err) {
+          platformSyncPending = true;
           this.logger.warn({
             message: `Inventory correction push failed for count ${countId}: ${err instanceof Error ? err.message : String(err)}`,
           });
-        });
+        }
       }
 
       const now = Date.now();
@@ -109,10 +118,10 @@ export class InventoryCountService {
       await auditLogService.log('inventory_count:completed', {
         userId: finalisedBy,
         details: `Inventory count ${countId} completed — ${adjustments.length} adjustment(s), total variance ${totalVariance}`,
-        metadata: { countId, adjustedLines: adjustments.length, totalVariance },
+        metadata: { countId, adjustedLines: adjustments.length, totalVariance, platformSyncPending },
       });
 
-      return { success: true, adjustedLines: adjustments.length, totalVariance };
+      return { success: true, adjustedLines: adjustments.length, totalVariance, platformSyncPending };
     } catch (err) {
       this.logger.error({ message: `Failed to finalise count ${countId}` }, err instanceof Error ? err : new Error(String(err)));
       return { success: false, adjustedLines: 0, totalVariance: 0, error: err instanceof Error ? err.message : 'Finalise failed' };

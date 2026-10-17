@@ -48,7 +48,7 @@
       "sylius": "Open-Source und flexibel",
       "wix": "Einfacher Website-Baukasten",
       "prestashop": "Open-Source E-Commerce",
-      "squarespace": "Design-orientierte Plattform",
+      "commercefull": "Einheitliche Commerce-Plattform",
       "offline": "Kein Online-Shop erforderlich"
     }
   },
@@ -203,6 +203,8 @@
     "subtotal": "Zwischensumme:",
     "tax": "Steuer ({{rate}}%):",
     "total": "Gesamt:",
+    "taxAtCheckout": "Wird beim Bezahlen berechnet",
+    "totalBeforeTax": "Gesamt vor Steuern",
     "sku": "SKU: {{sku}}",
     "pendingSync": "{{count}} Bestellung(en) warten auf Synchronisierung",
     "syncComplete": "{{count}} Bestellung(en) erfolgreich synchronisiert",
@@ -379,8 +381,6 @@
       "siteId": "Website-ID",
       "wixSiteIdPlaceholder": "Wix Website-ID eingeben",
       "prestashopUrlPlaceholder": "https://ihr-prestashop-shop.com",
-      "squarespaceSiteIdLabel": "Website-ID (optional)",
-      "squarespaceSiteIdPlaceholder": "Squarespace Website-ID eingeben",
       "localOnlyMode": "Nur-Lokal-Modus",
       "localOnlyDescription": "Funktioniert offline. Lädt das Menü von einer öffentlichen URL herunter. Bestellungen werden nur lokal gespeichert.",
       "menuUrl": "Menü-URL",

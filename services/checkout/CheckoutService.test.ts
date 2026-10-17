@@ -78,6 +78,8 @@ function createMockBasketService(): BasketServiceInterface {
     removeDiscount: jest.fn(),
     setCustomer: jest.fn(),
     setNote: jest.fn(),
+    setSaleMode: jest.fn(),
+    updateItemProperties: jest.fn(),
   };
 }
 
@@ -199,6 +201,7 @@ describe('CheckoutService', () => {
           customer_email: null,
           customer_name: null,
           note: null,
+          sale_mode: null,
           payment_method: 'cash',
           payment_transaction_id: null,
           cashier_id: null,

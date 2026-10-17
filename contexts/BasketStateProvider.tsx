@@ -19,6 +19,10 @@ export interface BasketItem {
   originalId?: string;
   sku?: string;
   platformId?: string;
+  /** Human-readable option summary, e.g. "Size: M / Color: Red" */
+  optionSummary?: string;
+  /** Line properties (e.g. a per-line note) — persisted in the items JSON */
+  properties?: Record<string, string>;
 }
 
 // Cart items as a map (productId -> quantity) for efficient lookups
@@ -122,6 +126,8 @@ export const BasketStateProvider = ({ children }: Readonly<{ children: ReactNode
       variantId: item.variantId,
       originalId: item.originalId,
       sku: item.sku,
+      optionSummary: item.optionSummary,
+      properties: item.properties,
     }));
   }, [basket?.items]);
 
@@ -130,7 +136,7 @@ export const BasketStateProvider = ({ children }: Readonly<{ children: ReactNode
   const basketItemsMap = useMemo(() => {
     if (!basket?.items) return {};
     return basket.items.reduce((acc, item) => {
-      acc[item.productId] = item.quantity;
+      acc[item.productId] = (acc[item.productId] ?? 0) + item.quantity;
       return acc;
     }, {} as BasketItemsMap);
   }, [basket?.items]);

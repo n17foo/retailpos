@@ -65,13 +65,6 @@ jest.mock('./platforms/PrestaShopCustomerService', () => ({
   })),
 }));
 
-jest.mock('./platforms/SquarespaceCustomerService', () => ({
-  SquarespaceCustomerService: jest.fn().mockImplementation(() => ({
-    initialize: jest.fn().mockResolvedValue(true),
-    isInitialized: jest.fn().mockReturnValue(true),
-  })),
-}));
-
 jest.mock('./platforms/CommercefullCustomerService', () => ({
   CommercefullCustomerService: jest.fn().mockImplementation(() => ({
     initialize: jest.fn().mockResolvedValue(true),

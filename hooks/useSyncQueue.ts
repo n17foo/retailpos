@@ -24,6 +24,8 @@ interface UseSyncQueueResult {
   failedCount: number;
   /** Whether data is loading */
   isLoading: boolean;
+  /** Error message when the queue failed to load (distinct from an empty queue) */
+  loadError: string | null;
   /** Whether a retry/discard is in progress */
   isProcessing: boolean;
   /** Retry syncing a single order */
@@ -76,9 +78,11 @@ export function useSyncQueue(): UseSyncQueueResult {
   const [orders, setOrders] = useState<SyncQueueOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadQueue = useCallback(async () => {
     setIsLoading(true);
+    setLoadError(null);
     try {
       const rows = await orderRepository.findUnsynced();
       // Also include failed orders that haven't been cancelled
@@ -105,8 +109,8 @@ export function useSyncQueue(): UseSyncQueueResult {
           itemCount: itemCounts.get(row.id) || 0,
         }))
       );
-    } catch {
-      // Silently fail — the UI will show empty state
+    } catch (err) {
+      setLoadError(err instanceof Error ? err.message : 'Failed to load sync queue');
     } finally {
       setIsLoading(false);
     }
@@ -172,6 +176,7 @@ export function useSyncQueue(): UseSyncQueueResult {
     totalCount,
     failedCount,
     isLoading,
+    loadError,
     isProcessing,
     retryOrder,
     retryAll,

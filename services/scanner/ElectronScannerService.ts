@@ -1,6 +1,8 @@
 import { LoggerFactory } from '../logger/LoggerFactory';
 import { ScannerServiceInterface } from './ScannerServiceInterface';
+import { scannerSettingsService } from './ScannerSettingsService';
 import { getElectronAPI } from '../../utils/electron';
+import { HidBurstDetector } from '../../utils/hidBurst';
 
 /**
  * Electron-specific barcode / QR scanner service.
@@ -28,32 +30,18 @@ export class ElectronScannerService implements ScannerServiceInterface {
   private scanListeners: Map<string, (data: string) => void> = new Map();
   private logger = LoggerFactory.getInstance().createLogger('ElectronScannerService');
 
-  // DOM keydown state
-  private inputBuffer = '';
-  private lastKeyTime = 0;
+  // DOM keydown state — shared HID burst detector driven by scanner settings
+  private burstDetector: HidBurstDetector | null = null;
   private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
 
   // Electron IPC unsubscribe function
   private ipcUnsubscribe: (() => void) | null = null;
 
-  /**
-   * Maximum milliseconds between keystrokes to consider them part of the
-   * same scan. Real scanners type at 10-50 ms intervals; a human can't
-   * sustain < 80 ms between keys.
-   */
-  private static readonly SCAN_INTERVAL_MS = 80;
-
-  /**
-   * Minimum characters for a valid barcode (filters accidental Enter presses).
-   */
-  private static readonly MIN_BARCODE_LENGTH = 3;
-
   async connect(deviceId: string = 'electron-hid'): Promise<boolean> {
     try {
       this.deviceId = deviceId;
       this.connected = true;
-      this.inputBuffer = '';
-      this.lastKeyTime = 0;
+      this.burstDetector = null;
 
       this.logger.info(`Electron scanner connected: ${deviceId}`);
       return true;
@@ -69,7 +57,7 @@ export class ElectronScannerService implements ScannerServiceInterface {
     this.scanListeners.clear();
     this.connected = false;
     this.deviceId = null;
-    this.inputBuffer = '';
+    this.burstDetector = null;
     this.logger.info('Electron scanner disconnected');
   }
 
@@ -150,31 +138,16 @@ export class ElectronScannerService implements ScannerServiceInterface {
   // ── Internal helpers ─────────────────────────────────────────
 
   private handleKeydown(e: KeyboardEvent): void {
-    const now = Date.now();
-
-    // If too much time has elapsed since the last keystroke, reset the buffer
-    // (this means the previous sequence was human typing, not a scanner)
-    if (now - this.lastKeyTime > ElectronScannerService.SCAN_INTERVAL_MS && this.inputBuffer.length > 0) {
-      this.inputBuffer = '';
+    if (!this.burstDetector) {
+      // HID burst detection shares the configured USB scanner settings — on
+      // desktop, HID scanners are the same keyboard-emulation devices.
+      this.burstDetector = new HidBurstDetector(scannerSettingsService.getUsbConfig(), barcode => this.emitScan(barcode));
     }
-
-    this.lastKeyTime = now;
-
-    if (e.key === 'Enter') {
-      if (this.inputBuffer.length >= ElectronScannerService.MIN_BARCODE_LENGTH) {
-        const barcode = this.inputBuffer.trim();
-        this.inputBuffer = '';
-        this.emitScan(barcode);
-      } else {
-        // Too short — likely a human pressing Enter in a form field
-        this.inputBuffer = '';
-      }
-      return;
-    }
-
-    // Only accumulate printable single characters
-    if (e.key.length === 1) {
-      this.inputBuffer += e.key;
+    const result = this.burstDetector.handleKey(e.key);
+    if (result.swallow) {
+      // Scanner burst — keep the keystroke out of the omnibar / focused inputs
+      e.preventDefault();
+      e.stopPropagation();
     }
   }
 

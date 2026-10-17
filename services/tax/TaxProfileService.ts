@@ -87,92 +87,12 @@ export class TaxProfileService {
   }
 
   /**
-   * Get the default tax profile
-   * Spec requirement 2.11.1, 2.11.2: Fallback when no profile is specified
-   *
-   * Seeds default profiles lazily on first call if the table is empty,
-   * so no explicit bootstrap call is required at app startup.
+   * Get the merchant-defined default tax profile, if any.
+   * No profiles (and no rates) are ever created automatically: a hard-coded region's VAT would be
+   * wrong for most stores. Without a default profile the store tax rate from POS settings applies.
    */
   async getDefaultProfile(): Promise<TaxProfileRow | null> {
-    const profile = await taxProfileRepository.findDefault();
-    if (profile) return profile;
-
-    await this.seedDefaults();
     return taxProfileRepository.findDefault();
-  }
-
-  /**
-   * Resolve tax rate for a tax code by name matching
-   * Spec requirement 2.11.2: Used for online product tax resolution
-   *
-   * @param taxCode - Platform tax code (e.g. 'standard', 'reduced-rate', 'zero-rate', 'exempt')
-   * @returns Matching tax profile or default profile
-   */
-  async resolveRateForTaxCode(taxCode: string): Promise<TaxProfileRow | null> {
-    if (!taxCode) {
-      return this.getDefaultProfile();
-    }
-
-    // Normalize tax code for matching
-    const normalizedCode = taxCode.toLowerCase().trim();
-
-    // Get all active profiles
-    const profiles = await taxProfileRepository.findActive();
-
-    // Try to find a profile whose name contains the tax code (case-insensitive)
-    const match = profiles.find(p => p.name.toLowerCase().includes(normalizedCode) || normalizedCode.includes(p.name.toLowerCase()));
-
-    if (match) {
-      logger.debug({ message: 'Tax code matched to profile', taxCode, profileId: match.id, profileName: match.name });
-      return match;
-    }
-
-    // No match found, use default
-    logger.debug({ message: 'Tax code not matched, using default profile', taxCode });
-    return this.getDefaultProfile();
-  }
-
-  /**
-   * Seed default tax profiles
-   * Spec requirement 2.10.5, 2.10.6: Create defaults only if none exist
-   *
-   * Creates three profiles:
-   * - Standard Rate (20%, default)
-   * - Reduced Rate (5%)
-   * - Zero Rate (0%)
-   */
-  async seedDefaults(): Promise<void> {
-    const existing = await taxProfileRepository.findAll();
-
-    if (existing.length > 0) {
-      logger.debug({ message: 'Tax profiles already exist, skipping seed', count: existing.length });
-      return;
-    }
-
-    logger.info({ message: 'Seeding default tax profiles' });
-
-    await this.createProfile({
-      name: 'Standard Rate',
-      rate: 0.2, // 20%
-      isDefault: true,
-      description: 'UK standard VAT rate',
-    });
-
-    await this.createProfile({
-      name: 'Reduced Rate',
-      rate: 0.05, // 5%
-      isDefault: false,
-      description: 'UK reduced VAT rate',
-    });
-
-    await this.createProfile({
-      name: 'Zero Rate',
-      rate: 0, // 0%
-      isDefault: false,
-      description: 'Zero-rated goods',
-    });
-
-    logger.info({ message: 'Default tax profiles seeded successfully' });
   }
 }
 

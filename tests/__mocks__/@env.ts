@@ -16,8 +16,6 @@ export const MAGENTO_BASE_URL = 'https://test-magento.com';
 export const MAGENTO_ACCESS_TOKEN = 'test-token';
 export const PRESTASHOP_BASE_URL = 'https://test-prestashop.com';
 export const PRESTASHOP_API_KEY = 'test-key';
-export const SQUARESPACE_BASE_URL = 'https://test-squarespace.com';
-export const SQUARESPACE_API_KEY = 'test-key';
 export const WIX_SITE_ID = 'test-site-id';
 export const WIX_API_KEY = 'test-key';
 export const SYLIUS_BASE_URL = 'https://test-sylius.com';
@@ -39,8 +37,6 @@ export default {
   MAGENTO_ACCESS_TOKEN,
   PRESTASHOP_BASE_URL,
   PRESTASHOP_API_KEY,
-  SQUARESPACE_BASE_URL,
-  SQUARESPACE_API_KEY,
   WIX_SITE_ID,
   WIX_API_KEY,
   SYLIUS_BASE_URL,

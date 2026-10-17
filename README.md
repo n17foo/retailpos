@@ -12,13 +12,13 @@ Website: [retailpos.org](https://retailpos.org)
 
 ## Features
 
-- **Multi-Platform Support** — Shopify, WooCommerce, BigCommerce, Magento, Sylius, Wix, PrestaShop, Squarespace, Commercefull, Offline
+- **Multi-Platform Support** — Shopify, WooCommerce, BigCommerce, Magento, Sylius, Wix, PrestaShop, Commercefull, Offline
 - **Offline-First** — Full POS functionality without internet; background sync with retry and exponential backoff
 - **Multi-Register** — Server/client mode over LAN with event-driven sync (SyncEventBus + SyncPoller)
 - **Product Variants** — Option-based variants with inventory tracking and barcode lookup
 - **Tax Profiles** — Configurable tax rates; platform-authoritative tax for online orders
 - **Checkout Flow** — Draft order creation, payment recording, cash drawer integration
-- **Returns & Refunds** — Return recording with optional platform monetary refund (10 platforms)
+- **Returns & Refunds** — Return recording with optional platform monetary refund (9 platforms)
 - **Customer Management** — Search and attach customers from platform APIs during checkout
 - **Reporting Dashboard** — Sales analytics, cashier performance, payment breakdown, CSV export
 - **Sync Queue** — Retry/discard failed orders with detailed error tracking
@@ -203,7 +203,7 @@ retailpos/
 │   ├── basket/                # Cart CRUD + service wiring factory
 │   ├── checkout/              # Checkout flow + order queries
 │   ├── config/                # POSConfigService + ServiceConfigBridge
-│   ├── customer/              # Platform customer lookup (10 platforms)
+│   ├── customer/              # Platform customer lookup (9 platforms)
 │   ├── display/               # Customer-facing display (WebSocket, serial, Electron)
 │   ├── drawer/                # Cash drawer peripheral
 │   ├── inventory/             # Inventory queries + updates
@@ -211,10 +211,10 @@ retailpos/
 │   ├── localapi/              # Multi-register local HTTP API
 │   ├── logger/                # Pluggable structured logger
 │   ├── notifications/         # In-app notification event bus
-│   ├── order/                 # Platform order services (10 platforms)
+│   ├── order/                 # Platform order services (9 platforms)
 │   ├── payment/               # Payment terminal providers
 │   ├── printer/               # Receipt printing + daily reports
-│   ├── product/               # Product management (10 platforms)
+│   ├── product/               # Product management (9 platforms)
 │   ├── refunds/               # Returns + refund orchestration
 │   ├── reporting/             # Sales analytics
 │   ├── scanner/               # Barcode/QR scanner abstraction

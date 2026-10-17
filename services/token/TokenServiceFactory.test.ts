@@ -119,16 +119,12 @@ describe('TokenServiceFactory', () => {
     expect(token).toBe('mage-admin-token');
   });
 
-  it('serves PrestaShop and Squarespace API keys as tokens', async () => {
-    mockCredentials.mockImplementation(async (platform: ECommercePlatform) =>
-      platform === ECommercePlatform.PRESTASHOP ? { apiKey: 'ps-key' } : { apiKey: 'ss-key' }
-    );
+  it('serves the PrestaShop API key as a token', async () => {
+    mockCredentials.mockResolvedValue({ apiKey: 'ps-key' });
 
     await factory.initializePlatformProvider(ECommercePlatform.PRESTASHOP);
-    await factory.initializePlatformProvider(ECommercePlatform.SQUARESPACE);
 
     await expect(service.getToken(ECommercePlatform.PRESTASHOP, TokenType.ACCESS)).resolves.toBe('ps-key');
-    await expect(service.getToken(ECommercePlatform.SQUARESPACE, TokenType.ACCESS)).resolves.toBe('ss-key');
   });
 
   it('caches acquired tokens so repeat reads skip the provider', async () => {

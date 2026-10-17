@@ -40,7 +40,6 @@ const LEGACY_SECRET_KEYS: Partial<Record<ECommercePlatform, string>> = {
   [ECommercePlatform.SYLIUS]: 'sylius_api_credentials',
   [ECommercePlatform.WIX]: 'wix_api_credentials',
   [ECommercePlatform.PRESTASHOP]: 'prestashop_api_credentials',
-  [ECommercePlatform.SQUARESPACE]: 'squarespace_api_credentials',
   [ECommercePlatform.COMMERCEFULL]: 'commercefull_api_credentials',
 };
 
@@ -141,11 +140,6 @@ function mapSettingsToCredentials(settings: StoredECommerceSettings, platform: E
       const url = storeUrl(settings.prestashop?.storeUrl);
       return { apiUrl: url, storeUrl: url, apiKey: settings.prestashop?.apiKey || settings.apiKey || undefined };
     }
-    case ECommercePlatform.SQUARESPACE:
-      return {
-        apiKey: settings.squarespace?.apiKey || settings.apiKey || undefined,
-        siteId: settings.squarespace?.siteId || undefined,
-      };
     case ECommercePlatform.COMMERCEFULL: {
       const url = storeUrl(settings.commercefull?.storeUrl);
       return {

@@ -1,3 +1,5 @@
+import type { ViewStyle } from 'react-native';
+
 export const lightColors = {
   // Primary colors
   primary: '#2196F3',
@@ -60,6 +62,16 @@ export const lightColors = {
   whiteOverlayLight: 'rgba(255, 255, 255, 0.2)',
   whiteOverlayMedium: 'rgba(255, 255, 255, 0.3)',
   whiteOverlayDark: 'rgba(255, 255, 255, 0.5)',
+
+  // Pointer affordances (mouse/keyboard input mode)
+  focusRing: '#2196F3',
+  pressed: '#CCE4F7',
+};
+
+export const darkHoverTokens = {
+  hover: 'rgba(255,255,255,0.08)',
+  pressed: 'rgba(255,255,255,0.16)',
+  focusRing: '#90CAF9',
 };
 
 export const darkColors = {
@@ -175,21 +187,26 @@ export const semanticColors = {
   sylius: '#1ABE5D',
   wix: '#0C6EFC',
   prestashop: '#DF0067',
-  squarespace: '#000000',
+  commercefull: '#4A55A2',
   offline: '#9E9E9E',
 };
 
 /**
- * Layout constants for responsive sidebar widths
+ * Layout constants
  */
 export const layout = {
-  sidebar: {
-    tablet: { category: 230, basket: 300 },
-    desktop: { category: 260, basket: 340 },
-    wide: { category: 300, basket: 380 },
-  },
-  headerHeight: 56,
-  tabBarHeight: 56,
+  headerHeight: 48,
+};
+
+/**
+ * Minimum hit-target sizes per input mode (spec §4.8.3).
+ * Touch gets larger targets than mouse/pointer input.
+ */
+export const hitTarget = {
+  touchMin: 48,
+  touchTender: 56,
+  pointerMin: 40,
+  pointerTender: 44,
 };
 
 export const elevation = {
@@ -221,4 +238,23 @@ export const elevation = {
     shadowRadius: 4.65,
     elevation: 6,
   },
+};
+
+/**
+ * Interactive-state styles for Pressable's style callback.
+ *
+ * `hovered`/`focused` exist at runtime on web/Electron but are not in RN's
+ * PressableStateCallbackType — the cast is contained here. `pressed` fires
+ * on every platform. The rings use CSS `outline` so they never shift layout.
+ */
+export const interactionStyle = (state: { pressed: boolean }): ViewStyle => {
+  const { pressed, hovered, focused } = state as { pressed: boolean; hovered?: boolean; focused?: boolean };
+  if (pressed) return { opacity: 0.85 };
+  if (focused) {
+    return { outlineStyle: 'solid', outlineColor: lightColors.focusRing, outlineWidth: 2, outlineOffset: 1 };
+  }
+  if (hovered) {
+    return { outlineStyle: 'solid', outlineColor: lightColors.focusRing, outlineWidth: 1, outlineOffset: 1 };
+  }
+  return {};
 };

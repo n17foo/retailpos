@@ -192,6 +192,11 @@ export class InstoreApiClient {
     return result.returnId;
   }
 
+  /** Delete a return row — used by the exchange saga to compensate an aborted exchange */
+  async deleteReturn(id: string): Promise<void> {
+    await this.delete(`/api/returns/${id}`);
+  }
+
   // ── Snapshot ────────────────────────────────────────────────────────
 
   async getSnapshot(): Promise<{

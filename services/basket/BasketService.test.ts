@@ -76,6 +76,7 @@ describe('BasketService', () => {
         customer_email: null,
         customer_name: null,
         note: null,
+        sale_mode: null,
         created_at: Date.now(),
         updated_at: Date.now(),
       });
@@ -119,6 +120,7 @@ describe('BasketService', () => {
           customer_email: data.customerEmail,
           customer_name: data.customerName,
           note: data.note,
+          sale_mode: data.saleMode,
           created_at: Date.now(),
           updated_at: Date.now(),
         };

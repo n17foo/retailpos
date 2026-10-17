@@ -77,14 +77,17 @@ export const usePrinterSettings = () => {
       try {
         const validation = validatePrinterSettings(settings);
         if (!validation.isValid) {
-          setError(validation.error || 'Invalid printer settings');
+          // validation.error is an i18n key — translate before showing/storing
+          const translated = validation.error
+            ? (t(validation.error, { defaultValue: validation.error }) as string)
+            : (t('settings.printer.validation.invalid', 'Invalid printer settings') as string);
+          setError(translated);
           setSaveStatus('error');
-          const showValidationError = (error: string) => {
-            const errorMessage = t('settings.printer.validationError', { error, defaultValue: `Validation error: ${error}` }) as string;
-            Alert.alert(t('settings.printer.validationErrorTitle', 'Validation Error') as string, errorMessage);
-            return errorMessage;
-          };
-          showValidationError(validation.error || 'Invalid printer settings');
+          const errorMessage = t('settings.printer.validationError', {
+            error: translated,
+            defaultValue: `Validation error: ${translated}`,
+          }) as string;
+          Alert.alert(t('settings.printer.validationErrorTitle', 'Validation Error') as string, errorMessage);
           return false;
         }
 

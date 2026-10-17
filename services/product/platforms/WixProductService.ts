@@ -261,6 +261,8 @@ export class WixProductService extends BaseProductService {
       price: variant.variant?.priceData?.price || wixProduct.priceData?.price || 0,
       compareAtPrice: variant.variant?.priceData?.discountedPrice,
       inventoryQuantity: variant.stock?.quantity || 0,
+      trackInventory: variant.stock?.trackQuantity ?? wixProduct.stock?.trackInventory ?? false,
+      isAvailable: variant.stock?.inStock ?? wixProduct.stock?.inventoryStatus !== 'OUT_OF_STOCK',
       weight: variant.variant?.weight,
       weightUnit: 'kg' as const,
     }));
@@ -273,6 +275,8 @@ export class WixProductService extends BaseProductService {
         sku: wixProduct.sku || '',
         price: wixProduct.priceData?.price || 0,
         inventoryQuantity: wixProduct.stock?.quantity || 0,
+        trackInventory: wixProduct.stock?.trackInventory ?? false,
+        isAvailable: wixProduct.stock?.inStock ?? wixProduct.stock?.inventoryStatus !== 'OUT_OF_STOCK',
       });
     }
 
@@ -290,6 +294,7 @@ export class WixProductService extends BaseProductService {
       description: wixProduct.description || '',
       vendor: wixProduct.brand || '',
       productType: wixProduct.productType || '',
+      categoryIds: (wixProduct.collectionIds || []).map((id: unknown) => String(id)),
       tags: wixProduct.ribbons?.map((r: any) => r.text) || [],
       options: (wixProduct.productOptions || []).map((option: any) => ({
         id: option.name,

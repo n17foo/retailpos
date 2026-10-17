@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
-import { Order } from '../OrderServiceInterface';
+import { Order, TaxQuote } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { PrestaShopApiClient } from '../../clients/prestashop/PrestaShopApiClient';
@@ -69,6 +69,46 @@ export class PrestaShopOrderService extends BaseOrderService {
       this.logger.error({ message: 'Error creating order on PrestaShop' }, error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
+  }
+
+  /**
+   * Ask PrestaShop for the tax on each line: the web service computes a product's price with and without tax
+   * for the shop's tax rules (`price[name][use_tax]`), so the tax is the platform's own figure.
+   * Docs: https://devdocs.prestashop-project.org/9/webservice/tutorials/advanced-use/specific-price/
+   * Catalogue prices in PrestaShop are tax-exclusive.
+   */
+  async quoteTax(order: Order): Promise<TaxQuote> {
+    if (!this.isInitialized()) {
+      throw new Error('PrestaShop order service not initialized');
+    }
+
+    let net = 0;
+    let tax = 0;
+    for (const item of order.lineItems) {
+      const combination = item.variantId && /^\d+$/.test(item.variantId) ? item.variantId : undefined;
+      const params: Record<string, string> = {
+        output_format: 'JSON',
+        'price[with_tax][use_tax]': '1',
+        'price[no_tax][use_tax]': '0',
+        'price[with_tax][quantity]': String(item.quantity),
+        'price[no_tax][quantity]': String(item.quantity),
+      };
+      if (combination) {
+        params['price[with_tax][product_attribute]'] = combination;
+        params['price[no_tax][product_attribute]'] = combination;
+      }
+      const data = await this.apiClient.get<any>(`products/${item.productId}`, params);
+      const product = data.product ?? data;
+      const withTax = Number(product.with_tax);
+      const noTax = Number(product.no_tax);
+      if (!Number.isFinite(withTax) || !Number.isFinite(noTax)) {
+        throw new Error(`PrestaShop did not return a tax-calculated price for product ${item.productId}`);
+      }
+      net += noTax * item.quantity;
+      tax += (withTax - noTax) * item.quantity;
+    }
+
+    return { subtotal: net, tax, taxIncluded: false };
   }
 
   async getOrder(orderId: string): Promise<Order | null> {

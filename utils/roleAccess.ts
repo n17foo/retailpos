@@ -8,7 +8,7 @@ import { UserRole } from '../repositories/UserRepository';
  * Cashier – Order, Scan, Search, Daily Orders, Printer, Payment Terminal
  */
 
-type TabName = 'Sale' | 'Scan' | 'Search' | 'Inventory' | 'More';
+type TabName = 'Sale' | 'Inventory' | 'More';
 type MoreMenuItem =
   | 'OrderHistory'
   | 'Settings'
@@ -23,9 +23,9 @@ type MoreMenuItem =
   | 'Procurement';
 
 const TAB_ACCESS: Record<UserRole, TabName[]> = {
-  admin: ['Sale', 'Scan', 'Search', 'Inventory', 'More'],
-  manager: ['Sale', 'Scan', 'Search', 'Inventory', 'More'],
-  cashier: ['Sale', 'Scan', 'Search', 'More'],
+  admin: ['Sale', 'Inventory', 'More'],
+  manager: ['Sale', 'Inventory', 'More'],
+  cashier: ['Sale', 'More'],
 };
 
 const MORE_MENU_ACCESS: Record<UserRole, MoreMenuItem[]> = {

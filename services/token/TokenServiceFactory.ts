@@ -86,13 +86,6 @@ export class TokenServiceFactory {
             'PrestaShop API key is not configured'
           );
           break;
-        case ECommercePlatform.SQUARESPACE:
-          this.registerStaticTokenProvider(
-            ECommercePlatform.SQUARESPACE,
-            credentials => credentials.apiKey,
-            'Squarespace API key is not configured'
-          );
-          break;
         case ECommercePlatform.COMMERCEFULL:
           this.setupCommercefullTokenProvider();
           break;
@@ -118,8 +111,7 @@ export class TokenServiceFactory {
 
   /**
    * Register a provider for platforms whose credential is a long-lived key or
-   * token (Shopify Admin API token, BigCommerce/WooCommerce/Wix/PrestaShop/
-   * Squarespace keys). These never expire, so the stored credential is
+   * token (Shopify Admin API token, BigCommerce/WooCommerce/Wix/PrestaShop keys). These never expire, so the stored credential is
    * returned directly — no fabricated or exchanged tokens.
    */
   private registerStaticTokenProvider(

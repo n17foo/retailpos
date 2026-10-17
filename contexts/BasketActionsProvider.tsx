@@ -17,6 +17,8 @@ export interface BasketProduct {
   image?: string | ImageSourcePropType | null;
   isEcommerceProduct?: boolean;
   variantId?: string;
+  /** Human-readable option summary, e.g. "Size: M / Color: Red" */
+  optionSummary?: string;
   originalId?: string;
   sku?: string;
   taxable?: boolean;
@@ -39,6 +41,9 @@ export interface BasketActionsContextType {
   // Customer and discount
   setCustomer: (email?: string, name?: string) => Promise<void>;
   setNote: (note: string) => Promise<void>;
+  setSaleMode: (mode: string | undefined) => Promise<void>;
+  /** Merge properties onto one basket line (line note, sale-mode marker, …) */
+  setLineProperties: (itemId: string, properties: Record<string, string>) => Promise<void>;
   applyDiscount: (code: string) => Promise<void>;
   removeDiscount: () => Promise<void>;
 
@@ -95,28 +100,14 @@ export const BasketActionsProvider = ({ children }: Readonly<{ children: ReactNo
       if (!state._containerRef.current) return;
 
       try {
-        // Spec requirement 2.11: Resolve tax rate at add-to-cart time
+        // Spec requirement 2.11: tax rate at add-to-cart time. Only the offline catalogue uses local tax setup.
+        // Online platforms own tax: the line carries no rate and the platform calculates tax for the whole
+        // basket at checkout (draft order / quote), so nothing is looked up or assumed per product here.
         let resolvedTaxRate = product.taxRate;
 
-        // Only resolve if taxRate is not already provided
-        if (resolvedTaxRate === undefined) {
-          const { taxProfileService } = await import('../services/tax/TaxProfileService');
-
-          if (product.taxProfileId) {
-            const profile = await taxProfileService.getProfileById(product.taxProfileId);
-            if (profile) {
-              resolvedTaxRate = profile.rate;
-            } else {
-              const defaultProfile = await taxProfileService.getDefaultProfile();
-              resolvedTaxRate = defaultProfile?.rate ?? 0.2;
-            }
-          } else if (product.taxCode) {
-            const profile = await taxProfileService.resolveRateForTaxCode(product.taxCode);
-            resolvedTaxRate = profile?.rate ?? 0.2;
-          } else {
-            const defaultProfile = await taxProfileService.getDefaultProfile();
-            resolvedTaxRate = defaultProfile?.rate ?? 0.2;
-          }
+        if (resolvedTaxRate === undefined && (product.platform ?? ECommercePlatform.OFFLINE) === ECommercePlatform.OFFLINE) {
+          const { resolveOfflineTaxRate } = await import('../services/tax/OfflineTaxResolver');
+          resolvedTaxRate = await resolveOfflineTaxRate(product.taxProfileId);
         }
 
         const newBasket = await state._containerRef.current.basketService.addItem({
@@ -124,6 +115,7 @@ export const BasketActionsProvider = ({ children }: Readonly<{ children: ReactNo
           variantId: product.variantId,
           sku: product.sku,
           name: product.name,
+          optionSummary: product.optionSummary,
           price: product.price,
           quantity,
           image: getImageUrl(product.image),
@@ -131,6 +123,7 @@ export const BasketActionsProvider = ({ children }: Readonly<{ children: ReactNo
           originalId: product.originalId || product.platformId,
           taxRate: resolvedTaxRate,
           taxable: product.taxable ?? true,
+          inventoryPolicy: 'deny',
         });
         if (state._mountedRef.current) {
           state._setBasket(newBasket);
@@ -255,6 +248,42 @@ export const BasketActionsProvider = ({ children }: Readonly<{ children: ReactNo
     [state]
   );
 
+  const setSaleMode = useCallback(
+    async (mode: string | undefined) => {
+      if (!state._containerRef.current) return;
+      try {
+        const newBasket = await state._containerRef.current.basketService.setSaleMode(mode);
+        if (state._mountedRef.current) {
+          state._setBasket(newBasket);
+          state._setError(null);
+        }
+      } catch (err) {
+        if (state._mountedRef.current) {
+          state._setError((err as Error).message);
+        }
+      }
+    },
+    [state]
+  );
+
+  const setLineProperties = useCallback(
+    async (itemId: string, properties: Record<string, string>) => {
+      if (!state._containerRef.current) return;
+      try {
+        const newBasket = await state._containerRef.current.basketService.updateItemProperties(itemId, properties);
+        if (state._mountedRef.current) {
+          state._setBasket(newBasket);
+          state._setError(null);
+        }
+      } catch (err) {
+        if (state._mountedRef.current) {
+          state._setError((err as Error).message);
+        }
+      }
+    },
+    [state]
+  );
+
   const applyDiscount = useCallback(
     async (code: string) => {
       if (!state._containerRef.current) return;
@@ -301,6 +330,8 @@ export const BasketActionsProvider = ({ children }: Readonly<{ children: ReactNo
       clearBasket,
       setCustomer,
       setNote,
+      setSaleMode,
+      setLineProperties,
       applyDiscount,
       removeDiscount,
       refreshBasket,
@@ -314,6 +345,8 @@ export const BasketActionsProvider = ({ children }: Readonly<{ children: ReactNo
       clearBasket,
       setCustomer,
       setNote,
+      setSaleMode,
+      setLineProperties,
       applyDiscount,
       removeDiscount,
       refreshBasket,

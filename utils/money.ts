@@ -38,14 +38,18 @@ export function sumMoney(amounts: number[]): number {
 
 /**
  * Format a dollar amount for display (e.g. "$19.99" or "19.99₽").
- * Always shows exactly 2 decimal places.
+ * Shows the currency's ISO 4217 minor units (2 decimals by default;
+ * zero-decimal currencies like JPY render as "¥1200", 3-decimal
+ * currencies like KWD as "KD1.500").
  * Symbol placement depends on the currency (before or after).
  */
 export function formatMoney(amount: number, currencyCode: string = 'GBP'): string {
   const currencyInfo = getCurrencyInfo(currencyCode);
   const symbol = currencyInfo?.symbol || currencyCode;
   const placement = currencyInfo?.symbolPlacement || 'before';
-  const formattedAmount = roundMoney(amount).toFixed(2);
+  const decimals = currencyInfo?.decimals ?? 2;
+  const factor = 10 ** decimals;
+  const formattedAmount = (Math.round(amount * factor) / factor).toFixed(decimals);
 
   if (placement === 'after') {
     return `${formattedAmount}${symbol}`;

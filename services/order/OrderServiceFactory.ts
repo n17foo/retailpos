@@ -6,7 +6,6 @@ import { MagentoOrderService } from './platforms/MagentoOrderService';
 import { SyliusOrderService } from './platforms/SyliusOrderService';
 import { WixOrderService } from './platforms/WixOrderService';
 import { PrestaShopOrderService } from './platforms/PrestaShopOrderService';
-import { SquarespaceOrderService } from './platforms/SquarespaceOrderService';
 import { CommercefullOrderService } from './platforms/CommercefullOrderService';
 import { OfflineOrderService } from './platforms/OfflineOrderService';
 import { PlatformOrderConfig } from './platforms/PlatformOrderServiceInterface';
@@ -28,7 +27,6 @@ export class OrderServiceFactory {
   private syliusService: SyliusOrderService | null = null;
   private wixService: WixOrderService | null = null;
   private prestaShopService: PrestaShopOrderService | null = null;
-  private squarespaceService: SquarespaceOrderService | null = null;
   private commercefullService: CommercefullOrderService | null = null;
   private offlineService: OfflineOrderService | null = null;
 
@@ -136,18 +134,6 @@ export class OrderServiceFactory {
           });
         }
         return this.prestaShopService;
-
-      case ECommercePlatform.SQUARESPACE:
-        if (!this.squarespaceService) {
-          this.squarespaceService = new SquarespaceOrderService(config);
-          this.squarespaceService.initialize().catch(err => {
-            this.logger.error(
-              { message: 'Failed to initialize Squarespace order service:' },
-              err instanceof Error ? err : new Error(String(err))
-            );
-          });
-        }
-        return this.squarespaceService;
 
       case ECommercePlatform.COMMERCEFULL:
         if (!this.commercefullService) {
@@ -261,16 +247,6 @@ export class OrderServiceFactory {
         this.prestaShopService.initialize().catch(err => {
           this.logger.error(
             { message: 'Failed to initialize PrestaShop order service with config:' },
-            err instanceof Error ? err : new Error(String(err))
-          );
-        });
-        break;
-
-      case ECommercePlatform.SQUARESPACE:
-        this.squarespaceService = new SquarespaceOrderService(config);
-        this.squarespaceService.initialize().catch(err => {
-          this.logger.error(
-            { message: 'Failed to initialize Squarespace order service with config:' },
             err instanceof Error ? err : new Error(String(err))
           );
         });

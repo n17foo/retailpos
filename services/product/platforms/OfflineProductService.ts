@@ -233,6 +233,8 @@ export class OfflineProductService implements PlatformProductServiceInterface {
    * Map external product format to standard Product format
    */
   private mapToProduct(item: any): Product {
+    // An explicit 0 is a real stock level; only a missing value means "not tracked"
+    const stock = [item.stock, item.quantity, item.inventoryQuantity].map(value => parseInt(value, 10)).find(n => Number.isFinite(n));
     return {
       id: item.id?.toString() || `item-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title: item.title || item.name || 'Untitled Product',
@@ -249,7 +251,9 @@ export class OfflineProductService implements PlatformProductServiceInterface {
           barcode: item.barcode || '',
           price: parseFloat(item.price) || 0,
           compareAtPrice: item.compareAtPrice ? parseFloat(item.compareAtPrice) : undefined,
-          inventoryQuantity: parseInt(item.stock) || parseInt(item.quantity) || parseInt(item.inventoryQuantity) || 999,
+          inventoryQuantity: stock ?? 0,
+          trackInventory: stock !== undefined,
+          isAvailable: stock === undefined || stock > 0,
         },
       ],
       images:

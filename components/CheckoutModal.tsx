@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, Modal, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
-import { lightColors, spacing, borderRadius, typography, elevation, semanticColors } from '../utils/theme';
+import { View, Text, Modal, StyleSheet, Pressable, ScrollView, TextInput } from 'react-native';
+import { lightColors, spacing, borderRadius, typography, elevation, semanticColors, interactionStyle } from '../utils/theme';
 import { formatMoney } from '../utils/money';
 import { Button } from './Button';
 import PinKeypad from './PinKeypad';
@@ -51,6 +51,14 @@ interface CheckoutModalProps {
   loyaltyPoints?: number;
   /** Available store credit in dollars */
   storeCreditDollars?: number;
+  /**
+   * Fast-path tender picked on the tender bar (spec §4.7):
+   * 'cash' opens straight into the cash-tender keypad; 'card' pre-selects the
+   * terminal method and fires it immediately when a terminal is connected.
+   */
+  initialTender?: 'cash' | 'card' | null;
+  /** Last checkout/payment failure — shown inline so the cashier can retry (§4.7) */
+  error?: string | null;
 }
 
 type ModalStep = 'method' | 'cash_tender' | 'split_tender';
@@ -145,6 +153,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
     customerEmail,
     loyaltyPoints = 0,
     storeCreditDollars = 0,
+    initialTender = null,
+    error = null,
   } = props;
 
   // Build the available method list for this device + provider combination.
@@ -157,6 +167,44 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
   // Split tender — amount input for the current line being added
   const [splitAmountStr, setSplitAmountStr] = useState('');
   const [splitMethod, setSplitMethod] = useState<PaymentMethod>('cash');
+
+  // The modal stays mounted between sales: start every checkout from a clean state
+  // (otherwise the previous sale's step, method and tendered amount leak into the next one).
+  // A tender picked on the tender bar skips the method step entirely (spec §4.7).
+  React.useEffect(() => {
+    if (!visible) return;
+    setTenderedStr('');
+    setSplitAmountStr('');
+    setSplitMethod('cash');
+    if (splitMode) {
+      setStep('split_tender');
+      setSelectedMethod('cash');
+    } else if (initialTender === 'cash') {
+      setSelectedMethod('cash');
+      setStep('cash_tender');
+    } else if (initialTender === 'card') {
+      setSelectedMethod(paymentMode === 'tap_to_pay' ? 'terminal' : 'cash');
+      setStep('method');
+    } else {
+      setStep('method');
+      setSelectedMethod('cash');
+    }
+  }, [visible, splitMode, initialTender, paymentMode]);
+
+  // Card fast path: a connected terminal fires immediately — no confirmation tap.
+  // Without a terminal the method stays pre-selected so the cashier can connect it.
+  const autoTenderedRef = React.useRef(false);
+  React.useEffect(() => {
+    if (!visible) {
+      autoTenderedRef.current = false;
+      return;
+    }
+    if (autoTenderedRef.current) return;
+    if (initialTender === 'card' && paymentMode === 'tap_to_pay' && activeProvider && terminalConnected) {
+      autoTenderedRef.current = true;
+      onSelectPayment({ method: 'terminal' });
+    }
+  }, [visible, initialTender, paymentMode, activeProvider, terminalConnected, onSelectPayment]);
 
   // When splitCashTenderAmount is set, transition to cash_tender step
   React.useEffect(() => {
@@ -220,6 +268,28 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
     }
   }, [isTenderValid, tenderedAmount, onSelectPayment, splitCashTenderAmount, onConfirmSplitCash]);
 
+  // Physical keyboard drives the cash keypad on pointer devices (spec §4.7.3):
+  // digits and '.' type the amount, Backspace deletes, Enter confirms.
+  React.useEffect(() => {
+    if (!visible || step !== 'cash_tender' || typeof window === 'undefined') return;
+    const handler = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      if (/^[0-9]$/.test(e.key) || e.key === '.') {
+        e.preventDefault();
+        handleKeyPress(e.key);
+      } else if (e.key === 'Backspace') {
+        e.preventDefault();
+        handleDelete();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        handleCashConfirm();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [visible, step, handleKeyPress, handleDelete, handleCashConfirm]);
+
   // ── Split tender step ────────────────────────────────────────────────────
   if (step === 'split_tender') {
     const collected = paymentLines.filter(p => p.amount > 0).reduce((s, p) => s + p.amount, 0);
@@ -261,25 +331,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
         <View style={styles.overlay}>
           <View style={styles.modal}>
             <View style={styles.header}>
-              <TouchableOpacity
+              <Pressable
                 onPress={() => setStep('method')}
-                style={styles.backButton}
+                style={state => [styles.backButton, interactionStyle(state)]}
                 disabled={isProcessing}
                 accessibilityLabel={t('common.back')}
                 accessibilityRole="button"
               >
                 <Text style={styles.backText}>←</Text>
-              </TouchableOpacity>
+              </Pressable>
               <Text style={styles.headerTitle}>Split Payment</Text>
-              <TouchableOpacity
+              <Pressable
                 onPress={handleCancel}
-                style={styles.closeButton}
+                style={state => [styles.closeButton, interactionStyle(state)]}
                 disabled={isProcessing}
                 accessibilityLabel={t('checkout.cancelCheckout')}
                 accessibilityRole="button"
               >
                 <Text style={styles.closeText}>✕</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -297,14 +367,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
                       <Text style={styles.splitLineMethod}>{methodLabel(line.method as PaymentMethod)}</Text>
                       <Text style={styles.splitLineAmount}>{formatMoney(line.amount, currency.code)}</Text>
                       {onRemovePaymentLine && (
-                        <TouchableOpacity
+                        <Pressable
                           onPress={() => onRemovePaymentLine(line.id)}
-                          style={styles.splitLineRemove}
+                          style={state => [styles.splitLineRemove, interactionStyle(state)]}
                           accessibilityLabel="Remove payment line"
                           accessibilityRole="button"
                         >
                           <Text style={styles.splitLineRemoveText}>✕</Text>
-                        </TouchableOpacity>
+                        </Pressable>
                       )}
                     </View>
                   ))}
@@ -331,9 +401,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
                   <Text style={styles.sectionTitle}>Add Payment</Text>
                   <View style={styles.splitMethodRow}>
                     {(['cash', ...(paymentMode === 'tap_to_pay' ? ['terminal'] : [])] as PaymentMethod[]).map(m => (
-                      <TouchableOpacity
+                      <Pressable
                         key={m}
-                        style={[styles.splitMethodButton, splitMethod === m && styles.splitMethodButtonSelected]}
+                        style={state => [
+                          [styles.splitMethodButton, splitMethod === m && styles.splitMethodButtonSelected],
+                          interactionStyle(state),
+                        ]}
                         onPress={() => setSplitMethod(m)}
                         accessibilityRole="radio"
                         accessibilityState={{ selected: splitMethod === m }}
@@ -341,15 +414,18 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
                         <Text style={[styles.splitMethodButtonText, splitMethod === m && styles.splitMethodButtonTextSelected]}>
                           {methodLabel(m)}
                         </Text>
-                      </TouchableOpacity>
+                      </Pressable>
                     ))}
                   </View>
                   {/* Store Credit / Loyalty buttons (only if customer attached and balance available) */}
                   {customerEmail && (storeCreditDollars > 0 || loyaltyPoints > 0) && (
                     <View style={styles.splitMethodRow}>
                       {storeCreditDollars > 0 && (
-                        <TouchableOpacity
-                          style={[styles.splitMethodButton, splitMethod === 'store_credit' && styles.splitMethodButtonSelected]}
+                        <Pressable
+                          style={state => [
+                            [styles.splitMethodButton, splitMethod === 'store_credit' && styles.splitMethodButtonSelected],
+                            interactionStyle(state),
+                          ]}
                           onPress={() => setSplitMethod('store_credit')}
                           accessibilityRole="radio"
                           accessibilityState={{ selected: splitMethod === 'store_credit' }}
@@ -359,11 +435,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
                           >
                             🎁 Credit ({formatMoney(storeCreditDollars, currency.code)})
                           </Text>
-                        </TouchableOpacity>
+                        </Pressable>
                       )}
                       {loyaltyPoints > 0 && (
-                        <TouchableOpacity
-                          style={[styles.splitMethodButton, splitMethod === 'loyalty' && styles.splitMethodButtonSelected]}
+                        <Pressable
+                          style={state => [
+                            [styles.splitMethodButton, splitMethod === 'loyalty' && styles.splitMethodButtonSelected],
+                            interactionStyle(state),
+                          ]}
                           onPress={() => setSplitMethod('loyalty')}
                           accessibilityRole="radio"
                           accessibilityState={{ selected: splitMethod === 'loyalty' }}
@@ -371,7 +450,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
                           <Text style={[styles.splitMethodButtonText, splitMethod === 'loyalty' && styles.splitMethodButtonTextSelected]}>
                             ⭐ Points ({loyaltyPoints})
                           </Text>
-                        </TouchableOpacity>
+                        </Pressable>
                       )}
                     </View>
                   )}
@@ -395,6 +474,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
             </ScrollView>
 
             <View style={styles.actions}>
+              {error && (
+                <Text style={styles.errorBanner} accessibilityRole="alert">
+                  {error}
+                </Text>
+              )}
               <Button
                 title={isProcessing ? t('common.processing') : 'Complete Sale'}
                 variant="success"
@@ -425,25 +509,25 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
           <View style={styles.modal}>
             {/* Header */}
             <View style={styles.header}>
-              <TouchableOpacity
+              <Pressable
                 onPress={() => setStep(splitCashTenderAmount !== null ? 'split_tender' : 'method')}
-                style={styles.backButton}
+                style={state => [styles.backButton, interactionStyle(state)]}
                 disabled={isProcessing}
                 accessibilityLabel={t('common.back')}
                 accessibilityRole="button"
               >
                 <Text style={styles.backText}>←</Text>
-              </TouchableOpacity>
+              </Pressable>
               <Text style={styles.headerTitle}>{splitCashTenderAmount !== null ? 'Cash Payment (Split)' : t('checkout.cashPayment')}</Text>
-              <TouchableOpacity
+              <Pressable
                 onPress={handleCancel}
-                style={styles.closeButton}
+                style={state => [styles.closeButton, interactionStyle(state)]}
                 disabled={isProcessing}
                 accessibilityLabel={t('checkout.cancelCheckout')}
                 accessibilityRole="button"
               >
                 <Text style={styles.closeText}>✕</Text>
-              </TouchableOpacity>
+              </Pressable>
             </View>
 
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -481,15 +565,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
                     { label: formatMoney(Math.ceil(amountDue / 20) * 20, currency.code), value: Math.ceil(amountDue / 20) * 20 },
                   ].filter((v, i, arr) => arr.findIndex(x => x.value === v.value) === i);
                 })().map(qa => (
-                  <TouchableOpacity
+                  <Pressable
                     key={qa.value}
-                    style={styles.quickAmountButton}
+                    style={state => [styles.quickAmountButton, interactionStyle(state)]}
                     onPress={() => setTenderedStr(qa.value.toFixed(2))}
                     accessibilityRole="button"
                     accessibilityLabel={qa.label}
                   >
                     <Text style={styles.quickAmountText}>{qa.label}</Text>
-                  </TouchableOpacity>
+                  </Pressable>
                 ))}
               </View>
 
@@ -501,6 +585,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
 
             {/* Confirm */}
             <View style={styles.actions}>
+              {error && (
+                <Text style={styles.errorBanner} accessibilityRole="alert">
+                  {error}
+                </Text>
+              )}
               <Button
                 title={
                   isProcessing
@@ -533,15 +622,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
           {/* Header */}
           <View style={styles.header}>
             <Text style={styles.headerTitle}>{t('checkout.completeOrder')}</Text>
-            <TouchableOpacity
+            <Pressable
               onPress={handleCancel}
-              style={styles.closeButton}
+              style={state => [styles.closeButton, interactionStyle(state)]}
               disabled={isProcessing}
               accessibilityLabel={t('checkout.cancelCheckout')}
               accessibilityRole="button"
             >
               <Text style={styles.closeText}>✕</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
 
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -592,12 +681,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
                 const isDisabled = method.id === 'terminal' && !terminalConnected;
 
                 return (
-                  <TouchableOpacity
+                  <Pressable
                     key={method.id}
-                    style={[styles.paymentOption, isSelected && styles.paymentOptionSelected, isDisabled && styles.paymentOptionDisabled]}
+                    style={state => [
+                      [styles.paymentOption, isSelected && styles.paymentOptionSelected, isDisabled && styles.paymentOptionDisabled],
+                      interactionStyle(state),
+                    ]}
                     onPress={() => !isDisabled && setSelectedMethod(method.id)}
                     disabled={isDisabled}
-                    activeOpacity={0.7}
                     accessibilityLabel={`Pay with ${method.label}`}
                     accessibilityRole="radio"
                     accessibilityState={{ selected: isSelected, disabled: isDisabled }}
@@ -609,7 +700,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
                       <Text style={styles.paymentDescription}>{method.description}</Text>
                     </View>
                     {isSelected && <Text style={styles.checkIcon}>✓</Text>}
-                  </TouchableOpacity>
+                  </Pressable>
                 );
               })}
             </View>
@@ -617,6 +708,11 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = props => {
 
           {/* Actions */}
           <View style={styles.actions}>
+            {error && (
+              <Text style={styles.errorBanner} accessibilityRole="alert">
+                {error}
+              </Text>
+            )}
             <Button
               title={
                 isProcessing
@@ -1009,6 +1105,13 @@ const styles = StyleSheet.create({
     color: lightColors.textPrimary,
     backgroundColor: lightColors.surface,
     marginBottom: spacing.sm,
+  },
+  errorBanner: {
+    fontSize: typography.fontSize.sm,
+    color: lightColors.error,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+    fontWeight: '600',
   },
 });
 

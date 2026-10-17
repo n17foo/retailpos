@@ -32,7 +32,7 @@ export type CapabilityLevel = 'supported' | 'custom' | 'not_recommended';
  *   local_only     — platform has no reliable pre-payment state. POS basket is
  *                    fully local; order is created/imported on the platform after
  *                    payment succeeds.
- *                    Platforms: Squarespace, Offline
+ *                    Platforms: Offline
  */
 export type BasketMode = 'native_draft' | 'remote_cart' | 'local_only';
 
@@ -152,18 +152,6 @@ export const PLATFORM_CAPABILITY_MATRIX: Readonly<Record<ECommercePlatform, Plat
     refunds: 'custom',
     loyalty: 'not_recommended', // no native loyalty API
     storeCredit: 'not_recommended', // no native store credit API
-  },
-  [ECommercePlatform.SQUARESPACE]: {
-    catalog: 'supported',
-    customers: 'supported',
-    inventory: 'supported',
-    orderSync: 'supported',
-    basketMode: 'local_only', // POS-local basket + post-payment order import
-    discounts: 'not_recommended',
-    giftCards: 'not_recommended',
-    refunds: 'not_recommended',
-    loyalty: 'not_recommended', // no loyalty API
-    storeCredit: 'not_recommended', // no store credit API
   },
   [ECommercePlatform.COMMERCEFULL]: {
     catalog: 'supported',

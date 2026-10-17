@@ -27,6 +27,10 @@ import { spacing } from '../utils/theme';
 import { useTranslate } from '../hooks/useTranslate';
 import { setupProgressService } from '../services/setup/SetupProgressService';
 import { platformCapabilityService } from '../services/platform/PlatformCapabilityService';
+import { posConfig } from '../services/config/POSConfigService';
+import { offlineCategoryService } from '../services/category/platforms/OfflineCategoryService';
+import { offlineProductService } from '../services/product/platforms/OfflineProductService';
+import { getCurrencySymbol } from '../utils/currency';
 import { useLogger } from '../hooks/useLogger';
 
 // Step components — reused from existing onboarding screens
@@ -107,6 +111,7 @@ const OnboardingScreen: React.FC = () => {
   const [ecommerceConfig, setEcommerceConfig] = useState<Record<string, string>>({});
   const [offlineConfig, setOfflineConfig] = useState<OfflineStoreConfig>({
     storeName: '',
+    storeAddress: '',
     categories: [],
     currency: 'GBP',
   });
@@ -155,6 +160,39 @@ const OnboardingScreen: React.FC = () => {
     updateEcommerceSettings(newSettings);
     await saveSettings();
     platformCapabilityService.setPlatform('offline');
+    // Store location is the tax destination for offline sales (D10).
+    await posConfig.updateAll({
+      storeName: config.storeName.trim(),
+      storeAddress: config.storeAddress.trim(),
+      currencySymbol: getCurrencySymbol(config.currency),
+    });
+    // Seed the offline catalogue so the categories/products entered here
+    // actually appear on the sale screen. Offline category matching is by
+    // name via productType (see utils/categoryFilter.ts).
+    for (const category of config.categories) {
+      try {
+        await offlineCategoryService.addCategory({ name: category.name });
+        for (const product of category.products) {
+          await offlineProductService.createProduct({
+            id: '',
+            title: product.name,
+            productType: category.name,
+            variants: [
+              {
+                id: `var-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+                title: 'Default',
+                sku: product.sku,
+                barcode: product.barcode,
+                price: parseFloat(product.price) || 0,
+                inventoryQuantity: 0,
+              },
+            ],
+          });
+        }
+      } catch (err) {
+        logger.error({ message: `Failed to seed offline category: ${category.name}` }, err instanceof Error ? err : new Error(String(err)));
+      }
+    }
     await setupProgressService.completePhase('platform');
     setCurrentPhase('admin_user_setup');
   };

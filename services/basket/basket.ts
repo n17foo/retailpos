@@ -14,7 +14,6 @@
  *   Sylius        → productVariantCode (stored in variantId)
  *   Wix           → variant (variantId)
  *   PrestaShop    → combination (variantId = combination id)
- *   Squarespace   → ProductVariant (variantId)
  *   Offline       → local product id
  */
 export interface BasketItem {
@@ -63,6 +62,8 @@ export interface Basket {
   customerName?: string;
   note?: string;
   registerId?: string;
+  /** Fulfilment mode for this sale ('counter' | 'pickup' | 'delivery' | …) — spec 6.36 */
+  saleMode?: string;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -116,17 +116,17 @@ Repositories abstract both SQLite (`OfflineOrderRepository`) and HTTP-to-server 
 
 ### Platform Capability Model
 
-`utils/platformCapabilities.ts` is the single source of truth for what each platform supports. It gates checkout behaviour (`basketMode`), sync strategy, and UI visibility. See `docs/specs/platform/platform-capabilities.md`.
+`utils/platformCapabilities.ts` is the single source of truth for what each platform supports. It gates checkout behaviour (`basketMode`), sync strategy, and UI visibility. See `docs/features/shared-libs/platform.md`.
 
 ### Tax — Platform-Authoritative (ADR-009)
 
-For `native_draft` platforms (Shopify, Wix, Commercefull), tax is calculated by the platform at `startCheckout()` time and overwrites local estimates. For all other platforms, local `TaxProfile` rates are authoritative.
+Online platforms own tax and the POS never assumes a rate. At `startCheckout()`, `native_draft` platforms (Shopify, Wix, Commercefull) return tax on a draft order; `remote_cart` platforms (WooCommerce, Magento, BigCommerce, Sylius, PrestaShop) calculate it on a temporary cart/quote (`quoteTax()`), and the effective rate is applied to the POS amount after discounts. If the platform cannot return tax, checkout stops. Local `TaxProfile` rates and the store tax rate apply to the offline catalogue only. See `docs/features/platform-clients/`.
 
 ---
 
 ## Supported Platforms
 
-`shopify` · `woocommerce` · `bigcommerce` · `magento` · `sylius` · `wix` · `prestashop` · `squarespace` · `commercefull` · `offline`
+`shopify` · `woocommerce` · `bigcommerce` · `magento` · `sylius` · `wix` · `prestashop` · `commercefull` · `offline`
 
 Defined in `utils/platforms.ts` → `ECommercePlatform` enum. Each platform has a capability profile in `utils/platformCapabilities.ts`.
 

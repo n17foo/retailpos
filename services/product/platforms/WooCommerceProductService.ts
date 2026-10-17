@@ -304,6 +304,8 @@ export class WooCommerceProductService extends BaseProductService {
           price: parseFloat(variant.price || 0),
           sku: variant.sku || '',
           inventoryQuantity: variant.stock_quantity || 0,
+          trackInventory: variant.manage_stock === true || (variant.manage_stock === 'parent' && wooProduct.manage_stock === true),
+          isAvailable: variant.stock_status !== 'outofstock',
         }))
       : [
           {
@@ -312,6 +314,8 @@ export class WooCommerceProductService extends BaseProductService {
             price: parseFloat(wooProduct.price || 0),
             sku: wooProduct.sku || '',
             inventoryQuantity: wooProduct.stock_quantity || 0,
+            trackInventory: wooProduct.manage_stock === true,
+            isAvailable: wooProduct.stock_status !== 'outofstock',
           },
         ];
 
@@ -324,6 +328,7 @@ export class WooCommerceProductService extends BaseProductService {
       description: wooProduct.description || '',
       vendor: wooProduct.vendor || '',
       productType: wooProduct.type || '',
+      categoryIds: wooProduct.categories ? wooProduct.categories.map((category: any) => String(category.id)) : [],
       tags,
       options: [],
       variants,

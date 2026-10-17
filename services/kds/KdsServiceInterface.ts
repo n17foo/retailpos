@@ -39,9 +39,10 @@ export interface KdsStatusUpdate {
  *
  * Implementations:
  *  - `HttpKdsService`      — sends tickets to a KDS over HTTP (e.g. Square KDS, custom)
+ *  - `NoOpKdsService`      — does nothing (when no KDS is configured)
+ * Planned (selectable in settings as "coming soon", not yet shipped):
  *  - `WebSocketKdsService` — real-time push via WebSocket
  *  - `ElectronKdsService`  — IPC to a second Electron window acting as the KDS
- *  - `NoOpKdsService`      — does nothing (when no KDS is configured)
  */
 export interface KdsServiceInterface {
   /** Which driver is backing this instance. */

@@ -19,4 +19,7 @@ export interface BasketServiceInterface {
   removeDiscount(): Promise<Basket>;
   setCustomer(email?: string, name?: string): Promise<Basket>;
   setNote(note: string): Promise<Basket>;
+  setSaleMode(mode: string | undefined): Promise<Basket>;
+  /** Replace a line's free-form properties (e.g. a per-line note) */
+  updateItemProperties(itemId: string, properties: Record<string, string>): Promise<Basket>;
 }

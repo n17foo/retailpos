@@ -322,6 +322,8 @@ export class MagentoProductService extends BaseProductService {
         price: parseFloat(magentoProduct.price || '0'),
         compareAtPrice: getCustomAttribute('special_price') ? parseFloat(getCustomAttribute('special_price')) : undefined,
         inventoryQuantity: magentoProduct.extension_attributes?.stock_item?.qty || 0,
+        trackInventory: magentoProduct.extension_attributes?.stock_item?.manage_stock !== false,
+        isAvailable: magentoProduct.extension_attributes?.stock_item?.is_in_stock !== false,
         weight: magentoProduct.weight ? parseFloat(magentoProduct.weight) : undefined,
         weightUnit: 'kg' as const,
       },
@@ -341,6 +343,9 @@ export class MagentoProductService extends BaseProductService {
       description: getCustomAttribute('description') || getCustomAttribute('short_description') || '',
       vendor: getCustomAttribute('manufacturer') || '',
       productType: magentoProduct.type_id || '',
+      categoryIds: (magentoProduct.extension_attributes?.category_links || magentoProduct.category_links || []).map((link: any) =>
+        String(link.category_id)
+      ),
       tags: [],
       options: [],
       variants,

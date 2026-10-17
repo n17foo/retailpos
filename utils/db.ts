@@ -1,28 +1,44 @@
-/* eslint-disable no-console */
 import * as SQLite from 'expo-sqlite';
 import { initializeSchema } from './dbSchema';
+import { LoggerFactory } from '../services/logger/LoggerFactory';
+
+const logger = LoggerFactory.getInstance().createLogger('DB');
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
-const dbPromise = SQLite.openDatabaseAsync('retailPOS.db')
-  .then(async database => {
-    console.log('[DB] Database retailPOS.db opened successfully');
-    dbInstance = database;
-    if (process.env.NODE_ENV !== 'test') {
-      console.log('[DB] Initializing schema...');
-      try {
-        await initializeSchema(database);
-        console.log('[DB] Schema initialized successfully');
-      } catch (e) {
-        console.error('[DB] Failed to initialize schema:', e);
-        throw e;
-      }
-    }
-    return database;
-  })
-  .catch(err => {
-    console.error('[DB] Error opening database retailPOS.db:', err);
-    throw err;
-  });
+let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
+
+/**
+ * Opens (and on first call, migrates) the database. A failure clears the cached
+ * promise so the next call retries instead of poisoning persistence forever.
+ */
+function getDbPromise(): Promise<SQLite.SQLiteDatabase> {
+  if (!dbPromise) {
+    dbPromise = SQLite.openDatabaseAsync('retailPOS.db')
+      .then(async database => {
+        logger.info('Database retailPOS.db opened successfully');
+        dbInstance = database;
+        if (process.env.NODE_ENV !== 'test') {
+          logger.info('Initializing schema…');
+          try {
+            await initializeSchema(database);
+            logger.info('Schema initialized successfully');
+          } catch (e) {
+            logger.error({ message: 'Failed to initialize schema' }, e instanceof Error ? e : new Error(String(e)));
+            throw e;
+          }
+        }
+        return database;
+      })
+      .catch(err => {
+        logger.error({ message: 'Error opening database retailPOS.db' }, err instanceof Error ? err : new Error(String(err)));
+        // Allow the next access to retry the open instead of failing forever.
+        dbInstance = null;
+        dbPromise = null;
+        throw err;
+      });
+  }
+  return dbPromise;
+}
 
 // A Proxy that delegates database calls to the asynchronous dbInstance once ready
 const db = new Proxy({} as SQLite.SQLiteDatabase, {
@@ -40,7 +56,7 @@ const db = new Proxy({} as SQLite.SQLiteDatabase, {
         return method;
       }
 
-      return dbPromise.then(resolvedDb => {
+      return getDbPromise().then(resolvedDb => {
         const method = resolvedDb[prop as keyof SQLite.SQLiteDatabase];
         if (typeof method === 'function') {
           return (method as (...args: unknown[]) => unknown).apply(resolvedDb, args);

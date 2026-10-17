@@ -156,6 +156,7 @@ const PaymentTerminalScreen: React.FC<PaymentTerminalScreenProps> = ({ navigatio
         processPayment({
           amount,
           reference: `ORDER-${Date.now()}`,
+          currency: currency.code,
           orderId: routeParams.orderId,
           customerName: routeParams.customerName,
           items: items.map(item => ({

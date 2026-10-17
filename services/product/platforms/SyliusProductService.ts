@@ -261,7 +261,9 @@ export class SyliusProductService extends BaseProductService {
       sku: variant.code || '',
       barcode: variant.barcode,
       price: variant.price ? variant.price / 100 : 0, // Sylius stores prices in cents
-      inventoryQuantity: variant.onHand || 0,
+      inventoryQuantity: Math.max(0, (variant.onHand || 0) - (variant.onHold || 0)),
+      trackInventory: variant.tracked !== false,
+      isAvailable: variant.tracked === false || (variant.onHand || 0) > 0,
       weight: variant.weight,
       weightUnit: 'g' as const,
     }));

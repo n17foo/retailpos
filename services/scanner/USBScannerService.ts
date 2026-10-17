@@ -1,6 +1,7 @@
 import { LoggerFactory } from '../logger/LoggerFactory';
 import { ScannerServiceInterface } from './ScannerServiceInterface';
 import { scannerSettingsService } from './ScannerSettingsService';
+import { HidBurstDetector } from '../../utils/hidBurst';
 
 /**
  * USB scanner service implementation
@@ -12,8 +13,7 @@ export class USBScannerService implements ScannerServiceInterface {
   private deviceId: string | null = null;
   private scanListeners: Map<string, (data: string) => void> = new Map();
   private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
-  private inputBuffer: string = '';
-  private lastKeyTime: number = 0;
+  private burstDetector: HidBurstDetector | null = null;
   private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
 
   constructor() {
@@ -55,8 +55,8 @@ export class USBScannerService implements ScannerServiceInterface {
         window.removeEventListener('keydown', this.keydownHandler, true);
         this.keydownHandler = null;
       }
+      this.burstDetector = null;
       this.scanListeners.clear();
-      this.inputBuffer = '';
       this.connected = false;
       this.deviceId = null;
       this.logger.info('Disconnected from USB scanner');
@@ -87,33 +87,19 @@ export class USBScannerService implements ScannerServiceInterface {
     this.scanListeners.set(subscriptionId, callback);
 
     if (!this.keydownHandler && typeof window !== 'undefined') {
-      this.inputBuffer = '';
-      this.lastKeyTime = 0;
-
-      // Load configuration from settings service
-      const config = scannerSettingsService.getUsbConfig();
-      const suffixKey = config.suffixChar === 'Tab' ? 'Tab' : 'Enter';
+      // HID burst detection is shared with the Electron service and driven by
+      // the configured scanner settings (interval, length bounds, suffix).
+      this.burstDetector = new HidBurstDetector(scannerSettingsService.getUsbConfig(), barcode => {
+        this.scanListeners.forEach(cb => cb(barcode));
+        this.logger.info(`USB barcode scanned: ${barcode}`);
+      });
 
       this.keydownHandler = (e: KeyboardEvent) => {
-        const now = Date.now();
-        if (now - this.lastKeyTime > config.scanIntervalMs && this.inputBuffer.length > 0) {
-          this.inputBuffer = '';
-        }
-        this.lastKeyTime = now;
-
-        if (e.key === suffixKey) {
-          if (this.inputBuffer.length >= config.minBarcodeLength && this.inputBuffer.length <= config.maxBarcodeLength) {
-            const barcode = this.inputBuffer.trim();
-            this.inputBuffer = '';
-            this.scanListeners.forEach(cb => cb(barcode));
-            this.logger.info(`USB barcode scanned: ${barcode}`);
-          } else {
-            this.inputBuffer = '';
-          }
-          return;
-        }
-        if (e.key.length === 1) {
-          this.inputBuffer += e.key;
+        const result = this.burstDetector?.handleKey(e.key);
+        if (result?.swallow) {
+          // Scanner burst — keep the keystroke out of the omnibar / focused inputs
+          e.preventDefault();
+          e.stopPropagation();
         }
       };
       window.addEventListener('keydown', this.keydownHandler, true);
@@ -132,7 +118,7 @@ export class USBScannerService implements ScannerServiceInterface {
     if (this.scanListeners.size === 0 && this.keydownHandler && typeof window !== 'undefined') {
       window.removeEventListener('keydown', this.keydownHandler, true);
       this.keydownHandler = null;
-      this.inputBuffer = '';
+      this.burstDetector = null;
       this.logger.info('DOM keydown HID listener removed for USB scanner');
     }
   }

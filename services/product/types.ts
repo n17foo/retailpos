@@ -202,7 +202,7 @@ export function toProductSummary(product: UnifiedProduct): UnifiedProductSummary
 }
 
 export function getDefaultVariant(product: UnifiedProduct): UnifiedProductVariant | undefined {
-  return product.variants.find(v => v.isAvailable) || product.variants[0];
+  return product.variants.find(v => (v.trackInventory ? v.inventoryQuantity > 0 : v.isAvailable)) || product.variants[0];
 }
 
 export function isOnSale(product: UnifiedProduct): boolean {

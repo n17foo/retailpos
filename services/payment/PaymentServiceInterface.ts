@@ -3,7 +3,7 @@
 export interface PaymentRequest {
   amount: number;
   reference: string;
-  currency?: string; // Currency code (e.g. 'usd', 'eur')
+  currency: string; // ISO currency code of the sale (e.g. 'GBP'); always the store's configured currency
   orderId?: string; // Optional order identifier
   customerName?: string; // Optional customer name for receipt
   itemCount?: number; // Number of items in the transaction

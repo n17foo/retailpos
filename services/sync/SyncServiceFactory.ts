@@ -8,7 +8,6 @@ import { MagentoSyncService } from './platforms/MagentoSyncService';
 import { SyliusSyncService } from './platforms/SyliusSyncService';
 import { OfflineSyncService } from './platforms/OfflineSyncService';
 import { PrestaShopSyncService } from './platforms/PrestaShopSyncService';
-import { SquarespaceSyncService } from './platforms/SquarespaceSyncService';
 import { CommercefullSyncService } from './platforms/CommercefullSyncService';
 import { PlatformSyncConfig } from './platforms/PlatformSyncServiceInterface';
 import { LoggerFactory } from '../logger/LoggerFactory';
@@ -127,10 +126,6 @@ export class SyncServiceFactory {
 
       case ECommercePlatform.PRESTASHOP:
         service = this.createPrestaShopSyncService();
-        break;
-
-      case ECommercePlatform.SQUARESPACE:
-        service = this.createSquarespaceSyncService();
         break;
 
       case ECommercePlatform.COMMERCEFULL:
@@ -273,19 +268,6 @@ export class SyncServiceFactory {
 
     service.initialize().catch(err => {
       this.logger.error({ message: 'Failed to initialize PrestaShop sync service' }, err instanceof Error ? err : new Error(String(err)));
-    });
-
-    return service;
-  }
-
-  /**
-   * Create a Squarespace-specific sync service
-   */
-  private createSquarespaceSyncService(): SyncServiceInterface {
-    const service = new SquarespaceSyncService();
-
-    service.initialize().catch(err => {
-      this.logger.error({ message: 'Failed to initialize Squarespace sync service' }, err instanceof Error ? err : new Error(String(err)));
     });
 
     return service;
@@ -659,18 +641,6 @@ export class SyncServiceFactory {
           );
         });
         this.serviceInstances[platform] = prestaService;
-        break;
-      }
-
-      case ECommercePlatform.SQUARESPACE: {
-        const squarespaceService = new SquarespaceSyncService();
-        squarespaceService.initialize().catch(err => {
-          this.logger.error(
-            { message: 'Failed to initialize Squarespace sync service with config' },
-            err instanceof Error ? err : new Error(String(err))
-          );
-        });
-        this.serviceInstances[platform] = squarespaceService;
         break;
       }
 

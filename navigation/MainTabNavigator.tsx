@@ -1,18 +1,14 @@
 import React, { lazy, Suspense, useCallback } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import SaleScreen from '../screens/SaleScreen';
 import { MoreNavigator } from './MoreNavigator';
 import type { MainTabParamList } from './types';
-import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { lightColors, typography, spacing } from '../utils/theme';
 import { canAccessTab } from '../utils/roleAccess';
 import type { UserRole } from '../repositories/UserRepository';
 
-const BarcodeScannerScreen = lazy(() => import('../screens/BarcodeScannerScreen').then(m => ({ default: m.BarcodeScannerScreen })));
-const SearchScreen = lazy(() => import('../screens/SearchScreen'));
 const InventoryScreen = lazy(() => import('../screens/InventoryScreen'));
 
 const LazyFallback = () => (
@@ -34,42 +30,23 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 interface MainTabNavigatorProps {
   username: string;
   userRole?: UserRole;
+  /** Locks the register (returns to the PIN screen) */
+  onLock: () => void;
   onLogout: () => void;
 }
 
 /**
- * Main Tab Navigator
- * Bottom tab navigation for the main app after login
+ * Main Tab Navigator.
+ *
+ * The sale screen is the full-screen home — it has no visible tab bar
+ * (docs/specs/system/sales-screen-fast-path-ux.md §4.2). Secondary
+ * destinations (Inventory, More) keep the tab bar so the cashier can get
+ * back to the sale in one tap.
  */
-export const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ username, userRole, onLogout }) => {
-  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
-
-  // Handler for barcode scan success — navigate to Sale tab and auto-add the scanned product
-  const handleScanSuccess = useCallback(
-    (productId: string) => {
-      navigation.navigate('Sale', { scannedProductId: productId });
-    },
-    [navigation]
-  );
-
-  const renderSaleScreen = useCallback(() => <SaleScreen username={username} />, [username]);
-
-  const renderScanScreen = useCallback(
-    () => (
-      <Suspense fallback={<LazyFallback />}>
-        <BarcodeScannerScreen onScanSuccess={handleScanSuccess} onClose={() => {}} />
-      </Suspense>
-    ),
-    [handleScanSuccess]
-  );
-
-  const renderSearchScreen = useCallback(
-    () => (
-      <Suspense fallback={<LazyFallback />}>
-        <SearchScreen />
-      </Suspense>
-    ),
-    []
+export const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ username, userRole, onLock, onLogout }) => {
+  const renderSaleScreen = useCallback(
+    () => <SaleScreen username={username} onLock={onLock} onLogout={onLogout} />,
+    [username, onLock, onLogout]
   );
 
   const renderInventoryScreen = useCallback(
@@ -107,31 +84,14 @@ export const MainTabNavigator: React.FC<MainTabNavigatorProps> = ({ username, us
       <Tab.Screen
         name="Sale"
         options={{
-          tabBarIcon: ({ color, size }) => <MaterialIcons name="shopping-cart" size={size} color={color} />,
+          // The sale flow is full-screen: omnibar search + in-place scanning
+          // replace the old Scan/Search tabs, and the ☰ menu replaces More.
+          tabBarStyle: { display: 'none' },
+          tabBarIcon: ({ color, size }) => <MaterialIcons name="point-of-sale" size={size} color={color} />,
           tabBarLabel: 'Sale',
         }}
       >
         {renderSaleScreen}
-      </Tab.Screen>
-
-      <Tab.Screen
-        name="Scan"
-        options={{
-          tabBarIcon: ({ color, size }) => <MaterialIcons name="qr-code-scanner" size={size} color={color} />,
-          tabBarLabel: 'Scan',
-        }}
-      >
-        {renderScanScreen}
-      </Tab.Screen>
-
-      <Tab.Screen
-        name="Search"
-        options={{
-          tabBarIcon: ({ color, size }) => <MaterialIcons name="search" size={size} color={color} />,
-          tabBarLabel: 'Search',
-        }}
-      >
-        {renderSearchScreen}
       </Tab.Screen>
 
       {canAccessTab(userRole, 'Inventory') && (

@@ -74,6 +74,22 @@ export interface Address {
 // Refund interfaces moved to refundServiceInterface.ts
 
 /**
+ * Tax calculated by the platform for a basket, obtained without leaving an order behind.
+ * The POS applies the platform's effective rate to what the customer is actually charged.
+ */
+export interface TaxQuote {
+  /** Net (tax-exclusive) items subtotal the platform calculated the tax on */
+  subtotal: number;
+  /** Tax the platform calculated on that subtotal */
+  tax: number;
+  /**
+   * True when catalogue prices already include tax: the POS price is gross and the tax is a portion of it.
+   * False when the tax is added on top of the price.
+   */
+  taxIncluded: boolean;
+}
+
+/**
  * Interface for order-related operations in an e-commerce platform.
  *
  * Draft order lifecycle (online platforms):
@@ -91,6 +107,12 @@ export interface OrderServiceInterface {
    * The draft is not yet paid — it is confirmed via completeOrder() after payment.
    */
   createDraftOrder(order: Order): Promise<Order>;
+
+  /**
+   * Ask the platform to calculate tax for this basket (cart / quote / checkout) and discard the result.
+   * Used by platforms that have no draft order. Throws when the platform cannot return the tax.
+   */
+  quoteTax(order: Order): Promise<TaxQuote>;
 
   /**
    * Cancel / delete a draft order on the platform before payment.

@@ -52,11 +52,16 @@ export const useSearch = () => {
     }
   }, [searchService, isInitialized, logger]);
 
+  // Results from a superseded request are dropped — typing ahead of a slow
+  // platform search must never show results for an older query.
+  const requestSeq = useRef(0);
+
   /**
    * Search for products
    */
   const searchProducts = useCallback(
     async (query: string, options?: SearchOptions) => {
+      const seq = ++requestSeq.current;
       try {
         setIsLoading(true);
         setError(null);
@@ -66,15 +71,20 @@ export const useSearch = () => {
         }
 
         const results = await searchService.searchProducts(query, options);
+        if (seq !== requestSeq.current) return results;
         setSearchResults(results);
         setSearchHistory(searchService.getSearchHistory());
 
         return results;
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to search products');
+        if (seq === requestSeq.current) {
+          setError(err instanceof Error ? err.message : 'Failed to search products');
+        }
         return null;
       } finally {
-        setIsLoading(false);
+        if (seq === requestSeq.current) {
+          setIsLoading(false);
+        }
       }
     },
     [searchService, isInitialized]

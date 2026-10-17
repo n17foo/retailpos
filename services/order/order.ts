@@ -45,6 +45,8 @@ export interface LocalOrder {
   giftCardCode?: string;
   giftCardAmount?: number;
   note?: string;
+  /** Fulfilment mode selected at sale time ('counter' | 'pickup' | 'delivery' | …) — spec 6.36 */
+  saleMode?: string;
   paymentMethod?: string;
   paymentTransactionId?: string;
   /** Multi-tender payment lines. Populated for split-tender orders. */

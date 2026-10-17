@@ -1,115 +1,137 @@
 /**
  * useSaleScreen
  *
- * Encapsulates all product-loading, search, category-filter, barcode-scan,
- * and UX state management logic. Implements Sales UX spec requirements.
+ * Composes the sale-screen state hooks (catalogue, scanner, checkout, basket)
+ * plus the layout/input-mode derivation. Mount it ONCE (via SaleProvider) and
+ * share the result through context.
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useRoute, type RouteProp } from '@react-navigation/native';
-import { useCategoryContext } from '../contexts/CategoryProvider';
-import { useEcommerceSettings } from './useEcommerceSettings';
-import { useProductsForDisplay } from './useProducts';
-import { useResponsive, getProductColumns, getSidebarWidths } from './useResponsive';
-import { useKeyboardShortcuts } from './useKeyboardShortcuts';
-import { ProductServiceFactory } from '../services/product/ProductServiceFactory';
-import { ECommercePlatform } from '../utils/platforms';
-import type { MainTabParamList } from '../navigation/types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useWindowDimensions } from 'react-native';
 import { useBasketState } from '../contexts/BasketStateProvider';
-import { BasketProduct, useBasketActions } from '../contexts/BasketActionsProvider';
 import { useCheckoutContext } from '../contexts/CheckoutProvider';
+import { useCategoryContext } from '../contexts/CategoryProvider';
+import { useSaleCatalog } from './useSaleCatalog';
+import { useSaleScanner } from './useSaleScanner';
+import { useCheckout } from './useCheckout';
+import { useLoyaltyBasket } from './useLoyaltyBasket';
+import { useCashDrawerStatus } from './useCashDrawerStatus';
+import { cashDrawerServiceFactory } from '../services/drawer/CashDrawerServiceFactory';
+import { posConfig } from '../services/config/POSConfigService';
+import { getSaleLayout } from '../utils/responsive.utils';
 import { getUserFacingSaleState, type UserFacingSaleState } from '../utils/orderStateMapper';
-import type { BasketBlocker } from '../components/BasketBlockers';
+import { isElectron, isMobile } from '../utils/electron';
+import type { BasketBlocker, BlockerCode } from '../components/BasketBlockers';
 import type { BasketItem } from '../services/basket/basket';
+import type { TenderShortcut } from './useCheckout';
+
+export interface SaleBlocker extends BasketBlocker {
+  code: BlockerCode;
+}
+
+/** 'auto' resolves to pointer on desktop/Electron/web and touch on native mobile */
+export type SaleInputMode = 'touch' | 'pointer';
+
+const resolveInputMode = (): SaleInputMode => {
+  const configured = posConfig.values.saleInputMode ?? 'auto';
+  if (configured === 'touch' || configured === 'pointer') return configured;
+  return isMobile() && !isElectron() ? 'touch' : 'pointer';
+};
 
 export function useSaleScreen() {
-  const { selectedCategory, selectedCategoryName, setSelectedCategory, setSelectedCategoryName } = useCategoryContext();
   const { basketItems, basketItemsMap, itemCount, total, basket } = useBasketState();
-  const { addToBasket, updateQuantity } = useBasketActions();
-  const { currentOrder, unsyncedOrdersCount, isProcessing } = useCheckoutContext();
-  const { isTabletOrDesktop, width } = useResponsive();
-  const [searchQuery, setSearchQuery] = useState('');
+  const { currentOrder, unsyncedOrdersCount, isProcessing, syncAllPendingOrders, isSyncing } = useCheckoutContext();
+  const { clear: clearCategory } = useCategoryContext();
 
-  const route = useRoute<RouteProp<MainTabParamList, 'Sale'>>();
-  const handledScanRef = useRef<string | null>(null);
+  const catalog = useSaleCatalog();
+  const scanner = useSaleScanner({
+    products: catalog.products,
+    catalogPlatform: catalog.catalogPlatform,
+    addProduct: catalog.addProduct,
+  });
 
-  const { currentPlatform } = useEcommerceSettings();
-  const {
-    products,
-    isLoading: isProductLoading,
-    loadMore,
-  } = useProductsForDisplay(currentPlatform || undefined, selectedCategory, selectedCategoryName);
+  // Basket sheet (phone stacked shell)
+  const [isBasketSheetOpen, setIsBasketSheetOpen] = useState(false);
 
-  const filteredProducts = searchQuery ? products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())) : products;
+  // After a completed payment the sale UI returns to its initial state
+  // ("All Products", no search) ready for the next customer (§4.7).
+  const checkout = useCheckout({
+    platform: catalog.currentPlatform ?? undefined,
+    onSuccess: () => {
+      clearCategory();
+      catalog.clearSearch();
+      setIsBasketSheetOpen(false);
+    },
+  });
 
-  const numColumns = getProductColumns(width);
-  const sidebarWidths = getSidebarWidths(width);
+  // Loyalty & store-credit balances — single instance shared by the basket
+  // panel and the checkout modal (discount/loyalty redesign is deferred).
+  const loyalty = useLoyaltyBasket(basket?.customerEmail, checkout.currentOrder?.id);
+  const { loadBalances } = loyalty;
+  useEffect(() => {
+    void loadBalances();
+  }, [basket?.customerEmail, loadBalances]);
 
-  // ── UX State Management (Sales UX spec §2.2, §2.3) ────────────────────
+  const { width, height } = useWindowDimensions();
+  const layout = useMemo(() => getSaleLayout(width, height), [width, height]);
+  const inputMode = useMemo(resolveInputMode, []);
 
-  // Validate basket and compute blockers
-  const blockers = useMemo((): BasketBlocker[] => {
-    const result: BasketBlocker[] = [];
+  // Cash-drawer status comes from the factory driver, polled while on the sale screen
+  const drawerService = useMemo(() => cashDrawerServiceFactory.getService(), []);
+  const { isOpen: isDrawerOpen } = useCashDrawerStatus(drawerService);
 
-    // Blocker: Discount requires customer email (spec §2.3.2)
+  /** One-tap tender — opens checkout straight into the right step (§4.7) */
+  const openTender = useCallback(
+    (tender: TenderShortcut) => {
+      void checkout.handleStartCheckout(tender);
+    },
+    [checkout]
+  );
+
+  // ── UX State Management (sales-ux spec §2.2, §2.3) ────────────────────
+
+  const blockers = useMemo((): SaleBlocker[] => {
+    const result: SaleBlocker[] = [];
+
+    // Blocker: discount requires a customer email (sales-ux spec §2.3.2)
     if (basket && basket.discountCode && !basket.customerEmail) {
       result.push({
+        code: 'customer-required',
         type: 'warning',
         message: 'Customer email required for discount',
-        action: {
-          label: 'Add Customer',
-          onPress: () => {
-            // This will be handled by the parent component
-            // by opening the customer modal
-          },
-        },
+        action: { label: 'Add Customer', onPress: () => {} },
       });
     }
 
-    // Blocker: Product missing required variant
-    // Check if any basket items have products with multiple variants but no variantId selected
-    const itemsNeedingVariant = basketItems.filter(item => {
-      const product = products.find(p => p.id === item.productId);
-      return product && product.variants && product.variants.length > 1 && !item.variantId;
-    });
-
-    if (itemsNeedingVariant.length > 0) {
-      itemsNeedingVariant.forEach(item => {
+    basketItems.forEach(item => {
+      const product = catalog.products.find(p => p.id === item.productId);
+      if (product && product.variants && product.variants.length > 1 && !item.variantId) {
         result.push({
+          code: 'variant-required',
           type: 'error',
           message: `Variant selection required for ${item.name}`,
-          action: {
-            label: 'Select Variant',
-            onPress: () => {
-              // This will be handled by the parent component
-              // by opening the variant picker
-            },
-          },
+          action: { label: 'Select Variant', onPress: () => {} },
         });
-      });
-    }
+      }
+    });
 
-    // Blocker: Unsynced orders (info level - doesn't prevent checkout)
+    // Info only: unsynced orders never prevent a sale (offline-first)
     if (unsyncedOrdersCount > 0) {
       result.push({
+        code: 'unsynced-orders',
         type: 'info',
         message: `${unsyncedOrdersCount} ${unsyncedOrdersCount === 1 ? 'order' : 'orders'} pending sync`,
-        action: {
-          label: 'Retry Sync',
-          onPress: () => {
-            // This will be handled by the parent component
-            // by calling syncAllPendingOrders
-          },
-        },
+        action: { label: 'Retry Sync', onPress: () => void syncAllPendingOrders() },
       });
     }
 
     return result;
-  }, [basket, basketItems, products, unsyncedOrdersCount]);
+  }, [basket, basketItems, catalog.products, unsyncedOrdersCount, syncAllPendingOrders]);
 
-  // Compute user-facing sale state
+  // Only warnings and errors stop checkout; info-level blockers are shown but do not change the sale state
+  const blockingBlockers = useMemo(() => blockers.filter(b => b.type !== 'info'), [blockers]);
+
   const saleState: UserFacingSaleState = useMemo(() => {
-    // Convert context BasketItems to service BasketItems for state computation
     const serviceBasketItems: BasketItem[] = basketItems.map(item => ({
       id: item.id,
       productId: item.productId,
@@ -120,147 +142,56 @@ export function useSaleScreen() {
       sku: item.sku,
       image: typeof item.image === 'string' ? item.image : '',
     }));
-    return getUserFacingSaleState(serviceBasketItems, currentOrder, blockers, isProcessing);
-  }, [basketItems, currentOrder, blockers, isProcessing]);
+    return getUserFacingSaleState(serviceBasketItems, currentOrder, blockingBlockers, isProcessing);
+  }, [basketItems, currentOrder, blockingBlockers, isProcessing]);
 
-  // Keyboard shortcut: Cmd+K to focus search (desktop)
-  useKeyboardShortcuts([{ key: 'k', meta: true, handler: () => {}, description: 'Focus search' }], isTabletOrDesktop);
-
-  // Auto-add product when arriving from a barcode scan
-  useEffect(() => {
-    const scannedId = route.params?.scannedProductId;
-    if (!scannedId || scannedId === handledScanRef.current) return;
-    handledScanRef.current = scannedId;
-
-    const tryAdd = async () => {
-      let product = products.find(p => p.id === scannedId);
-
-      if (!product) {
-        try {
-          const service = ProductServiceFactory.getInstance().getService(currentPlatform || ECommercePlatform.OFFLINE);
-          const result = await service?.getProducts({ ids: [scannedId], limit: 1 }).then(r => r.products[0]);
-          if (result) {
-            const { getDefaultVariant } = await import('../services/product/types');
-            const { mapToUnifiedProducts } = await import('../services/product/mappers');
-            const unified = mapToUnifiedProducts([result], currentPlatform || ECommercePlatform.OFFLINE);
-            const u = unified[0];
-            if (u) {
-              const dv = getDefaultVariant(u);
-              const img = u.images.find(i => i.isPrimary) || u.images[0];
-              product = {
-                id: u.id,
-                platformId: u.platformId,
-                name: u.title,
-                price: dv?.price || 0,
-                image: img?.url ? { uri: img.url } : null,
-                categoryId: u.categoryIds[0] || u.productType || '',
-                categoryName: u.productType,
-                description: u.description,
-                sku: dv?.sku,
-                barcode: dv?.barcode,
-                stock: dv?.inventoryQuantity || 0,
-                isEcommerceProduct: u.platform !== ECommercePlatform.OFFLINE,
-                variantId: dv?.id,
-                platform: u.platform,
-                variants: u.variants.length > 1 ? u.variants : undefined,
-                options: u.options.length > 0 ? u.options : undefined,
-                taxProfileId: u.taxProfileId,
-                taxCode: u.taxCode ?? dv?.taxCode,
-              };
-            }
-          }
-        } catch {
-          // fall through
-        }
-      }
-
-      if (!product) return;
-
-      const basketProduct: BasketProduct = {
-        id: product.id,
-        name: product.name,
-        price: product.price,
-        image: product.image,
-        isEcommerceProduct: product.isEcommerceProduct,
-        variantId: product.variantId,
-        sku: product.sku,
-        platformId: product.platformId,
-        platform: product.platform,
-        taxProfileId: product.taxProfileId,
-        taxCode: product.taxCode,
-      };
-      addToBasket(basketProduct, 1).catch(() => {});
-    };
-
-    tryAdd();
-  }, [route.params?.scannedProductId, products, addToBasket, currentPlatform]);
-
-  const handleAddToCart = useCallback(
-    async (id: string, quantity: number, variantId?: string) => {
-      const product = products.find(p => p.id === id);
-      if (!product) return;
-
-      const cartItem = basketItems.find(item => item.productId === id);
-
-      if (quantity <= 0 && cartItem) {
-        await updateQuantity(cartItem.id, 0);
-      } else if (cartItem) {
-        await updateQuantity(cartItem.id, quantity);
-      } else if (quantity > 0) {
-        const basketProduct: BasketProduct = {
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          image: product.image,
-          isEcommerceProduct: product.isEcommerceProduct,
-          variantId: variantId ?? product.variantId,
-          sku: product.sku,
-          platformId: product.platformId,
-          platform: product.platform,
-          taxProfileId: product.taxProfileId,
-          taxCode: product.taxCode,
-        };
-        await addToBasket(basketProduct, quantity);
-      }
-    },
-    [products, basketItems, updateQuantity, addToBasket]
-  );
-
-  const clearCategoryFilter = useCallback(() => {
-    setSearchQuery('');
-    setSelectedCategory(null);
-    setSelectedCategoryName(null);
-  }, [setSelectedCategory, setSelectedCategoryName]);
+  /** New sale after payment or explicit reset — clears catalogue selection and search */
+  const resetSaleUi = useCallback(() => {
+    clearCategory();
+    catalog.clearSearch();
+    setIsBasketSheetOpen(false);
+  }, [clearCategory, catalog]);
 
   return {
-    // Platform
-    currentPlatform,
-    // Products
-    products,
-    filteredProducts,
-    isProductLoading,
-    loadMore,
-    // Search
-    searchQuery,
-    setSearchQuery,
-    // Category
-    selectedCategory,
-    selectedCategoryName,
-    setSelectedCategory,
-    setSelectedCategoryName,
-    clearCategoryFilter,
-    // Cart
+    // Catalogue
+    ...catalog,
+    // Scanner
+    scanNotice: scanner.notice,
+    dismissScanNotice: scanner.dismissNotice,
+    isCameraOpen: scanner.isCameraOpen,
+    openCamera: scanner.openCamera,
+    closeCamera: scanner.closeCamera,
+    handleBarCodeScanned: scanner.handleBarCodeScanned,
+    /** Direct scan entry point — the hidden HID capture field feeds this */
+    handleScan: scanner.handleScan,
+    // Basket
+    basket,
+    basketItems,
     basketItemsMap,
     itemCount,
     total,
-    handleAddToCart,
-    // Layout
-    isTabletOrDesktop,
-    numColumns,
-    sidebarWidths,
-    // UX State (Sales UX spec)
+    // Layout / input
+    layout,
+    inputMode,
+    isElectron: isElectron(),
+    // Basket sheet (stacked shell)
+    isBasketSheetOpen,
+    openBasketSheet: useCallback(() => setIsBasketSheetOpen(true), []),
+    closeBasketSheet: useCallback(() => setIsBasketSheetOpen(false), []),
+    // Drawer
+    isDrawerOpen,
+    // Checkout
+    checkout,
+    openTender,
+    // Loyalty (shared balances)
+    loyalty,
+    // UX state
     saleState,
     blockers,
+    blockingBlockers,
     unsyncedOrdersCount,
+    isSyncing,
+    syncAllPendingOrders,
+    resetSaleUi,
   };
 }

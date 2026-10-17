@@ -17,7 +17,14 @@ export interface ReturnValidationContext {
 }
 
 const MAX_RETURN_LINES = 200;
-const COUNTED_RETURN_STATUSES = new Set(['completed', 'approved']);
+
+/**
+ * Return statuses that reserve quantity against the original line.
+ * `pending` counts so a return in flight can't be double-submitted by a
+ * concurrent request; the reservation releases when the row is rejected
+ * or deleted (e.g. by exchange compensation).
+ */
+export const COUNTED_RETURN_STATUSES = new Set(['pending', 'completed', 'approved']);
 
 /**
  * Validate a return request against the original sale.

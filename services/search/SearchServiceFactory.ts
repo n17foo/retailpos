@@ -94,12 +94,8 @@ export class SearchServiceFactory {
       platformServices.push(new MagentoSearchService(magentoConfig));
     }
 
-    // PrestaShop and Squarespace use the offline search service (no dedicated search implementation)
+    // PrestaShop uses the offline search service (no dedicated search implementation)
     if (platformConfigs.prestashop) {
-      platformServices.push(new OfflineSearchService() as unknown as PlatformSearchServiceInterface);
-    }
-
-    if (platformConfigs.squarespace) {
       platformServices.push(new OfflineSearchService() as unknown as PlatformSearchServiceInterface);
     }
 
@@ -198,8 +194,8 @@ export class SearchServiceFactory {
       platformServices.push(new MagentoSearchService(magentoConfig));
     }
 
-    // PrestaShop and Squarespace don't have dedicated search services;
-    // they use the offline search service which searches local product data.
+    // PrestaShop doesn't have a dedicated search service;
+    // it uses the offline search service which searches local product data.
 
     return platformServices;
   }

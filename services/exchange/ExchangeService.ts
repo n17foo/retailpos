@@ -105,6 +105,29 @@ export class ExchangeService {
       return { success: false, error: 'Exchange not fully settled' };
     }
 
+    // Compensation log — populated as writes succeed so a later failure can
+    // undo them (return records are deleted; the link step is cosmetic).
+    const createdReturnIds: string[] = [];
+
+    const compensateReturns = async (): Promise<void> => {
+      const repo = getReturnRepository();
+      for (const returnId of createdReturnIds) {
+        try {
+          await repo.delete(returnId);
+        } catch (err) {
+          this.logger.error(
+            { message: `Compensation failed: could not delete return ${returnId} after aborted exchange` },
+            err instanceof Error ? err : new Error(String(err))
+          );
+        }
+      }
+      if (createdReturnIds.length > 0) {
+        this.logger.warn({
+          message: `Exchange aborted — ${createdReturnIds.length} return record(s) compensated for order ${session.originalOrderId}`,
+        });
+      }
+    };
+
     try {
       // 1. Create return records
       const returnResult = await this.returnService.processReturn({
@@ -126,27 +149,44 @@ export class ExchangeService {
       if (!returnResult.success) {
         return { success: false, error: returnResult.error ?? 'Failed to process return leg' };
       }
+      createdReturnIds.push(...returnResult.returnIds);
 
-      // 2. If new items exist, create a new order
+      // 2. If new items exist, create a new order — on failure, undo the
+      // return leg so the original order isn't left half-exchanged
       let newOrderId: string | undefined;
       if (session.newItems.length > 0) {
-        const newOrder = await this.checkoutService.startCheckout(undefined, cashierId, cashierName);
-        newOrderId = newOrder.id;
+        try {
+          const newOrder = await this.checkoutService.startCheckout(undefined, cashierId, cashierName);
+          newOrderId = newOrder.id;
 
-        const primaryMethod = session.payments.find(p => p.amount > 0)?.method ?? 'other';
-        const primaryTxId = session.payments.find(p => p.amount > 0)?.transactionId;
-        await this.checkoutService.completePayment(newOrderId, primaryMethod, primaryTxId, session.payments);
+          const primaryMethod = session.payments.find(p => p.amount > 0)?.method ?? 'other';
+          const primaryTxId = session.payments.find(p => p.amount > 0)?.transactionId;
+          const paymentResult = await this.checkoutService.completePayment(newOrderId, primaryMethod, primaryTxId, session.payments);
+          if (!paymentResult.success) {
+            throw new Error(paymentResult.error ?? 'Payment completion failed');
+          }
+        } catch (orderError) {
+          await compensateReturns();
+          throw orderError;
+        }
       }
 
-      // 3. Link return records to exchange order
+      // 3. Link return records to exchange order — cosmetic; a failure here
+      // must not fail an otherwise-complete exchange
       if (newOrderId && returnResult.returnIds.length > 0) {
-        const repo = getReturnRepository();
-        for (const returnId of returnResult.returnIds) {
-          // linkToExchange is available on OfflineReturnRepository
-          await (repo as unknown as { linkToExchange?: (id: string, orderId: string) => Promise<void> }).linkToExchange?.(
-            returnId,
-            newOrderId
-          );
+        try {
+          const repo = getReturnRepository();
+          for (const returnId of returnResult.returnIds) {
+            // linkToExchange is available on OfflineReturnRepository
+            await (repo as unknown as { linkToExchange?: (id: string, orderId: string) => Promise<void> }).linkToExchange?.(
+              returnId,
+              newOrderId
+            );
+          }
+        } catch (linkError) {
+          this.logger.warn({
+            message: `Exchange completed but return→order linking failed for ${newOrderId}: ${linkError instanceof Error ? linkError.message : String(linkError)}`,
+          });
         }
       }
 

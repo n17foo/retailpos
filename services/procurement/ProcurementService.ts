@@ -31,6 +31,12 @@ export interface ReceiveLineInput {
 export interface ReceiveResult {
   success: boolean;
   newStatus: 'partially_received' | 'received';
+  /**
+   * True when the local receipt committed but the platform stock push failed
+   * or partially failed — the updates were persisted to the pending-inventory
+   * queue and replay on the next successful inventory call.
+   */
+  platformSyncPending?: boolean;
   error?: string;
 }
 
@@ -108,7 +114,12 @@ export class ProcurementService {
         await procurementRepository.incrementReceivedQty(line.itemId, line.receiveNow);
       }
 
-      // Push stock adjustments to platform (gated on inventory capability)
+      // Push stock adjustments to platform (gated on inventory capability).
+      // Local receipt stays committed on failure — the physical goods are
+      // received regardless — and RetryingInventoryService has already
+      // persisted the batch to the pending queue for replay, so the failure
+      // is surfaced as platformSyncPending rather than aborting the receive.
+      let platformSyncPending = false;
       const capabilities = getPlatformCapabilities(platform);
       if (capabilities.inventory !== 'not_recommended') {
         const inventoryService = InventoryServiceFactory.getInstance().getService(platform);
@@ -123,9 +134,13 @@ export class ProcurementService {
           .filter((u): u is NonNullable<typeof u> => u !== null);
 
         if (updates.length > 0) {
-          await inventoryService.updateInventory(updates).catch(err => {
+          try {
+            const result = await inventoryService.updateInventory(updates);
+            platformSyncPending = result.failed > 0;
+          } catch (err) {
+            platformSyncPending = true;
             this.logger.warn({ message: `Inventory push failed for PO ${poId}: ${err instanceof Error ? err.message : String(err)}` });
-          });
+          }
         }
       }
 
@@ -138,14 +153,14 @@ export class ProcurementService {
       await auditLogService.log('purchase_order:received', {
         userId: receivedBy,
         details: `Purchase order ${poId} receiving: ${lines.length} line(s) — status: ${newStatus}`,
-        metadata: { poId, newStatus, lines },
+        metadata: { poId, newStatus, lines, platformSyncPending },
       });
 
       if (newStatus === 'received') {
         notificationService.notify('Purchase Order Received', `PO ${poId.slice(-8)} fully received`, 'info');
       }
 
-      return { success: true, newStatus };
+      return { success: true, newStatus, platformSyncPending };
     } catch (err) {
       this.logger.error({ message: `Failed to receive PO ${poId}` }, err instanceof Error ? err : new Error(String(err)));
       return { success: false, newStatus: 'partially_received', error: err instanceof Error ? err.message : 'Receiving failed' };

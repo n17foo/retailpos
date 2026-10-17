@@ -13,11 +13,11 @@ import { BigCommerceRefundService } from './platforms/bigCommerceRefundService';
 import { SyliusRefundService } from './platforms/syliusRefundService';
 import { WixRefundService } from './platforms/wixRefundService';
 import { PrestaShopRefundService } from './platforms/PrestaShopRefundService';
-import { SquarespaceRefundService } from './platforms/SquarespaceRefundService';
 import { CommercefullRefundService } from './platforms/CommercefullRefundService';
 import { OfflineRefundService } from './platforms/OfflineRefundService';
-import { validateReturnRequest } from './returnValidation';
+import { COUNTED_RETURN_STATUSES, validateReturnRequest } from './returnValidation';
 import { addMoney } from '../../utils/money';
+import { withKeyedLock } from '../../utils/keyedLock';
 
 export interface ReturnItem {
   id: string;
@@ -154,47 +154,59 @@ export class ReturnService {
   /** Process a return for one or more items from an order */
   async processReturn(input: ProcessReturnInput): Promise<ProcessReturnResult> {
     try {
-      // Validate the order exists and is paid/synced
-      const order = await orderRepository.findById(input.orderId);
-      if (!order) {
-        return { success: false, returnIds: [], totalRefund: 0, error: 'Order not found' };
-      }
-      const [orderItems, existingReturns] = await Promise.all([
-        this.orderItemRepo.findByOrderId(input.orderId),
-        this.returnRepo.findByOrderId(input.orderId),
-      ]);
-      const validationError = validateReturnRequest(input.items, {
-        orderStatus: order.status,
-        orderTotal: order.total,
-        orderItems: orderItems ?? [],
-        existingReturns: existingReturns ?? [],
+      // Serialise per order: validation reads existing returns, so two
+      // concurrent requests must not both pass against the same remaining
+      // quantity before either writes (double-return race). On a LAN client
+      // the server re-validates under the same lock inside its POST route.
+      const settled = await withKeyedLock(`return:${input.orderId}`, async () => {
+        // Validate the order exists and is paid/synced
+        const order = await orderRepository.findById(input.orderId);
+        if (!order) {
+          return { error: 'Order not found' };
+        }
+        const [orderItems, existingReturns] = await Promise.all([
+          this.orderItemRepo.findByOrderId(input.orderId),
+          this.returnRepo.findByOrderId(input.orderId),
+        ]);
+        const validationError = validateReturnRequest(input.items, {
+          orderStatus: order.status,
+          orderTotal: order.total,
+          orderItems: orderItems ?? [],
+          existingReturns: existingReturns ?? [],
+        });
+        if (validationError) {
+          return { error: validationError };
+        }
+
+        const returnIds: string[] = [];
+        let totalRefund = 0;
+
+        for (const item of input.items) {
+          const returnInput: CreateReturnInput = {
+            orderId: input.orderId,
+            orderItemId: item.orderItemId ?? null,
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            productName: item.productName,
+            quantity: item.quantity,
+            refundAmount: item.refundAmount,
+            reason: item.reason ?? null,
+            restock: item.restock,
+          };
+
+          const id = await this.returnRepo.create(returnInput);
+          await this.returnRepo.updateStatus(id, 'completed', input.processedBy);
+          returnIds.push(id);
+          totalRefund = addMoney(totalRefund, item.refundAmount);
+        }
+
+        return { order, returnIds, totalRefund };
       });
-      if (validationError) {
-        return { success: false, returnIds: [], totalRefund: 0, error: validationError };
+
+      if ('error' in settled) {
+        return { success: false, returnIds: [], totalRefund: 0, error: settled.error };
       }
-
-      const returnIds: string[] = [];
-      let totalRefund = 0;
-
-      for (const item of input.items) {
-        const returnInput: CreateReturnInput = {
-          orderId: input.orderId,
-          orderItemId: item.orderItemId ?? null,
-          productId: item.productId,
-          variantId: item.variantId ?? null,
-          productName: item.productName,
-          quantity: item.quantity,
-          refundAmount: item.refundAmount,
-          reason: item.reason ?? null,
-          restock: item.restock,
-        };
-
-        let id: string;
-        id = await this.returnRepo.create(returnInput);
-        await this.returnRepo.updateStatus(id, 'completed', input.processedBy);
-        returnIds.push(id);
-        totalRefund = addMoney(totalRefund, item.refundAmount);
-      }
+      const { order, returnIds, totalRefund } = settled;
 
       this.logger.info(`Processed return for order ${input.orderId}: ${returnIds.length} item(s), refund ${totalRefund.toFixed(2)}`);
 
@@ -292,10 +304,11 @@ export class ReturnService {
     const orderItems = await this.orderItemRepo.findByOrderId(orderId);
     const existingReturns = await this.returnRepo.findByOrderId(orderId);
 
-    // Sum up already-returned quantities per order item
+    // Sum up quantity-reserving returns per order item — pending returns hold
+    // their quantity until rejected so the UI can't offer a double-return
     const returnedMap = new Map<string, number>();
     for (const ret of existingReturns) {
-      if (ret.status === 'completed' || ret.status === 'approved') {
+      if (COUNTED_RETURN_STATUSES.has(ret.status)) {
         const key = ret.order_item_id || ret.product_id;
         returnedMap.set(key, (returnedMap.get(key) || 0) + ret.quantity);
       }
@@ -369,9 +382,6 @@ export class ReturnService {
         break;
       case ECommercePlatform.PRESTASHOP:
         service = new PrestaShopRefundService();
-        break;
-      case ECommercePlatform.SQUARESPACE:
-        service = new SquarespaceRefundService();
         break;
       case ECommercePlatform.COMMERCEFULL:
         service = new CommercefullRefundService();

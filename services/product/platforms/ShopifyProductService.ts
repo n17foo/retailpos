@@ -101,21 +101,22 @@ export class ShopifyProductService extends BaseProductService {
         const queryParams = new URLSearchParams();
         queryParams.append('limit', String(limit));
 
-        if (options.search) {
-          queryParams.append('title', options.search);
-        }
-
-        if (options.ids && options.ids.length > 0) {
-          queryParams.append('ids', options.ids.join(','));
-        }
-
-        if (options.category) {
-          queryParams.append('product_type', options.category);
-        }
-
-        // Handle cursor-based pagination
         if (options.cursor) {
+          // Shopify rejects any other filter alongside page_info; the cursor already encodes them
           queryParams.append('page_info', options.cursor);
+        } else {
+          if (options.search) {
+            queryParams.append('title', options.search);
+          }
+
+          if (options.ids && options.ids.length > 0) {
+            queryParams.append('ids', options.ids.join(','));
+          }
+
+          if (options.category) {
+            // Categories are collections (numeric ids); fall back to product_type for plain names
+            queryParams.append(/^\d+$/.test(options.category) ? 'collection_id' : 'product_type', options.category);
+          }
         }
 
         const { data, headers } = await this.apiClient.getWithHeaders<{ products: any[] }>(`products.json?${queryParams.toString()}`);
@@ -290,9 +291,14 @@ export class ShopifyProductService extends BaseProductService {
         price: parseFloat(variant.price),
         compareAtPrice: variant.compare_at_price ? parseFloat(variant.compare_at_price) : undefined,
         inventoryQuantity: variant.inventory_quantity || 0,
+        taxable: variant.taxable !== false,
+        trackInventory: variant.inventory_management != null,
+        isAvailable: true,
         weight: variant.weight,
         weightUnit: variant.weight_unit,
-        options: variant.option_values?.map((opt: any) => opt.value) || [],
+        options: [variant.option1, variant.option2, variant.option3].filter(
+          (o: unknown): o is string => typeof o === 'string' && o.length > 0
+        ),
       })) || [];
 
     const options =

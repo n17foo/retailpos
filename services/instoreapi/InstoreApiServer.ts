@@ -14,6 +14,7 @@ import type { Category } from '../category/CategoryServiceInterface';
 import type { Product } from '../product/ProductServiceInterface';
 import { instoreApiTransport } from './InstoreApiTransport';
 import { validateReturnRequest } from '../refunds/returnValidation';
+import { withKeyedLock } from '../../utils/keyedLock';
 import { randomHex } from '../../utils/crypto';
 import { SIGNATURE_HEADERS, SIGNATURE_WINDOW_MS, verifyRequestSignature } from './requestSigning';
 
@@ -427,32 +428,43 @@ export class InstoreApiServer {
         return { status: 400, body: { error: 'Invalid processedBy' } };
       }
 
-      const order = await orderRepository.findById(ret.orderId);
-      if (!order) return { status: 404, body: { error: 'Order not found' } };
-      const orderItems = await this.orderItemRepo.findByOrderId(ret.orderId);
-      const existingReturns = await returnRepository.findByOrderId(ret.orderId);
-      const validationError = validateReturnRequest(
-        [
+      // Serialise per order with the same keyed lock ReturnService uses — a
+      // local processReturn and this route can race on the same register.
+      return withKeyedLock(`return:${ret.orderId}`, async () => {
+        const order = await orderRepository.findById(ret.orderId as string);
+        if (!order) return { status: 404, body: { error: 'Order not found' } };
+        const orderItems = await this.orderItemRepo.findByOrderId(ret.orderId as string);
+        const existingReturns = await returnRepository.findByOrderId(ret.orderId as string);
+        const validationError = validateReturnRequest(
+          [
+            {
+              orderItemId: (ret.orderItemId as string | null | undefined) ?? null,
+              productId: ret.productId as string,
+              quantity: ret.quantity as number,
+              refundAmount: ret.refundAmount as number,
+            },
+          ],
           {
-            orderItemId: (ret.orderItemId as string | null | undefined) ?? null,
-            productId: ret.productId as string,
-            quantity: ret.quantity as number,
-            refundAmount: ret.refundAmount as number,
-          },
-        ],
-        {
-          orderStatus: order.status,
-          orderTotal: order.total,
-          orderItems,
-          existingReturns,
-        }
-      );
-      if (validationError) return { status: 422, body: { error: validationError } };
+            orderStatus: order.status,
+            orderTotal: order.total,
+            orderItems,
+            existingReturns,
+          }
+        );
+        if (validationError) return { status: 422, body: { error: validationError } };
 
-      const id = await returnRepository.create(input as CreateReturnInput);
-      await returnRepository.updateStatus(id, 'completed', b.processedBy as string | undefined);
-      syncEventBus.emit('return:created', { returnId: id, orderId: ret.orderId });
-      return { status: 201, body: { returnId: id } };
+        const id = await returnRepository.create(input as CreateReturnInput);
+        await returnRepository.updateStatus(id, 'completed', b?.processedBy as string | undefined);
+        syncEventBus.emit('return:created', { returnId: id, orderId: ret.orderId });
+        return { status: 201, body: { returnId: id } };
+      });
+    });
+
+    // Lets a client register's exchange saga compensate (delete return rows it
+    // created) when the new-order leg fails — InstoreApiReturnRepository.delete
+    this.route('DELETE', '/api/returns/:id', async params => {
+      await returnRepository.delete(params.id);
+      return { status: 200, body: { ok: true } };
     });
   }
 

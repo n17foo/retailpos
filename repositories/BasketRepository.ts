@@ -12,6 +12,7 @@ export interface BasketRow {
   customer_email: string | null;
   customer_name: string | null;
   note: string | null;
+  sale_mode: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -34,6 +35,7 @@ export interface UpdateBasketInput {
   customerEmail: string | null;
   customerName: string | null;
   note: string | null;
+  saleMode: string | null;
 }
 
 export class BasketRepository {
@@ -53,10 +55,10 @@ export class BasketRepository {
   async updateBasket(basketId: string, input: UpdateBasketInput): Promise<void> {
     const now = Date.now();
     await db.runAsync(
-      `UPDATE baskets SET 
-        items = ?, subtotal = ?, tax = ?, total = ?, 
+      `UPDATE baskets SET
+        items = ?, subtotal = ?, tax = ?, total = ?,
         discount_amount = ?, discount_code = ?,
-        customer_email = ?, customer_name = ?, note = ?,
+        customer_email = ?, customer_name = ?, note = ?, sale_mode = ?,
         updated_at = ?
        WHERE id = ?`,
       [
@@ -69,6 +71,7 @@ export class BasketRepository {
         input.customerEmail,
         input.customerName,
         input.note,
+        input.saleMode,
         now,
         basketId,
       ]
@@ -78,8 +81,8 @@ export class BasketRepository {
   async clearBasket(basketId: string): Promise<void> {
     const now = Date.now();
     await db.runAsync(
-      `UPDATE baskets SET items = ?, subtotal = ?, tax = ?, total = ?, 
-       discount_amount = NULL, discount_code = NULL, updated_at = ?
+      `UPDATE baskets SET items = ?, subtotal = ?, tax = ?, total = ?,
+       discount_amount = NULL, discount_code = NULL, sale_mode = NULL, updated_at = ?
        WHERE id = ?`,
       ['[]', 0, 0, 0, now, basketId]
     );

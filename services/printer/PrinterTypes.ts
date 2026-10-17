@@ -59,6 +59,8 @@ export interface ReceiptData {
   cashierName: string;
   customerName?: string;
   notes?: string;
+  /** Fulfilment mode (pickup / delivery / …) — printed when set (spec 6.36) */
+  saleMode?: string;
   currencySymbol?: string;
 }
 

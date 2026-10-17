@@ -26,6 +26,7 @@ function makeRow(overrides: Partial<OrderRow> = {}): OrderRow {
     customer_email: null,
     customer_name: 'Jane Doe',
     note: null,
+    sale_mode: null,
     payment_method: 'cash',
     payment_transaction_id: null,
     cashier_id: 'c1',

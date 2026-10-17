@@ -1,4 +1,4 @@
-import { toCents, toDollars, roundMoney, multiplyMoney, addMoney, subtractMoney, sumMoney } from './money';
+import { toCents, toDollars, roundMoney, multiplyMoney, addMoney, subtractMoney, sumMoney, formatMoney } from './money';
 
 describe('money utilities', () => {
   // ─── toCents ────────────────────────────────────────────────
@@ -122,6 +122,27 @@ describe('money utilities', () => {
     it('handles many small values', () => {
       const items = Array(100).fill(0.01);
       expect(sumMoney(items)).toBe(1);
+    });
+  });
+
+  describe('formatMoney', () => {
+    it('renders 2 decimals for standard currencies', () => {
+      expect(formatMoney(19.99, 'GBP')).toBe('£19.99');
+      expect(formatMoney(5, 'USD')).toBe('$5.00');
+    });
+
+    it('renders no decimals for zero-decimal currencies', () => {
+      expect(formatMoney(1200, 'JPY')).toBe('¥1200');
+      expect(formatMoney(1200.4, 'JPY')).toBe('¥1200');
+      expect(formatMoney(500, 'VND')).toBe('500₫');
+    });
+
+    it('renders 3 decimals for three-decimal currencies', () => {
+      expect(formatMoney(1.5, 'KWD')).toBe('KD1.500');
+    });
+
+    it('falls back to the currency code for unknown currencies', () => {
+      expect(formatMoney(9.99, 'XXX')).toBe('XXX9.99');
     });
   });
 });

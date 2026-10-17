@@ -38,6 +38,8 @@ export interface Product {
   description?: string;
   vendor?: string;
   productType?: string;
+  /** Raw platform category ids the product belongs to (unprefixed), when the platform exposes them */
+  categoryIds?: string[];
   tags?: string[];
   options?: ProductOption[];
   variants: ProductVariant[];
@@ -66,6 +68,10 @@ export interface ProductVariant {
   price: number;
   compareAtPrice?: number;
   inventoryQuantity: number;
+  /** Whether the platform tracks stock for this variant. Undefined = unknown (treated as tracked). */
+  trackInventory?: boolean;
+  /** Platform-reported availability. Only consulted when stock is not tracked. */
+  isAvailable?: boolean;
   weight?: number;
   weightUnit?: 'g' | 'kg' | 'oz' | 'lb';
   requiresShipping?: boolean;

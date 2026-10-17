@@ -7,7 +7,6 @@ import { CompositeCategoryService } from './platforms/CompositeCategoryService';
 import { PlatformCategoryConfig, PlatformCategoryServiceInterface } from './platforms/PlatformCategoryServiceInterface';
 import { OfflineCategoryService, offlineCategoryService } from './platforms/OfflineCategoryService';
 import { PrestaShopCategoryService } from './platforms/PrestaShopCategoryService';
-import { SquarespaceCategoryService } from './platforms/SquarespaceCategoryService';
 import { MagentoCategoryService } from './platforms/MagentoCategoryService';
 import { SyliusCategoryService } from './platforms/SyliusCategoryService';
 import { WixCategoryService } from './platforms/WixCategoryService';
@@ -32,7 +31,6 @@ export class CategoryServiceFactory {
     [ECommercePlatform.SYLIUS]: null,
     [ECommercePlatform.WIX]: null,
     [ECommercePlatform.PRESTASHOP]: null,
-    [ECommercePlatform.SQUARESPACE]: null,
     [ECommercePlatform.COMMERCEFULL]: null,
     [ECommercePlatform.OFFLINE]: null,
   };
@@ -101,10 +99,6 @@ export class CategoryServiceFactory {
         service = this.createPrestaShopService();
         break;
 
-      case ECommercePlatform.SQUARESPACE:
-        service = this.createSquarespaceService();
-        break;
-
       case ECommercePlatform.COMMERCEFULL:
         service = this.createCommercefullService();
         break;
@@ -156,9 +150,6 @@ export class CategoryServiceFactory {
             break;
           case ECommercePlatform.PRESTASHOP:
             service = this.createPrestaShopService();
-            break;
-          case ECommercePlatform.SQUARESPACE:
-            service = this.createSquarespaceService();
             break;
           case ECommercePlatform.COMMERCEFULL:
             service = this.createCommercefullService();
@@ -306,23 +297,6 @@ export class CategoryServiceFactory {
     service.getCategories().catch(err => {
       this.logger.error(
         { message: 'Failed to initialize PrestaShop category service:' },
-        err instanceof Error ? err : new Error(String(err))
-      );
-    });
-
-    return service;
-  }
-
-  /**
-   * Create and initialize a Squarespace category service
-   */
-  private createSquarespaceService(): CategoryServiceInterface {
-    const service = new SquarespaceCategoryService();
-
-    // Initialize asynchronously
-    service.getCategories().catch(err => {
-      this.logger.error(
-        { message: 'Failed to initialize Squarespace category service:' },
         err instanceof Error ? err : new Error(String(err))
       );
     });

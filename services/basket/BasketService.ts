@@ -133,6 +133,29 @@ export class BasketService implements BasketServiceInterface {
     return basket;
   }
 
+  async setSaleMode(mode: string | undefined): Promise<Basket> {
+    const basket = await this.getOrCreateBasket();
+    basket.saleMode = mode;
+    basket.updatedAt = new Date();
+    await this.updateBasketInDb(basket);
+    return basket;
+  }
+
+  /**
+   * Merge key-value properties onto a basket line (e.g. a line note).
+   * Persisted inside the items JSON blob.
+   */
+  async updateItemProperties(itemId: string, properties: Record<string, string>): Promise<Basket> {
+    const basket = await this.getOrCreateBasket();
+    const item = basket.items.find(i => i.id === itemId);
+    if (item) {
+      item.properties = { ...item.properties, ...properties };
+      basket.updatedAt = new Date();
+      await this.updateBasketInDb(basket);
+    }
+    return basket;
+  }
+
   // ── Private helpers ─────────────────────────────────────────────────
 
   private async getOrCreateBasket(): Promise<Basket> {
@@ -168,6 +191,7 @@ export class BasketService implements BasketServiceInterface {
       customerEmail: row.customer_email ?? undefined,
       customerName: row.customer_name ?? undefined,
       note: row.note ?? undefined,
+      saleMode: row.sale_mode ?? undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),
     };
@@ -178,15 +202,13 @@ export class BasketService implements BasketServiceInterface {
     const subtotal = sumMoney(lineTotals);
 
     // Spec requirement 1.4: Calculate tax per-item using stored taxRate
-    // For items where taxable === true, apply the item's taxRate (or DEFAULT_TAX_RATE fallback)
-    const DEFAULT_TAX_RATE = 0.2; // 20% fallback (emergency only)
-
+    // Tax uses only the rate stored on the item when it was added. An item without a rate (platform
+    // gave none) contributes no local tax; the platform's own calculation is used at checkout.
     const taxAmounts = items.map(item => {
-      if (item.taxable === false) return 0;
+      if (item.taxable === false || item.taxRate === undefined) return 0;
 
       const lineTotal = multiplyMoney(item.price, item.quantity);
-      const taxRate = item.taxRate ?? DEFAULT_TAX_RATE;
-      return multiplyMoney(lineTotal, taxRate);
+      return multiplyMoney(lineTotal, item.taxRate);
     });
 
     const tax = sumMoney(taxAmounts);
@@ -218,6 +240,7 @@ export class BasketService implements BasketServiceInterface {
       customerEmail: basket.customerEmail ?? null,
       customerName: basket.customerName ?? null,
       note: basket.note ?? null,
+      saleMode: basket.saleMode ?? null,
     });
   }
 }

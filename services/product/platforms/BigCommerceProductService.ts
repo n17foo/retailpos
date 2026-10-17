@@ -290,7 +290,9 @@ export class BigCommerceProductService extends BaseProductService {
         sku: variant.sku,
         price: parseFloat(variant.price || bcProduct.price || '0'),
         compareAtPrice: variant.calculated_price !== variant.price ? parseFloat(variant.calculated_price) : undefined,
-        inventoryQuantity: variant.inventory_level || 0,
+        inventoryQuantity: (bcProduct.inventory_tracking === 'product' ? bcProduct.inventory_level : variant.inventory_level) || 0,
+        trackInventory: bcProduct.inventory_tracking !== 'none',
+        isAvailable: bcProduct.availability !== 'disabled' && !variant.purchasing_disabled,
         weight: variant.weight ? parseFloat(variant.weight) : undefined,
         options: variant.option_values?.map((opt: any) => opt.label) || [],
       })) || [];
@@ -304,6 +306,8 @@ export class BigCommerceProductService extends BaseProductService {
         price: parseFloat(bcProduct.price || '0'),
         compareAtPrice: bcProduct.sale_price ? parseFloat(bcProduct.sale_price) : undefined,
         inventoryQuantity: bcProduct.inventory_level || 0,
+        trackInventory: bcProduct.inventory_tracking !== 'none',
+        isAvailable: bcProduct.availability !== 'disabled',
         weight: bcProduct.weight ? parseFloat(bcProduct.weight) : undefined,
         options: [],
       });
@@ -332,6 +336,7 @@ export class BigCommerceProductService extends BaseProductService {
       description: bcProduct.description || '',
       vendor: bcProduct.brand_name || bcProduct.brand?.name || '',
       productType: bcProduct.type || bcProduct.categories?.map((cat: any) => cat.name).join(', ') || '',
+      categoryIds: (bcProduct.categories || []).map((cat: any) => String(typeof cat === 'object' ? cat.id : cat)),
       tags: [], // BigCommerce doesn't have a direct "tags" concept, using empty array
       options,
       variants,

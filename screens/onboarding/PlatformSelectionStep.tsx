@@ -21,7 +21,7 @@ const PLATFORMS: Omit<PlatformInfo, 'description'>[] = [
   { id: 'sylius', name: 'Sylius', icon: '🧩', brandColor: semanticColors.sylius },
   { id: 'wix', name: 'Wix', icon: '✨', brandColor: semanticColors.wix },
   { id: 'prestashop', name: 'PrestaShop', icon: '🛒', brandColor: semanticColors.prestashop },
-  { id: 'squarespace', name: 'Squarespace', icon: '◼️', brandColor: semanticColors.squarespace },
+  { id: 'commercefull', name: 'Commercefull', icon: '🏬', brandColor: semanticColors.commercefull },
   { id: 'offline', name: 'Offline Mode', icon: '📴', brandColor: semanticColors.offline },
 ];
 

@@ -1,3 +1,4 @@
+import { getStoreCurrencyCode } from '../config/StoreCurrency';
 import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from './PaymentServiceInterface';
 import { LoggerFactory } from '../logger/LoggerFactory';
 
@@ -117,7 +118,7 @@ export class TapPaymentsService implements PaymentServiceInterface {
 
       const result = await this.sdk.TapPayments.charge({
         amount: request.amount,
-        currency: request.currency ?? 'USD',
+        currency: request.currency?.toUpperCase(),
         reference: { transaction: request.reference, order: request.orderId ?? request.reference },
         customer: { name: request.customerName ?? '' },
         metadata: { orderId: request.orderId ?? '' },
@@ -183,7 +184,7 @@ export class TapPaymentsService implements PaymentServiceInterface {
       const result = await this.sdk.TapPayments.refund({
         chargeId: transactionId,
         amount,
-        currency: 'USD',
+        currency: (await getStoreCurrencyCode()).toUpperCase(),
       });
       return {
         success: result.status === 'REFUNDED',

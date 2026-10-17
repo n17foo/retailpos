@@ -1,4 +1,6 @@
-import { ECommercePlatform, isOnlinePlatform } from '../../utils/platforms';
+import { ECommercePlatform, isOnlinePlatform, PLATFORM_DISPLAY_NAMES } from '../../utils/platforms';
+import { toPlatformProductId, toPlatformVariantId } from '../../utils/platformIds';
+import { applyTaxQuote } from './taxQuote';
 import { BasketItem } from '../basket/basket';
 import { LocalOrder, LocalOrderStatus, CheckoutResult, PaymentLine } from '../order/order';
 import { BasketServiceInterface } from '../basket/BasketServiceInterface';
@@ -14,6 +16,7 @@ import { OrderServiceFactory } from '../order/OrderServiceFactory';
 import { getPlatformCapabilities, getBasketMode } from '../../utils/platformCapabilities';
 import { loyaltyService } from '../loyalty/LoyaltyService';
 import { localCustomerService } from '../customer/LocalCustomerService';
+import { DiscountServiceFactory } from '../discount/DiscountServiceFactory';
 import { procurementService } from '../procurement/ProcurementService';
 import { InventoryServiceFactory } from '../inventory/InventoryServiceFactory';
 
@@ -39,11 +42,14 @@ export class CheckoutService implements CheckoutServiceInterface {
     const now = Date.now();
     const orderId = generateUUID();
 
-    // ── Basket mode branching ──────────────────────────────────────────
-    // native_draft  → create platform draft, use platform totals
-    // remote_cart   → skip draft at checkout start; order created post-payment via sync
-    // local_only    → fully local; order imported to platform after payment
-    // See: docs/specs/checkout/checkout.md §Checkout Capability Modes
+    // ── Tax comes from the platform ────────────────────────────────────
+    // Online platforms own tax. The platform calculates it for the whole basket and the POS never assumes a rate:
+    //   native_draft  → create a platform draft; its totals are authoritative (Shopify, Wix, Commercefull)
+    //   remote_cart   → ask the platform to calculate tax on a cart/quote/checkout and discard it
+    //                   (WooCommerce, Magento, BigCommerce, Sylius, PrestaShop); the order is created after payment
+    //   local_only    → offline catalogue only: basket totals with the merchant's local tax setup
+    // If an online platform cannot return the tax, checkout stops: charging without it would charge the customer wrongly.
+    // See: docs/specs/platform/platform-tax.md and docs/specs/checkout/checkout.md §Checkout Capability Modes
     let subtotal = basket.subtotal;
     let tax = basket.tax;
     let total = basket.total;
@@ -51,51 +57,60 @@ export class CheckoutService implements CheckoutServiceInterface {
     let status: LocalOrderStatus = 'pending';
     let platformTaxRates: (number | undefined)[] = basket.items.map(() => undefined);
 
-    const basketMode = platform && isOnlinePlatform(platform) ? getBasketMode(getPlatformCapabilities(platform)) : 'local_only';
+    const isOnline = !!platform && isOnlinePlatform(platform);
+    const basketMode = isOnline ? getBasketMode(getPlatformCapabilities(platform)) : 'local_only';
 
-    if (basketMode === 'native_draft') {
+    if (isOnline && platform) {
+      const orderService = OrderServiceFactory.getInstance().getService(platform);
+      const platformOrder = {
+        customerEmail: basket.customerEmail,
+        customerName: basket.customerName,
+        note: basket.note,
+        lineItems: basket.items.map(item => ({
+          productId: toPlatformProductId(platform, item),
+          variantId: toPlatformVariantId(platform, item),
+          sku: item.sku,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          total: item.price * item.quantity,
+        })),
+        subtotal: basket.subtotal,
+        tax: basket.tax,
+        total: basket.total,
+        discounts: basket.discountCode
+          ? [{ code: basket.discountCode, amount: basket.discountAmount ?? 0, type: 'fixed_amount' as const }]
+          : undefined,
+      };
+
       try {
-        const orderService = OrderServiceFactory.getInstance().getService(platform!);
-        const draftOrder = await orderService.createDraftOrder({
-          customerEmail: basket.customerEmail,
-          customerName: basket.customerName,
-          note: basket.note,
-          lineItems: basket.items.map(item => ({
-            productId: item.productId,
-            variantId: item.variantId,
-            sku: item.sku,
-            name: item.name,
-            quantity: item.quantity,
-            price: item.price,
-            total: item.price * item.quantity,
-          })),
-          subtotal: basket.subtotal,
-          tax: basket.tax,
-          total: basket.total,
-          discounts: basket.discountCode
-            ? [{ code: basket.discountCode, amount: basket.discountAmount ?? 0, type: 'fixed_amount' }]
-            : undefined,
-        });
+        if (basketMode === 'native_draft') {
+          const draftOrder = await orderService.createDraftOrder(platformOrder);
 
-        // Use platform-authoritative values
-        subtotal = draftOrder.subtotal;
-        tax = draftOrder.tax;
-        total = draftOrder.total;
-        platformOrderId = draftOrder.platformOrderId ?? draftOrder.id;
-        status = 'draft';
+          subtotal = draftOrder.subtotal;
+          tax = draftOrder.tax;
+          total = draftOrder.total;
+          platformOrderId = draftOrder.platformOrderId ?? draftOrder.id;
+          status = 'draft';
 
-        // Capture platform tax rates by position for order_items persistence
-        platformTaxRates = basket.items.map((_, i) => draftOrder.lineItems[i]?.taxRate);
+          // Capture platform tax rates by position for order_items persistence
+          platformTaxRates = basket.items.map((_, i) => draftOrder.lineItems[i]?.taxRate);
+        } else {
+          const quote = await orderService.quoteTax(platformOrder);
+          ({ subtotal, tax, total } = applyTaxQuote(basket.subtotal, basket.discountAmount ?? 0, quote));
+        }
       } catch (err) {
-        this.logger.warn(
-          { message: `Draft order creation failed for ${platform} (native_draft mode), falling back to basket totals` },
+        this.logger.error(
+          { message: `Could not get tax from ${platform} (${basketMode}); checkout stopped` },
           err instanceof Error ? err : new Error(String(err))
         );
-        // status stays 'pending', totals stay from basket
+        throw new Error(
+          `Could not get the tax calculation from ${PLATFORM_DISPLAY_NAMES[platform]}, so the sale cannot be completed. ` +
+            `Check the connection and try again. (${err instanceof Error ? err.message : String(err)})`,
+          { cause: err }
+        );
       }
     }
-    // remote_cart and local_only: basket totals are authoritative.
-    // For remote_cart, the platform order is created post-payment by OrderSyncService.
 
     const localOrder: LocalOrder = {
       id: orderId,
@@ -110,6 +125,7 @@ export class CheckoutService implements CheckoutServiceInterface {
       customerEmail: basket.customerEmail,
       customerName: basket.customerName,
       note: basket.note,
+      saleMode: basket.saleMode,
       cashierId,
       cashierName,
       registerId: basket.registerId,
@@ -130,6 +146,7 @@ export class CheckoutService implements CheckoutServiceInterface {
       customerEmail: basket.customerEmail ?? null,
       customerName: basket.customerName ?? null,
       note: basket.note ?? null,
+      saleMode: basket.saleMode ?? null,
       cashierId: cashierId ?? null,
       cashierName: cashierName ?? null,
       registerId: basket.registerId ?? null,
@@ -202,6 +219,19 @@ export class CheckoutService implements CheckoutServiceInterface {
     return order;
   }
 
+  /**
+   * Return a 'processing' order to 'draft' after a failed payment attempt so the
+   * cashier can retry or pick another tender method without losing the order.
+   */
+  async revertToDraft(orderId: string): Promise<LocalOrder> {
+    await this.orderRepo.updateStatus(orderId, 'draft');
+    const order = await this.getLocalOrder(orderId);
+    if (!order) {
+      throw new Error(`Order ${orderId} not found`);
+    }
+    return order;
+  }
+
   async completePayment(orderId: string, paymentMethod: string, transactionId?: string, payments?: PaymentLine[]): Promise<CheckoutResult> {
     try {
       // Validate split tender total matches order total (spec §6.1)
@@ -245,6 +275,14 @@ export class CheckoutService implements CheckoutServiceInterface {
 
       // Post-payment hooks — non-blocking, must not affect checkout result
       // orderRow was already fetched above; reuse it
+      if (orderRow?.discount_code) {
+        // Usage counts only on completed sales — validation never burns usage
+        DiscountServiceFactory.getInstance()
+          .getService((orderRow.platform as ECommercePlatform) ?? undefined)
+          .recordUsage?.(orderRow.discount_code)
+          .catch(() => {});
+      }
+
       if (orderRow?.customer_email) {
         const email = orderRow.customer_email;
         const total = orderRow.total;
@@ -332,6 +370,7 @@ export class CheckoutService implements CheckoutServiceInterface {
       customerEmail: row.customer_email ?? undefined,
       customerName: row.customer_name ?? undefined,
       note: row.note ?? undefined,
+      saleMode: row.sale_mode ?? undefined,
       paymentMethod: row.payment_method ?? undefined,
       paymentTransactionId: row.payment_transaction_id ?? undefined,
       payments: row.payments_json ? (JSON.parse(row.payments_json) as PaymentLine[]) : undefined,

@@ -19,7 +19,7 @@ const PLATFORM_NAMES: Record<string, string> = {
   sylius: 'Sylius',
   wix: 'Wix',
   prestashop: 'PrestaShop',
-  squarespace: 'Squarespace',
+  commercefull: 'Commercefull',
 };
 
 const PlatformConfigurationStep: React.FC<PlatformConfigurationStepProps> = ({ platformId, onBack, onComplete, config, setConfig }) => {
@@ -67,9 +67,9 @@ const PlatformConfigurationStep: React.FC<PlatformConfigurationStepProps> = ({ p
           return false;
         }
         break;
-      case 'squarespace':
-        if (!config.apiKey) {
-          Alert.alert('Validation Error', 'Please enter API Key.');
+      case 'commercefull':
+        if (!config.storeUrl || !config.apiKey || !config.apiSecret) {
+          Alert.alert('Validation Error', 'Please enter Store URL, Email, and Password.');
           return false;
         }
         break;
@@ -262,23 +262,31 @@ const PlatformConfigurationStep: React.FC<PlatformConfigurationStepProps> = ({ p
     </View>
   );
 
-  const renderSquarespaceForm = () => (
+  const renderCommercefullForm = () => (
     <View style={styles.formContainer}>
-      <Text style={styles.inputLabel}>API Key</Text>
+      <Text style={styles.inputLabel}>Store URL</Text>
+      <TextInput
+        style={styles.input}
+        value={config.storeUrl || ''}
+        onChangeText={value => updateConfig('storeUrl', value)}
+        placeholder="https://your-commercefull-store.com"
+        autoCapitalize="none"
+      />
+      <Text style={styles.inputLabel}>Email / API Key</Text>
       <TextInput
         style={styles.input}
         value={config.apiKey || ''}
         onChangeText={value => updateConfig('apiKey', value)}
-        placeholder="Enter Squarespace API Key"
-        secureTextEntry
+        placeholder="Enter account email or API key"
         autoCapitalize="none"
       />
-      <Text style={styles.inputLabel}>Site ID (Optional)</Text>
+      <Text style={styles.inputLabel}>Password / API Secret</Text>
       <TextInput
         style={styles.input}
-        value={config.siteId || ''}
-        onChangeText={value => updateConfig('siteId', value)}
-        placeholder="Enter Squarespace Site ID"
+        value={config.apiSecret || ''}
+        onChangeText={value => updateConfig('apiSecret', value)}
+        placeholder="Enter account password or API secret"
+        secureTextEntry
         autoCapitalize="none"
       />
     </View>
@@ -300,8 +308,8 @@ const PlatformConfigurationStep: React.FC<PlatformConfigurationStepProps> = ({ p
         return renderWixForm();
       case 'prestashop':
         return renderPrestaShopForm();
-      case 'squarespace':
-        return renderSquarespaceForm();
+      case 'commercefull':
+        return renderCommercefullForm();
       case 'offline':
         // Offline mode is handled by OfflineSetupStep
         return <Text style={styles.errorText}>Please use the Offline Setup flow.</Text>;

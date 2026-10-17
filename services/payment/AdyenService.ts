@@ -1,3 +1,4 @@
+import { getStoreCurrencyCode } from '../config/StoreCurrency';
 import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from './PaymentServiceInterface';
 import { LoggerFactory } from '../logger/LoggerFactory';
 
@@ -118,7 +119,7 @@ export class AdyenService implements PaymentServiceInterface {
       this.logger.info(`Processing Adyen payment of ${request.amount} (ref: ${request.reference})`);
 
       const result = await this.sdk.AdyenTerminal.startPayment({
-        amount: { value: request.amount, currency: request.currency ?? 'USD' },
+        amount: { value: request.amount, currency: request.currency?.toUpperCase() },
         reference: request.reference,
         merchantAccount: process.env.ADYEN_MERCHANT_ACCOUNT ?? '',
         metadata: {
@@ -186,7 +187,7 @@ export class AdyenService implements PaymentServiceInterface {
       this.logger.info(`Refunding Adyen transaction: ${transactionId} for ${amount}`);
       const result = await this.sdk.AdyenTerminal.refundPayment({
         pspReference: transactionId,
-        amount: { value: amount, currency: 'USD' },
+        amount: { value: amount, currency: (await getStoreCurrencyCode()).toUpperCase() },
       });
       return {
         success: result.status === 'received',

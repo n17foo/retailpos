@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
-import { Order } from '../OrderServiceInterface';
+import { Order, TaxQuote } from '../OrderServiceInterface';
 import { PlatformOrderServiceInterface, PlatformConfigRequirements, PlatformOrderConfig } from './PlatformOrderServiceInterface';
 import { LoggerFactory } from '../../logger/LoggerFactory';
 
@@ -40,6 +40,14 @@ export abstract class BaseOrderService implements PlatformOrderServiceInterface 
 
   async createDraftOrder(order: Order): Promise<Order> {
     return this.createOrder({ ...order, paymentStatus: 'draft' });
+  }
+
+  /**
+   * Platform-calculated tax for a basket. Platforms that can return it override this; the default
+   * refuses so a sale is never priced with a tax figure the platform did not provide.
+   */
+  async quoteTax(_order: Order): Promise<TaxQuote> {
+    throw new Error(`${this.constructor.name} cannot calculate tax`);
   }
 
   async cancelDraftOrder(platformOrderId: string): Promise<void> {

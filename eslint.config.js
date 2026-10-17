@@ -12,6 +12,7 @@ module.exports = [
       '.expo/**',
       '.expo-shared/**',
       'dist/**',
+      'dist-electron/**',
       'build/**',
       'coverage/**',
       'electron/**',

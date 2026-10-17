@@ -12,6 +12,8 @@ interface OfflineSetupStepProps {
 
 export interface OfflineStoreConfig {
   storeName: string;
+  /** Store location — the tax destination for offline sales (D10) */
+  storeAddress: string;
   categories: OfflineCategory[];
   currency: string;
 }
@@ -32,6 +34,7 @@ export interface OfflineProduct {
 
 const DEFAULT_CONFIG: OfflineStoreConfig = {
   storeName: '',
+  storeAddress: '',
   categories: [],
   currency: 'GBP',
 };
@@ -166,6 +169,15 @@ const OfflineSetupStep: React.FC<OfflineSetupStepProps> = ({ onBack, onComplete,
           value={currentConfig.storeName}
           onChangeText={value => setConfig({ ...currentConfig, storeName: value })}
           placeholder="My Local Store"
+          autoCapitalize="words"
+        />
+
+        <Text style={styles.inputLabel}>Store Address (tax destination)</Text>
+        <TextInput
+          style={styles.input}
+          value={currentConfig.storeAddress}
+          onChangeText={value => setConfig({ ...currentConfig, storeAddress: value })}
+          placeholder="123 High Street, London"
           autoCapitalize="words"
         />
 

@@ -12,8 +12,12 @@ import { lightColors, spacing, typography, borderRadius, elevation } from '../ut
 
 export type BlockerType = 'error' | 'warning' | 'info';
 
+/** Stable identifiers so UI can attach behaviour without matching on message text */
+export type BlockerCode = 'customer-required' | 'variant-required' | 'unsynced-orders';
+
 export interface BasketBlocker {
   type: BlockerType;
+  code?: BlockerCode;
   message: string;
   action?: {
     label: string;

@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useActivePlatform } from './useActivePlatform';
 import { CategoryServiceFactory } from '../services/category/CategoryServiceFactory';
 import { ECommercePlatform } from '../utils/platforms';
 import {
@@ -57,10 +58,12 @@ interface UseUnifiedCategoriesReturn extends UseUnifiedCategoriesState {
  * Hook for managing unified categories
  * Fetches categories from the configured platform and converts them to unified format
  */
-export const useUnifiedCategories = (platform?: ECommercePlatform): UseUnifiedCategoriesReturn => {
+export const useUnifiedCategories = (platformParam?: ECommercePlatform | null): UseUnifiedCategoriesReturn => {
+  const { platform, isResolved } = useActivePlatform(platformParam);
   const [categories, setCategories] = useState<UnifiedCategory[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
   // Compute category summaries from full categories
   const categorySummaries = useMemo(() => {
@@ -74,6 +77,7 @@ export const useUnifiedCategories = (platform?: ECommercePlatform): UseUnifiedCa
 
   // Fetch categories from the service
   const fetchCategories = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
     setIsLoading(true);
     setError(null);
 
@@ -86,14 +90,18 @@ export const useUnifiedCategories = (platform?: ECommercePlatform): UseUnifiedCa
       }
 
       const result = await service.getCategories();
-      const mappingPlatform = platform || ECommercePlatform.OFFLINE;
-      const unifiedCategories = mapToUnifiedCategories(result, mappingPlatform);
+      if (requestId !== requestIdRef.current) return;
 
-      setCategories(unifiedCategories);
+      const mappingPlatform = platform || ECommercePlatform.OFFLINE;
+      setCategories(mapToUnifiedCategories(result, mappingPlatform));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch categories');
+      if (requestId === requestIdRef.current) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch categories');
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === requestIdRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [platform]);
 
@@ -166,8 +174,8 @@ export const useUnifiedCategories = (platform?: ECommercePlatform): UseUnifiedCa
 
   // Fetch categories on mount and when platform changes
   useEffect(() => {
-    fetchCategories();
-  }, [fetchCategories]);
+    if (isResolved) fetchCategories();
+  }, [fetchCategories, isResolved]);
 
   return {
     categories,
@@ -191,11 +199,25 @@ export const useUnifiedCategories = (platform?: ECommercePlatform): UseUnifiedCa
  * Helper hook for category navigation
  * Manages current category selection and navigation state
  */
-export const useCategoryNavigation = (platform?: ECommercePlatform) => {
-  const { categories, categoryTree, isLoading, error, getCategoryById, getChildCategories, getBreadcrumb, refresh } =
-    useUnifiedCategories(platform);
-
+export const useCategoryNavigation = (categories: UnifiedCategory[]) => {
   const [currentCategoryId, setCurrentCategoryId] = useState<string | null>(null);
+
+  const categoryById = useMemo(() => new Map(categories.map(c => [c.id, c])), [categories]);
+  const getCategoryById = useCallback((id: string): UnifiedCategory | undefined => categoryById.get(id), [categoryById]);
+  const getChildCategories = useCallback(
+    (parentId: string): UnifiedCategory[] => categories.filter(c => c.parentId === parentId),
+    [categories]
+  );
+  const getBreadcrumb = useCallback(
+    (categoryId: string): UnifiedCategory[] => {
+      const trail = getCategoryAncestors(categories, categoryId)
+        .map(getCategoryById)
+        .filter((c): c is UnifiedCategory => c !== undefined);
+      const category = getCategoryById(categoryId);
+      return category ? [...trail, category] : trail;
+    },
+    [categories, getCategoryById]
+  );
 
   // Get current category
   const currentCategory = useMemo(() => {
@@ -246,19 +268,15 @@ export const useCategoryNavigation = (platform?: ECommercePlatform) => {
   const canNavigateUp = currentCategoryId !== null;
 
   return {
-    categories,
-    categoryTree,
     displayCategories,
     currentCategory,
     currentCategoryId,
     breadcrumb,
-    isLoading,
-    error,
+    getCategoryById,
     navigateTo,
     navigateUp,
     navigateToRoot,
     canNavigateUp,
     hasChildren,
-    refresh,
   };
 };

@@ -12,6 +12,21 @@ export interface POSConfig {
   drawerOpenOnCash: boolean;
   /** Idle minutes before the register locks and requires re-authentication. 0 disables. */
   autoLockMinutes?: number;
+  // ── Sale screen (docs/specs/system/sales-screen-fast-path-ux.md §5.7) ──
+  /** Tile density: 'large' | 'compact' | 'text' | 'auto' (default: auto-derived from catalogue images) */
+  saleDensity?: 'large' | 'compact' | 'text' | 'auto';
+  /** Input mode override: 'auto' | 'touch' | 'pointer' */
+  saleInputMode?: 'auto' | 'touch' | 'pointer';
+  /** Repeat-read de-dup window for scanners, ms (default 700) */
+  saleScanDedupMs?: number;
+  /** Enabled sale modes — the mode chip is hidden when a single mode is enabled */
+  saleModes?: string[];
+  /** One-tap line-note quick chips (empty = none shown) */
+  saleNoteChips?: string[];
+  /** Delay before the sale screen returns to a clean state after payment, ms (default 3000) */
+  saleAutoNewSaleDelayMs?: number;
+  /** Order total at or above which manager approval is required (absent = no gate) */
+  checkoutHighValueThreshold?: number;
 }
 
 /** Security default applied until an admin configures autoLockMinutes. */
@@ -28,6 +43,13 @@ export const SETTINGS_KEYS: Record<keyof POSConfig, string> = {
   storePhone: 'pos.storePhone',
   currencySymbol: 'pos.currencySymbol',
   drawerOpenOnCash: 'pos.drawerOpenOnCash',
+  saleDensity: 'sale.density',
+  saleInputMode: 'sale.inputMode',
+  saleScanDedupMs: 'sale.scanDedupMs',
+  saleModes: 'sale.modes',
+  saleNoteChips: 'sale.noteChips',
+  saleAutoNewSaleDelayMs: 'sale.autoNewSaleDelayMs',
+  checkoutHighValueThreshold: 'checkout.highValueThreshold',
 };
 
 /**

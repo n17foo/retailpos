@@ -40,14 +40,25 @@ export class LocalDiscountService extends BaseDiscountService {
         return this.createInvalidResult(code, validation.error!);
       }
 
-      // Increment usage count (optimistic - will be decremented if order is cancelled)
-      await this.discountRepo.incrementUsageCount(code);
-
       this.logger.info({ message: `Discount validated: ${code}`, amount: discount.value });
       return this.createValidResult(discount, subtotal);
     } catch (error) {
       this.logger.error({ message: `Error validating discount: ${code}` }, error instanceof Error ? error : new Error(String(error)));
       return this.createInvalidResult(code, 'Error validating discount code');
+    }
+  }
+
+  /**
+   * Record a completed sale against the code's usage counter.
+   * Called by checkout after payment succeeds — validation alone never burns usage.
+   */
+  async recordUsage(code: string): Promise<void> {
+    try {
+      await this.discountRepo.incrementUsageCount(code);
+      this.logger.info({ message: `Discount usage recorded: ${code}` });
+    } catch (error) {
+      this.logger.error({ message: `Error recording discount usage: ${code}` }, error instanceof Error ? error : new Error(String(error)));
+      throw error;
     }
   }
 

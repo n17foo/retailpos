@@ -48,7 +48,7 @@
       "sylius": "Open-source & flexible",
       "wix": "Simple website builder",
       "prestashop": "Open-source e-commerce",
-      "squarespace": "Design-first platform",
+      "commercefull": "Unified commerce platform",
       "offline": "No online store needed"
     }
   },
@@ -203,6 +203,8 @@
     "subtotal": "Subtotal:",
     "tax": "Tax ({{rate}}%):",
     "total": "Total:",
+    "taxAtCheckout": "Calculated at checkout",
+    "totalBeforeTax": "Total before tax",
     "sku": "SKU: {{sku}}",
     "pendingSync": "{{count}} order(s) pending sync",
     "syncComplete": "{{count}} order(s) synced successfully",
@@ -379,8 +381,6 @@
       "siteId": "Site ID",
       "wixSiteIdPlaceholder": "Enter Wix Site ID",
       "prestashopUrlPlaceholder": "https://your-prestashop-store.com",
-      "squarespaceSiteIdLabel": "Site ID (optional)",
-      "squarespaceSiteIdPlaceholder": "Enter Squarespace Site ID",
       "localOnlyMode": "Local-Only Mode",
       "localOnlyDescription": "Works offline. Downloads menu from a public URL. Orders are stored locally only.",
       "menuUrl": "Menu URL",

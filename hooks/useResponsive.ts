@@ -1,8 +1,8 @@
 import { useWindowDimensions } from 'react-native';
 import { useMemo } from 'react';
-import { breakpoints, getProductColumns, getSidebarWidths } from '../utils/responsive.utils';
+import { breakpoints, getProductColumns } from '../utils/responsive.utils';
 
-export { breakpoints, getProductColumns, getSidebarWidths };
+export { breakpoints, getProductColumns };
 
 export type DeviceSize = 'mobile' | 'tablet' | 'desktop' | 'wide';
 

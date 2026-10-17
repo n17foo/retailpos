@@ -8,7 +8,8 @@ import { useCurrency } from '../hooks/useCurrency';
 
 const SyncQueueScreen: React.FC = () => {
   const currency = useCurrency();
-  const { orders, totalCount, failedCount, isLoading, isProcessing, retryOrder, retryAll, discardOrder, refresh } = useSyncQueue();
+  const { orders, totalCount, failedCount, isLoading, loadError, isProcessing, retryOrder, retryAll, discardOrder, refresh } =
+    useSyncQueue();
 
   const handleRetryOrder = useCallback(
     (orderId: string) => {
@@ -202,11 +203,19 @@ const SyncQueueScreen: React.FC = () => {
         contentContainerStyle={orders.length === 0 ? styles.emptyContainer : styles.listContent}
         refreshControl={<RefreshControl refreshing={false} onRefresh={refresh} />}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <MaterialIcons name="check-circle" size={64} color={lightColors.success} />
-            <Text style={styles.emptyTitle}>All synced!</Text>
-            <Text style={styles.emptyDescription}>All orders have been successfully synced to the platform.</Text>
-          </View>
+          loadError ? (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="error-outline" size={64} color={lightColors.error} />
+              <Text style={styles.emptyTitle}>Couldn't load the sync queue</Text>
+              <Text style={styles.emptyDescription}>{loadError} — pull down to retry.</Text>
+            </View>
+          ) : (
+            <View style={styles.emptyState}>
+              <MaterialIcons name="check-circle" size={64} color={lightColors.success} />
+              <Text style={styles.emptyTitle}>All synced!</Text>
+              <Text style={styles.emptyDescription}>All orders have been successfully synced to the platform.</Text>
+            </View>
+          )
         }
       />
     </View>

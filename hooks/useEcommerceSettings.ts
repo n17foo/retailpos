@@ -47,10 +47,6 @@ export interface ECommerceSettings {
     apiKey: string;
     storeUrl: string;
   };
-  squarespace: {
-    apiKey: string;
-    siteId: string;
-  };
   commercefull: {
     apiKey: string;
     apiSecret: string;
@@ -108,10 +104,6 @@ const DEFAULT_ECOMMERCE_SETTINGS: ECommerceSettings = {
   prestashop: {
     apiKey: '',
     storeUrl: '',
-  },
-  squarespace: {
-    apiKey: '',
-    siteId: '',
   },
   commercefull: {
     apiKey: '',
@@ -325,9 +317,6 @@ export const useEcommerceSettings = () => {
       }),
       ...(updates.prestashop && {
         prestashop: { ...current.prestashop, ...updates.prestashop },
-      }),
-      ...(updates.squarespace && {
-        squarespace: { ...current.squarespace, ...updates.squarespace },
       }),
       ...(updates.commercefull && {
         commercefull: { ...current.commercefull, ...updates.commercefull },

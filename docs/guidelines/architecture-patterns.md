@@ -223,7 +223,6 @@ Called once after onboarding and when credentials change.
 ServiceConfigBridge.configureServicesForPlatform(settings)
   → ProductServiceFactory.configureService(platform, apiConfig)
   → OrderServiceFactory.configureService(platform, apiConfig)
-  → TaxServiceFactory.configureService(platform, apiConfig)
 ```
 
 Factory imports are **lazy** (`require()`) to break circular dependencies.
@@ -244,25 +243,19 @@ Three focused services own sale lifecycle:
 
 ---
 
-## Tax Strategy Pattern
+## Tax Is Calculated By The Platform
 
-Platform-specific tax via strategy pattern:
+Online platforms own tax; the POS never assumes a rate. `CheckoutService.startCheckout()` obtains it per basket mode:
 
 ```
-TaxServiceFactory
-  └── getService(platform) → TaxServiceInterface
-        ├── ShopifyTaxStrategy
-        ├── WooCommerceTaxStrategy
-        ├── OfflineTaxStrategy
+native_draft   (Shopify, Wix, Commercefull)  → orderService.createDraftOrder()  → draft totals are authoritative
+remote_cart    (Woo, Magento, BigCommerce,    → orderService.quoteTax()          → TaxQuote, applied via applyTaxQuote()
+                Sylius, PrestaShop)
+local_only     (Offline)                      → basket totals + resolveOfflineTaxRate()
 ```
 
-Every strategy extends `BaseTaxStrategy` with five-step resolution:
-
-1. Normalize tax code
-2. Exempt fast-path
-3. Live platform rate
-4. Local profile fallback
-5. Default profile fallback
+If an online platform cannot return the tax, checkout stops. Platform API calls use raw ids (`utils/platformIds.ts`).
+See docs/features/platform-clients/ (platform-tax spec retired).
 
 ---
 

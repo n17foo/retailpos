@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
-import { Order } from '../OrderServiceInterface';
+import { Order, TaxQuote } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { SyliusApiClient } from '../../clients/sylius/SyliusApiClient';
@@ -86,6 +86,32 @@ export class SyliusOrderService extends BaseOrderService {
     } catch (error) {
       this.logger.error({ message: 'Error creating order on Sylius' }, error instanceof Error ? error : new Error(String(error)));
       throw error;
+    }
+  }
+
+  /**
+   * Ask Sylius to calculate tax for the basket: build a cart (an order in the `cart` state), read its totals,
+   * delete it. Sylius reports `taxTotal` (split into `taxExcludedTotal` / `taxIncludedTotal`) in minor units; tax
+   * follows the channel's default tax zone when the cart has no address.
+   */
+  async quoteTax(order: Order): Promise<TaxQuote> {
+    if (!this.isInitialized()) {
+      throw new Error('Sylius order service not initialized');
+    }
+
+    const cartToken = await this.createCart();
+    try {
+      for (const item of order.lineItems) {
+        await this.addItemToCart(cartToken, item);
+      }
+      const cart = await this.apiClient.get<any>(`orders/${cartToken}`);
+      const included = (cart.taxIncludedTotal ?? 0) / 100;
+      const excluded = (cart.taxExcludedTotal ?? Math.max(0, (cart.taxTotal ?? 0) - (cart.taxIncludedTotal ?? 0))) / 100;
+      const taxIncluded = included > 0 && excluded === 0;
+      const items = (cart.itemsTotal ?? 0) / 100;
+      return { subtotal: taxIncluded ? items - included : items, tax: (cart.taxTotal ?? 0) / 100, taxIncluded };
+    } finally {
+      await this.apiClient.delete(`orders/${cartToken}`).catch(() => undefined);
     }
   }
 

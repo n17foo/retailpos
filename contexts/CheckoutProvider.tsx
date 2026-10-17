@@ -18,6 +18,8 @@ interface CheckoutContextValue {
   isSyncing: boolean;
   startCheckout: (platform?: ECommercePlatform) => Promise<LocalOrder | null>;
   markPaymentProcessing: (orderId: string) => Promise<void>;
+  /** Return a 'processing' order to 'draft' so a failed payment can be retried */
+  revertToDraft: (orderId: string) => Promise<void>;
   completePayment: (
     orderId: string,
     paymentMethod: string,
@@ -109,6 +111,12 @@ export const CheckoutProvider: React.FC<CheckoutProviderProps> = ({ children }) 
     []
   );
 
+  const revertToDraft = useCallback(async (orderId: string) => {
+    const { checkoutService } = await getServiceContainer();
+    const order = await checkoutService.revertToDraft(orderId);
+    setCurrentOrder(order);
+  }, []);
+
   const cancelOrder = useCallback(async (orderId: string) => {
     const { checkoutService } = await getServiceContainer();
     await checkoutService.cancelOrder(orderId);
@@ -118,7 +126,7 @@ export const CheckoutProvider: React.FC<CheckoutProviderProps> = ({ children }) 
   const cancelDraftOrder = useCallback(async () => {
     if (!currentOrder) return;
     const { checkoutService } = await getServiceContainer();
-    await checkoutService.cancelDraftOrder(currentOrder.id);
+    await checkoutService.cancelDraftOrder(currentOrder.id, currentOrder.platform, currentOrder.platformOrderId);
     setCurrentOrder(null);
   }, [currentOrder]);
 
@@ -192,6 +200,7 @@ export const CheckoutProvider: React.FC<CheckoutProviderProps> = ({ children }) 
     isSyncing,
     startCheckout,
     markPaymentProcessing,
+    revertToDraft,
     completePayment,
     cancelOrder,
     cancelDraftOrder,

@@ -1,0 +1,100 @@
+# Multi-Register (Instore API)
+
+## Purpose
+
+Several registers share one local database over the LAN. One device runs as
+**server** (hosts an HTTP API on its SQLite data), others run as **clients**
+(call it instead of touching a local DB). Discovery finds servers on the
+subnet, HMAC request signing authenticates every call, and a WebSocket/sync
+layer pushes order/product events so client registers see each other's work
+in real time. `standalone` mode = single register, no networking.
+
+## Scope
+
+### Included
+
+- `InstoreApiConfig` — `mode: standalone|server|client`, serverAddress, port
+  (default 8787), `registerId`, `registerName`, `sharedSecret` (auto-generated
+  on server start if absent; stored via `ProtectedValueStore`).
+- `InstoreApiServer` — route table + handlers over local repositories/services
+  (orders, products, returns, users/PIN verify, categories, tax-profiles,
+  sync events, snapshot, commercefull webhook).
+- `InstoreApiDiscovery` — subnet scan for `/api/health` responders
+  (no mDNS dependency).
+- `InstoreApiTransport` — client-side signed HTTP calls.
+- `requestSigning` — `x-instore-signature` HMAC-SHA256 over
+  `method\npath\ntimestamp\nnonce\nsha256(body)`; nonce replay cache;
+  verify-pin brute-force guard.
+- `websocket/` + `sync/` — `StoreApiWebSocket`, `StoreApiConnectionManager`,
+  `SnapshotService`, `SyncEventBus`, `SyncPoller` — real-time events
+  (`order:created|updated|paid`, …) to clients.
+- `payment/` — `InstoreApiPaymentService` + `PaymentIntentClient` — PED
+  payment orchestration via `/api/payment/*` (payments feature).
+- `InstoreApiSettingsTab` — mode/secret/register config UI.
+
+### Excluded
+
+- Order sync _to the platform_ — orders-sync feature (this is register↔server,
+  not POS↔ecommerce).
+- The payment provider itself — payments feature; this is the transport.
+
+## Entry Points
+
+- **Settings → Instore API tab** — pick mode, generate/copy shared secret,
+  name the register, set server address/port.
+- **Discovery** — client registers scan the subnet for `/api/health`.
+- **App start** — `App.tsx` starts/stops `instoreApiServer`,
+  `storeApiConnectionManager`, `syncPoller` based on mode.
+
+## Feature Flow
+
+```
+Server register (mode=server):
+  InstoreApiServer.start(port) → routes serve local repos
+    + auth on every route except /api/health + /api/webhooks/commercefull
+  websocket broadcasts domain events
+
+Client register (mode=client):
+  Discovery.scanSubnet → list of {address, registerId, registerName}
+    → configure serverAddress:port + sharedSecret
+    → every call: signRequest(secret, method, path, body)
+       → server verifies HMAC + timestamp window + nonce uniqueness
+    → data mutations POST to server (orders, returns, categories, products)
+    → reads via transport (orders, products, snapshot)
+    → realtime via websocket/SyncPoller → syncEventBus → UI refreshes
+```
+
+## Implementation Map
+
+| Layer    | Responsibility                                | Implementation                                                                                                      |
+| -------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Services | Config, server, discovery, transport, signing | `services/instoreapi/{InstoreApiConfig,InstoreApiServer,InstoreApiDiscovery,InstoreApiTransport,requestSigning}.ts` |
+| Services | Realtime                                      | `services/instoreapi/{websocket,sync}/`                                                                             |
+| Services | PED payments                                  | `services/instoreapi/payment/`                                                                                      |
+| Screens  | Settings tab                                  | `screens/settings/InstoreApiSettingsTab.tsx`                                                                        |
+| App      | Lifecycle start/stop                          | `App.tsx`                                                                                                           |
+
+## State Ownership
+
+| State                    | Owner                       | Persistence                | Reset condition  |
+| ------------------------ | --------------------------- | -------------------------- | ---------------- |
+| Mode + settings + secret | `InstoreApiConfig`          | `ProtectedValueStore` (KV) | User edit        |
+| Nonce replay cache       | `InstoreApiServer`          | Memory                     | Expiry / restart |
+| Socket connection        | `StoreApiConnectionManager` | None                       | Reconnect        |
+| Server route state       | repositories (shared DB)    | SQLite                     | —                |
+
+## Dependencies
+
+- `ProtectedValueStore` — shared secret storage.
+- `utils/crypto.ts` — `sha256Hex` for signing (hand-rolled SHA-256).
+- Repositories/services on the server register — routes are thin wrappers.
+- LAN connectivity for all client operations.
+
+## Side Effects
+
+- HTTP server bound to port 8787 on the server device.
+- Every client mutation hits server SQLite (the authoritative store).
+- WebSocket events broadcast to clients → UI re-fetches.
+- Auto-generated shared secret logged once for operator to copy.
+- PIN-verify calls go to the server (brute-force guarded) — client-side auth
+  depends on LAN.

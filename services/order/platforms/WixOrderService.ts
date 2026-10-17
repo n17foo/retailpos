@@ -221,8 +221,9 @@ export class WixOrderService extends BaseOrderService {
       name: item.productName?.original || item.name || '',
       quantity: item.quantity,
       price: item.priceData?.price || 0,
-      taxRate: item.taxDetails?.taxRate ? parseFloat(item.taxDetails.taxRate) : undefined,
-      taxAmount: item.taxDetails?.totalTax ? parseFloat(item.taxDetails.totalTax) : undefined,
+      // `taxInfo` replaces the deprecated `taxDetails` (removed by Wix on 2024-09-30)
+      taxRate: item.taxInfo?.taxRate != null ? parseFloat(item.taxInfo.taxRate) : undefined,
+      taxAmount: item.taxInfo?.taxAmount?.amount != null ? parseFloat(item.taxInfo.taxAmount.amount) : undefined,
       total: item.priceData?.totalPrice || 0,
       properties: {},
     }));

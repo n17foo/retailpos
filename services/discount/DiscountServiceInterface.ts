@@ -47,6 +47,13 @@ export interface DiscountServiceInterface {
   validateDiscount(code: string, subtotal: number): Promise<DiscountValidationResult>;
 
   /**
+   * Record that a code was actually used — called once the order is paid.
+   * Validation must NOT consume usage (codes can be applied and removed).
+   * Optional: platform-backed services count usage on the platform side.
+   */
+  recordUsage?(code: string): Promise<void>;
+
+  /**
    * Get all available discount codes (for admin/manager view)
    * @returns List of discount codes
    */

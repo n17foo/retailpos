@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
-import { Order } from '../OrderServiceInterface';
+import { Order, TaxQuote } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { WooCommerceApiClient } from '../../clients/woocommerce/WooCommerceApiClient';
@@ -91,6 +91,38 @@ export class WooCommerceOrderService extends BaseOrderService {
     } catch (error) {
       this.logger.error({ message: 'Error creating WooCommerce draft order' }, error instanceof Error ? error : new Error(String(error)));
       throw error;
+    }
+  }
+
+  /**
+   * Ask WooCommerce to calculate tax for the basket.
+   * WooCommerce only calculates tax on an order, so a pending order is created, read and deleted straight away.
+   * Lines are sent as product + quantity only, so WooCommerce prices them with the store's prices and tax settings
+   * (including "prices entered inclusive of tax") instead of trusting a POS-side figure.
+   * Docs: https://developer.woocommerce.com/docs/apis/rest-api/v3/orders/ (taxes are calculated on create)
+   */
+  async quoteTax(order: Order): Promise<TaxQuote> {
+    if (!this.isInitialized()) {
+      throw new Error('WooCommerce order service not initialized');
+    }
+
+    const data = await this.apiClient.post<any>('orders', {
+      status: 'pending',
+      set_paid: false,
+      customer_id: 0,
+      line_items: order.lineItems.map(item => ({
+        product_id: Number(item.productId),
+        // A simple product has no variation: the POS variant id then equals the product id
+        variation_id: item.variantId && item.variantId !== item.productId ? Number(item.variantId) : undefined,
+        quantity: item.quantity,
+      })),
+    });
+
+    try {
+      const net = (data.line_items || []).reduce((sum: number, line: any) => sum + parseFloat(line.total || '0'), 0);
+      return { subtotal: net, tax: parseFloat(data.total_tax || '0'), taxIncluded: data.prices_include_tax === true };
+    } finally {
+      await this.cancelDraftOrder(String(data.id));
     }
   }
 
@@ -210,7 +242,8 @@ export class WooCommerceOrderService extends BaseOrderService {
   private mapToWooCommerceOrder(order: Order): any {
     const lineItems = order.lineItems.map(item => ({
       product_id: item.productId,
-      variation_id: item.variantId,
+      // A simple product has no variation: the POS variant id then equals the product id
+      variation_id: item.variantId && item.variantId !== item.productId ? item.variantId : undefined,
       quantity: item.quantity,
       price: item.price,
       name: item.name,

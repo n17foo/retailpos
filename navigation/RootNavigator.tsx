@@ -87,7 +87,14 @@ export const RootNavigator: React.FC = () => {
             <Stack.Screen name="Auth">{() => <AuthNavigator onLogin={handleLogin} showOnboarding={!isOnboarded} />}</Stack.Screen>
           ) : (
             <Stack.Screen name="Main">
-              {() => <MainTabNavigator username={user?.username || ''} userRole={user?.role} onLogout={() => handleLogout()} />}
+              {() => (
+                <MainTabNavigator
+                  username={user?.username || ''}
+                  userRole={user?.role}
+                  onLock={() => handleLogout('Register locked')}
+                  onLogout={() => handleLogout()}
+                />
+              )}
             </Stack.Screen>
           )}
         </Stack.Navigator>

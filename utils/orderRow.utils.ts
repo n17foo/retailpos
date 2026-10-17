@@ -16,6 +16,7 @@ export interface OrderWithItems {
   paymentMethod: string | null;
   customerName: string | null;
   cashierName: string | null;
+  saleMode: string | null;
   createdAt: Date;
   items: OrderItemRow[];
 }
@@ -31,6 +32,7 @@ export function rowToOrder(row: OrderRow, items: OrderItemRow[]): OrderWithItems
     paymentMethod: row.payment_method,
     customerName: row.customer_name,
     cashierName: row.cashier_name,
+    saleMode: row.sale_mode,
     createdAt: new Date(row.created_at),
     items,
   };

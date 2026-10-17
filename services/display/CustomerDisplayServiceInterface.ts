@@ -24,8 +24,6 @@ export interface CustomerDisplayState {
  * Interface for customer-facing display integrations.
  *
  * Implementations:
- *  - `ElectronDisplayService`  — second Electron window via IPC
- *  - `SerialDisplayService`    — USB serial pole display (VFD/LCD, e.g. Epson DM-D110)
  *  - `WebSocketDisplayService` — push to a browser-based display on a second device
  *  - `NoOpDisplayService`      — does nothing (when no display is configured)
  */
@@ -70,15 +68,11 @@ export interface CustomerDisplayServiceInterface {
   disconnect(): Promise<void>;
 }
 
-export type DisplayDriverType = 'electron' | 'serial' | 'websocket' | 'none';
+export type DisplayDriverType = 'websocket' | 'none';
 
 export interface DisplayConnectionConfig {
-  /** Serial port path (e.g. '/dev/tty.usbserial-1410') or WebSocket URL */
+  /** WebSocket URL of the display endpoint */
   endpoint?: string;
-  /** Baud rate for serial displays (default 9600) */
-  baudRate?: number;
-  /** Display width in characters (default 20 for 2×20 VFD) */
-  characterWidth?: number;
   /** Connection timeout in milliseconds (default 5000) */
   connectionTimeoutMs?: number;
 }

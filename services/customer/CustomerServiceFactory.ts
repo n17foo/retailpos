@@ -6,7 +6,6 @@ import { MagentoCustomerService } from './platforms/MagentoCustomerService';
 import { SyliusCustomerService } from './platforms/SyliusCustomerService';
 import { WixCustomerService } from './platforms/WixCustomerService';
 import { PrestaShopCustomerService } from './platforms/PrestaShopCustomerService';
-import { SquarespaceCustomerService } from './platforms/SquarespaceCustomerService';
 import { CommercefullCustomerService } from './platforms/CommercefullCustomerService';
 import { ECommercePlatform, isOnlinePlatform } from '../../utils/platforms';
 import { LoggerFactory } from '../logger/LoggerFactory';
@@ -67,9 +66,6 @@ export class CustomerServiceFactory {
         break;
       case ECommercePlatform.PRESTASHOP:
         service = new PrestaShopCustomerService();
-        break;
-      case ECommercePlatform.SQUARESPACE:
-        service = new SquarespaceCustomerService();
         break;
       case ECommercePlatform.COMMERCEFULL:
         service = new CommercefullCustomerService();

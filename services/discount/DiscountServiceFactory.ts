@@ -69,7 +69,6 @@ export class DiscountServiceFactory {
       case ECommercePlatform.SYLIUS:
       case ECommercePlatform.WIX:
       case ECommercePlatform.PRESTASHOP:
-      case ECommercePlatform.SQUARESPACE:
       case ECommercePlatform.COMMERCEFULL:
       default:
         this.logger.info({

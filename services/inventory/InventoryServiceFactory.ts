@@ -6,11 +6,11 @@ import { MagentoInventoryService } from './platforms/MagentoInventoryService';
 import { SyliusInventoryService } from './platforms/SyliusInventoryService';
 import { WixInventoryService } from './platforms/WixInventoryService';
 import { PrestaShopInventoryService } from './platforms/PrestaShopInventoryService';
-import { SquarespaceInventoryService } from './platforms/SquarespaceInventoryService';
 import { CommercefullInventoryService } from './platforms/CommercefullInventoryService';
 import { OfflineInventoryService } from './platforms/OfflineInventoryService';
 import { CompositeInventoryService } from './platforms/CompositeInventoryService';
 import { PlatformInventoryConfig, PlatformInventoryServiceInterface } from './platforms/PlatformInventoryServiceInterface';
+import { RetryingInventoryService } from './RetryingInventoryService';
 import { ECommercePlatform } from '../../utils/platforms';
 import { LoggerFactory } from '../logger/LoggerFactory';
 
@@ -32,7 +32,6 @@ export class InventoryServiceFactory {
     [ECommercePlatform.SYLIUS]: null,
     [ECommercePlatform.WIX]: null,
     [ECommercePlatform.PRESTASHOP]: null,
-    [ECommercePlatform.SQUARESPACE]: null,
     [ECommercePlatform.COMMERCEFULL]: null,
     [ECommercePlatform.OFFLINE]: null,
   };
@@ -101,10 +100,6 @@ export class InventoryServiceFactory {
         service = this.createPrestaShopService();
         break;
 
-      case ECommercePlatform.SQUARESPACE:
-        service = this.createSquarespaceService();
-        break;
-
       case ECommercePlatform.COMMERCEFULL:
         service = this.createCommercefullService();
         break;
@@ -118,9 +113,10 @@ export class InventoryServiceFactory {
         return this.offlineDefaultService;
     }
 
-    // Cache the instance
-    this.serviceInstances[platform] = service;
-    return service;
+    // Cache the instance — non-offline services are wrapped so failed
+    // platform writes persist and retry instead of diverging silently
+    this.serviceInstances[platform] = this.wrapForRetry(platform, service);
+    return this.serviceInstances[platform]!;
   }
 
   /**
@@ -157,9 +153,6 @@ export class InventoryServiceFactory {
           case ECommercePlatform.PRESTASHOP:
             service = this.createPrestaShopService();
             break;
-          case ECommercePlatform.SQUARESPACE:
-            service = this.createSquarespaceService();
-            break;
           case ECommercePlatform.COMMERCEFULL:
             service = this.createCommercefullService();
             break;
@@ -171,9 +164,9 @@ export class InventoryServiceFactory {
         }
 
         if (service) {
-          this.serviceInstances[platform] = service;
+          this.serviceInstances[platform] = this.wrapForRetry(platform, service);
         }
-        return service;
+        return platform && this.serviceInstances[platform];
       })
       .filter(Boolean) as InventoryServiceInterface[];
 
@@ -340,27 +333,6 @@ export class InventoryServiceFactory {
     return service;
   }
 
-  /**
-   * Create and initialize a Squarespace inventory service
-   */
-  private createSquarespaceService(): InventoryServiceInterface {
-    const service = new SquarespaceInventoryService();
-
-    const config: PlatformInventoryConfig = {
-      apiKey: process.env.SQUARESPACE_API_KEY,
-      siteId: process.env.SQUARESPACE_SITE_ID,
-    };
-
-    service.initialize(config).catch(err => {
-      this.logger.error(
-        { message: 'Failed to initialize Squarespace inventory service:' },
-        err instanceof Error ? err : new Error(String(err))
-      );
-    });
-
-    return service;
-  }
-
   private createCommercefullService(): InventoryServiceInterface {
     const service = new CommercefullInventoryService();
 
@@ -422,10 +394,6 @@ export class InventoryServiceFactory {
         service = new PrestaShopInventoryService();
         break;
 
-      case ECommercePlatform.SQUARESPACE:
-        service = new SquarespaceInventoryService();
-        break;
-
       case ECommercePlatform.COMMERCEFULL:
         service = new CommercefullInventoryService();
         break;
@@ -447,7 +415,18 @@ export class InventoryServiceFactory {
           err instanceof Error ? err : new Error(String(err))
         );
       });
-      this.serviceInstances[platform] = service;
+      this.serviceInstances[platform] = this.wrapForRetry(platform, service);
     }
+  }
+
+  /**
+   * Wrap online platform services so failed inventory writes are persisted
+   * and replayed; the offline service writes locally and needs no retry.
+   */
+  private wrapForRetry(platform: ECommercePlatform, service: InventoryServiceInterface): InventoryServiceInterface {
+    if (platform === ECommercePlatform.OFFLINE) {
+      return service;
+    }
+    return new RetryingInventoryService(service as PlatformInventoryServiceInterface, platform);
   }
 }

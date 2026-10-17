@@ -48,7 +48,7 @@
       "sylius": "Open-source et flexible",
       "wix": "Constructeur de sites simple",
       "prestashop": "E-commerce open-source",
-      "squarespace": "Plateforme axée sur le design",
+      "commercefull": "Plateforme de commerce unifié",
       "offline": "Pas de boutique en ligne nécessaire"
     }
   },
@@ -203,6 +203,8 @@
     "subtotal": "Sous-total :",
     "tax": "Taxe ({{rate}}%) :",
     "total": "Total :",
+    "taxAtCheckout": "Calculée au paiement",
+    "totalBeforeTax": "Total avant taxes",
     "sku": "SKU : {{sku}}",
     "pendingSync": "{{count}} commande(s) en attente de synchronisation",
     "syncComplete": "{{count}} commande(s) synchronisée(s) avec succès",
@@ -379,8 +381,6 @@
       "siteId": "ID du site",
       "wixSiteIdPlaceholder": "Entrez l'ID du site Wix",
       "prestashopUrlPlaceholder": "https://votre-magasin-prestashop.com",
-      "squarespaceSiteIdLabel": "ID du site (optionnel)",
-      "squarespaceSiteIdPlaceholder": "Entrez l'ID du site Squarespace",
       "localOnlyMode": "Mode local uniquement",
       "localOnlyDescription": "Fonctionne hors ligne. Télécharge le menu depuis une URL publique. Les commandes sont stockées localement uniquement.",
       "menuUrl": "URL du menu",

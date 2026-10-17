@@ -5,9 +5,11 @@ import { CheckoutResult, SyncResult } from '../order/order';
 import { CheckoutServiceInterface } from '../checkout/CheckoutServiceInterface';
 import { OrderSyncServiceInterface } from './OrderSyncServiceInterface';
 import { OrderRepository } from '../../repositories/OrderRepository';
+import { KeyValueRepository } from '../../repositories/KeyValueRepository';
 import { LoggerInterface } from '../logger/LoggerInterface';
-import { MAX_SYNC_RETRIES, posConfig } from '../config/POSConfigService';
-import { isOnlinePlatform } from '../../utils/platforms';
+import { MAX_SYNC_RETRIES } from '../config/POSConfigService';
+import { ECommercePlatform, isOnlinePlatform } from '../../utils/platforms';
+import { toPlatformProductId, toPlatformVariantId } from '../../utils/platformIds';
 import { kdsServiceFactory } from '../kds/KdsServiceFactory';
 
 /**
@@ -15,8 +17,25 @@ import { kdsServiceFactory } from '../kds/KdsServiceFactory';
  * Depends on CheckoutService for order queries.
  */
 export class OrderSyncService implements OrderSyncServiceInterface {
-  /** Tracks retry attempts per order (in-memory, resets on app restart) */
-  private retryCounts = new Map<string, number>();
+  /** Persisted retry counts — survive app restarts so backoff/exhaustion don't reset */
+  private readonly kv = new KeyValueRepository();
+
+  private retryKey(orderId: string): string {
+    return `sync:retries:${orderId}`;
+  }
+
+  private async getRetries(orderId: string): Promise<number> {
+    const raw = await this.kv.getItem(this.retryKey(orderId));
+    return raw ? parseInt(raw, 10) || 0 : 0;
+  }
+
+  private async setRetries(orderId: string, count: number): Promise<void> {
+    await this.kv.setItem(this.retryKey(orderId), count);
+  }
+
+  private async clearRetries(orderId: string): Promise<void> {
+    await this.kv.removeItem(this.retryKey(orderId));
+  }
 
   constructor(
     private checkoutService: CheckoutServiceInterface,
@@ -60,6 +79,7 @@ export class OrderSyncService implements OrderSyncServiceInterface {
         );
         const platformOrderId = completed?.platformOrderId ?? completed?.id ?? localOrder.platformOrderId;
         await this.orderRepo.updateSyncSuccess(orderId, platformOrderId);
+        await this.clearRetries(orderId);
         this.dispatchKdsTicket(localOrder);
         return { success: true, orderId, platformOrderId };
       }
@@ -67,7 +87,7 @@ export class OrderSyncService implements OrderSyncServiceInterface {
       const platformOrder: Order = {
         customerEmail: localOrder.customerEmail,
         customerName: localOrder.customerName,
-        lineItems: this.basketItemsToLineItems(localOrder.items),
+        lineItems: this.basketItemsToLineItems(localOrder.items, localOrder.platform),
         subtotal: localOrder.subtotal,
         tax: localOrder.tax,
         total: localOrder.total,
@@ -89,6 +109,7 @@ export class OrderSyncService implements OrderSyncServiceInterface {
 
       const createdOrder = await orderService.createOrder(platformOrder);
       await this.orderRepo.updateSyncSuccess(orderId, createdOrder.id ?? createdOrder.platformOrderId ?? '');
+      await this.clearRetries(orderId);
       this.dispatchKdsTicket(localOrder);
 
       return {
@@ -100,16 +121,16 @@ export class OrderSyncService implements OrderSyncServiceInterface {
       const errorMessage = (error as Error).message;
       this.logger.error({ message: `Failed to sync order ${orderId} to platform` }, error as Error);
 
-      const retries = (this.retryCounts.get(orderId) ?? 0) + 1;
-      this.retryCounts.set(orderId, retries);
+      const retries = (await this.getRetries(orderId)) + 1;
 
       if (this.isRetryable(error) && retries < MAX_SYNC_RETRIES()) {
+        await this.setRetries(orderId, retries);
         await this.orderRepo.updateSyncError(orderId, 'pending', errorMessage);
         this.logger.info(`Order ${orderId} queued for retry (${retries}/${MAX_SYNC_RETRIES()})`);
         return { success: false, orderId, error: `Order queued for retry (${retries}/${MAX_SYNC_RETRIES()}): ${errorMessage}` };
       } else {
         await this.orderRepo.updateSyncError(orderId, 'failed', errorMessage);
-        this.retryCounts.delete(orderId);
+        await this.clearRetries(orderId);
         return { success: false, orderId, error: errorMessage };
       }
     }
@@ -117,7 +138,7 @@ export class OrderSyncService implements OrderSyncServiceInterface {
 
   async retrySingleOrder(orderId: string): Promise<CheckoutResult> {
     // Reset retry count so the order gets a fresh set of attempts
-    this.retryCounts.delete(orderId);
+    await this.clearRetries(orderId);
     // Reset sync status back to pending so it's eligible for sync
     await this.orderRepo.updateSyncError(orderId, 'pending', '');
     return this.syncOrderToPlatform(orderId);
@@ -134,7 +155,7 @@ export class OrderSyncService implements OrderSyncServiceInterface {
 
       await this.orderRepo.updateStatus(orderId, 'cancelled');
       await this.orderRepo.updateSyncError(orderId, 'failed', 'Manually discarded by user');
-      this.retryCounts.delete(orderId);
+      await this.clearRetries(orderId);
       this.logger.info(`Discarded failed order: ${orderId}`);
       return true;
     } catch (error) {
@@ -196,24 +217,23 @@ export class OrderSyncService implements OrderSyncServiceInterface {
       });
   }
 
-  private basketItemsToLineItems(items: BasketItem[]): OrderLineItem[] {
-    // Fallback tax rate if item doesn't have one (spec requirement: sync.md §6.3)
-    const DEFAULT_TAX_RATE = posConfig.values.taxRate ?? 0.2;
-
+  private basketItemsToLineItems(items: BasketItem[], platform?: ECommercePlatform): OrderLineItem[] {
     return items.map(item => {
       const lineTotal = item.price * item.quantity;
-      const taxRate = item.taxRate ?? DEFAULT_TAX_RATE;
+      // No stored rate means the platform provided none: send no tax so the platform applies its own
+      const taxRate = item.taxable === false ? 0 : item.taxRate;
 
       return {
-        productId: item.originalId ?? item.productId,
-        variantId: item.variantId,
+        // Platform APIs only understand their own raw ids, not the POS's platform-prefixed ids
+        productId: platform ? toPlatformProductId(platform, item) : (item.originalId ?? item.productId),
+        variantId: platform ? toPlatformVariantId(platform, item) : item.variantId,
         sku: item.sku,
         name: item.name,
         quantity: item.quantity,
         price: item.price,
         total: lineTotal,
         taxRate,
-        taxAmount: lineTotal * taxRate,
+        taxAmount: taxRate === undefined ? undefined : lineTotal * taxRate,
         taxCode: item.taxCode,
         properties: item.properties,
       };

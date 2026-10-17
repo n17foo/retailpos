@@ -217,6 +217,10 @@ export class UnifiedPrinterService extends AbstractPrinterService {
       await this.printerInstance.printText(`Date: ${data.date.toLocaleString()}\n`);
       await this.printerInstance.printText(`Cashier: ${data.cashierName}\n`);
 
+      if (data.saleMode) {
+        await this.printerInstance.printText(`Mode: ${data.saleMode}\n`);
+      }
+
       if (data.customerName) {
         await this.printerInstance.printText(`Customer: ${data.customerName}\n`);
       }

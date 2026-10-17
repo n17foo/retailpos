@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Modal, FlatList } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Modal, FlatList } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { lightColors, spacing, typography, borderRadius, elevation } from '../utils/theme';
+import { lightColors, spacing, typography, borderRadius, elevation, interactionStyle } from '../utils/theme';
 import { formatMoney } from '../utils/money';
 import { UnifiedProductVariant, UnifiedProductOption } from '../services/product/types';
+import { isVariantSellable } from '../utils/sellability';
 import { useTranslate } from '../hooks/useTranslate';
 
 interface VariantPickerProps {
@@ -53,11 +54,11 @@ const VariantPicker: React.FC<VariantPickerProps> = ({ variants, options, curren
   };
 
   const renderVariantItem = ({ item }: { item: UnifiedProductVariant }) => {
-    const isOutOfStock = item.trackInventory && item.inventoryQuantity <= 0 && !item.allowBackorder;
+    const isOutOfStock = !isVariantSellable(item);
 
     return (
-      <TouchableOpacity
-        style={[styles.variantItem, isOutOfStock && styles.variantItemDisabled]}
+      <Pressable
+        style={state => [styles.variantItem, isOutOfStock && styles.variantItemDisabled, !isOutOfStock && interactionStyle(state)]}
         onPress={() => !isOutOfStock && handleVariantSelect(item)}
         disabled={isOutOfStock}
         accessibilityLabel={`${item.title}, ${formatMoney(item.price, currencyCode)}${isOutOfStock ? `, ${t('variantPicker.outOfStock')}` : ''}`}
@@ -81,7 +82,7 @@ const VariantPicker: React.FC<VariantPickerProps> = ({ variants, options, curren
           )}
         </View>
         {!isOutOfStock && <MaterialIcons name="add-circle-outline" size={22} color={lightColors.primary} />}
-      </TouchableOpacity>
+      </Pressable>
     );
   };
 
@@ -95,14 +96,14 @@ const VariantPicker: React.FC<VariantPickerProps> = ({ variants, options, curren
               <Text style={styles.title} numberOfLines={1}>
                 {productTitle}
               </Text>
-              <TouchableOpacity
+              <Pressable
                 onPress={handleClose}
-                style={styles.closeButton}
+                style={state => [styles.closeButton, interactionStyle(state)]}
                 accessibilityLabel={t('variantPicker.closeLabel')}
                 accessibilityRole="button"
               >
                 <MaterialIcons name="close" size={22} color={lightColors.textSecondary} />
-              </TouchableOpacity>
+              </Pressable>
             </View>
             <Text style={styles.subtitle}>
               {filteredVariants.length === 1
@@ -121,16 +122,16 @@ const VariantPicker: React.FC<VariantPickerProps> = ({ variants, options, curren
                     {option.values.map(value => {
                       const isSelected = selectedOptions[option.name] === value;
                       return (
-                        <TouchableOpacity
+                        <Pressable
                           key={value}
-                          style={[styles.optionChip, isSelected && styles.optionChipSelected]}
+                          style={state => [styles.optionChip, isSelected && styles.optionChipSelected, interactionStyle(state)]}
                           onPress={() => handleOptionSelect(option.name, value)}
                           accessibilityLabel={`${option.name}: ${value}`}
                           accessibilityRole="button"
                           accessibilityState={{ selected: isSelected }}
                         >
                           <Text style={[styles.optionChipText, isSelected && styles.optionChipTextSelected]}>{value}</Text>
-                        </TouchableOpacity>
+                        </Pressable>
                       );
                     })}
                   </View>

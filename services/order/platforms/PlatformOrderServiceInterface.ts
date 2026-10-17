@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
-import { Order } from '../OrderServiceInterface';
+import { Order, TaxQuote } from '../OrderServiceInterface';
 
 /**
  * Configuration requirements for platform order services
@@ -53,6 +53,8 @@ export interface PlatformOrderServiceInterface {
 
   /** Create a draft order (platform-calculated tax, not yet paid) */
   createDraftOrder(order: Order): Promise<Order>;
+  /** Platform-calculated tax for a basket without creating a lasting order (platforms without drafts) */
+  quoteTax(order: Order): Promise<TaxQuote>;
   /** Cancel/delete a draft before payment */
   cancelDraftOrder(platformOrderId: string): Promise<void>;
   /** Mark a draft as paid after payment succeeds */

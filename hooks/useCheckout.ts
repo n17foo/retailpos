@@ -31,9 +31,13 @@ import { loyaltyService } from '../services/loyalty/LoyaltyService';
 import { storeCreditService } from '../services/customer/StoreCreditService';
 import { toCents } from '../utils/money';
 import { useLogger } from './useLogger';
+import { useCurrency } from './useCurrency';
 import { useManagerApproval } from './useManagerApproval';
 import { useBasketState } from '../contexts/BasketStateProvider';
 import { useCheckoutContext } from '../contexts/CheckoutProvider';
+import { posConfig } from '../services/config/POSConfigService';
+
+export type TenderShortcut = 'cash' | 'card' | 'method';
 
 interface UseCheckoutOptions {
   platform?: ECommercePlatform;
@@ -42,8 +46,16 @@ interface UseCheckoutOptions {
 
 export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
   const logger = useLogger('useCheckout');
-  const { basketItems, total, subtotal, tax, itemCount, basket } = useBasketState();
-  const { currentOrder, startCheckout, markPaymentProcessing, completePayment, cancelOrder, cancelDraftOrder } = useCheckoutContext();
+  const currency = useCurrency();
+  const { basketItems, total: basketTotal, subtotal: basketSubtotal, tax: basketTax, itemCount, basket } = useBasketState();
+  const { currentOrder, startCheckout, markPaymentProcessing, revertToDraft, completePayment, cancelOrder, cancelDraftOrder } =
+    useCheckoutContext();
+
+  // Once checkout has started, the order holds the authoritative amounts (including the tax the platform calculated).
+  // Everything charged, tendered or displayed must use them, never the basket's pre-checkout figures.
+  const total = currentOrder?.total ?? basketTotal;
+  const subtotal = currentOrder?.subtotal ?? basketSubtotal;
+  const tax = currentOrder?.tax ?? basketTax;
 
   const { processPayment, isTerminalConnected, getPaymentMode, getCurrentProvider } = usePayment();
   const { requestApproval } = useManagerApproval();
@@ -51,31 +63,40 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** The tender button that opened checkout — 'cash' jumps straight to tendering, 'card' pays immediately */
+  const [initialTender, setInitialTender] = useState<'cash' | 'card' | null>(null);
 
   // ── Split tender state ───────────────────────────────────────────────
   const [splitMode, setSplitMode] = useState(false);
   const [paymentLines, setPaymentLines] = useState<PaymentLine[]>([]);
   const [splitCashTenderAmount, setSplitCashTenderAmount] = useState<number | null>(null);
 
-  // ── Start checkout — creates platform draft ──────────────────────────
-  const handleStartCheckout = useCallback(async () => {
-    if (basketItems.length === 0) return;
-    setIsProcessing(true);
-    setError(null);
-    setSplitMode(false);
-    setPaymentLines([]);
-    setSplitCashTenderAmount(null);
-    try {
-      const order = await startCheckout(platform);
-      if (order) {
-        setCheckoutVisible(true);
+  // ── Start checkout ────────────────────────────────────────────────────
+  // The checkout UI opens immediately; the platform draft order is created in
+  // parallel and the modal only enables payment actions once it is ready
+  // (docs/specs/system/sales-screen-fast-path-ux.md §4.7).
+  const handleStartCheckout = useCallback(
+    async (tender: TenderShortcut = 'method') => {
+      if (basketItems.length === 0) return;
+      setError(null);
+      setSplitMode(false);
+      setPaymentLines([]);
+      setSplitCashTenderAmount(null);
+      setInitialTender(tender === 'method' ? null : tender);
+      setCheckoutVisible(true);
+      // Reopening an open order (modal was closed mid-checkout, or an
+      // interrupted draft was resumed) reuses it — never create a second draft.
+      if (currentOrder && (currentOrder.status === 'draft' || currentOrder.status === 'pending')) {
+        return;
       }
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [basketItems.length, startCheckout, platform]);
+      try {
+        await startCheckout(platform);
+      } catch (err) {
+        setError((err as Error).message);
+      }
+    },
+    [basketItems.length, startCheckout, platform, currentOrder]
+  );
 
   // ── Cancel draft — return to basket for editing ──────────────────────
   // Called when cashier closes CheckoutModal before paying
@@ -109,6 +130,7 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
           const response = await processPayment({
             amount: line.amount,
             reference: `ORDER-${Date.now()}-SPLIT`,
+            currency: currency.code,
             orderId: currentOrder.id,
             itemCount,
           });
@@ -186,7 +208,7 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
         setPaymentLines(prev => [...prev, full]);
       }
     },
-    [currentOrder, processPayment, itemCount, basket?.customerEmail]
+    [currentOrder, processPayment, itemCount, basket?.customerEmail, currency.code]
   );
 
   const confirmSplitCashPayment = useCallback(
@@ -312,6 +334,7 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
                   date: new Date(),
                   cashierName: order.cashierName ?? 'Cashier',
                   customerName: order.customerName,
+                  saleMode: order.saleMode,
                 })
                 .catch(() => {});
             }
@@ -326,14 +349,32 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
         setCheckoutVisible(false);
         onSuccess?.(result.orderId);
       } else {
-        setError(result.error ?? 'Payment failed');
+        if (currentOrder.status === 'processing') {
+          await revertToDraft(currentOrder.id).catch(() => {});
+        }
+        setError(result.error ?? 'Payment failed — try again or choose another method');
       }
     } catch (err) {
+      if (currentOrder.status === 'processing') {
+        await revertToDraft(currentOrder.id).catch(() => {});
+      }
       setError((err as Error).message);
     } finally {
       setIsProcessing(false);
     }
-  }, [currentOrder, remainingDue, paymentLines, markPaymentProcessing, completePayment, onSuccess, subtotal, tax, total, logger]);
+  }, [
+    currentOrder,
+    remainingDue,
+    paymentLines,
+    markPaymentProcessing,
+    completePayment,
+    revertToDraft,
+    onSuccess,
+    subtotal,
+    tax,
+    total,
+    logger,
+  ]);
 
   // ── Process payment ──────────────────────────────────────────────────
   const handlePayment = useCallback(
@@ -343,11 +384,10 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
       setIsProcessing(true);
       setError(null);
       try {
-        // Check if manager approval is required for high-value transactions
-        const settings = await keyValueRepository.getObject<{ highValueThreshold?: number }>('checkoutSettings');
-        const highValueThreshold = settings?.highValueThreshold ?? 500; // Default £500
+        // Manager approval only applies when a threshold has been configured; there is no built-in default
+        const highValueThreshold = posConfig.values.checkoutHighValueThreshold;
 
-        if (total >= highValueThreshold) {
+        if (typeof highValueThreshold === 'number' && highValueThreshold > 0 && total >= highValueThreshold) {
           logger.info(`High-value transaction detected (${total} >= ${highValueThreshold}), requesting manager approval`);
           const approved = await requestApproval('order:high_value');
           if (!approved) {
@@ -362,7 +402,7 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
         // Show payment screen on customer display
         customerDisplayServiceFactory
           .getService()
-          .showPayment(total, 'GBP')
+          .showPayment(total, currency.code)
           .catch(() => {});
 
         let transactionId: string | undefined;
@@ -372,16 +412,17 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
           const response = await processPayment({
             amount: total,
             reference: `ORDER-${Date.now()}`,
+            currency: currency.code,
             orderId: currentOrder.id,
             itemCount,
           });
 
           if (!response.success) {
-            // Payment failed — cancel the order so cashier can retry with a
-            // different method (spec 2.7.1–2.7.2)
-            await cancelOrder(currentOrder.id);
-            setCheckoutVisible(false);
-            setError(response.errorMessage || 'Payment failed');
+            // Payment failed — keep the order alive and return it to 'draft' so
+            // the cashier can retry or pick another tender method (spec §4.7)
+            await revertToDraft(currentOrder.id);
+            setInitialTender(null);
+            setError(response.errorMessage || 'Payment failed — try again or choose another method');
             return;
           }
 
@@ -423,6 +464,7 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
                     date: new Date(),
                     cashierName: order.cashierName ?? 'Cashier',
                     customerName: order.customerName,
+                    saleMode: order.saleMode,
                   })
                   .catch(() => {});
               }
@@ -434,9 +476,16 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
           setCheckoutVisible(false);
           onSuccess?.(result.orderId);
         } else {
-          setError(result.error || 'Payment failed');
+          // Order stays retryable — a 'processing' order must go back to 'draft'
+          if (currentOrder.status === 'processing') {
+            await revertToDraft(currentOrder.id).catch(() => {});
+          }
+          setError(result.error || 'Payment failed — try again or choose another method');
         }
       } catch (err) {
+        if (currentOrder.status === 'processing') {
+          await revertToDraft(currentOrder.id).catch(() => {});
+        }
         setError((err as Error).message);
       } finally {
         setIsProcessing(false);
@@ -447,7 +496,7 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
       markPaymentProcessing,
       processPayment,
       completePayment,
-      cancelOrder,
+      revertToDraft,
       total,
       tax,
       itemCount,
@@ -455,6 +504,7 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
       onSuccess,
       logger,
       requestApproval,
+      currency.code,
     ]
   );
 
@@ -469,6 +519,10 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
     subtotal,
     tax,
     itemCount,
+    /** The tender button that opened checkout — consumed by CheckoutModal */
+    initialTender,
+    /** Draft order still being created on the platform — payment actions stay disabled */
+    isDraftPending: checkoutVisible && !currentOrder,
     // Terminal
     terminalConnected: isTerminalConnected(),
     // Payment mode — drives which options CheckoutModal shows

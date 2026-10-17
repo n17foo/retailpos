@@ -20,7 +20,7 @@ describe('validatePrinterSettings — printer name', () => {
   it('fails when printerName is empty', () => {
     const result = validatePrinterSettings({ ...base, printerName: '' });
     expect(result.isValid).toBe(false);
-    expect(result.error).toMatch(/printer name is required/i);
+    expect(result.error).toBe('settings.printer.validation.printerNameRequired');
   });
 
   it('fails when printerName is only whitespace', () => {
@@ -59,7 +59,7 @@ describe('validatePrinterSettings — Bluetooth', () => {
   it('fails with a MAC address that is too short', () => {
     const result = validatePrinterSettings({ ...bt, macAddress: 'AA:BB:CC:DD:EE' });
     expect(result.isValid).toBe(false);
-    expect(result.error).toMatch(/mac address/i);
+    expect(result.error).toBe('settings.printer.validation.invalidMacAddress');
   });
 
   it('fails with a MAC address that has invalid characters', () => {
@@ -92,7 +92,7 @@ describe('validatePrinterSettings — Network', () => {
   it('fails with an invalid IP address', () => {
     const result = validatePrinterSettings({ ...net, ipAddress: 'not-an-ip' });
     expect(result.isValid).toBe(false);
-    expect(result.error).toMatch(/ip address/i);
+    expect(result.error).toBe('settings.printer.validation.invalidIpAddress');
   });
 
   it('fails with an empty IP address', () => {
@@ -106,7 +106,7 @@ describe('validatePrinterSettings — Network', () => {
   it('fails when port is 0', () => {
     const result = validatePrinterSettings({ ...net, port: 0 });
     expect(result.isValid).toBe(false);
-    expect(result.error).toMatch(/port/i);
+    expect(result.error).toBe('settings.printer.validation.invalidPort');
   });
 
   it('fails when port exceeds 65535', () => {
@@ -143,13 +143,13 @@ describe('validatePrinterSettings — USB', () => {
   it('fails when vendorId is undefined', () => {
     const result = validatePrinterSettings({ ...usb, vendorId: undefined });
     expect(result.isValid).toBe(false);
-    expect(result.error).toMatch(/vendor id/i);
+    expect(result.error).toBe('settings.printer.validation.usbIdsRequired');
   });
 
   it('fails when productId is undefined', () => {
     const result = validatePrinterSettings({ ...usb, productId: undefined });
     expect(result.isValid).toBe(false);
-    expect(result.error).toMatch(/product id/i);
+    expect(result.error).toBe('settings.printer.validation.usbIdsRequired');
   });
 
   it('fails when both vendorId and productId are undefined', () => {

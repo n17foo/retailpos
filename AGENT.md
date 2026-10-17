@@ -6,7 +6,7 @@
 
 ## What this project is
 
-RetailPOS is a cross-platform point-of-sale application (React Native + Expo + Electron) that connects to 9 e-commerce platforms (Shopify, WooCommerce, Magento, BigCommerce, Sylius, Wix, PrestaShop, Squarespace, Commercefull) plus a fully-offline mode. It supports basket management, checkout, payment terminals, barcode scanning, receipt printing, multi-register operation over a LAN, and role-based permissions.
+RetailPOS is a cross-platform point-of-sale application (React Native + Expo + Electron) that connects to 8 e-commerce platforms (Shopify, WooCommerce, Magento, BigCommerce, Sylius, Wix, PrestaShop, Commercefull) plus a fully-offline mode. It supports basket management, checkout, payment terminals, barcode scanning, receipt printing, multi-register operation over a LAN, and role-based permissions.
 
 ---
 
@@ -36,8 +36,9 @@ assets/             # Static images and icons
 components/         # Shared React Native UI components
 contexts/           # React Context providers (Basket, Auth, Category, …)
 docs/
-  adr/              # Architecture Decision Records (ADR-001 … ADR-015)
-  specs/            # EARS requirement specs per domain
+  adr/              # Architecture Decision Records (ADR-001 … ADR-017)
+  features/         # Feature docs — README (what/where) + rules.md (behaviour) per feature
+  specs/            # EARS-GUIDE only — feature requirements now live in docs/features/
   steering/         # Canonical rules: language, patterns, coding standards, UX, testing
 electron/           # Electron desktop shell (main.js, IPC bridge)
 hooks/              # Custom hooks — one per domain, wraps factory calls
@@ -59,26 +60,26 @@ utils/              # money.ts, theme.ts, platforms.ts, platformCapabilities.ts,
 | `checkout/`      | CheckoutService — startCheckout, completePayment, order queries                                                    |
 | `clients/`       | Shared platform API clients (BaseApiClient + per-platform auth strategies)                                         |
 | `config/`        | POSConfigService + ServiceConfigBridge + EcommerceSettingsStorage + PlatformCredentialsResolver                    |
-| `customer/`      | Customer lookup — 10 platforms + factory                                                                           |
-| `discount/`      | Coupon / discount validation — 10 platforms + factory                                                              |
+| `customer/`      | Customer lookup — 9 platforms + factory                                                                            |
+| `discount/`      | Coupon / discount validation — 9 platforms + factory                                                               |
 | `drawer/`        | CashDrawer peripheral (decoupled from printer)                                                                     |
-| `giftcard/`      | Gift card — 10 platforms + factory                                                                                 |
-| `inventory/`     | Inventory read / write — 10 platforms + factory                                                                    |
+| `giftcard/`      | Gift card — 9 platforms + factory                                                                                  |
+| `inventory/`     | Inventory read / write — 9 platforms + factory                                                                     |
 | `instoreapi/`    | Multi-register LAN API (server / client / discovery / sync / WebSocket / payment orchestration)                    |
 | `logger/`        | LoggerFactory + pluggable LogTransport                                                                             |
 | `notifications/` | NotificationService singleton + Toast                                                                              |
-| `order/`         | Order domain — 10 platforms + factory                                                                              |
+| `order/`         | Order domain — 9 platforms + factory                                                                               |
 | `payment/`       | Payment terminals — Stripe NFC, Stripe, Square, Adyen, Tap Payments, Instore API (PED via store-api orchestration) |
 | `permissions/`   | PermissionService, ManagerApprovalService, action registry                                                         |
 | `printer/`       | Receipt printing — USB/BT/Net/Electron                                                                             |
-| `product/`       | Product catalog — 10 platforms + factory                                                                           |
+| `product/`       | Product catalog — 9 platforms + factory                                                                            |
 | `procurement/`   | Purchase orders, vendors, stock-takes, transfer orders                                                             |
 | `returns/`       | ReturnService — returns + refunds, 10 platform adapters                                                            |
 | `scanner/`       | Barcode scanning — camera, BT, USB, QR hardware, Electron                                                          |
-| `search/`        | Product search — 10 platforms + factory                                                                            |
+| `search/`        | Product search — 9 platforms + factory                                                                             |
 | `secrets/`       | SecretsService — Keychain / Electron safeStorage / Browser / Memory backends                                       |
 | `sync/`          | OrderSyncService + BackgroundSyncService (exponential backoff)                                                     |
-| `tax/`           | TaxProfileService + TaxServiceFactory (strategy pattern)                                                           |
+| `tax/`           | OfflineTaxResolver + TaxProfileService — local tax setup (offline only); online tax comes from the platform        |
 | `token/`         | TokenService + per-platform providers — platform token acquisition, refresh, login warm-up                         |
 
 ---
@@ -104,13 +105,13 @@ Full rules with examples: `docs/guidelines/coding-standards.md`
 
 ## Where to find detailed guidance
 
-| Topic                               | Document                                   |
-| ----------------------------------- | ------------------------------------------ |
-| Domain vocabulary (canonical terms) | `docs/guidelines/ubiquitous-language.md`   |
-| Coding standards & naming           | `docs/guidelines/coding-standards.md`      |
-| Architecture patterns (with code)   | `docs/guidelines/architecture-patterns.md` |
-| UX / theme / component structure    | `docs/guidelines/ux-standards.md`          |
-| Testing setup & mock patterns       | `docs/guidelines/testing-guidelines.md`    |
-| Architecture overview               | `ARCHITECTURE.md`                          |
-| Feature requirements (EARS specs)   | `docs/specs/[domain]/`                     |
-| Architecture decisions              | `docs/adr/ADR-NNN-*.md`                    |
+| Topic                               | Document                                       |
+| ----------------------------------- | ---------------------------------------------- |
+| Domain vocabulary (canonical terms) | `docs/guidelines/ubiquitous-language.md`       |
+| Coding standards & naming           | `docs/guidelines/coding-standards.md`          |
+| Architecture patterns (with code)   | `docs/guidelines/architecture-patterns.md`     |
+| UX / theme / component structure    | `docs/guidelines/ux-standards.md`              |
+| Testing setup & mock patterns       | `docs/guidelines/testing-guidelines.md`        |
+| Architecture overview               | `ARCHITECTURE.md`                              |
+| Feature behaviour & rules           | `docs/features/[feature]/` (README + rules.md) |
+| Architecture decisions              | `docs/adr/ADR-NNN-*.md`                        |

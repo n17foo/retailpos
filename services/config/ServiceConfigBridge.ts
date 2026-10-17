@@ -53,10 +53,6 @@ export interface StoredECommerceSettings {
     apiKey: string;
     storeUrl: string;
   };
-  squarespace?: {
-    apiKey: string;
-    siteId: string;
-  };
   commercefull?: {
     apiKey: string;
     apiSecret: string;
@@ -162,7 +158,6 @@ export class ServiceConfigBridge {
       sylius: ECommercePlatform.SYLIUS,
       wix: ECommercePlatform.WIX,
       prestashop: ECommercePlatform.PRESTASHOP,
-      squarespace: ECommercePlatform.SQUARESPACE,
       commercefull: ECommercePlatform.COMMERCEFULL,
       offline: ECommercePlatform.OFFLINE,
     };
@@ -224,12 +219,6 @@ export class ServiceConfigBridge {
         return {
           apiKey: settings.prestashop?.apiKey || settings.apiKey,
           storeUrl: settings.prestashop?.storeUrl || settings.apiUrl,
-        };
-
-      case ECommercePlatform.SQUARESPACE:
-        return {
-          apiKey: settings.squarespace?.apiKey || settings.apiKey,
-          siteId: settings.squarespace?.siteId,
         };
 
       case ECommercePlatform.COMMERCEFULL:

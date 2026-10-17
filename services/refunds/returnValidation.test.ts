@@ -49,6 +49,23 @@ describe('validateReturnRequest', () => {
     ).toMatch(/exceeds the quantity/);
   });
 
+  it('reserves quantity for pending returns but frees it once rejected', () => {
+    // 1 of 2 already pending → only 1 remains returnable
+    const pending = [{ order_item_id: 'line-1', product_id: 'p1', quantity: 1, refund_amount: 10, status: 'pending' }];
+    expect(
+      validateReturnRequest([{ orderItemId: 'line-1', productId: 'p1', quantity: 2, refundAmount: 2 }], ctx({ existingReturns: pending }))
+    ).toMatch(/exceeds the quantity/);
+    expect(
+      validateReturnRequest([{ orderItemId: 'line-1', productId: 'p1', quantity: 1, refundAmount: 2 }], ctx({ existingReturns: pending }))
+    ).toBeNull();
+
+    // Rejected returns release the reservation
+    const rejected = [{ order_item_id: 'line-1', product_id: 'p1', quantity: 1, refund_amount: 10, status: 'rejected' }];
+    expect(
+      validateReturnRequest([{ orderItemId: 'line-1', productId: 'p1', quantity: 2, refundAmount: 2 }], ctx({ existingReturns: rejected }))
+    ).toBeNull();
+  });
+
   it('caps the cumulative refund at the order total', () => {
     const prior = [{ order_item_id: 'line-1', product_id: 'p1', quantity: 1, refund_amount: 25, status: 'completed' }];
     expect(

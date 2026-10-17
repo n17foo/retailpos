@@ -16,6 +16,7 @@ export interface OrderRow {
   customer_email: string | null;
   customer_name: string | null;
   note: string | null;
+  sale_mode: string | null;
   payment_method: string | null;
   payment_transaction_id: string | null;
   cashier_id: string | null;
@@ -42,6 +43,7 @@ export interface CreateOrderInput {
   customerEmail: string | null;
   customerName: string | null;
   note: string | null;
+  saleMode?: string | null;
   cashierId: string | null;
   cashierName: string | null;
   registerId?: string | null;

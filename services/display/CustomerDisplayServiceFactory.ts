@@ -4,7 +4,7 @@ import { WebSocketDisplayService } from './WebSocketDisplayService';
 import { LoggerFactory } from '../logger/LoggerFactory';
 import { keyValueRepository } from '../../repositories/KeyValueRepository';
 
-export type DisplayType = 'websocket' | 'serial' | 'electron' | 'none';
+export type DisplayType = 'websocket' | 'none';
 
 const DISPLAY_SETTINGS_KEY = 'customerDisplaySettings';
 
@@ -12,8 +12,6 @@ export interface CustomerDisplaySettings {
   enabled: boolean;
   type: DisplayType;
   endpoint: string;
-  baudRate?: number;
-  characterWidth?: number;
   idleMessage?: string;
   thankYouMessage?: string;
 }
@@ -98,8 +96,6 @@ export class CustomerDisplayServiceFactory {
 
     const config: DisplayConnectionConfig = {
       endpoint: settings.endpoint,
-      baudRate: settings.baudRate,
-      characterWidth: settings.characterWidth,
     };
 
     switch (settings.type) {
@@ -107,7 +103,8 @@ export class CustomerDisplayServiceFactory {
         this.currentService = new WebSocketDisplayService();
         break;
       default:
-        this.logger.warn({ message: `Display type '${settings.type}' not yet implemented, using no-op` });
+        // Stale persisted value (e.g. a removed driver type) — fall back safely
+        this.logger.warn({ message: `Unknown display type '${settings.type}', using no-op` });
         this.currentService = new NoOpDisplayService();
         return true;
     }

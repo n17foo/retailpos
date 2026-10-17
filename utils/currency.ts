@@ -3,6 +3,8 @@ export interface CurrencyInfo {
   symbol: string;
   name: string;
   symbolPlacement: 'before' | 'after';
+  /** ISO 4217 minor units — defaults to 2 when omitted */
+  decimals?: number;
 }
 
 export const CURRENCIES: CurrencyInfo[] = [
@@ -11,14 +13,14 @@ export const CURRENCIES: CurrencyInfo[] = [
   { code: 'EUR', symbol: '€', name: 'Euro', symbolPlacement: 'before' },
   { code: 'CAD', symbol: 'CA$', name: 'Canadian Dollar', symbolPlacement: 'before' },
   { code: 'AUD', symbol: 'A$', name: 'Australian Dollar', symbolPlacement: 'before' },
-  { code: 'JPY', symbol: '¥', name: 'Japanese Yen', symbolPlacement: 'before' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen', symbolPlacement: 'before', decimals: 0 },
   { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc', symbolPlacement: 'before' },
   { code: 'CNY', symbol: '¥', name: 'Chinese Yuan', symbolPlacement: 'before' },
   { code: 'INR', symbol: '₹', name: 'Indian Rupee', symbolPlacement: 'before' },
   { code: 'BRL', symbol: 'R$', name: 'Brazilian Real', symbolPlacement: 'before' },
   { code: 'MXN', symbol: 'MX$', name: 'Mexican Peso', symbolPlacement: 'before' },
   { code: 'ZAR', symbol: 'R', name: 'South African Rand', symbolPlacement: 'before' },
-  { code: 'KRW', symbol: '₩', name: 'South Korean Won', symbolPlacement: 'before' },
+  { code: 'KRW', symbol: '₩', name: 'South Korean Won', symbolPlacement: 'before', decimals: 0 },
   { code: 'SEK', symbol: 'kr', name: 'Swedish Krona', symbolPlacement: 'before' },
   { code: 'NOK', symbol: 'kr', name: 'Norwegian Krone', symbolPlacement: 'before' },
   { code: 'DKK', symbol: 'kr', name: 'Danish Krone', symbolPlacement: 'before' },
@@ -37,17 +39,17 @@ export const CURRENCIES: CurrencyInfo[] = [
   { code: 'PHP', symbol: '₱', name: 'Philippine Peso', symbolPlacement: 'before' },
   { code: 'COP', symbol: 'COL$', name: 'Colombian Peso', symbolPlacement: 'before' },
   { code: 'ARS', symbol: 'AR$', name: 'Argentine Peso', symbolPlacement: 'before' },
-  { code: 'CLP', symbol: 'CL$', name: 'Chilean Peso', symbolPlacement: 'before' },
+  { code: 'CLP', symbol: 'CL$', name: 'Chilean Peso', symbolPlacement: 'before', decimals: 0 },
   { code: 'PEN', symbol: 'S/', name: 'Peruvian Sol', symbolPlacement: 'before' },
   { code: 'MAD', symbol: 'MAD', name: 'Moroccan Dirham', symbolPlacement: 'before' },
   { code: 'SAR', symbol: '﷼', name: 'Saudi Riyal', symbolPlacement: 'before' },
   { code: 'QAR', symbol: 'QR', name: 'Qatari Riyal', symbolPlacement: 'before' },
-  { code: 'KWD', symbol: 'KD', name: 'Kuwaiti Dinar', symbolPlacement: 'before' },
-  { code: 'BHD', symbol: 'BD', name: 'Bahraini Dinar', symbolPlacement: 'before' },
+  { code: 'KWD', symbol: 'KD', name: 'Kuwaiti Dinar', symbolPlacement: 'before', decimals: 3 },
+  { code: 'BHD', symbol: 'BD', name: 'Bahraini Dinar', symbolPlacement: 'before', decimals: 3 },
   { code: 'TWD', symbol: 'NT$', name: 'Taiwan Dollar', symbolPlacement: 'before' },
   { code: 'MYR', symbol: 'RM', name: 'Malaysian Ringgit', symbolPlacement: 'before' },
   { code: 'IDR', symbol: 'Rp', name: 'Indonesian Rupiah', symbolPlacement: 'before' },
-  { code: 'VND', symbol: '₫', name: 'Vietnamese Dong', symbolPlacement: 'after' },
+  { code: 'VND', symbol: '₫', name: 'Vietnamese Dong', symbolPlacement: 'after', decimals: 0 },
   { code: 'PKR', symbol: '₨', name: 'Pakistani Rupee', symbolPlacement: 'before' },
   { code: 'BDT', symbol: '৳', name: 'Bangladeshi Taka', symbolPlacement: 'before' },
   { code: 'LKR', symbol: 'Rs', name: 'Sri Lankan Rupee', symbolPlacement: 'before' },
@@ -58,7 +60,7 @@ export const CURRENCIES: CurrencyInfo[] = [
   { code: 'RON', symbol: 'lei', name: 'Romanian Leu', symbolPlacement: 'after' },
   { code: 'BGN', symbol: 'лв', name: 'Bulgarian Lev', symbolPlacement: 'after' },
   { code: 'HRK', symbol: 'kn', name: 'Croatian Kuna', symbolPlacement: 'after' },
-  { code: 'ISK', symbol: 'kr', name: 'Icelandic Krona', symbolPlacement: 'after' },
+  { code: 'ISK', symbol: 'kr', name: 'Icelandic Krona', symbolPlacement: 'after', decimals: 0 },
   { code: 'LEK', symbol: 'Lek', name: 'Albanian Lek', symbolPlacement: 'after' },
 ];
 

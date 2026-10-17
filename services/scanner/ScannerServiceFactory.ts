@@ -115,6 +115,80 @@ export class ScannerServiceFactory {
     return this.currentType;
   }
 
+  // ── Shared sale connection ─────────────────────────────────────────────
+  //
+  // The sale screen holds one ref-counted connection to every HID-class
+  // scanner (USB, QR hardware) for the lifetime of the screen. Scans are
+  // fanned out to all registered callbacks; the underlying device is
+  // connected once and only disconnected when the last consumer releases.
+
+  private saleRefCount = 0;
+  private saleCallbackSeq = 0;
+  private saleCallbacks: Map<string, (code: string) => void> = new Map();
+  private saleSubscriptionIds: Map<ScannerServiceInterface, string> = new Map();
+  private saleConnectPromise: Promise<void> | null = null;
+
+  /**
+   * Register a scan callback on the shared sale connection.
+   * Returns a release function — the hardware stays connected until the last
+   * release call, so scans arriving while a modal/sheet is open are not lost.
+   */
+  public async connectForSale(onScan: (code: string) => void): Promise<() => void> {
+    const id = `sale-${++this.saleCallbackSeq}`;
+    this.saleCallbacks.set(id, onScan);
+    this.saleRefCount += 1;
+
+    if (!this.saleConnectPromise) {
+      this.saleConnectPromise = this.establishSaleConnection();
+    }
+    await this.saleConnectPromise;
+
+    return () => {
+      this.saleCallbacks.delete(id);
+      this.saleRefCount = Math.max(0, this.saleRefCount - 1);
+      if (this.saleRefCount === 0) {
+        void this.teardownSaleConnection();
+      }
+    };
+  }
+
+  private async establishSaleConnection(): Promise<void> {
+    // USB and QR-hardware services are both HID keyboard scanners — on Electron
+    // they share one service instance, deduplicated here.
+    const services = new Set<ScannerServiceInterface>();
+    for (const type of [ScannerType.USB, ScannerType.QR_HARDWARE]) {
+      const service = this.services.get(type);
+      if (service) services.add(service);
+    }
+
+    for (const service of services) {
+      try {
+        const connected = service.isConnected() || (await service.connect('sale-hid'));
+        if (connected) {
+          const subId = service.startScanListener(code => {
+            this.saleCallbacks.forEach(cb => cb(code));
+          });
+          if (subId) this.saleSubscriptionIds.set(service, subId);
+        }
+      } catch (error) {
+        this.logger.error({ message: 'Failed to connect scanner for sale' }, error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+  }
+
+  private async teardownSaleConnection(): Promise<void> {
+    this.saleConnectPromise = null;
+    for (const [service, subId] of this.saleSubscriptionIds) {
+      try {
+        service.stopScanListener(subId);
+        await service.disconnect();
+      } catch (error) {
+        this.logger.error({ message: 'Failed to release sale scanner' }, error instanceof Error ? error : new Error(String(error)));
+      }
+    }
+    this.saleSubscriptionIds.clear();
+  }
+
   /**
    * Cleanup all scanner connections
    */

@@ -1,50 +1,73 @@
-import React from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { lightColors, spacing, typography, borderRadius } from '../utils/theme';
-import { Basket } from './sale/Basket';
-import { ProductGrid } from './sale/ProductGrid';
-import { Header } from './sale/Header';
-import { Category } from './sale/Category';
-import { CategoryList } from './sale/CategoryList';
-import { BasketContent } from './sale/BasketContent';
-import { SearchBar } from '../components/SearchBar';
-import { SalesStatusHeader } from '../components/SalesStatusHeader';
-import { InterruptionBanner } from '../components/InterruptionBanner';
-import { useSaleScreen } from '../hooks/useSaleScreen';
-import { useInterruptionRecovery } from '../hooks/useInterruptionRecovery';
+/**
+ * SaleScreen — the full-screen home of the POS
+ * (docs/specs/system/sales-screen-fast-path-ux.md).
+ *
+ *  - Merged top bar: menu, register/cashier, omnibar, sync badge, drawer
+ *    warning, sale-state chip. No bottom tab bar.
+ *  - Persistent category navigation under the top bar.
+ *  - Omnibar search replaces the product grid with results; Enter adds the
+ *    single/exact match.
+ *  - Split shell (tablet/desktop/landscape): permanent basket column.
+ *    Stacked shell (phone): sticky BasketBar opens the basket as a sheet.
+ *  - Hardware scans resolve in place (ScanNoticeBar) — the shared scanner
+ *    stays connected while sheets and the checkout modal are open.
+ */
+
+import React, { useCallback, useState } from 'react';
+import { View, StyleSheet } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { lightColors, hitTarget } from '../utils/theme';
+import { SaleProvider, useSale } from '../contexts/SaleProvider';
 import { useAuthContext } from '../contexts/AuthProvider';
 import { useCheckoutContext } from '../contexts/CheckoutProvider';
+import { useInterruptionRecovery } from '../hooks/useInterruptionRecovery';
+import { useLogger } from '../hooks/useLogger';
+import { TopBar } from './sale/TopBar';
+import { MainMenu } from './sale/MainMenu';
+import { CategoryBar } from './sale/CategoryBar';
+import { ProductGrid } from './sale/ProductGrid';
+import { SearchResults } from './sale/SearchResults';
+import { BasketPanel } from './sale/BasketPanel';
+import { BasketBar } from './sale/BasketBar';
+import { ScanNoticeBar } from './sale/ScanNoticeBar';
+import { BottomSheet } from '../components/BottomSheet';
+import { HidCaptureField } from '../components/HidCaptureField';
+import { CameraScanOverlay } from '../components/CameraScanOverlay';
+import { CheckoutModal } from '../components/CheckoutModal';
+import { InterruptionBanner } from '../components/InterruptionBanner';
+import { instoreApiConfig } from '../services/instoreapi/InstoreApiConfig';
+import { PrinterServiceFactory } from '../services/printer/PrinterServiceFactory';
+import { notificationService } from '../services/notifications/NotificationService';
+import { posConfig } from '../services/config/POSConfigService';
+import { useBasketActions } from '../contexts/BasketActionsProvider';
+import type { MainTabParamList, MoreStackParamList } from '../navigation/types';
 
 interface SaleScreenProps {
   username?: string;
+  /** Locks the register (returns to the PIN screen) */
+  onLock?: () => void;
+  onLogout?: () => void;
 }
 
-const SaleScreen: React.FC<SaleScreenProps> = ({ username = 'User' }) => {
+const SaleScreenContent: React.FC<SaleScreenProps> = ({ username = 'User', onLock, onLogout }) => {
+  const logger = useLogger('SaleScreen');
   const { user } = useAuthContext();
-  const { syncAllPendingOrders, isSyncing } = useCheckoutContext();
-  const {
-    currentPlatform,
-    filteredProducts,
-    isProductLoading,
-    loadMore,
-    searchQuery,
-    setSearchQuery,
-    selectedCategoryName,
-    setSelectedCategory,
-    setSelectedCategoryName,
-    clearCategoryFilter,
-    basketItemsMap,
-    itemCount,
-    total,
-    handleAddToCart,
-    isTabletOrDesktop,
-    numColumns,
-    sidebarWidths,
-    // UX State
-    saleState,
-    unsyncedOrdersCount,
-  } = useSaleScreen();
+  const { getLocalOrders } = useCheckoutContext();
+  const navigation = useNavigation<BottomTabNavigationProp<MainTabParamList>>();
+  const sale = useSale();
+  const { layout, inputMode, checkout } = sale;
+  const { setSaleMode } = useBasketActions();
+
+  // Fulfilment modes — the top-bar chip stays hidden unless more than one is enabled (spec 6.36)
+  const saleModes = posConfig.values.saleModes ?? ['counter'];
+  const activeSaleMode = sale.basket?.saleMode ?? saleModes[0];
+  const cycleSaleMode = () => {
+    const idx = Math.max(0, saleModes.indexOf(activeSaleMode));
+    void setSaleMode(saleModes[(idx + 1) % saleModes.length]);
+  };
+
+  const [menuVisible, setMenuVisible] = useState(false);
 
   const {
     interruptionState,
@@ -57,7 +80,47 @@ const SaleScreen: React.FC<SaleScreenProps> = ({ username = 'User' }) => {
     dismissBanner,
   } = useInterruptionRecovery();
 
-  // Build interruption banner actions
+  const goToMore = useCallback(
+    (route: keyof MoreStackParamList) => {
+      navigation.navigate('More', { screen: route } as never);
+    },
+    [navigation]
+  );
+
+  /** Reprint the most recently paid order's receipt (menu quick action) */
+  const handleReprint = useCallback(async () => {
+    try {
+      const [paid, synced] = await Promise.all([getLocalOrders('paid'), getLocalOrders('synced')]);
+      const last = [...paid, ...synced].sort(
+        (a, b) => new Date(b.paidAt ?? b.updatedAt).getTime() - new Date(a.paidAt ?? a.updatedAt).getTime()
+      )[0];
+      if (!last) {
+        notificationService.notify('Reprint receipt', 'No completed orders yet', 'info');
+        return;
+      }
+      const printer = PrinterServiceFactory.getInstance();
+      if (!printer.isConnectedToPrinter()) {
+        notificationService.notify('Reprint receipt', 'No printer connected', 'warning');
+        return;
+      }
+      await printer.printReceipt({
+        orderId: last.id.slice(-8),
+        items: last.items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
+        subtotal: last.subtotal,
+        tax: last.tax,
+        total: last.total,
+        paymentMethod: last.paymentMethod ?? 'other',
+        date: new Date(last.paidAt ?? last.updatedAt),
+        cashierName: last.cashierName ?? 'Cashier',
+        customerName: last.customerName,
+        saleMode: last.saleMode,
+      });
+    } catch (error) {
+      logger.error({ message: 'Reprint failed' }, error instanceof Error ? error : new Error(String(error)));
+      notificationService.notify('Reprint receipt', 'Could not reprint the last receipt', 'warning');
+    }
+  }, [getLocalOrders, logger]);
+
   const getInterruptionActions = () => {
     switch (interruptionState.type) {
       case 'draft-sale':
@@ -67,7 +130,14 @@ const SaleScreen: React.FC<SaleScreenProps> = ({ username = 'User' }) => {
         ];
       case 'interrupted-checkout':
         return [
-          { label: 'Resume Checkout', onPress: resumeCheckout, variant: 'primary' as const },
+          {
+            label: 'Resume Checkout',
+            onPress: () => {
+              resumeCheckout();
+              void sale.checkout.handleStartCheckout('method');
+            },
+            variant: 'primary' as const,
+          },
           { label: 'Cancel Order', onPress: cancelAndDismiss, variant: 'secondary' as const },
         ];
       case 'interrupted-payment':
@@ -94,131 +164,78 @@ const SaleScreen: React.FC<SaleScreenProps> = ({ username = 'User' }) => {
       case 'interrupted-payment':
         return `Payment was interrupted. Order #${interruptionState.orderId?.slice(-8)} · Processing state`;
       case 'unsynced':
-        return `${unsyncedOrdersCount} ${unsyncedOrdersCount === 1 ? 'order' : 'orders'} pending sync`;
+        return `${sale.unsyncedOrdersCount} ${sale.unsyncedOrdersCount === 1 ? 'order' : 'orders'} pending sync`;
       default:
         return '';
     }
   };
 
-  const renderProductArea = () => (
-    <View style={styles.productArea}>
-      <View style={styles.searchContainer}>
-        <SearchBar placeholder="Search products..." onSearch={setSearchQuery} value={searchQuery} />
-      </View>
+  const categoryTargetSize = inputMode === 'touch' ? hitTarget.touchMin : hitTarget.pointerMin;
 
-      {selectedCategoryName && (
-        <View style={styles.activeCategoryBar}>
-          <MaterialIcons name="folder" size={14} color={lightColors.primary} />
-          <Text style={styles.activeCategoryText} numberOfLines={1}>
-            {selectedCategoryName}
-          </Text>
-          <TouchableOpacity
-            onPress={() => {
-              setSelectedCategory(null);
-              setSelectedCategoryName(null);
-            }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            accessibilityLabel="Clear category filter"
-            accessibilityRole="button"
-          >
-            <MaterialIcons name="close" size={14} color={lightColors.textSecondary} />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {isProductLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={lightColors.primary} />
-          <Text style={styles.loadingText}>Loading products...</Text>
-        </View>
-      ) : filteredProducts.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <MaterialIcons name="search-off" size={56} color={lightColors.textSecondary} />
-          <Text style={styles.emptyTitle}>{searchQuery ? 'No results found' : 'No products'}</Text>
-          <Text style={styles.emptySubtitle}>
-            {searchQuery
-              ? `No products match "${searchQuery}"`
-              : selectedCategoryName
-                ? `No products in "${selectedCategoryName}"`
-                : 'Add products to your catalogue to get started'}
-          </Text>
-          {(searchQuery || selectedCategoryName) && (
-            <TouchableOpacity style={styles.clearFilterButton} onPress={clearCategoryFilter}>
-              <Text style={styles.clearFilterText}>Clear filters</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+  const catalogueArea = (
+    <>
+      <CategoryBar mode={layout.categoryMode} targetSize={categoryTargetSize} />
+      {sale.scanNotice && <ScanNoticeBar notice={sale.scanNotice} />}
+      {sale.isSearchActive ? (
+        <SearchResults
+          results={sale.searchProducts}
+          isSearching={sale.isSearching}
+          query={sale.searchQuery}
+          onAdd={hit => void sale.addSearchProduct(hit)}
+        />
       ) : (
         <ProductGrid
-          products={filteredProducts}
-          onAddToCart={handleAddToCart}
-          basketItems={basketItemsMap}
-          numColumns={numColumns}
-          onLoadMore={loadMore}
+          products={sale.displayProducts}
+          onAdd={(product, variantId) => void sale.addProduct(product, variantId)}
+          basketItemsMap={sale.basketItemsMap}
+          layout={layout}
+          density={sale.tileDensity}
+          isLoading={sale.isCatalogLoading}
+          onLoadMore={sale.hasMore ? sale.loadMore : undefined}
         />
       )}
-    </View>
+    </>
   );
 
-  // ── Tablet / Desktop: 3-panel layout ──────────────────────────────────
-  if (isTabletOrDesktop) {
-    return (
-      <View style={styles.container}>
-        <Header username={username} cartItemTotal={itemCount} />
-        <SalesStatusHeader
-          registerName="Register 1"
-          cashierName={user?.username || username}
-          saleState={saleState}
-          itemCount={itemCount}
-          total={total}
-          unsyncedCount={unsyncedOrdersCount}
-          isSyncing={isSyncing}
-          onSyncPress={syncAllPendingOrders}
-        />
-        {interruptionState.type !== 'none' && (
-          <InterruptionBanner
-            type={interruptionState.type}
-            message={getInterruptionMessage()}
-            actions={getInterruptionActions()}
-            onDismiss={dismissBanner}
-          />
-        )}
-        <View style={styles.desktopLayout}>
-          <View style={[styles.sidebar, styles.categorySidebar, { width: sidebarWidths.category }]}>
-            <Text style={styles.sidebarTitle}>Categories</Text>
-            <CategoryList showBreadcrumb />
-          </View>
-          <View style={styles.mainContent}>{renderProductArea()}</View>
-          <View style={[styles.sidebar, styles.basketSidebar, { width: sidebarWidths.basket }]}>
-            <View style={styles.sidebarTitleRow}>
-              <Text style={styles.sidebarTitle}>Cart</Text>
-              {itemCount > 0 && (
-                <View style={styles.sidebarBadge}>
-                  <Text style={styles.sidebarBadgeText}>{itemCount}</Text>
-                </View>
-              )}
-            </View>
-            <BasketContent platform={currentPlatform ?? undefined} />
-          </View>
-        </View>
-      </View>
-    );
-  }
+  const basketPanel = (
+    <BasketPanel
+      platform={sale.currentPlatform ?? undefined}
+      inputMode={inputMode}
+      onTender={t => {
+        sale.openTender(t);
+        sale.closeBasketSheet();
+      }}
+    />
+  );
 
-  // ── Mobile: sliding panels ─────────────────────────────────────────────
   return (
     <View style={styles.container}>
-      <Header username={username} cartItemTotal={itemCount} />
-      <SalesStatusHeader
-        registerName="Register 1"
+      {/* Invisible HID capture field keeps scanner bursts out of other inputs (native) */}
+      <HidCaptureField onScan={code => void sale.handleScan(code)} />
+
+      <TopBar
+        registerName={instoreApiConfig.current.registerName}
         cashierName={user?.username || username}
-        saleState={saleState}
-        itemCount={itemCount}
-        total={total}
-        unsyncedCount={unsyncedOrdersCount}
-        isSyncing={isSyncing}
-        onSyncPress={syncAllPendingOrders}
+        saleState={sale.saleState}
+        unsyncedCount={sale.unsyncedOrdersCount}
+        isSyncing={sale.isSyncing}
+        onSyncPress={() => void sale.syncAllPendingOrders()}
+        isDrawerOpen={sale.isDrawerOpen}
+        onMenuPress={() => setMenuVisible(true)}
+        height={layout.topBarHeight}
+        searchQuery={sale.searchQuery}
+        onSearchChange={sale.setSearchQuery}
+        onSearchSubmit={() => void sale.submitSearch()}
+        onCameraPress={sale.openCamera}
+        showCamera={!sale.isElectron}
+        isSearching={sale.isSearching}
+        inputMode={inputMode}
+        collapseOmnibar={layout.layoutClass === 'phone-landscape'}
+        saleModes={saleModes}
+        saleMode={activeSaleMode}
+        onCycleSaleMode={cycleSaleMode}
       />
+
       {interruptionState.type !== 'none' && (
         <InterruptionBanner
           type={interruptionState.type}
@@ -227,72 +244,83 @@ const SaleScreen: React.FC<SaleScreenProps> = ({ username = 'User' }) => {
           onDismiss={dismissBanner}
         />
       )}
-      <View style={styles.content}>{renderProductArea()}</View>
-      <Category />
-      <Basket platform={currentPlatform || undefined} />
+
+      {layout.shell === 'split' ? (
+        <View style={styles.splitLayout}>
+          <View style={styles.catalogueColumn}>{catalogueArea}</View>
+          <View style={[styles.basketColumn, { width: layout.basketWidth }]}>{basketPanel}</View>
+        </View>
+      ) : (
+        <View style={styles.stackedLayout}>
+          <View style={styles.catalogueColumn}>{catalogueArea}</View>
+          <BasketBar itemCount={sale.itemCount} total={sale.total} onPress={sale.openBasketSheet} />
+          <BottomSheet visible={sale.isBasketSheetOpen} onClose={sale.closeBasketSheet} title="Basket">
+            {basketPanel}
+          </BottomSheet>
+        </View>
+      )}
+
+      <MainMenu
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        userRole={user?.role}
+        onLock={() => onLock?.()}
+        onLogout={() => onLogout?.()}
+        onReprintReceipt={handleReprint}
+        onShiftReport={() => goToMore('Reports')}
+        unsyncedCount={sale.unsyncedOrdersCount}
+        onSyncPress={() => void sale.syncAllPendingOrders()}
+      />
+
+      <CameraScanOverlay
+        visible={sale.isCameraOpen}
+        onClose={sale.closeCamera}
+        onScanned={sale.handleBarCodeScanned}
+        presentation={layout.shell === 'split' ? 'side' : 'full'}
+      />
+
+      <CheckoutModal
+        visible={checkout.checkoutVisible}
+        orderId={checkout.currentOrder?.id || ''}
+        orderTotal={checkout.total}
+        orderSubtotal={checkout.subtotal}
+        orderTax={checkout.tax}
+        itemCount={checkout.itemCount}
+        onSelectPayment={selection => void checkout.handlePayment(selection)}
+        onCancel={() => void checkout.handleCancelCheckout()}
+        isProcessing={checkout.isProcessing || checkout.isDraftPending}
+        terminalConnected={checkout.terminalConnected}
+        paymentMode={checkout.paymentMode}
+        activeProvider={checkout.activeProvider}
+        splitMode={checkout.splitMode}
+        paymentLines={checkout.paymentLines}
+        onAddPaymentLine={line => void checkout.addPaymentLine(line)}
+        onRemovePaymentLine={lineId => void checkout.removePaymentLine(lineId)}
+        onCompleteSplit={() => void checkout.handleCompleteSplit()}
+        splitCashTenderAmount={checkout.splitCashTenderAmount}
+        onConfirmSplitCash={amount => void checkout.confirmSplitCashPayment(amount)}
+        customerEmail={sale.basket?.customerEmail}
+        loyaltyPoints={sale.loyalty.loyaltyBalance?.points || 0}
+        storeCreditDollars={sale.loyalty.storeCreditDollars}
+        initialTender={checkout.initialTender}
+        error={checkout.error}
+      />
     </View>
   );
 };
 
+const SaleScreen: React.FC<SaleScreenProps> = props => (
+  <SaleProvider>
+    <SaleScreenContent {...props} />
+  </SaleProvider>
+);
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: lightColors.background },
-  desktopLayout: { flex: 1, flexDirection: 'row' },
-  sidebar: { backgroundColor: lightColors.surface, borderColor: lightColors.border },
-  categorySidebar: { borderRightWidth: 1 },
-  basketSidebar: { borderLeftWidth: 1 },
-  sidebarTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: lightColors.border,
-    gap: spacing.xs,
-  },
-  sidebarTitle: { fontSize: typography.fontSize.md, fontWeight: '700', color: lightColors.textPrimary },
-  sidebarBadge: {
-    backgroundColor: lightColors.primary,
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  sidebarBadgeText: { color: lightColors.textOnPrimary, fontSize: 11, fontWeight: '700' },
-  mainContent: { flex: 1, backgroundColor: lightColors.background },
-  content: { flex: 1 },
-  productArea: { flex: 1 },
-  searchContainer: { padding: spacing.sm, paddingBottom: spacing.xs },
-  activeCategoryBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    backgroundColor: lightColors.primary + '12',
-    borderBottomWidth: 1,
-    borderBottomColor: lightColors.primary + '25',
-  },
-  activeCategoryText: { flex: 1, fontSize: typography.fontSize.sm, fontWeight: '600', color: lightColors.primary },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: lightColors.surface },
-  loadingText: { marginTop: spacing.sm, fontSize: typography.fontSize.md, color: lightColors.textSecondary },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: spacing.xl, backgroundColor: lightColors.background },
-  emptyTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    color: lightColors.textPrimary,
-    marginTop: spacing.md,
-    marginBottom: spacing.xs,
-  },
-  emptySubtitle: { fontSize: typography.fontSize.md, color: lightColors.textSecondary, textAlign: 'center', lineHeight: 22 },
-  clearFilterButton: {
-    marginTop: spacing.lg,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: lightColors.primary,
-    borderRadius: borderRadius.md,
-  },
-  clearFilterText: { color: lightColors.textOnPrimary, fontWeight: '600', fontSize: typography.fontSize.md },
+  splitLayout: { flex: 1, flexDirection: 'row' },
+  stackedLayout: { flex: 1 },
+  catalogueColumn: { flex: 1, backgroundColor: lightColors.background },
+  basketColumn: { backgroundColor: lightColors.surface, borderLeftWidth: 1, borderLeftColor: lightColors.border },
 });
 
 export default SaleScreen;
