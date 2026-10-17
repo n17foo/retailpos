@@ -5,6 +5,7 @@
 
 // Set NODE_ENV to test to prevent database schema initialization
 process.env.NODE_ENV = 'test';
+(globalThis as Record<string, unknown>).IS_REACT_ACT_ENVIRONMENT = true;
 
 // Suppress async logging warnings by filtering console.error
 // eslint-disable-next-line no-console

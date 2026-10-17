@@ -19,7 +19,7 @@ with zero hardware configured.
 - Cash drawer: driver selection (printer-connected vs Electron), `open()`,
   audit event per open.
 - Scanner drivers: type + connection lifecycle (in-sale behaviour documented
-  in `sale/scanning.md`).
+  in `scanning/rules.md`).
 - Customer display: `CustomerDisplayState` push (idle/basket/payment/thankyou).
 - KDS: `KdsOrder` ticket dispatch + status callback (`received|preparing|
 ready|recalled`); vendor presets.
@@ -31,9 +31,9 @@ ready|recalled`); vendor presets.
 ### Excluded
 
 - In-sale scan behaviour (omnibar, burst detection, dedup) —
-  `docs/features/sale/scanning.md`.
+  `docs/features/scanning/rules.md`.
 - Payment terminals — `docs/features/payments/`.
-- Receipt _data assembly_ (totals, tax, sale_mode) — sale/checkout;
+- Receipt _data assembly_ (totals, tax, sale_mode) — checkout;
   hardware layer only transports/renders it.
 
 ## Entry Points

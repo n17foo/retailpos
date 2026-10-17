@@ -67,10 +67,10 @@ that pops without an audit row means the driver path was bypassed.
 **Rule.** `ScannerDriverType ∈ {bluetooth, usb, camera, qr_hardware, mock}`;
 `ScannerServiceInterface` exposes connection + scan-callback; the sale screen
 ref-counts the connection and feeds keys through `HidBurstDetector` — that
-behaviour is documented in `sale/scanning.md`.
+behaviour is documented in `scanning/rules.md`.
 
 **Evidence.** `services/scanner/*`, `hooks/{useScanner,useSaleScanner}.ts`,
-`sale/scanning.md`.
+`scanning/rules.md`.
 
 🟢 **E4.1 — Electron**
 `ElectronScannerService` gets scans via `electronAPI.onBarcodeScan` IPC.

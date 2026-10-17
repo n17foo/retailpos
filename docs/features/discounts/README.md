@@ -28,7 +28,7 @@ expiry). Only Shopify has a real platform adapter today; offline mode uses
 ### Excluded
 
 - Loyalty/store-credit ledgers — **customers** feature.
-- Tender settlement — sale/checkout.
+- Tender settlement — checkout.
 - Discount administration UI — no management screen found (codes are
   platform-managed or seeded in the discounts table).
 

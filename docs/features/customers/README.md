@@ -27,7 +27,7 @@ customer search via adapters; `LocalCustomerService` backs offline mode.
 ### Excluded
 
 - Coupon/discount validation — **discounts** feature.
-- Sale-time application of loyalty/credit as tender — sale/checkout
+- Sale-time application of loyalty/credit as tender — checkout
   (plumbing retained; redesign deferred).
 - Customer creation on platforms — POS consumes; does not push new customers
   upstream (interface exposes search only).

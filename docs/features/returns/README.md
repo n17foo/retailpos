@@ -26,7 +26,7 @@ new order atomically-ish.
 
 ### Excluded
 
-- Original sale/checkout — sale feature.
+- Original checkout — sale feature.
 - Payment-terminal charge paths — payments feature (refundTransaction is the
   optional payment-side hook).
 - Inventory levels themselves — inventory feature; returns only _flag_

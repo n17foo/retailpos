@@ -1,0 +1,185 @@
+import { PlatformRefundServiceInterface, PlatformCredentials } from './PlatformRefundServiceInterface';
+import { RefundData, RefundResult, RefundRecord } from '../RefundService';
+import { LoggerFactory } from '../../../../../shared/services/logger/LoggerFactory';
+import { getPlatformCredentials } from '../../../../platform-clients/services/config/PlatformCredentialsResolver';
+import { ECommercePlatform } from '../../../../../shared/utils/platforms';
+import { WixApiClient } from '../../../../platform-clients/services/clients/wix/WixApiClient';
+
+/**
+ * Wix-specific implementation of the refund service
+ * Handles refunds for Wix orders
+ */
+export class WixRefundService implements PlatformRefundServiceInterface {
+  private apiClient = WixApiClient.getInstance();
+  private initialized: boolean = false;
+  private refundHistory: Map<string, RefundRecord[]> = new Map();
+  private logger: ReturnType<typeof LoggerFactory.prototype.createLogger>;
+
+  constructor() {
+    this.logger = LoggerFactory.getInstance().createLogger('WixRefundService');
+  }
+
+  /**
+   * Initialize the Wix refund service
+   */
+  async initialize(): Promise<boolean> {
+    try {
+      // Initialize directly without depending on the e-commerce factory
+      // Check for credentials availability
+      const credentials = await this.getWixCredentials();
+      this.initialized = credentials !== null;
+
+      if (this.initialized) {
+        this.logger.info('Wix refund service initialized successfully');
+      } else {
+        this.logger.warn('Wix refund service initialization failed - missing credentials');
+      }
+
+      return this.initialized;
+    } catch (error) {
+      this.logger.error({ message: 'Error initializing Wix refund service' }, error instanceof Error ? error : new Error(String(error)));
+      this.initialized = false;
+      return false;
+    }
+  }
+
+  /**
+   * Get Wix API credentials from secrets service
+   * @returns Wix API credentials or null if not found
+   */
+  private async getWixCredentials(): Promise<PlatformCredentials | null> {
+    try {
+      const credentials = await getPlatformCredentials(ECommercePlatform.WIX);
+      if (!credentials) {
+        this.logger.error({ message: 'Wix API credentials not configured' });
+        return null;
+      }
+
+      return credentials;
+    } catch (error) {
+      this.logger.error({ message: 'Error retrieving Wix credentials' }, error instanceof Error ? error : new Error(String(error)));
+      return null;
+    }
+  }
+
+  /**
+   * Process a Wix refund directly using the API
+   * @param orderId Order ID to refund
+   * @param refundData Refund details
+   */
+  private async processWixRefundDirectly(orderId: string, refundData: RefundData): Promise<RefundResult> {
+    try {
+      this.logger.info(`Processing Wix refund for order ${orderId}`);
+
+      const data = await this.apiClient.post<{ refund?: { id?: string } }>('ecom/v1/refunds/create', {
+        refund: {
+          orderId,
+          amount: { amount: String(refundData.amount || 0) },
+          reason: refundData.reason || 'Refunded via RetailPOS',
+          details: {
+            items:
+              refundData.items?.map(item => ({
+                lineItemId: item.lineItemId,
+                quantity: item.quantity,
+                amount: String(item.amount || 0),
+              })) || [],
+          },
+        },
+      });
+      const refundId = String(data.refund?.id || `wix-refund-${Date.now()}`);
+
+      return {
+        success: true,
+        refundId,
+        amount: refundData.amount || 0,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      this.logger.error(
+        { message: `Error processing Wix refund for order ${orderId}` },
+        error instanceof Error ? error : new Error(String(error))
+      );
+
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date(),
+      };
+    }
+  }
+
+  /**
+   * Check if service is initialized
+   */
+  isInitialized(): boolean {
+    return this.initialized;
+  }
+
+  /**
+   * Process a refund for a Wix order
+   * @param orderId The Wix order ID to refund
+   * @param refundData Details about the refund
+   */
+  async processRefund(orderId: string, refundData: RefundData): Promise<RefundResult> {
+    try {
+      if (!this.isInitialized()) {
+        throw new Error('Wix refund service not initialized');
+      }
+
+      this.logger.info(`Processing Wix refund for order: ${orderId}`);
+
+      // Process refund directly with Wix API
+      const result = await this.processWixRefundDirectly(orderId, refundData);
+
+      // If successful, record the refund in history
+      if (result.success && result.refundId) {
+        const refundRecord: RefundRecord = {
+          id: result.refundId,
+          orderId,
+          amount: result.amount || refundData.amount || 0,
+          items: refundData.items?.map(item => ({
+            lineItemId: item.lineItemId,
+            quantity: item.quantity,
+            amount: item.amount || 0,
+          })),
+          reason: refundData.reason,
+          note: refundData.note,
+          status: 'completed',
+          source: 'ecommerce',
+          timestamp: new Date(),
+        };
+
+        this.addRefundToHistory(orderId, refundRecord);
+      }
+
+      return {
+        ...result,
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      this.logger.error({ message: 'Error processing Wix refund' }, error instanceof Error ? error : new Error(String(error)));
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        timestamp: new Date(),
+      };
+    }
+  }
+
+  /**
+   * Get refund history for a Wix order
+   * @param orderId The order ID to get refund history for
+   */
+  async getRefundHistory(orderId: string): Promise<RefundRecord[]> {
+    return this.refundHistory.get(orderId) || [];
+  }
+
+  /**
+   * Add a refund record to the history
+   */
+  private addRefundToHistory(orderId: string, refund: RefundRecord): void {
+    const history = this.refundHistory.get(orderId) || [];
+    history.push(refund);
+    this.refundHistory.set(orderId, history);
+  }
+}

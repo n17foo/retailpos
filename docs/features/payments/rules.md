@@ -38,7 +38,7 @@ transactionId, brand, last4 available for receipts/audit.
 
 🔴 **E2.2 — Decline**
 `success:false` + `errorCode` (e.g. `card_declined`) — checkout treats it as
-retryable UI, order stays draft (see sale/checkout doc).
+retryable UI, order stays draft (see checkout doc).
 
 🟠 **E2.3 — Missing optional method**
 `voidTransaction` undefined on a provider → guarded call

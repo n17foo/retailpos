@@ -1,0 +1,75 @@
+import { BaseApiClient, AuthStrategy, BaseApiClientConfig } from '../BaseApiClient';
+import { SYLIUS_API_VERSION } from '../../config/apiVersions';
+import { ECommercePlatform } from '../../../../../shared/utils/platforms';
+import { getPlatformToken } from '../../token/TokenUtils';
+import { TokenType } from '../../token/TokenServiceInterface';
+
+/**
+ * Sylius-specific API client configuration.
+ */
+export interface SyliusConfig extends BaseApiClientConfig {
+  storeUrl?: string;
+  apiKey?: string;
+  apiSecret?: string;
+  accessToken?: string;
+  apiVersion?: string;
+}
+
+/**
+ * Shared HTTP client for all Sylius platform services.
+ *
+ * Centralises Bearer token (OAuth) header injection and URL building
+ * (`${storeUrl}/api/${version}/...`), so that individual
+ * Sylius*Service files no longer duplicate this logic.
+ */
+export class SyliusApiClient extends BaseApiClient<SyliusConfig> {
+  private static instance: SyliusApiClient;
+
+  private constructor() {
+    super('SyliusApiClient');
+  }
+
+  public static getInstance(): SyliusApiClient {
+    if (!SyliusApiClient.instance) {
+      SyliusApiClient.instance = new SyliusApiClient();
+    }
+    return SyliusApiClient.instance;
+  }
+
+  public async initialize(): Promise<boolean> {
+    try {
+      if (!this.config.storeUrl) {
+        this.logger.warn({ message: 'Missing Sylius storeUrl' });
+        return false;
+      }
+
+      this.config.storeUrl = this.normalizeUrl(this.config.storeUrl);
+      this.config.apiVersion = this.config.apiVersion || SYLIUS_API_VERSION;
+
+      this.initialized = true;
+      return true;
+    } catch (error) {
+      this.logger.error({ message: 'Failed to initialize Sylius API client' }, error instanceof Error ? error : new Error(String(error)));
+      return false;
+    }
+  }
+
+  public override getApiVersion(): string {
+    return this.config.apiVersion || SYLIUS_API_VERSION;
+  }
+
+  protected async getAuthStrategy(): Promise<AuthStrategy> {
+    const token = (await getPlatformToken(ECommercePlatform.SYLIUS, TokenType.ACCESS)) || this.config.accessToken;
+    return token ? { type: 'bearer', token } : { type: 'none' };
+  }
+
+  protected buildApiUrl(path: string): string {
+    const base = this.config.storeUrl || '';
+    const version = this.getApiVersion();
+    if (path.startsWith('http')) {
+      return path;
+    }
+    const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+    return `${base}/api/${version}/${cleanPath}`;
+  }
+}

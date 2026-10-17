@@ -37,6 +37,9 @@ yarn-error.*
 *.tsbuildinfo
 .env
 
+# testing
+coverage/
+
 # Electron
 dist-electron/
 *.dmg

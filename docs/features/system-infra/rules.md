@@ -66,7 +66,7 @@ PG4) — the service itself doesn't throttle.
 omnibar's resolution path; adapter availability mirrors the `catalog`
 capability.
 
-**Evidence.** `services/search/*`, `sale/catalogue.md` (consumer rules).
+**Evidence.** `services/search/*`, `catalogue/rules.md` (consumer rules).
 
 🟠 **E5.1** — OFFLINE → local search over the seeded catalogue (which has
 the onboarding-seeding gap noted in the onboarding doc).

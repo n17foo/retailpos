@@ -1,0 +1,406 @@
+jest.mock('../../../../shared/utils/db', () => ({ db: {} }));
+
+// Prevent react-native-logs from firing deferred console.log after test teardown
+jest.mock('../../../../shared/services/logger/LoggerFactory', () => ({
+  LoggerFactory: {
+    getInstance: jest.fn(() => ({
+      createLogger: jest.fn(() => ({
+        debug: jest.fn(),
+        info: jest.fn(),
+        warn: jest.fn(),
+        error: jest.fn(),
+      })),
+    })),
+  },
+}));
+
+import { AuthService } from './AuthService';
+import { AuthConfigService } from './AuthConfigService';
+import { AuthMethodProvider, AuthMethodType, AuthMode, AUTH_METHOD_INFO, getAuthMethodsForMode } from './AuthMethodInterface';
+import { KeyValueRepository } from '../../../../shared/repositories/KeyValueRepository';
+jest.mock('./providers/PinAuthProvider', () => ({
+  PinAuthProvider: jest.fn().mockImplementation(() => ({
+    type: 'pin',
+    info: {},
+    isAvailable: jest.fn().mockResolvedValue(true),
+    authenticate: jest.fn().mockResolvedValue({
+      success: true,
+      user: { id: 'user-1', name: 'Cashier', role: 'cashier', is_active: true, created_at: 1, updated_at: 1 },
+    }),
+    enroll: jest.fn(),
+    unenroll: jest.fn(),
+    isEnrolled: jest.fn(),
+  })),
+}));
+jest.mock('./providers/BiometricAuthProvider', () => ({
+  BiometricAuthProvider: jest.fn().mockImplementation(() => ({
+    type: 'biometric',
+    info: {},
+    isAvailable: jest.fn().mockResolvedValue(true),
+    authenticate: jest.fn().mockResolvedValue({
+      success: true,
+      user: { id: 'user-1', name: 'Cashier', role: 'cashier', is_active: true, created_at: 1, updated_at: 1 },
+    }),
+    enroll: jest.fn(),
+    unenroll: jest.fn(),
+    isEnrolled: jest.fn(),
+  })),
+}));
+jest.mock('./providers/PasswordAuthProvider', () => ({
+  PasswordAuthProvider: jest.fn().mockImplementation(() => ({
+    type: 'password',
+    info: {},
+    isAvailable: jest.fn().mockResolvedValue(true),
+    authenticate: jest.fn().mockResolvedValue({
+      success: true,
+      user: { id: 'user-1', name: 'Cashier', role: 'cashier', is_active: true, created_at: 1, updated_at: 1 },
+    }),
+    enroll: jest.fn(),
+    unenroll: jest.fn(),
+    isEnrolled: jest.fn(),
+  })),
+}));
+jest.mock('./providers/MagstripeAuthProvider', () => ({
+  MagstripeAuthProvider: jest.fn().mockImplementation(() => ({
+    type: 'magstripe',
+    info: {},
+    isAvailable: jest.fn().mockResolvedValue(true),
+    authenticate: jest.fn().mockResolvedValue({
+      success: true,
+      user: { id: 'user-1', name: 'Cashier', role: 'cashier', is_active: true, created_at: 1, updated_at: 1 },
+    }),
+    enroll: jest.fn(),
+    unenroll: jest.fn(),
+    isEnrolled: jest.fn(),
+  })),
+}));
+jest.mock('./providers/RfidNfcAuthProvider', () => ({
+  RfidNfcAuthProvider: jest.fn().mockImplementation(() => ({
+    type: 'rfid_nfc',
+    info: {},
+    isAvailable: jest.fn().mockResolvedValue(true),
+    authenticate: jest.fn().mockResolvedValue({
+      success: true,
+      user: { id: 'user-1', name: 'Cashier', role: 'cashier', is_active: true, created_at: 1, updated_at: 1 },
+    }),
+    enroll: jest.fn(),
+    unenroll: jest.fn(),
+    isEnrolled: jest.fn(),
+  })),
+}));
+jest.mock('./providers/PlatformAuthProvider', () => ({
+  PlatformAuthProvider: jest.fn().mockImplementation(() => ({
+    type: 'platform_auth',
+    info: {},
+    isAvailable: jest.fn().mockResolvedValue(true),
+    authenticate: jest.fn().mockResolvedValue({
+      success: true,
+      user: { id: 'user-1', name: 'Cashier', role: 'cashier', is_active: true, created_at: 1, updated_at: 1 },
+    }),
+    enroll: jest.fn(),
+    unenroll: jest.fn(),
+    isEnrolled: jest.fn(),
+  })),
+}));
+
+// ── Helpers ──────────────────────────────────────────────────────────
+
+const TEST_USER = {
+  id: 'user-1',
+  name: 'Cashier',
+  role: 'cashier' as const,
+  is_active: true,
+  created_at: 1,
+  updated_at: 1,
+};
+
+function makeProvider(type: AuthMethodType, available = true): jest.Mocked<AuthMethodProvider> {
+  return {
+    type,
+    info: AUTH_METHOD_INFO[type],
+    isAvailable: jest.fn().mockResolvedValue(available),
+    authenticate: jest.fn().mockResolvedValue({ success: true, user: TEST_USER }),
+    enroll: jest.fn().mockResolvedValue(true),
+    unenroll: jest.fn().mockResolvedValue(true),
+    isEnrolled: jest.fn().mockResolvedValue(false),
+  };
+}
+
+function makeMockKv(): jest.Mocked<KeyValueRepository> {
+  const store: Record<string, string> = {};
+  return {
+    getItem: jest.fn(async (k: string) => store[k] ?? null),
+    setItem: jest.fn(async (k: string, v: string) => {
+      store[k] = v;
+    }),
+    removeItem: jest.fn(async (k: string) => {
+      delete store[k];
+    }),
+    getObject: jest.fn(async <T>(k: string): Promise<T | null> => {
+      const v = store[k];
+      return v ? (JSON.parse(v) as T) : null;
+    }),
+    setObject: jest.fn(async <T>(k: string, v: T) => {
+      store[k] = JSON.stringify(v);
+    }),
+  } as unknown as jest.Mocked<KeyValueRepository>;
+}
+
+function makeConfig(primary: AuthMethodType = 'pin', allowed: AuthMethodType[] = ['pin'], mode: AuthMode = 'offline') {
+  const kv = makeMockKv();
+  const cfg = new AuthConfigService(kv);
+  // Patch in-memory values directly via setters
+  (cfg as unknown as Record<string, unknown>)['primary'] = primary;
+  (cfg as unknown as Record<string, unknown>)['allowed'] = allowed;
+  (cfg as unknown as Record<string, unknown>)['mode'] = mode;
+  return cfg;
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────
+
+describe('AuthService', () => {
+  afterEach(() => {
+    AuthService.resetInstance();
+  });
+
+  // ── 1.1 Provider registration ────────────────────────────────────────
+
+  describe('constructor / provider registration (req 1.1)', () => {
+    it('registers all six built-in providers at construction', () => {
+      const cfg = makeConfig();
+      const svc = new AuthService(cfg);
+      const types: AuthMethodType[] = ['pin', 'biometric', 'password', 'magstripe', 'rfid_nfc', 'platform_auth'];
+      for (const t of types) {
+        expect(svc.getProvider(t)).toBeDefined();
+      }
+    });
+  });
+
+  // ── 2.2 authenticate(method, credential) ────────────────────────────
+
+  describe('authenticate()', () => {
+    it('2.2.1 calls isAvailable() before authenticating', async () => {
+      const cfg = makeConfig();
+      const svc = new AuthService(cfg);
+      const pin = makeProvider('pin');
+      svc.registerProvider(pin);
+
+      await svc.authenticate('pin', '123456');
+      expect(pin.isAvailable).toHaveBeenCalled();
+      expect(pin.authenticate).toHaveBeenCalledWith('123456');
+    });
+
+    it('2.2.2 returns failure (no throw) when isAvailable() is false', async () => {
+      const cfg = makeConfig();
+      const svc = new AuthService(cfg);
+      const bio = makeProvider('biometric', false);
+      svc.registerProvider(bio);
+
+      const result = await svc.authenticate('biometric');
+      expect(result.success).toBe(false);
+      expect(result.error).toBeDefined();
+      expect(bio.authenticate).not.toHaveBeenCalled();
+    });
+
+    it('returns failure when provider type is unknown', async () => {
+      const cfg = makeConfig();
+      const svc = new AuthService(cfg);
+      const result = await svc.authenticate('unknown_method' as AuthMethodType, 'cred');
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects direct use of a disabled authentication method', async () => {
+      const cfg = makeConfig('pin', ['pin']);
+      const svc = new AuthService(cfg);
+      const password = makeProvider('password');
+      svc.registerProvider(password);
+
+      const result = await svc.authenticate('password', 'secret');
+
+      expect(result.success).toBe(false);
+      expect(password.authenticate).not.toHaveBeenCalled();
+    });
+
+    it('rejects provider success without an active staff identity', async () => {
+      const cfg = makeConfig();
+      const svc = new AuthService(cfg);
+      const pin = makeProvider('pin');
+      pin.authenticate.mockResolvedValue({ success: true });
+      svc.registerProvider(pin);
+
+      const result = await svc.authenticate('pin', '123456');
+
+      expect(result.success).toBe(false);
+    });
+  });
+
+  // ── 2.2.3–2.2.5 authenticateWithPrimary ─────────────────────────────
+
+  describe('authenticateWithPrimary()', () => {
+    it('2.2.3 uses the configured primary method', async () => {
+      const cfg = makeConfig('password', ['pin', 'password']);
+      const svc = new AuthService(cfg);
+      const pwd = makeProvider('password');
+      svc.registerProvider(pwd);
+      pwd.authenticate.mockResolvedValue({
+        success: true,
+        user: { id: 'user-1', name: 'Cashier', role: 'cashier', is_active: true, created_at: 1, updated_at: 1 },
+      });
+
+      await svc.authenticateWithPrimary('secret');
+      expect(pwd.authenticate).toHaveBeenCalledWith('secret');
+    });
+
+    it('does not replay a failed password as a PIN credential', async () => {
+      const cfg = makeConfig('password', ['pin', 'password']);
+      const svc = new AuthService(cfg);
+
+      const pwd = makeProvider('password');
+      pwd.authenticate.mockResolvedValue({ success: false, error: 'wrong password' });
+      svc.registerProvider(pwd);
+
+      const pin = makeProvider('pin');
+      svc.registerProvider(pin);
+
+      const result = await svc.authenticateWithPrimary('123456');
+      expect(pin.authenticate).not.toHaveBeenCalled();
+      expect(result).toEqual({ success: false, error: 'wrong password' });
+    });
+
+    it('does not replay unavailable hardware credentials to PIN auth', async () => {
+      const cfg = makeConfig('magstripe', ['pin', 'magstripe']);
+      const svc = new AuthService(cfg);
+
+      const mag = makeProvider('magstripe', false);
+      svc.registerProvider(mag);
+
+      const pin = makeProvider('pin');
+      svc.registerProvider(pin);
+
+      const result = await svc.authenticateWithPrimary('123456');
+      expect(pin.authenticate).not.toHaveBeenCalled();
+      expect(result.success).toBe(false);
+    });
+
+    it('3.4 does not trigger fallback when PIN is primary and succeeds', async () => {
+      const cfg = makeConfig('pin', ['pin']);
+      const svc = new AuthService(cfg);
+
+      const pin = makeProvider('pin');
+      pin.authenticate.mockResolvedValue({
+        success: true,
+        user: { id: 'user-1', name: 'Cashier', role: 'cashier', is_active: true, created_at: 1, updated_at: 1 },
+      });
+      svc.registerProvider(pin);
+
+      const result = await svc.authenticateWithPrimary('111111');
+      expect(result.success).toBe(true);
+      expect(pin.authenticate).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns the primary provider failure unchanged', async () => {
+      const cfg = makeConfig('password', ['pin', 'password']);
+      const svc = new AuthService(cfg);
+
+      const pwd = makeProvider('password');
+      pwd.authenticate.mockResolvedValue({ success: false, error: 'wrong password' });
+      svc.registerProvider(pwd);
+
+      const result = await svc.authenticateWithPrimary('secret');
+      expect(result).toEqual({ success: false, error: 'wrong password' });
+    });
+  });
+
+  // ── 2.3 getAvailableProviders ────────────────────────────────────────
+
+  describe('getAvailableProviders()', () => {
+    it('2.3.1 returns only allowed methods that are available', async () => {
+      const cfg = makeConfig('pin', ['pin', 'biometric', 'password']);
+      const svc = new AuthService(cfg);
+
+      const pin = makeProvider('pin', true);
+      const bio = makeProvider('biometric', false);
+      const pwd = makeProvider('password', true);
+      svc.registerProvider(pin);
+      svc.registerProvider(bio);
+      svc.registerProvider(pwd);
+
+      const result = await svc.getAvailableProviders();
+      const types = result.map(p => p.type);
+      expect(types).toContain('pin');
+      expect(types).toContain('password');
+      expect(types).not.toContain('biometric');
+    });
+
+    it('2.3.2 always includes PIN even if not in the allowed list result', async () => {
+      const cfg = makeConfig('biometric', ['biometric']);
+      const svc = new AuthService(cfg);
+
+      const bio = makeProvider('biometric', false);
+      svc.registerProvider(bio);
+
+      const pin = makeProvider('pin', true);
+      svc.registerProvider(pin);
+
+      const result = await svc.getAvailableProviders();
+      expect(result.some(p => p.type === 'pin')).toBe(true);
+    });
+
+    it('5.5 returns only PIN when all other methods are unavailable', async () => {
+      const cfg = makeConfig('pin', ['pin', 'biometric', 'magstripe']);
+      const svc = new AuthService(cfg);
+
+      const pin = makeProvider('pin', true);
+      const bio = makeProvider('biometric', false);
+      const mag = makeProvider('magstripe', false);
+      svc.registerProvider(pin);
+      svc.registerProvider(bio);
+      svc.registerProvider(mag);
+
+      const result = await svc.getAvailableProviders();
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe('pin');
+    });
+
+    it('5.6 treats a provider as unavailable when isAvailable() throws, continues evaluating others', async () => {
+      const cfg = makeConfig('pin', ['pin', 'biometric', 'password']);
+      const svc = new AuthService(cfg);
+
+      const pin = makeProvider('pin', true);
+      const bio = makeProvider('biometric');
+      bio.isAvailable.mockRejectedValue(new Error('OS crash'));
+      const pwd = makeProvider('password', true);
+
+      svc.registerProvider(pin);
+      svc.registerProvider(bio);
+      svc.registerProvider(pwd);
+
+      const result = await svc.getAvailableProviders();
+      const types = result.map(p => p.type);
+      expect(types).not.toContain('biometric');
+      expect(types).toContain('password');
+      expect(types).toContain('pin');
+    });
+  });
+
+  // ── 2.3.3 getAuthMethodsForMode ─────────────────────────────────────
+
+  describe('getAuthMethodsForMode()', () => {
+    it('2.3.3 returns methods that support online mode', () => {
+      const online = getAuthMethodsForMode('online');
+      expect(online).not.toContain('platform_auth');
+      expect(online).toContain('pin');
+    });
+
+    it('2.3.3 returns methods that support offline mode', () => {
+      const offline = getAuthMethodsForMode('offline');
+      expect(offline).toContain('pin');
+      expect(offline).not.toContain('platform_auth');
+    });
+
+    it('3.1 platform_auth is not selectable in either mode', () => {
+      expect(getAuthMethodsForMode('offline')).not.toContain('platform_auth');
+      expect(getAuthMethodsForMode('online')).not.toContain('platform_auth');
+    });
+  });
+});

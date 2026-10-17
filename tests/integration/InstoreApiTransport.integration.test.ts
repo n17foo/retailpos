@@ -6,11 +6,11 @@
  */
 
 import { Platform } from 'react-native';
-import { instoreApiConfig } from '../../services/instoreapi/InstoreApiConfig';
-import { instoreApiServer } from '../../services/instoreapi/InstoreApiServer';
-import { instoreApiTransport } from '../../services/instoreapi/InstoreApiTransport';
-import { CommercefullWebhookReceiver } from '../../services/clients/commercefull/CommercefullWebhookReceiver';
-import { SIGNATURE_HEADERS, signRequest } from '../../services/instoreapi/requestSigning';
+import { instoreApiConfig } from '../../features/multi-register/services/InstoreApiConfig';
+import { instoreApiServer } from '../../features/multi-register/services/InstoreApiServer';
+import { instoreApiTransport } from '../../features/multi-register/services/InstoreApiTransport';
+import { CommercefullWebhookReceiver } from '../../features/platform-clients/services/clients/commercefull/CommercefullWebhookReceiver';
+import { SIGNATURE_HEADERS, signRequest } from '../../features/multi-register/services/requestSigning';
 
 const TEST_SECRET = 'test-secret';
 

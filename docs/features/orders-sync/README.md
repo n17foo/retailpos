@@ -28,7 +28,7 @@ flow over the LAN so every till sees each other's sales.
 
 ### Excluded
 
-- Taking the order / paying — that's the **sale/checkout** feature.
+- Taking the order / paying — that's the **checkout** feature.
 - The instore-api server/discovery internals — multi-register infrastructure
   (only the order-event surface is covered here).
 - Inventory/product sync — separate sync pipelines.

@@ -56,7 +56,7 @@ fails → its API calls can't authenticate (Q2).
 
 **Rule.** `resolveOfflineTaxRate(taxProfileId)`: product's profile → default
 profile → store tax. Online platforms compute tax themselves (POS doesn't
-replicate it — see sale/checkout "tax comes from the platform").
+replicate it — see checkout "tax comes from the platform").
 
 **Evidence.** `services/tax/OfflineTaxResolver.ts:10-15`,
 `TaxProfileService.ts`.

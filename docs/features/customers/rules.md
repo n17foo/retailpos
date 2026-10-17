@@ -40,7 +40,7 @@ loyalty tender without a customer) auto-opens the picker and blocks checkout
 until resolved.
 
 **Evidence.** `screens/sale/BasketPanel.tsx:131-154`, checkout blockers
-(sale/checkout doc).
+(checkout doc).
 
 🟢 **E3.1** — pick "Jane" → badge shows name/email; checkout blocker clears.
 

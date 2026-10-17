@@ -28,7 +28,7 @@ route through the Instore API orchestration layer (ADR-015). A single
 
 ### Excluded
 
-- Order lifecycle and checkout modal — **sale/checkout** feature.
+- Order lifecycle and checkout modal — **checkout** feature.
 - Cash handling — no terminal involved; handled in checkout.
 - Receipts — **printer** feature (triggered after successful payment).
 - Cash drawer — hardware feature; driven by printer/driver, not payment.

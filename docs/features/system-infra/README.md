@@ -23,14 +23,14 @@ factory, and the platform product-search adapters that power omnibar search.
   Browser / Memory backends behind `SecretsServiceInterface`.
 - `LoggerFactory` — `createLogger(context)` + pluggable `LogTransport`s.
 - `SearchServiceFactory` + per-platform search adapters (consumed by the
-  sale omnibar; see `sale/catalogue.md`).
+  sale omnibar; see `catalogue/rules.md`).
 
 ### Excluded
 
 - Order-sync retry — that's `OrderSyncService`/`BackgroundSyncService`
   (orders-sync feature); the request queue here is for _generic_ API calls.
 - Customer-display service — hardware feature.
-- In-sale search UX — `sale/catalogue.md`; this doc covers the adapters only.
+- In-sale search UX — `catalogue/rules.md`; this doc covers the adapters only.
 
 ## Entry Points
 
