@@ -32,9 +32,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Setup Expo
         uses: expo/expo-github-action@v8
 
@@ -54,6 +51,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
           if [ "${{ inputs.build_type }}" = "release" ]; then
             ./gradlew assembleRelease --no-daemon
           else
