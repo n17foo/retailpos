@@ -1,29 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../../shared/utils/theme';
 import { formatMoney, multiplyMoney } from '../../../shared/utils/money';
 import { useRefund } from '../hooks/useRefund';
 import { RefundRecord } from '../services/refunds/RefundService';
 import { Button } from '../../../shared/components/Button';
-import Input from '../../../shared/components/Input';
 import { useCurrency } from '../../platform-clients/hooks/useCurrency';
 import { useLogger } from '../../../shared/hooks/useLogger';
 import { useManagerApproval } from '../../authentication/hooks/useManagerApproval';
+import { AmountRefundForm } from '../components/AmountRefundForm';
+import { ReturnItemsForm, ReturnItemInput } from '../components/ReturnItemsForm';
+import { RefundHistoryList } from '../components/RefundHistoryList';
+import type { ReturnableItem } from '../components/ExchangeReturnItemsStep';
 
 interface ReturnsScreenProps {
   onGoBack?: () => void;
-}
-
-interface ReturnItemInput {
-  orderItemId?: string;
-  productId: string;
-  variantId?: string;
-  productName: string;
-  quantity: number;
-  refundAmount: number;
-  reason?: string;
-  restock?: boolean;
 }
 
 const RefundScreen: React.FC<ReturnsScreenProps> = ({ onGoBack }) => {
@@ -51,18 +43,7 @@ const RefundScreen: React.FC<ReturnsScreenProps> = ({ onGoBack }) => {
   // Return-specific state
   const [returnItems, setReturnItems] = useState<ReturnItemInput[]>([]);
   const [issueRefund, setIssueRefund] = useState(true);
-  const [returnableItems, setReturnableItems] = useState<
-    Array<{
-      orderItemId: string;
-      productId: string;
-      variantId: string | null;
-      name: string;
-      price: number;
-      originalQuantity: number;
-      returnedQuantity: number;
-      returnableQuantity: number;
-    }>
-  >([]);
+  const [returnableItems, setReturnableItems] = useState<ReturnableItem[]>([]);
   const [loadingReturnableItems, setLoadingReturnableItems] = useState(false);
 
   // Fetch refund history when order/transaction ID changes
@@ -209,14 +190,7 @@ const RefundScreen: React.FC<ReturnsScreenProps> = ({ onGoBack }) => {
     }
   };
 
-  const addReturnItem = (item: {
-    orderItemId: string;
-    productId: string;
-    variantId: string | null;
-    name: string;
-    price: number;
-    returnableQuantity: number;
-  }) => {
+  const addReturnItem = (item: ReturnableItem) => {
     setReturnItems([
       ...returnItems,
       {
@@ -250,37 +224,6 @@ const RefundScreen: React.FC<ReturnsScreenProps> = ({ onGoBack }) => {
       refundAmount: multiplyMoney(unitPrice, clampedQty),
     };
     setReturnItems(newItems);
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return lightColors.success;
-      case 'failed':
-        return lightColors.error;
-      default:
-        return lightColors.warning;
-    }
-  };
-
-  const renderRefundHistoryItem = ({ item }: { item: RefundRecord }) => {
-    const statusColor = getStatusColor(item.status);
-    return (
-      <View style={styles.historyItem}>
-        <View style={styles.historyHeader}>
-          <Text style={styles.historyId}>#{item.id.slice(-8)}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor + '20' }]}>
-            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
-            <Text style={[styles.statusText, { color: statusColor }]}>{item.status}</Text>
-          </View>
-        </View>
-        <Text style={styles.historyAmount}>{formatMoney(item.amount, currency.code)}</Text>
-        <Text style={styles.historyMeta}>
-          {item.timestamp.toLocaleString()} · {item.source}
-        </Text>
-        {item.reason && <Text style={styles.historyReason}>{item.reason}</Text>}
-      </View>
-    );
   };
 
   return (
@@ -334,147 +277,33 @@ const RefundScreen: React.FC<ReturnsScreenProps> = ({ onGoBack }) => {
 
       <ScrollView style={styles.formScrollContainer}>
         <View style={styles.formContainer}>
-          {refundType === 'payment' ? (
-            <>
-              <Input
-                label="Transaction ID"
-                placeholder="Enter transaction ID"
-                value={transactionId}
-                onChangeText={setTransactionId}
-                required
-              />
-              <Input
-                label="Amount"
-                placeholder="Enter refund amount"
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="decimal-pad"
-                required
-              />
-              <Input
-                label="Reason"
-                placeholder="Reason for refund (optional)"
-                value={reason}
-                onChangeText={setReason}
-                multiline
-                numberOfLines={3}
-              />
-            </>
-          ) : refundType === 'ecommerce' ? (
-            <>
-              <Input label="Order ID" placeholder="Enter order ID" value={orderId} onChangeText={setOrderId} required />
-              <Input
-                label="Amount"
-                placeholder="Enter refund amount"
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="decimal-pad"
-                required
-              />
-              <Input
-                label="Reason"
-                placeholder="Reason for refund (optional)"
-                value={reason}
-                onChangeText={setReason}
-                multiline
-                numberOfLines={3}
-              />
-            </>
+          {refundType === 'return' ? (
+            <ReturnItemsForm
+              orderId={orderId}
+              returnableItems={returnableItems}
+              isLoadingReturnable={loadingReturnableItems}
+              returnItems={returnItems}
+              issueRefund={issueRefund}
+              reason={reason}
+              currencyCode={currency.code}
+              onOrderIdChange={setOrderId}
+              onAddItem={addReturnItem}
+              onRemoveItem={removeReturnItem}
+              onUpdateItemQuantity={updateReturnItemQuantity}
+              onIssueRefundChange={setIssueRefund}
+              onReasonChange={setReason}
+            />
           ) : (
-            <>
-              <Input label="Order ID" placeholder="Enter order ID" value={orderId} onChangeText={setOrderId} required />
-
-              {loadingReturnableItems ? (
-                <ActivityIndicator style={styles.returnableLoader} />
-              ) : returnableItems.length > 0 ? (
-                <>
-                  <Text style={styles.sectionSubtitle}>Available Items to Return</Text>
-                  {returnableItems.map(item => (
-                    <View key={item.orderItemId} style={styles.returnableItem}>
-                      <View style={styles.returnableItemInfo}>
-                        <Text style={styles.returnableItemName}>{item.name}</Text>
-                        <Text style={styles.returnableItemMeta}>
-                          {item.returnableQuantity} available · {formatMoney(item.price, currency.code)} each
-                        </Text>
-                      </View>
-                      <Button
-                        title="Add"
-                        variant="outline"
-                        size="sm"
-                        onPress={() => addReturnItem(item)}
-                        disabled={returnItems.some(ri => ri.orderItemId === item.orderItemId)}
-                      />
-                    </View>
-                  ))}
-                </>
-              ) : orderId ? (
-                <Text style={styles.emptyReturnableText}>No returnable items found for this order</Text>
-              ) : null}
-
-              {returnItems.length > 0 && (
-                <>
-                  <Text style={styles.sectionSubtitle}>Items to Return</Text>
-                  {returnItems.map((item, index) => (
-                    <View key={index} style={styles.returnItem}>
-                      <View style={styles.returnItemHeader}>
-                        <Text style={styles.returnItemName}>{item.productName}</Text>
-                        <TouchableOpacity onPress={() => removeReturnItem(index)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                          <MaterialIcons name="close" size={20} color={lightColors.error} />
-                        </TouchableOpacity>
-                      </View>
-                      <View style={styles.returnItemControls}>
-                        <View style={styles.quantityControl}>
-                          <TouchableOpacity
-                            onPress={() => updateReturnItemQuantity(index, item.quantity - 1)}
-                            disabled={item.quantity <= 1}
-                            style={styles.quantityButton}
-                          >
-                            <MaterialIcons
-                              name="remove"
-                              size={20}
-                              color={item.quantity <= 1 ? lightColors.textSecondary : lightColors.primary}
-                            />
-                          </TouchableOpacity>
-                          <Text style={styles.quantityText}>{item.quantity}</Text>
-                          <TouchableOpacity
-                            onPress={() => updateReturnItemQuantity(index, item.quantity + 1)}
-                            style={styles.quantityButton}
-                          >
-                            <MaterialIcons name="add" size={20} color={lightColors.primary} />
-                          </TouchableOpacity>
-                        </View>
-                        <Text style={styles.returnItemAmount}>{formatMoney(item.refundAmount, currency.code)}</Text>
-                      </View>
-                    </View>
-                  ))}
-
-                  <View style={styles.returnOptionsContainer}>
-                    <TouchableOpacity
-                      style={styles.checkboxRow}
-                      onPress={() => setIssueRefund(!issueRefund)}
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: issueRefund }}
-                    >
-                      <MaterialIcons
-                        name={issueRefund ? 'check-box' : 'check-box-outline-blank'}
-                        size={24}
-                        color={issueRefund ? lightColors.primary : lightColors.textSecondary}
-                      />
-                      <Text style={styles.checkboxLabel}>Issue monetary refund</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  <Input
-                    label="Reason"
-                    placeholder="Reason for return (optional)"
-                    value={reason}
-                    onChangeText={setReason}
-                    multiline
-                    numberOfLines={3}
-                  />
-                </>
-              )}
-            </>
+            <AmountRefundForm
+              idLabel={refundType === 'payment' ? 'Transaction ID' : 'Order ID'}
+              idPlaceholder={refundType === 'payment' ? 'Enter transaction ID' : 'Enter order ID'}
+              idValue={refundType === 'payment' ? transactionId : orderId}
+              amount={amount}
+              reason={reason}
+              onIdChange={refundType === 'payment' ? setTransactionId : setOrderId}
+              onAmountChange={setAmount}
+              onReasonChange={setReason}
+            />
           )}
 
           <Button
@@ -488,16 +317,7 @@ const RefundScreen: React.FC<ReturnsScreenProps> = ({ onGoBack }) => {
         </View>
       </ScrollView>
 
-      <View style={styles.historyContainer}>
-        <Text style={styles.sectionTitle}>Refund History</Text>
-        {historyLoading ? (
-          <ActivityIndicator style={styles.historyLoader} />
-        ) : refundHistory.length > 0 ? (
-          <FlatList data={refundHistory} renderItem={renderRefundHistoryItem} keyExtractor={item => item.id} />
-        ) : (
-          <Text style={styles.emptyHistoryText}>No refund history available</Text>
-        )}
-      </View>
+      <RefundHistoryList history={refundHistory} isLoading={historyLoading} currencyCode={currency.code} />
     </View>
   );
 };
@@ -575,176 +395,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     ...elevation.low,
     marginBottom: spacing.md,
-  },
-  sectionSubtitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-    color: lightColors.textPrimary,
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  returnableLoader: {
-    marginVertical: spacing.lg,
-  },
-  emptyReturnableText: {
-    textAlign: 'center',
-    marginVertical: spacing.lg,
-    color: lightColors.textSecondary,
-    fontSize: typography.fontSize.sm,
-  },
-  returnableItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.sm,
-    backgroundColor: lightColors.background,
-    borderRadius: borderRadius.sm,
-    marginBottom: spacing.xs,
-  },
-  returnableItemInfo: {
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  returnableItemName: {
-    fontSize: typography.fontSize.md,
-    fontWeight: '500',
-    color: lightColors.textPrimary,
-    marginBottom: 2,
-  },
-  returnableItemMeta: {
-    fontSize: typography.fontSize.xs,
-    color: lightColors.textSecondary,
-  },
-  returnItem: {
-    padding: spacing.sm,
-    backgroundColor: lightColors.background,
-    borderRadius: borderRadius.sm,
-    marginBottom: spacing.xs,
-  },
-  returnItemHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  returnItemName: {
-    fontSize: typography.fontSize.md,
-    fontWeight: '500',
-    color: lightColors.textPrimary,
-    flex: 1,
-  },
-  returnItemControls: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  quantityControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  quantityButton: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: lightColors.surface,
-    borderRadius: borderRadius.sm,
-  },
-  quantityText: {
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-    color: lightColors.textPrimary,
-    minWidth: 30,
-    textAlign: 'center',
-  },
-  returnItemAmount: {
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-    color: lightColors.textPrimary,
-  },
-  returnOptionsContainer: {
-    marginTop: spacing.sm,
-    marginBottom: spacing.sm,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
-  },
-  checkboxLabel: {
-    fontSize: typography.fontSize.md,
-    color: lightColors.textPrimary,
-  },
-  historyContainer: {
-    flex: 1,
-  },
-  sectionTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '500',
-    marginBottom: spacing.xs,
-    color: lightColors.textPrimary,
-  },
-  historyLoader: {
-    marginTop: spacing.lg,
-  },
-  emptyHistoryText: {
-    textAlign: 'center',
-    marginTop: spacing.lg,
-    color: lightColors.textSecondary,
-  },
-  historyItem: {
-    backgroundColor: lightColors.surface,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.xs,
-    ...elevation.low,
-  },
-  historyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  historyId: {
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textSecondary,
-    fontWeight: '600',
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: borderRadius.sm,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 4,
-  },
-  statusText: {
-    fontSize: typography.fontSize.xs,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  historyAmount: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '700',
-    color: lightColors.error,
-    marginBottom: spacing.xs,
-  },
-  historyMeta: {
-    fontSize: typography.fontSize.xs,
-    color: lightColors.textSecondary,
-  },
-  historyReason: {
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textSecondary,
-    fontStyle: 'italic',
-    marginTop: spacing.xs,
   },
 });
 

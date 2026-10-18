@@ -1,0 +1,250 @@
+import { StyleSheet } from 'react-native';
+import { lightColors, spacing, typography, borderRadius, elevation } from '../../../shared/utils/theme';
+
+/** Shared styles for the exchange-flow step components. */
+export const exchangeStyles = StyleSheet.create({
+  stepContent: {
+    flex: 1,
+    padding: spacing.md,
+  },
+  sectionTitle: {
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+    color: lightColors.textPrimary,
+    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
+  },
+  emptyText: {
+    color: lightColors.textSecondary,
+    fontSize: typography.fontSize.sm,
+    textAlign: 'center',
+    marginTop: spacing.lg,
+  },
+  list: {
+    flex: 1,
+  },
+  returnItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: lightColors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.xs,
+    ...elevation.low,
+  },
+  returnItemInfo: {
+    flex: 1,
+  },
+  returnItemName: {
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+    color: lightColors.textPrimary,
+  },
+  returnItemPrice: {
+    fontSize: typography.fontSize.sm,
+    color: lightColors.textSecondary,
+    marginTop: 2,
+  },
+  qtyControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  qtyButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: lightColors.primary + '20',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qtyButtonText: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: '700',
+    color: lightColors.primary,
+  },
+  qtyButtonDisabled: {
+    color: lightColors.textDisabled,
+  },
+  qtyValue: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: '700',
+    color: lightColors.textPrimary,
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  footer: {
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: lightColors.border,
+    marginTop: spacing.sm,
+  },
+  creditSummary: {
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+    color: lightColors.success,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  netDueBanner: {
+    backgroundColor: lightColors.primary + '15',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    alignItems: 'center',
+  },
+  netDueLabel: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: '700',
+    color: lightColors.primary,
+  },
+  newItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: lightColors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.xs,
+    ...elevation.low,
+  },
+  removeButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addItemHint: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.xs,
+    padding: spacing.sm,
+    backgroundColor: lightColors.inputBackground,
+    borderRadius: borderRadius.sm,
+    marginBottom: spacing.sm,
+  },
+  addItemHintText: {
+    flex: 1,
+    fontSize: typography.fontSize.xs,
+    color: lightColors.textSecondary,
+  },
+  addItemButton: {
+    marginBottom: spacing.sm,
+  },
+  settleSummary: {
+    backgroundColor: lightColors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    ...elevation.low,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  summaryLabel: {
+    fontSize: typography.fontSize.md,
+    color: lightColors.textSecondary,
+  },
+  summaryValue: {
+    fontSize: typography.fontSize.md,
+    color: lightColors.textPrimary,
+    fontWeight: '500',
+  },
+  summaryTotal: {
+    borderTopWidth: 1,
+    borderTopColor: lightColors.border,
+    paddingTop: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  summaryTotalLabel: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: '700',
+    color: lightColors.textPrimary,
+  },
+  summaryTotalValue: {
+    fontSize: typography.fontSize.lg,
+    fontWeight: '700',
+  },
+  paymentsSection: {
+    marginBottom: spacing.md,
+  },
+  paymentLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: lightColors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.xs,
+    ...elevation.low,
+  },
+  paymentLineMethod: {
+    flex: 1,
+    fontSize: typography.fontSize.md,
+    color: lightColors.textPrimary,
+    fontWeight: '500',
+  },
+  paymentLineAmount: {
+    fontSize: typography.fontSize.md,
+    fontWeight: '700',
+    color: lightColors.textPrimary,
+    marginRight: spacing.sm,
+  },
+  remainingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  remainingLabel: {
+    fontSize: typography.fontSize.md,
+    fontWeight: '600',
+    color: lightColors.textPrimary,
+  },
+  remainingValue: {
+    fontSize: typography.fontSize.xl,
+    fontWeight: '700',
+  },
+  addPaymentSection: {
+    marginBottom: spacing.md,
+  },
+  methodRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  methodButton: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: lightColors.border,
+    backgroundColor: lightColors.surface,
+  },
+  methodButtonSelected: {
+    borderColor: lightColors.primary,
+    backgroundColor: lightColors.primary + '15',
+  },
+  methodButtonText: {
+    fontSize: typography.fontSize.sm,
+    color: lightColors.textSecondary,
+    fontWeight: '500',
+  },
+  methodButtonTextSelected: {
+    color: lightColors.primary,
+    fontWeight: '700',
+  },
+  amountInput: {
+    borderWidth: 1,
+    borderColor: lightColors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    fontSize: typography.fontSize.md,
+    color: lightColors.textPrimary,
+    backgroundColor: lightColors.surface,
+    marginBottom: spacing.sm,
+  },
+});

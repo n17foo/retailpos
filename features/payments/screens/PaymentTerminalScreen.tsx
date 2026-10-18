@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../../shared/utils/theme';
 import { formatMoney } from '../../../shared/utils/money';
@@ -7,6 +7,9 @@ import { usePayment } from '../hooks/usePayment';
 import { PaymentResponse } from '../services/PaymentServiceInterface';
 import { PaymentProvider } from '../services/PaymentServiceFactory';
 import StripeNfcPaymentTerminal from '../components/StripeNfcPaymentTerminal';
+import { PaymentResultCard } from '../components/PaymentResultCard';
+import { TerminalDiscoveryList, DiscoveredTerminal } from '../components/TerminalDiscoveryList';
+import { TerminalChargePanel } from '../components/TerminalChargePanel';
 import { useCurrency } from '../../platform-clients/hooks/useCurrency';
 
 interface PaymentTerminalScreenProps {
@@ -37,6 +40,8 @@ const PROVIDER_LABELS: Record<PaymentProvider, string> = {
   [PaymentProvider.INSTORE_API]: 'Instore PED',
 };
 
+const MAX_RETRY_ATTEMPTS = 3;
+
 const PaymentTerminalScreen: React.FC<PaymentTerminalScreenProps> = ({ navigation, route }) => {
   const currency = useCurrency();
   const routeParams = route?.params ?? {};
@@ -51,7 +56,7 @@ const PaymentTerminalScreen: React.FC<PaymentTerminalScreenProps> = ({ navigatio
   const isStripeNfcActive = currentProvider === PaymentProvider.STRIPE_NFC;
   const providerLabel = PROVIDER_LABELS[currentProvider] ?? currentProvider;
 
-  const [availableTerminals, setAvailableTerminals] = useState<Array<{ id: string; name: string }>>([]);
+  const [availableTerminals, setAvailableTerminals] = useState<DiscoveredTerminal[]>([]);
   const [scanning, setScanning] = useState(false);
   const [selectedTerminal, setSelectedTerminal] = useState<string | null>(null);
   const [selectedTerminalName, setSelectedTerminalName] = useState<string | null>(null);
@@ -61,8 +66,7 @@ const PaymentTerminalScreen: React.FC<PaymentTerminalScreenProps> = ({ navigatio
   const [result, setResult] = useState<PaymentResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-
-  const MAX_RETRY_ATTEMPTS = 3;
+  const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Discover real terminals from the active payment provider
   const handleScan = useCallback(async () => {
@@ -92,6 +96,9 @@ const PaymentTerminalScreen: React.FC<PaymentTerminalScreenProps> = ({ navigatio
   // Disconnect on unmount
   useEffect(() => {
     return () => {
+      if (completionTimerRef.current) {
+        clearTimeout(completionTimerRef.current);
+      }
       if (isTerminalConnected()) {
         disconnect();
       }
@@ -146,11 +153,12 @@ const PaymentTerminalScreen: React.FC<PaymentTerminalScreenProps> = ({ navigatio
     setRetryCount(prev => prev + 1);
 
     const PAYMENT_TIMEOUT = 60000; // 60 seconds
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
     try {
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Payment timeout - please try again')), PAYMENT_TIMEOUT)
-      );
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Payment timeout - please try again')), PAYMENT_TIMEOUT);
+      });
 
       const response = await Promise.race([
         processPayment({
@@ -171,11 +179,14 @@ const PaymentTerminalScreen: React.FC<PaymentTerminalScreenProps> = ({ navigatio
       setResult(response);
       if (response.success) {
         setRetryCount(0); // Reset on success
-        setTimeout(() => onPaymentComplete(response), 1500);
+        completionTimerRef.current = setTimeout(() => onPaymentComplete(response), 1500);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Payment failed. Please try again.');
     } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       setProcessing(false);
     }
   };
@@ -241,137 +252,41 @@ const PaymentTerminalScreen: React.FC<PaymentTerminalScreenProps> = ({ navigatio
 
       {/* Result card */}
       {result ? (
-        <View style={[styles.resultCard, result.success ? styles.resultSuccess : styles.resultFailure]}>
-          <MaterialIcons
-            name={result.success ? 'check-circle' : 'cancel'}
-            size={40}
-            color={result.success ? lightColors.success : lightColors.error}
-          />
-          <Text style={[styles.resultTitle, { color: result.success ? lightColors.success : lightColors.error }]}>
-            {result.success ? 'Payment Accepted' : 'Payment Declined'}
-          </Text>
-          {result.success && result.transactionId ? <Text style={styles.resultMeta}>Ref: {result.transactionId.slice(-12)}</Text> : null}
-          {result.success && result.cardBrand && result.last4 ? (
-            <Text style={styles.resultMeta}>
-              {result.cardBrand} ···· {result.last4}
-            </Text>
-          ) : null}
-          {!result.success && result.errorMessage ? <Text style={styles.resultMeta}>{result.errorMessage}</Text> : null}
-          {!result.success ? (
-            <TouchableOpacity
-              style={styles.retryButton}
-              onPress={() => {
-                setResult(null);
-                setError(null);
-              }}
-              disabled={retryCount >= MAX_RETRY_ATTEMPTS}
-              accessibilityLabel="Try payment again"
-              accessibilityRole="button"
-            >
-              <MaterialIcons
-                name="refresh"
-                size={16}
-                color={retryCount >= MAX_RETRY_ATTEMPTS ? lightColors.textDisabled : lightColors.primary}
-              />
-              <Text style={[styles.retryButtonText, retryCount >= MAX_RETRY_ATTEMPTS && { color: lightColors.textDisabled }]}>
-                Try Again {retryCount > 0 && `(${MAX_RETRY_ATTEMPTS - retryCount} left)`}
-              </Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
+        <PaymentResultCard
+          result={result}
+          retryCount={retryCount}
+          maxRetries={MAX_RETRY_ATTEMPTS}
+          onRetry={() => {
+            setResult(null);
+            setError(null);
+          }}
+        />
       ) : null}
 
       {/* Terminal discovery list */}
       {!result && !connected ? (
-        <View style={styles.terminalSelector}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{scanning ? 'Scanning for terminals…' : `${providerLabel} Terminals`}</Text>
-            <TouchableOpacity
-              style={styles.scanButton}
-              onPress={handleScan}
-              disabled={scanning || connecting}
-              accessibilityLabel="Scan for terminals"
-              accessibilityRole="button"
-            >
-              {scanning ? (
-                <ActivityIndicator size="small" color={lightColors.primary} />
-              ) : (
-                <MaterialIcons name="refresh" size={20} color={lightColors.primary} />
-              )}
-            </TouchableOpacity>
-          </View>
-
-          {!scanning && availableTerminals.length === 0 && !error ? (
-            <View style={styles.emptyState}>
-              <MaterialIcons name="point-of-sale" size={48} color={lightColors.textDisabled} />
-              <Text style={styles.emptyStateText}>No terminals found</Text>
-              <Text style={styles.emptyStateHint}>Tap refresh to scan again</Text>
-            </View>
-          ) : null}
-
-          <ScrollView showsVerticalScrollIndicator={false}>
-            {availableTerminals.map(terminal => {
-              const isConnecting = connecting && selectedTerminal === terminal.id;
-              return (
-                <TouchableOpacity
-                  key={terminal.id}
-                  style={[styles.terminalButton, isConnecting && styles.terminalButtonActive]}
-                  onPress={() => handleConnect(terminal.id, terminal.name)}
-                  disabled={connecting}
-                  accessibilityLabel={`Connect to ${terminal.name}`}
-                  accessibilityRole="button"
-                >
-                  <MaterialIcons name="point-of-sale" size={22} color={lightColors.textOnPrimary} />
-                  <View style={styles.terminalInfo}>
-                    <Text style={styles.terminalButtonText}>{terminal.name}</Text>
-                    <Text style={styles.terminalId}>{terminal.id}</Text>
-                  </View>
-                  {isConnecting ? (
-                    <ActivityIndicator size="small" color={lightColors.textOnPrimary} />
-                  ) : (
-                    <MaterialIcons name="chevron-right" size={22} color={lightColors.textOnPrimary} />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
+        <TerminalDiscoveryList
+          providerLabel={providerLabel}
+          terminals={availableTerminals}
+          scanning={scanning}
+          connecting={connecting}
+          connectingTerminalId={selectedTerminal}
+          hasError={!!error}
+          onScan={handleScan}
+          onConnect={handleConnect}
+        />
       ) : null}
 
       {/* Connected — ready to charge */}
       {!result && connected ? (
-        <View style={styles.processingContainer}>
-          <View style={styles.connectedTerminalRow}>
-            <MaterialIcons name="check-circle" size={22} color={lightColors.success} />
-            <Text style={styles.connectedText}>{selectedTerminalName}</Text>
-            <TouchableOpacity
-              onPress={handleDisconnect}
-              style={styles.disconnectButton}
-              accessibilityLabel="Disconnect terminal"
-              accessibilityRole="button"
-            >
-              <MaterialIcons name="link-off" size={18} color={lightColors.textSecondary} />
-            </TouchableOpacity>
-          </View>
-
-          {processing ? (
-            <View style={styles.processingIndicator}>
-              <ActivityIndicator size="large" color={lightColors.primary} />
-              <Text style={styles.processingText}>Processing payment…</Text>
-              <Text style={styles.processingSubtext}>Present card to terminal</Text>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.payButton}
-              onPress={handleProcessPayment}
-              accessibilityLabel={amount > 0 ? `Charge ${formatMoney(amount, currency.code)}` : 'Process payment'}
-              accessibilityRole="button"
-            >
-              <MaterialIcons name="payment" size={22} color={lightColors.textOnPrimary} />
-              <Text style={styles.payButtonText}>{amount > 0 ? `Charge ${formatMoney(amount, currency.code)}` : 'Process Payment'}</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <TerminalChargePanel
+          terminalName={selectedTerminalName}
+          processing={processing}
+          amount={amount}
+          currencyCode={currency.code}
+          onDisconnect={handleDisconnect}
+          onCharge={handleProcessPayment}
+        />
       ) : null}
 
       {/* Cancel footer — hidden while processing or showing result */}
@@ -484,168 +399,6 @@ const styles = StyleSheet.create({
     flex: 1,
     color: lightColors.error,
     fontSize: typography.fontSize.sm,
-  },
-  // ── Result card ──────────────────────────────────────────────────────
-  resultCard: {
-    margin: spacing.md,
-    padding: spacing.xl,
-    borderRadius: borderRadius.md,
-    alignItems: 'center',
-    gap: spacing.sm,
-    ...elevation.low,
-  },
-  resultSuccess: {
-    backgroundColor: lightColors.success + '10',
-    borderWidth: 1,
-    borderColor: lightColors.success + '40',
-  },
-  resultFailure: {
-    backgroundColor: lightColors.error + '10',
-    borderWidth: 1,
-    borderColor: lightColors.error + '40',
-  },
-  resultTitle: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: '700',
-  },
-  resultMeta: {
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textSecondary,
-  },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: 1,
-    borderColor: lightColors.primary,
-    borderRadius: borderRadius.sm,
-  },
-  retryButtonText: {
-    color: lightColors.primary,
-    fontSize: typography.fontSize.sm,
-    fontWeight: '600',
-  },
-  // ── Terminal selector ────────────────────────────────────────────────
-  terminalSelector: {
-    flex: 1,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-    color: lightColors.textSecondary,
-  },
-  scanButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xl * 2,
-    gap: spacing.sm,
-  },
-  emptyStateText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    color: lightColors.textSecondary,
-  },
-  emptyStateHint: {
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textDisabled,
-  },
-  terminalButton: {
-    backgroundColor: lightColors.primary,
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  terminalButtonActive: {
-    backgroundColor: lightColors.primaryDark,
-  },
-  terminalInfo: {
-    flex: 1,
-  },
-  terminalButtonText: {
-    color: lightColors.textOnPrimary,
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-  },
-  terminalId: {
-    color: lightColors.textOnPrimary + 'AA',
-    fontSize: typography.fontSize.xs,
-    marginTop: 2,
-  },
-  // ── Connected / processing ───────────────────────────────────────────
-  processingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
-  },
-  connectedTerminalRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    marginBottom: spacing.xl,
-  },
-  connectedText: {
-    flex: 1,
-    fontSize: typography.fontSize.md,
-    color: lightColors.success,
-    fontWeight: '600',
-  },
-  disconnectButton: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  payButton: {
-    backgroundColor: lightColors.success,
-    paddingVertical: spacing.md + 2,
-    paddingHorizontal: spacing.xl,
-    borderRadius: borderRadius.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    width: '100%',
-  },
-  payButtonText: {
-    color: lightColors.textOnPrimary,
-    fontSize: typography.fontSize.lg,
-    fontWeight: '700',
-  },
-  processingIndicator: {
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  processingText: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '500',
-    color: lightColors.textPrimary,
-    marginTop: spacing.sm,
-  },
-  processingSubtext: {
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textSecondary,
   },
   // ── Footer ───────────────────────────────────────────────────────────
   footer: {

@@ -6,29 +6,19 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { lightColors, spacing, borderRadius, typography, elevation } from '../../../shared/utils/theme';
-import { formatMoney } from '../../../shared/utils/money';
+import { lightColors, spacing, typography } from '../../../shared/utils/theme';
 import { useCurrency } from '../../platform-clients/hooks/useCurrency';
 import { Button } from '../../../shared/components/Button';
 import { Input } from '../../../shared/components/Input';
-import { Card } from '../../../shared/components/Card';
 import { useProductsForDisplay } from '../../catalogue/hooks/useProducts';
 import { barcodeLabelService, LabelData, LabelFormat } from '../services/BarcodeLabelService';
 import { useAuthContext } from '../../authentication/contexts/AuthProvider';
 import { Paths, File } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-
-interface ProductSelection {
-  productId: string;
-  variantId?: string;
-  name: string;
-  sku?: string;
-  price?: number;
-  selected: boolean;
-  quantity: number;
-}
+import { BarcodeLabelProductRow, ProductSelection } from '../components/BarcodeLabelProductRow';
+import { LabelFormatCard } from '../components/LabelFormatCard';
 
 const BarcodeLabelScreen: React.FC = () => {
   const { products } = useProductsForDisplay();
@@ -182,39 +172,8 @@ const BarcodeLabelScreen: React.FC = () => {
     }
   };
 
-  // Render product item
   const renderProduct = ({ item }: { item: ProductSelection }) => (
-    <TouchableOpacity
-      style={[styles.productCard, item.selected && styles.productCardSelected]}
-      onPress={() => toggleProduct(item.productId)}
-    >
-      <View style={styles.productHeader}>
-        <View style={styles.checkbox}>
-          <MaterialIcons
-            name={item.selected ? 'check-box' : 'check-box-outline-blank'}
-            size={24}
-            color={item.selected ? lightColors.primary : lightColors.textSecondary}
-          />
-        </View>
-        <View style={styles.productInfo}>
-          <Text style={styles.productName}>{item.name}</Text>
-          {item.sku && <Text style={styles.productSku}>SKU: {item.sku}</Text>}
-          {item.price !== undefined && <Text style={styles.productPrice}>{formatMoney(item.price, currency.code)}</Text>}
-        </View>
-        {item.selected && (
-          <View style={styles.quantityContainer}>
-            <Text style={styles.quantityLabel}>Qty:</Text>
-            <TextInput
-              style={styles.quantityInput}
-              value={item.quantity.toString()}
-              onChangeText={val => updateQuantity(item.productId, val)}
-              keyboardType="number-pad"
-              selectTextOnFocus
-            />
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
+    <BarcodeLabelProductRow item={item} currencyCode={currency.code} onToggle={toggleProduct} onQuantityChange={updateQuantity} />
   );
 
   return (
@@ -259,54 +218,7 @@ const BarcodeLabelScreen: React.FC = () => {
       />
 
       {/* Label Format Settings */}
-      {selectedProducts.length > 0 && (
-        <Card style={styles.formatCard}>
-          <Text style={styles.formatTitle}>Label Format</Text>
-          <View style={styles.formatOptions}>
-            <View style={styles.formatRow}>
-              <Text style={styles.formatLabel}>Font Size:</Text>
-              <View style={styles.fontSizeButtons}>
-                {(['small', 'medium', 'large'] as const).map(size => (
-                  <TouchableOpacity
-                    key={size}
-                    style={[styles.fontSizeButton, labelFormat.fontSize === size && styles.fontSizeButtonActive]}
-                    onPress={() => setLabelFormat(prev => ({ ...prev, fontSize: size }))}
-                  >
-                    <Text style={[styles.fontSizeButtonText, labelFormat.fontSize === size && styles.fontSizeButtonTextActive]}>
-                      {size}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            <View style={styles.formatCheckboxes}>
-              {[
-                { key: 'includeName', label: 'Product Name' },
-                { key: 'includeSku', label: 'SKU' },
-                { key: 'includePrice', label: 'Price' },
-              ].map(option => (
-                <TouchableOpacity
-                  key={option.key}
-                  style={styles.formatCheckbox}
-                  onPress={() =>
-                    setLabelFormat(prev => ({
-                      ...prev,
-                      [option.key]: !prev[option.key as keyof LabelFormat],
-                    }))
-                  }
-                >
-                  <MaterialIcons
-                    name={labelFormat[option.key as keyof LabelFormat] ? 'check-box' : 'check-box-outline-blank'}
-                    size={20}
-                    color={lightColors.primary}
-                  />
-                  <Text style={styles.formatCheckboxText}>{option.label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </Card>
-      )}
+      {selectedProducts.length > 0 && <LabelFormatCard format={labelFormat} onFormatChange={setLabelFormat} />}
 
       {/* Action Buttons */}
       {selectedProducts.length > 0 && (
@@ -378,67 +290,6 @@ const styles = StyleSheet.create({
   listContent: {
     padding: spacing.md,
   },
-  productCard: {
-    backgroundColor: lightColors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 2,
-    borderColor: lightColors.background,
-    ...elevation.low,
-  },
-  productCardSelected: {
-    borderColor: lightColors.primary,
-    backgroundColor: lightColors.primary + '08',
-  },
-  productHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-  },
-  productInfo: {
-    flex: 1,
-  },
-  productName: {
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-    color: lightColors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  productSku: {
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textSecondary,
-    marginBottom: spacing.xs,
-  },
-  productPrice: {
-    fontSize: typography.fontSize.sm,
-    color: lightColors.success,
-    fontWeight: '600',
-  },
-  quantityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  quantityLabel: {
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textSecondary,
-  },
-  quantityInput: {
-    width: 50,
-    height: 32,
-    borderWidth: 1,
-    borderColor: lightColors.border,
-    borderRadius: borderRadius.sm,
-    textAlign: 'center',
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textPrimary,
-    backgroundColor: lightColors.inputBackground,
-  },
   emptyState: {
     flex: 1,
     alignItems: 'center',
@@ -449,67 +300,6 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSize.md,
     color: lightColors.textSecondary,
     marginTop: spacing.md,
-  },
-  formatCard: {
-    margin: spacing.md,
-    marginTop: 0,
-  },
-  formatTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-    color: lightColors.textPrimary,
-    marginBottom: spacing.md,
-  },
-  formatOptions: {
-    gap: spacing.md,
-  },
-  formatRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  formatLabel: {
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textSecondary,
-  },
-  fontSizeButtons: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-  },
-  fontSizeButton: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-    borderWidth: 1,
-    borderColor: lightColors.border,
-    backgroundColor: lightColors.inputBackground,
-  },
-  fontSizeButtonActive: {
-    borderColor: lightColors.primary,
-    backgroundColor: lightColors.primary,
-  },
-  fontSizeButtonText: {
-    fontSize: typography.fontSize.xs,
-    color: lightColors.textSecondary,
-    textTransform: 'capitalize',
-  },
-  fontSizeButtonTextActive: {
-    color: lightColors.textOnPrimary,
-    fontWeight: '600',
-  },
-  formatCheckboxes: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  formatCheckbox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  formatCheckboxText: {
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textPrimary,
   },
   actions: {
     flexDirection: 'row',

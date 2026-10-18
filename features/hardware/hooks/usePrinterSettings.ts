@@ -129,6 +129,8 @@ export const usePrinterSettings = () => {
       const controller = new AbortController();
       testConnectionRef.current = controller;
 
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
       try {
         setIsTesting(true);
         setError(null);
@@ -140,7 +142,9 @@ export const usePrinterSettings = () => {
         }
 
         // Set a timeout for the connection test
-        const timeout = new Promise<boolean>((_, reject) => setTimeout(() => reject(new Error('Connection timeout')), 10000));
+        const timeout = new Promise<boolean>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('Connection timeout')), 10000);
+        });
 
         // Delegate to the real printer service
         const printerFactory = PrinterServiceFactory.getInstance();
@@ -176,6 +180,9 @@ export const usePrinterSettings = () => {
           throw err;
         }
       } finally {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         if (testConnectionRef.current === controller) {
           setIsTesting(false);
           testConnectionRef.current = null;

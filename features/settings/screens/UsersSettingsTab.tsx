@@ -1,24 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
-import { useUsers, User, UserRole } from '../../authentication/hooks/useUsers';
-import PinKeypad from '../../authentication/components/PinKeypad';
-import PinDisplay from '../../authentication/components/PinDisplay';
-import { elevation, lightColors } from '../../../shared/utils/theme';
-
-const PIN_LENGTH = 6;
-
-const ROLES: { value: UserRole; label: string }[] = [
-  { value: 'admin', label: 'Administrator' },
-  { value: 'manager', label: 'Manager' },
-  { value: 'cashier', label: 'Cashier' },
-];
-
-interface UserFormData {
-  name: string;
-  email: string;
-  role: UserRole;
-  platform_user_id: string;
-}
+import { View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { useUsers, User } from '../../authentication/hooks/useUsers';
+import { userSettingsStyles as styles } from '../components/userSettingsStyles';
+import { UserCard } from '../components/UserCard';
+import { UserFormModal } from '../components/UserFormModal';
+import { PinChangeModal, PinEntryStep } from '../components/PinChangeModal';
+import { PIN_LENGTH, EMPTY_USER_FORM, UserFormData } from '../utils/userFormData';
 
 const UsersSettingsTab: React.FC = () => {
   const { users, isLoading, error, loadUsers, createUser, updateUser, updatePin, deactivateUser, activateUser, isPinUnique } = useUsers();
@@ -27,27 +14,17 @@ const UsersSettingsTab: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showPinModal, setShowPinModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [formData, setFormData] = useState<UserFormData>({
-    name: '',
-    email: '',
-    role: 'cashier',
-    platform_user_id: '',
-  });
+  const [formData, setFormData] = useState<UserFormData>({ ...EMPTY_USER_FORM });
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
-  const [pinStep, setPinStep] = useState<'enter' | 'confirm'>('enter');
+  const [pinStep, setPinStep] = useState<PinEntryStep>('enter');
 
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
 
   const resetForm = () => {
-    setFormData({
-      name: '',
-      email: '',
-      role: 'cashier',
-      platform_user_id: '',
-    });
+    setFormData({ ...EMPTY_USER_FORM });
     setNewPin('');
     setConfirmPin('');
     setPinStep('enter');
@@ -208,154 +185,6 @@ const UsersSettingsTab: React.FC = () => {
     ]);
   };
 
-  const renderUserCard = (user: User) => (
-    <View key={user.id} style={[styles.userCard, !user.is_active && styles.userCardInactive]}>
-      <View style={styles.userInfo}>
-        <Text style={styles.userName}>{user.name}</Text>
-        <Text style={styles.userRole}>{ROLES.find(r => r.value === user.role)?.label || user.role}</Text>
-        {user.email && <Text style={styles.userEmail}>{user.email}</Text>}
-        {!user.is_active && <Text style={styles.inactiveLabel}>Inactive</Text>}
-      </View>
-      <View style={styles.userActions}>
-        <TouchableOpacity style={styles.actionButton} onPress={() => handleEditUser(user)}>
-          <Text style={styles.actionButtonText}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton} onPress={() => handleChangePin(user)}>
-          <Text style={styles.actionButtonText}>PIN</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, user.is_active ? styles.deactivateButton : styles.activateButton]}
-          onPress={() => handleToggleActive(user)}
-        >
-          <Text style={[styles.actionButtonText, user.is_active ? styles.deactivateText : styles.activateText]}>
-            {user.is_active ? 'Disable' : 'Enable'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  const renderAddEditModal = (isEdit: boolean) => (
-    <Modal visible={isEdit ? showEditModal : showAddModal} animationType="slide" transparent>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>{isEdit ? 'Edit User' : 'Add New User'}</Text>
-
-          <Text style={styles.inputLabel}>Name *</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.name}
-            onChangeText={text => setFormData({ ...formData, name: text })}
-            placeholder="Enter name"
-          />
-
-          <Text style={styles.inputLabel}>Email</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.email}
-            onChangeText={text => setFormData({ ...formData, email: text })}
-            placeholder="Enter email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-
-          <Text style={styles.inputLabel}>Role *</Text>
-          <View style={styles.roleSelector}>
-            {ROLES.map(role => (
-              <TouchableOpacity
-                key={role.value}
-                style={[styles.roleOption, formData.role === role.value && styles.roleOptionSelected]}
-                onPress={() => setFormData({ ...formData, role: role.value })}
-              >
-                <Text style={[styles.roleOptionText, formData.role === role.value && styles.roleOptionTextSelected]}>{role.label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          <Text style={styles.inputLabel}>Platform User ID (for e-commerce sync)</Text>
-          <TextInput
-            style={styles.input}
-            value={formData.platform_user_id}
-            onChangeText={text => setFormData({ ...formData, platform_user_id: text })}
-            placeholder="Enter platform user ID"
-            autoCapitalize="none"
-          />
-
-          {!isEdit && (
-            <>
-              <Text style={styles.inputLabel}>PIN * (6 digits)</Text>
-              <View style={styles.pinInputContainer}>
-                <PinDisplay pinLength={PIN_LENGTH} filledCount={newPin.length} />
-                <PinKeypad
-                  onKeyPress={key => {
-                    if (key === 'biometric') return;
-                    if (newPin.length < PIN_LENGTH) setNewPin(newPin + key);
-                  }}
-                  onDeletePress={() => setNewPin(newPin.slice(0, -1))}
-                  disableBiometric
-                />
-              </View>
-            </>
-          )}
-
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={() => {
-                isEdit ? setShowEditModal(false) : setShowAddModal(false);
-                resetForm();
-              }}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={isEdit ? handleUpdateUser : handleCreateUser}>
-              <Text style={styles.saveButtonText}>{isEdit ? 'Save' : 'Create'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-
-  const renderPinModal = () => (
-    <Modal visible={showPinModal} animationType="slide" transparent>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>{pinStep === 'enter' ? 'Enter New PIN' : 'Confirm New PIN'}</Text>
-          <Text style={styles.modalSubtitle}>{selectedUser?.name}</Text>
-
-          <View style={styles.pinInputContainer}>
-            <PinDisplay pinLength={PIN_LENGTH} filledCount={pinStep === 'enter' ? newPin.length : confirmPin.length} />
-            <PinKeypad onKeyPress={handlePinKeyPress} onDeletePress={handlePinDelete} disableBiometric />
-          </View>
-
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={() => {
-                setShowPinModal(false);
-                resetForm();
-              }}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            {pinStep === 'confirm' && (
-              <TouchableOpacity
-                style={[styles.modalButton, styles.backButton]}
-                onPress={() => {
-                  setConfirmPin('');
-                  setPinStep('enter');
-                }}
-              >
-                <Text style={styles.backButtonText}>Back</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -369,220 +198,60 @@ const UsersSettingsTab: React.FC = () => {
       {isLoading && <Text style={styles.loadingText}>Loading...</Text>}
 
       <View style={styles.userList}>
-        {users.length === 0 ? <Text style={styles.emptyText}>No users found. Add your first user above.</Text> : users.map(renderUserCard)}
+        {users.length === 0 ? (
+          <Text style={styles.emptyText}>No users found. Add your first user above.</Text>
+        ) : (
+          users.map(user => (
+            <UserCard key={user.id} user={user} onEdit={handleEditUser} onChangePin={handleChangePin} onToggleActive={handleToggleActive} />
+          ))
+        )}
       </View>
 
-      {renderAddEditModal(false)}
-      {renderAddEditModal(true)}
-      {renderPinModal()}
+      <UserFormModal
+        visible={showAddModal}
+        isEdit={false}
+        formData={formData}
+        newPin={newPin}
+        onFormChange={setFormData}
+        onNewPinChange={setNewPin}
+        onCancel={() => {
+          setShowAddModal(false);
+          resetForm();
+        }}
+        onSubmit={handleCreateUser}
+      />
+      <UserFormModal
+        visible={showEditModal}
+        isEdit
+        formData={formData}
+        newPin={newPin}
+        onFormChange={setFormData}
+        onNewPinChange={setNewPin}
+        onCancel={() => {
+          setShowEditModal(false);
+          resetForm();
+        }}
+        onSubmit={handleUpdateUser}
+      />
+      <PinChangeModal
+        visible={showPinModal}
+        userName={selectedUser?.name}
+        pinStep={pinStep}
+        newPin={newPin}
+        confirmPin={confirmPin}
+        onKeyPress={handlePinKeyPress}
+        onDelete={handlePinDelete}
+        onCancel={() => {
+          setShowPinModal(false);
+          resetForm();
+        }}
+        onBack={() => {
+          setConfirmPin('');
+          setPinStep('enter');
+        }}
+      />
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: lightColors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-    backgroundColor: lightColors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: lightColors.border,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  addButton: {
-    backgroundColor: lightColors.primary,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: lightColors.textOnPrimary,
-    fontWeight: '600',
-  },
-  userList: {
-    padding: 15,
-  },
-  userCard: {
-    backgroundColor: lightColors.surface,
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 10,
-    ...elevation.low,
-  },
-  userCardInactive: {
-    opacity: 0.6,
-    backgroundColor: lightColors.inputBackground,
-  },
-  userInfo: {
-    marginBottom: 10,
-  },
-  userName: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  userRole: {
-    fontSize: 14,
-    color: lightColors.textSecondary,
-    marginTop: 2,
-  },
-  userEmail: {
-    fontSize: 12,
-    color: lightColors.textHint,
-    marginTop: 2,
-  },
-  inactiveLabel: {
-    color: lightColors.error,
-    fontSize: 12,
-    fontWeight: '500',
-    marginTop: 4,
-  },
-  userActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  actionButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: lightColors.inputBackground,
-  },
-  actionButtonText: {
-    fontSize: 14,
-    color: lightColors.textPrimary,
-  },
-  deactivateButton: {
-    backgroundColor: lightColors.warningBackground,
-  },
-  deactivateText: {
-    color: lightColors.warningText,
-  },
-  activateButton: {
-    backgroundColor: lightColors.successBackground,
-  },
-  activateText: {
-    color: lightColors.successText,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: lightColors.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: lightColors.surface,
-    borderRadius: 15,
-    padding: 20,
-    width: '90%',
-    maxHeight: '90%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 5,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    color: lightColors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 5,
-    color: lightColors.textPrimary,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: lightColors.border,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 15,
-    fontSize: 16,
-  },
-  roleSelector: {
-    flexDirection: 'row',
-    marginBottom: 15,
-    gap: 8,
-  },
-  roleOption: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: lightColors.border,
-    alignItems: 'center',
-  },
-  roleOptionSelected: {
-    backgroundColor: lightColors.primary,
-    borderColor: lightColors.primary,
-  },
-  roleOptionText: {
-    fontSize: 12,
-    color: lightColors.textPrimary,
-  },
-  roleOptionTextSelected: {
-    color: lightColors.textOnPrimary,
-    fontWeight: '600',
-  },
-  pinInputContainer: {
-    alignItems: 'center',
-    marginVertical: 10,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 20,
-  },
-  modalButton: {
-    paddingHorizontal: 25,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  cancelButton: {
-    backgroundColor: lightColors.inputBackground,
-  },
-  cancelButtonText: {
-    color: lightColors.textPrimary,
-  },
-  saveButton: {
-    backgroundColor: lightColors.primary,
-  },
-  saveButtonText: {
-    color: lightColors.textOnPrimary,
-    fontWeight: '600',
-  },
-  backButton: {
-    backgroundColor: lightColors.inputBackground,
-  },
-  backButtonText: {
-    color: lightColors.textPrimary,
-  },
-  errorText: {
-    color: lightColors.error,
-    padding: 15,
-    textAlign: 'center',
-  },
-  loadingText: {
-    color: lightColors.textSecondary,
-    padding: 15,
-    textAlign: 'center',
-  },
-  emptyText: {
-    color: lightColors.textSecondary,
-    textAlign: 'center',
-    padding: 30,
-  },
-});
 
 export default UsersSettingsTab;

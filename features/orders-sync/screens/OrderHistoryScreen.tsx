@@ -1,18 +1,21 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, RefreshControl } from 'react-native';
+import { View, Text, Alert, RefreshControl } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthContext } from '../../authentication/contexts/AuthProvider';
 import { useDailyReport, DailyReportData } from '../hooks/useDailyReport';
 import type { MoreStackScreenProps } from '../../../app/navigation/types';
-import { lightColors, spacing, typography, borderRadius } from '../../../shared/utils/theme';
+import { lightColors } from '../../../shared/utils/theme';
 import { LocalOrder } from '../../basket/services/BasketServiceInterface';
 import { formatMoney } from '../../../shared/utils/money';
-import OrderCard from '../components/OrderCard';
 import ShiftModal from '../components/ShiftModal';
 import ReportModal from '../components/ReportModal';
 import ReceiptModal from '../components/ReceiptModal';
+import { OrderHistoryHeader } from '../components/OrderHistoryHeader';
+import { SyncQueueBanner } from '../components/SyncQueueBanner';
+import { OrderHistoryListItem } from '../components/OrderHistoryListItem';
+import { orderHistoryStyles as styles } from '../components/orderHistoryStyles';
 import { useCurrency } from '../../platform-clients/hooks/useCurrency';
 import { useLogger } from '../../../shared/hooks/useLogger';
 import { PrinterServiceFactory } from '../../hardware/services/printer/PrinterServiceFactory';
@@ -194,21 +197,15 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = () => {
   // ============ Render ============
 
   const renderOrderItem = ({ item: order }: { item: LocalOrder }) => (
-    <View>
-      <OrderCard
-        order={order}
-        isSyncing={syncingOrderId === order.id}
-        onResync={handleResyncOrder}
-        onPrintReceipt={handlePrintReceipt}
-        onExchange={handleExchange}
-      />
-      {isAdmin && (
-        <TouchableOpacity style={styles.deleteOrderButton} onPress={() => handleDeleteOrder(order.id)}>
-          <MaterialIcons name="delete-outline" size={16} color={lightColors.error} />
-          <Text style={styles.deleteOrderText}>Delete</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+    <OrderHistoryListItem
+      order={order}
+      isSyncing={syncingOrderId === order.id}
+      isAdmin={isAdmin}
+      onResync={handleResyncOrder}
+      onDelete={handleDeleteOrder}
+      onPrintReceipt={handlePrintReceipt}
+      onExchange={handleExchange}
+    />
   );
 
   const renderEmpty = () => (
@@ -229,69 +226,21 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View>
-            <Text style={styles.title}>Order History</Text>
-            <Text style={styles.subtitle}>
-              {orders.length} order{orders.length !== 1 ? 's' : ''}{' '}
-              {unsyncedOrdersCount > 0 ? `\u2022 ${unsyncedOrdersCount} pending sync` : ''}
-            </Text>
-          </View>
-          {currentShift && (
-            <View style={styles.shiftBadge}>
-              <MaterialIcons name="access-time" size={14} color={lightColors.success} />
-              <Text style={styles.shiftBadgeText}>Shift Open</Text>
-            </View>
-          )}
-        </View>
+      <OrderHistoryHeader
+        orderCount={orders.length}
+        unsyncedOrdersCount={unsyncedOrdersCount}
+        shiftOpen={!!currentShift}
+        isCashier={isCashier}
+        isToday={isToday}
+        dateLabel={isToday ? 'Today' : formatDate(getOffset(dayOffset))}
+        onPreviousDay={handlePreviousDay}
+        onNextDay={handleNextDay}
+        onOpenShift={handleOpenShift}
+        onCloseShift={handleCloseShift}
+        onViewReport={handleGenerateReport}
+      />
 
-        {/* Date navigation (admin/manager only) */}
-        {!isCashier && (
-          <View style={styles.dateNav}>
-            <TouchableOpacity style={styles.dateNavButton} onPress={handlePreviousDay}>
-              <MaterialIcons name="chevron-left" size={24} color={lightColors.primary} />
-            </TouchableOpacity>
-            <Text style={styles.dateNavText}>{isToday ? 'Today' : formatDate(getOffset(dayOffset))}</Text>
-            <TouchableOpacity
-              style={[styles.dateNavButton, isToday && styles.dateNavButtonDisabled]}
-              onPress={handleNextDay}
-              disabled={isToday}
-            >
-              <MaterialIcons name="chevron-right" size={24} color={isToday ? lightColors.textDisabled : lightColors.primary} />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <View style={styles.actionBar}>
-          {!currentShift ? (
-            <TouchableOpacity style={styles.shiftButton} onPress={handleOpenShift}>
-              <MaterialIcons name="play-arrow" size={18} color={lightColors.surface} />
-              <Text style={styles.shiftButtonText}>Open Shift</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={[styles.shiftButton, styles.closeShiftButton]} onPress={handleCloseShift}>
-              <MaterialIcons name="stop" size={18} color={lightColors.surface} />
-              <Text style={styles.shiftButtonText}>Close Shift</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity style={styles.reportButton} onPress={handleGenerateReport}>
-            <MaterialIcons name="assessment" size={18} color={lightColors.primary} />
-            <Text style={styles.reportButtonText}>View Report</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {(syncQueueStatus.pending > 0 || syncQueueStatus.failed > 0) && (
-        <View style={styles.queueStatus}>
-          <MaterialIcons name="sync" size={16} color={lightColors.primary} />
-          <Text style={styles.queueText}>
-            {syncQueueStatus.pending + syncQueueStatus.failed} request{syncQueueStatus.pending + syncQueueStatus.failed !== 1 ? 's' : ''} in
-            queue
-          </Text>
-        </View>
-      )}
+      <SyncQueueBanner pending={syncQueueStatus.pending} failed={syncQueueStatus.failed} />
 
       <FlashList
         data={orders}
@@ -324,165 +273,5 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = () => {
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: lightColors.background,
-  },
-  header: {
-    padding: spacing.md,
-    backgroundColor: lightColors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: lightColors.border,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.sm,
-  },
-  title: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: '700',
-    color: lightColors.textPrimary,
-    marginBottom: spacing.xs,
-  },
-  subtitle: {
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textSecondary,
-  },
-  shiftBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: lightColors.success + '20',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-  },
-  shiftBadgeText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.fontSize.xs,
-    fontWeight: '600',
-    color: lightColors.success,
-  },
-  // Date navigation
-  dateNav: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.sm,
-    backgroundColor: lightColors.background,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.xs,
-  },
-  dateNavButton: {
-    padding: spacing.xs,
-  },
-  dateNavButtonDisabled: {
-    opacity: 0.4,
-  },
-  dateNavText: {
-    fontSize: typography.fontSize.md,
-    fontWeight: '600',
-    color: lightColors.textPrimary,
-    paddingHorizontal: spacing.md,
-    minWidth: 140,
-    textAlign: 'center',
-  },
-  // Actions
-  actionBar: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  shiftButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: lightColors.success,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-  },
-  closeShiftButton: {
-    backgroundColor: lightColors.warning,
-  },
-  shiftButtonText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.fontSize.sm,
-    fontWeight: '600',
-    color: lightColors.surface,
-  },
-  reportButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: lightColors.primary + '20',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-  },
-  reportButtonText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.fontSize.sm,
-    fontWeight: '600',
-    color: lightColors.primary,
-  },
-  // Queue status
-  queueStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.sm,
-    marginHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    backgroundColor: lightColors.primary + '10',
-    borderRadius: borderRadius.md,
-  },
-  queueText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.fontSize.sm,
-    color: lightColors.primary,
-    fontWeight: '500',
-  },
-  // Delete button (admin only)
-  deleteOrderButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: spacing.md,
-    marginTop: -spacing.xs,
-    marginBottom: spacing.xs,
-    paddingVertical: spacing.xs,
-    backgroundColor: lightColors.error + '10',
-    borderBottomLeftRadius: borderRadius.md,
-    borderBottomRightRadius: borderRadius.md,
-  },
-  deleteOrderText: {
-    marginLeft: spacing.xs,
-    fontSize: typography.fontSize.sm,
-    fontWeight: '500',
-    color: lightColors.error,
-  },
-  // Empty state
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.xl,
-  },
-  emptyTitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: '600',
-    color: lightColors.textPrimary,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  emptySubtitle: {
-    fontSize: typography.fontSize.md,
-    color: lightColors.textSecondary,
-    textAlign: 'center',
-  },
-  emptyList: {
-    flex: 1,
-  },
-});
 
 export default OrderHistoryScreen;

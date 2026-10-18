@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, Animated, Easing } from 'react-native';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../../shared/utils/theme';
 import { formatMoney } from '../../../shared/utils/money';
@@ -42,6 +42,7 @@ const StripeNfcPaymentTerminal: React.FC<StripeNfcPaymentTerminalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [paymentStatus, setPaymentStatus] = useState<string>('ready');
   const [cardType, setCardType] = useState<string | null>(null);
+  const completionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const logger = useLogger('StripeNfcPaymentTerminal');
 
   // Get payment services from hook
@@ -88,6 +89,8 @@ const StripeNfcPaymentTerminal: React.FC<StripeNfcPaymentTerminalProps> = ({
     setPaymentStatus('connecting');
     setError(null);
 
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
     try {
       // Verify terminal connection
       if (!isTerminalConnected()) {
@@ -100,9 +103,9 @@ const StripeNfcPaymentTerminal: React.FC<StripeNfcPaymentTerminalProps> = ({
       setPaymentStatus('waiting_for_tap');
 
       // Build payment request with rich metadata and timeout
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Payment timeout - please try again')), PAYMENT_TIMEOUT)
-      );
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Payment timeout - please try again')), PAYMENT_TIMEOUT);
+      });
 
       const response = await Promise.race([
         processPayment({
@@ -127,7 +130,7 @@ const StripeNfcPaymentTerminal: React.FC<StripeNfcPaymentTerminalProps> = ({
         setCardType(response.cardBrand || null);
 
         // Short delay to show success state before completing
-        setTimeout(() => {
+        completionTimerRef.current = setTimeout(() => {
           onPaymentComplete(response);
         }, 1500);
       } else {
@@ -148,6 +151,9 @@ const StripeNfcPaymentTerminal: React.FC<StripeNfcPaymentTerminalProps> = ({
       setPaymentStatus('error');
       setError(err instanceof Error ? err.message : 'Unknown payment error occurred');
     } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
       setProcessing(false);
     }
   };
@@ -155,6 +161,9 @@ const StripeNfcPaymentTerminal: React.FC<StripeNfcPaymentTerminalProps> = ({
   // Clean up on unmount
   useEffect(() => {
     return () => {
+      if (completionTimerRef.current) {
+        clearTimeout(completionTimerRef.current);
+      }
       if (isTerminalConnected()) {
         disconnect();
       }

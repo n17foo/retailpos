@@ -74,8 +74,10 @@ describe('useSaleScanner', () => {
       return null;
     }
 
+    let root: ReturnType<typeof createRoot> | null = null;
     await act(async () => {
-      createRoot().render(React.createElement(Harness));
+      root = createRoot();
+      root.render(React.createElement(Harness));
     });
 
     expect(mockConnectForSale).toHaveBeenCalledTimes(1);
@@ -93,5 +95,10 @@ describe('useSaleScanner', () => {
       await latest!.handleScan('UNKNOWN-CODE');
     });
     expect(latest!.notice?.kind).toBe('not_found');
+
+    // Unmount to clear the pending notice-dismiss timer (avoids leaking it past teardown)
+    await act(async () => {
+      root!.unmount();
+    });
   });
 });

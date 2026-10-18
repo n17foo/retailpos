@@ -1,180 +1,17 @@
-import React, { useCallback, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, TextInput } from 'react-native';
+import React, { useCallback } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useEcommerceSettings } from '../../platform-clients/hooks/useEcommerceSettings';
-import { lightColors, spacing, borderRadius, typography, elevation, semanticColors } from '../../../shared/utils/theme';
+import { lightColors, spacing, borderRadius, typography, elevation } from '../../../shared/utils/theme';
 import { Button } from '../../../shared/components/Button';
 import { useTranslate } from '../../../shared/hooks/useTranslate';
 import { ECommercePlatform } from '../../../shared/utils/platforms';
 import { useLogger } from '../../../shared/hooks/useLogger';
-import {
-  getPlatformCapabilities,
-  PlatformCapabilities,
-  CapabilityLevel,
-  BasketMode,
-  getUnavailableReason,
-} from '../../../shared/utils/platformCapabilities';
-import { getPlatformDisplayName } from '../../../shared/utils/platforms';
 import { auditLogService } from '../../../shared/services/audit/AuditLogService';
 import { useAuthContext } from '../../authentication/contexts/AuthProvider';
-
-// Platform display names
-const PLATFORM_NAMES: Record<string, string> = {
-  shopify: 'Shopify',
-  woocommerce: 'WooCommerce',
-  bigcommerce: 'BigCommerce',
-  magento: 'Magento',
-  sylius: 'Sylius',
-  wix: 'Wix',
-  prestashop: 'PrestaShop',
-  commercefull: 'Commercefull',
-  offline: 'Offline',
-};
-
-/** Feature rows shown in the capability summary panel */
-const CAPABILITY_FEATURES: Array<{ key: Exclude<keyof PlatformCapabilities, 'basketMode'>; label: string }> = [
-  { key: 'catalog', label: 'Catalog & variants' },
-  { key: 'customers', label: 'Customer management' },
-  { key: 'inventory', label: 'Inventory sync' },
-  { key: 'orderSync', label: 'Order sync' },
-  { key: 'discounts', label: 'Discounts & coupons' },
-  { key: 'giftCards', label: 'Gift cards' },
-  { key: 'refunds', label: 'Refunds' },
-  { key: 'loyalty', label: 'Loyalty points sync' },
-  { key: 'storeCredit', label: 'Store credit sync' },
-];
-
-const BASKET_MODE_LABEL: Record<BasketMode, { label: string; description: string; color: string; bg: string }> = {
-  native_draft: {
-    label: 'Native draft',
-    description: 'Platform creates a draft order with server-calculated tax',
-    color: lightColors.successText,
-    bg: lightColors.successBackground,
-  },
-  remote_cart: {
-    label: 'Remote cart',
-    description: 'POS basket is local; platform cart/quote created post-payment',
-    color: lightColors.secondaryDark,
-    bg: lightColors.secondaryLight,
-  },
-  local_only: {
-    label: 'Local only',
-    description: 'Fully local basket; order imported to platform after payment',
-    color: semanticColors.infoText,
-    bg: semanticColors.infoBackground,
-  },
-};
-
-const CAPABILITY_BADGE: Record<CapabilityLevel, { label: string; color: string; bg: string }> = {
-  supported: { label: 'Supported', color: lightColors.successText, bg: lightColors.successBackground },
-  custom: { label: 'Custom adapter', color: lightColors.secondaryDark, bg: lightColors.secondaryLight },
-  not_recommended: { label: 'Not supported', color: lightColors.error, bg: lightColors.errorBackground },
-};
-
-interface CapabilitySummaryPanelProps {
-  platform: string;
-}
-
-/**
- * Platform Capability Summary panel.
- * Reads from the centralized capability matrix — no hardcoded values.
- * Satisfies settings-tabs.md §5.3.a, §5.3.b, §5.11.
- */
-const CapabilitySummaryPanel: React.FC<CapabilitySummaryPanelProps> = ({ platform }) => {
-  const capabilities = useMemo(() => getPlatformCapabilities(platform), [platform]);
-  const platformName = getPlatformDisplayName(platform);
-  const basketModeInfo = BASKET_MODE_LABEL[capabilities.basketMode];
-
-  return (
-    <View style={capStyles.container}>
-      <Text style={capStyles.title}>Platform capability summary</Text>
-      <Text style={capStyles.subtitle}>{platformName}</Text>
-
-      {/* Basket mode — shown first as it affects checkout behaviour */}
-      <View style={capStyles.row}>
-        <Text style={capStyles.featureLabel}>Basket / checkout mode</Text>
-        <View style={[capStyles.badge, { backgroundColor: basketModeInfo.bg }]}>
-          <Text style={[capStyles.badgeText, { color: basketModeInfo.color }]}>{basketModeInfo.label}</Text>
-        </View>
-        <Text style={capStyles.reason} numberOfLines={2}>
-          {basketModeInfo.description}
-        </Text>
-      </View>
-
-      {CAPABILITY_FEATURES.map(({ key, label }) => {
-        const level = capabilities[key];
-        const badge = CAPABILITY_BADGE[level];
-        const reason = level !== 'supported' ? getUnavailableReason(capabilities, key, platformName) : '';
-        return (
-          <View key={key} style={capStyles.row}>
-            <Text style={capStyles.featureLabel}>{label}</Text>
-            <View style={[capStyles.badge, { backgroundColor: badge.bg }]}>
-              <Text style={[capStyles.badgeText, { color: badge.color }]}>{badge.label}</Text>
-            </View>
-            {reason ? (
-              <Text style={capStyles.reason} numberOfLines={2}>
-                {reason}
-              </Text>
-            ) : null}
-          </View>
-        );
-      })}
-    </View>
-  );
-};
-
-const capStyles = StyleSheet.create({
-  container: {
-    backgroundColor: lightColors.background,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: lightColors.border,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  title: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.semiBold as '600',
-    color: lightColors.textPrimary,
-    marginBottom: 2,
-  },
-  subtitle: {
-    fontSize: typography.fontSize.xs,
-    color: lightColors.textSecondary,
-    marginBottom: spacing.sm,
-  },
-  row: {
-    flexDirection: 'row' as const,
-    alignItems: 'flex-start' as const,
-    flexWrap: 'wrap' as const,
-    paddingVertical: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: lightColors.divider,
-  },
-  featureLabel: {
-    flex: 1,
-    fontSize: typography.fontSize.xs,
-    color: lightColors.textPrimary,
-    paddingRight: spacing.xs,
-    paddingTop: 2,
-  },
-  badge: {
-    borderRadius: borderRadius.round,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    alignSelf: 'flex-start' as const,
-  },
-  badgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  reason: {
-    width: '100%',
-    fontSize: 10,
-    color: lightColors.textSecondary,
-    marginTop: 2,
-    fontStyle: 'italic' as const,
-  },
-});
+import { settingsFieldStyles } from '../components/settingsFieldStyles';
+import { CapabilitySummaryPanel } from '../components/CapabilitySummaryPanel';
+import { PlatformRadioGroup } from '../components/PlatformRadioGroup';
+import { PlatformCredentialFields } from '../components/PlatformCredentialFields';
 
 const EcommerceSettingsTab: React.FC = () => {
   const { t } = useTranslate();
@@ -197,142 +34,6 @@ const EcommerceSettingsTab: React.FC = () => {
       updateSettings({ platform });
     },
     [updateSettings]
-  );
-
-  // Handle API key change
-  const handleApiKeyChange = useCallback(
-    (apiKey: string) => {
-      if (ecommerceSettings.platform === 'shopify') {
-        updateSettings({
-          apiKey,
-          shopify: {
-            ...ecommerceSettings.shopify,
-            apiKey,
-            accessToken: apiKey,
-          },
-        });
-      } else if (ecommerceSettings.platform === 'woocommerce') {
-        updateSettings({
-          apiKey,
-          woocommerce: {
-            ...ecommerceSettings.woocommerce,
-            apiKey,
-          },
-        });
-      } else if (ecommerceSettings.platform === 'bigcommerce') {
-        updateSettings({
-          apiKey,
-          bigcommerce: {
-            ...ecommerceSettings.bigcommerce,
-            accessToken: apiKey,
-          },
-        });
-      } else if (ecommerceSettings.platform === 'magento') {
-        updateSettings({
-          apiKey,
-          magento: {
-            ...ecommerceSettings.magento,
-            accessToken: apiKey,
-          },
-        });
-      } else if (ecommerceSettings.platform === 'sylius') {
-        updateSettings({
-          apiKey,
-          sylius: {
-            ...ecommerceSettings.sylius,
-            apiToken: apiKey,
-          },
-        });
-      } else if (ecommerceSettings.platform === 'wix') {
-        updateSettings({
-          apiKey,
-          wix: {
-            ...ecommerceSettings.wix,
-            apiKey,
-          },
-        });
-      } else if (ecommerceSettings.platform === 'prestashop') {
-        updateSettings({
-          apiKey,
-          prestashop: {
-            ...ecommerceSettings.prestashop,
-            apiKey,
-          },
-        });
-      } else if (ecommerceSettings.platform === 'commercefull') {
-        updateSettings({
-          apiKey,
-          commercefull: {
-            ...ecommerceSettings.commercefull,
-            apiKey,
-          },
-        });
-      } else {
-        updateSettings({ apiKey });
-      }
-    },
-    [updateSettings, ecommerceSettings]
-  );
-
-  // Handle store URL change
-  const handleStoreUrlChange = useCallback(
-    (storeUrl: string) => {
-      if (ecommerceSettings.platform === 'shopify') {
-        updateSettings({
-          shopify: {
-            ...ecommerceSettings.shopify,
-            storeUrl: storeUrl,
-          },
-        });
-      } else if (ecommerceSettings.platform === 'woocommerce') {
-        updateSettings({
-          woocommerce: {
-            ...ecommerceSettings.woocommerce,
-            storeUrl: storeUrl,
-          },
-        });
-      } else if (ecommerceSettings.platform === 'magento') {
-        updateSettings({
-          magento: {
-            ...ecommerceSettings.magento,
-            storeUrl,
-          },
-        });
-      } else if (ecommerceSettings.platform === 'sylius') {
-        updateSettings({
-          sylius: {
-            ...ecommerceSettings.sylius,
-            storeUrl,
-          },
-        });
-      } else if (ecommerceSettings.platform === 'prestashop') {
-        updateSettings({
-          prestashop: {
-            ...ecommerceSettings.prestashop,
-            storeUrl,
-          },
-        });
-      } else if (ecommerceSettings.platform === 'commercefull') {
-        updateSettings({
-          commercefull: {
-            ...ecommerceSettings.commercefull,
-            storeUrl,
-          },
-        });
-      } else {
-        updateSettings({ apiUrl: storeUrl });
-      }
-    },
-    [
-      updateSettings,
-      ecommerceSettings.platform,
-      ecommerceSettings.shopify,
-      ecommerceSettings.woocommerce,
-      ecommerceSettings.magento,
-      ecommerceSettings.sylius,
-      ecommerceSettings.prestashop,
-      ecommerceSettings.commercefull,
-    ]
   );
 
   // Handle enabled toggle
@@ -398,17 +99,20 @@ const EcommerceSettingsTab: React.FC = () => {
     <View style={styles.settingsSection}>
       <Text style={styles.sectionTitle}>{t('settings.ecommerce.title')}</Text>
 
-      <View style={styles.optionRow}>
-        <Text style={styles.label}>{t('settings.ecommerce.enableEcommerce')}</Text>
+      <View style={settingsFieldStyles.optionRow}>
+        <Text style={settingsFieldStyles.label}>{t('settings.ecommerce.enableEcommerce')}</Text>
         <TouchableOpacity
-          style={[styles.toggleButton, ecommerceSettings.enabled ? styles.toggleActive : styles.toggleInactive]}
+          style={[
+            settingsFieldStyles.toggleButton,
+            ecommerceSettings.enabled ? settingsFieldStyles.toggleActive : settingsFieldStyles.toggleInactive,
+          ]}
           onPress={() => {
             const newEnabledState = !ecommerceSettings.enabled;
             logger.info('Toggle pressed, new state:', newEnabledState);
             handleEnabledChange(newEnabledState);
           }}
         >
-          <Text style={[styles.toggleText, ecommerceSettings.enabled && styles.toggleActiveText]}>
+          <Text style={[settingsFieldStyles.toggleText, ecommerceSettings.enabled && settingsFieldStyles.toggleActiveText]}>
             {ecommerceSettings.enabled ? 'ON' : 'OFF'}
           </Text>
         </TouchableOpacity>
@@ -417,258 +121,25 @@ const EcommerceSettingsTab: React.FC = () => {
       {ecommerceSettings.enabled && (
         <>
           {/* Platform Selection */}
-          <View style={styles.optionRow}>
-            <Text style={styles.label}>{t('settings.ecommerce.platform')}</Text>
-            <View style={styles.radioContainer}>
-              {Object.keys(PLATFORM_NAMES).map(platform => (
-                <View key={platform} style={styles.radioWrapper}>
-                  <TouchableOpacity style={styles.radioOuter} onPress={() => handlePlatformChange(platform as ECommercePlatform)}>
-                    {ecommerceSettings.platform === platform && <View style={styles.radioInner} />}
-                  </TouchableOpacity>
-                  <Text style={styles.radioLabel} onPress={() => handlePlatformChange(platform as ECommercePlatform)}>
-                    {PLATFORM_NAMES[platform]}
-                  </Text>
-                </View>
-              ))}
-            </View>
+          <View style={settingsFieldStyles.optionRow}>
+            <Text style={settingsFieldStyles.label}>{t('settings.ecommerce.platform')}</Text>
+            <PlatformRadioGroup selected={ecommerceSettings.platform} onSelect={handlePlatformChange} />
           </View>
 
           {/* Platform Capability Summary — spec §5.3.a, §5.3.b */}
           {ecommerceSettings.platform && <CapabilitySummaryPanel platform={ecommerceSettings.platform} />}
 
-          {ecommerceSettings.platform !== 'offline' && ecommerceSettings.platform !== 'wix' && (
-            <>
-              {/* Store URL */}
-              <View style={styles.optionRow}>
-                <Text style={styles.label}>
-                  {ecommerceSettings.platform === 'shopify'
-                    ? t('settings.ecommerce.shopifyStoreUrl')
-                    : ecommerceSettings.platform === 'woocommerce'
-                      ? t('settings.ecommerce.woocommerceStoreUrl')
-                      : t('settings.ecommerce.storeUrl')}
-                </Text>
-                <TextInput
-                  style={styles.input}
-                  value={
-                    ecommerceSettings.platform === 'shopify'
-                      ? ecommerceSettings.shopify?.storeUrl
-                      : ecommerceSettings.platform === 'woocommerce'
-                        ? ecommerceSettings.woocommerce?.storeUrl
-                        : ecommerceSettings.platform === 'magento'
-                          ? ecommerceSettings.magento?.storeUrl
-                          : ecommerceSettings.platform === 'sylius'
-                            ? ecommerceSettings.sylius?.storeUrl
-                            : ecommerceSettings.platform === 'prestashop'
-                              ? ecommerceSettings.prestashop?.storeUrl
-                              : ecommerceSettings.platform === 'commercefull'
-                                ? ecommerceSettings.commercefull?.storeUrl
-                                : ecommerceSettings.apiUrl || ''
-                  }
-                  onChangeText={handleStoreUrlChange}
-                  placeholder={
-                    ecommerceSettings.platform === 'shopify'
-                      ? t('settings.ecommerce.shopifyUrlPlaceholder')
-                      : ecommerceSettings.platform === 'woocommerce'
-                        ? t('settings.ecommerce.woocommerceUrlPlaceholder')
-                        : t('settings.ecommerce.defaultUrlPlaceholder')
-                  }
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={ecommerceSettings.enabled}
-                  keyboardType="url"
-                />
-              </View>
-
-              {/* API Key */}
-              <View style={styles.optionRow}>
-                <Text style={styles.label}>
-                  {ecommerceSettings.platform === 'shopify' ? t('settings.ecommerce.adminApiToken') : t('settings.payment.apiKey')}
-                </Text>
-                <TextInput
-                  style={styles.input}
-                  value={
-                    ecommerceSettings.platform === 'shopify'
-                      ? ecommerceSettings.shopify?.accessToken || ecommerceSettings.shopify?.apiKey || ecommerceSettings.apiKey
-                      : ecommerceSettings.platform === 'woocommerce'
-                        ? ecommerceSettings.woocommerce?.apiKey || ecommerceSettings.apiKey
-                        : ecommerceSettings.platform === 'bigcommerce'
-                          ? ecommerceSettings.bigcommerce?.accessToken || ecommerceSettings.apiKey
-                          : ecommerceSettings.platform === 'magento'
-                            ? ecommerceSettings.magento?.accessToken || ecommerceSettings.apiKey
-                            : ecommerceSettings.platform === 'sylius'
-                              ? ecommerceSettings.sylius?.apiToken || ecommerceSettings.apiKey
-                              : ecommerceSettings.platform === 'wix'
-                                ? ecommerceSettings.wix?.apiKey || ecommerceSettings.apiKey
-                                : ecommerceSettings.platform === 'prestashop'
-                                  ? ecommerceSettings.prestashop?.apiKey || ecommerceSettings.apiKey
-                                  : ecommerceSettings.platform === 'commercefull'
-                                    ? ecommerceSettings.commercefull?.apiKey || ecommerceSettings.apiKey
-                                    : ecommerceSettings.apiKey
-                  }
-                  onChangeText={handleApiKeyChange}
-                  placeholder={
-                    ecommerceSettings.platform === 'shopify'
-                      ? t('settings.ecommerce.shopifyApiPlaceholder')
-                      : t('settings.ecommerce.apiKeyPlaceholder')
-                  }
-                  secureTextEntry
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={ecommerceSettings.enabled}
-                />
-              </View>
-            </>
-          )}
-
-          {/* Platform-specific settings */}
-          {ecommerceSettings.platform === 'woocommerce' && (
-            <View style={styles.optionRow}>
-              <Text style={styles.label}>{t('settings.ecommerce.consumerSecret')}</Text>
-              <TextInput
-                style={styles.input}
-                value={ecommerceSettings.woocommerce?.apiSecret || ''}
-                onChangeText={value =>
-                  updateSettings({
-                    woocommerce: {
-                      ...ecommerceSettings.woocommerce,
-                      apiSecret: value,
-                    },
-                  })
-                }
-                placeholder={t('settings.ecommerce.consumerSecretPlaceholder')}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={ecommerceSettings.enabled}
-              />
-            </View>
-          )}
-
-          {ecommerceSettings.platform === 'commercefull' && (
-            <View style={styles.optionRow}>
-              <Text style={styles.label}>{t('settings.ecommerce.consumerSecret')}</Text>
-              <TextInput
-                style={styles.input}
-                value={ecommerceSettings.commercefull?.apiSecret || ''}
-                onChangeText={value =>
-                  updateSettings({
-                    commercefull: { ...ecommerceSettings.commercefull, apiSecret: value },
-                  })
-                }
-                placeholder={t('settings.ecommerce.consumerSecretPlaceholder')}
-                secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={ecommerceSettings.enabled}
-              />
-            </View>
-          )}
-
-          {ecommerceSettings.platform === 'bigcommerce' && (
-            <>
-              <View style={styles.optionRow}>
-                <Text style={styles.label}>{t('settings.ecommerce.storeHash')}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={ecommerceSettings.bigcommerce?.storeHash || ''}
-                  onChangeText={value =>
-                    updateSettings({
-                      bigcommerce: { ...ecommerceSettings.bigcommerce, storeHash: value },
-                    })
-                  }
-                  placeholder={t('settings.ecommerce.storeHashPlaceholder')}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={ecommerceSettings.enabled}
-                />
-              </View>
-              <View style={styles.optionRow}>
-                <Text style={styles.label}>{t('settings.ecommerce.clientId')}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={ecommerceSettings.bigcommerce?.clientId || ''}
-                  onChangeText={value =>
-                    updateSettings({
-                      bigcommerce: { ...ecommerceSettings.bigcommerce, clientId: value },
-                    })
-                  }
-                  placeholder={t('settings.ecommerce.clientIdPlaceholder')}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={ecommerceSettings.enabled}
-                />
-              </View>
-            </>
-          )}
-
-          {ecommerceSettings.platform === 'wix' && (
-            <>
-              <View style={styles.optionRow}>
-                <Text style={styles.label}>{t('settings.ecommerce.siteId')}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={ecommerceSettings.wix?.siteId || ''}
-                  onChangeText={value =>
-                    updateSettings({
-                      wix: { ...ecommerceSettings.wix, siteId: value },
-                    })
-                  }
-                  placeholder={t('settings.ecommerce.wixSiteIdPlaceholder')}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={ecommerceSettings.enabled}
-                />
-              </View>
-              <View style={styles.optionRow}>
-                <Text style={styles.label}>{t('settings.ecommerce.clientId')}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={ecommerceSettings.wix?.accountId || ''}
-                  onChangeText={value =>
-                    updateSettings({
-                      wix: { ...ecommerceSettings.wix, accountId: value },
-                    })
-                  }
-                  placeholder={t('settings.ecommerce.clientIdPlaceholder')}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={ecommerceSettings.enabled}
-                />
-              </View>
-            </>
-          )}
-
-          {ecommerceSettings.platform === 'offline' && (
-            <>
-              <View style={styles.infoBox}>
-                <Text style={styles.infoTitle}>{t('settings.ecommerce.localOnlyMode')}</Text>
-                <Text style={styles.infoText}>{t('settings.ecommerce.localOnlyDescription')}</Text>
-              </View>
-              <View style={styles.optionRow}>
-                <Text style={styles.label}>{t('settings.ecommerce.storeName')}</Text>
-                <TextInput
-                  style={styles.input}
-                  value={ecommerceSettings.offline?.storeName || ''}
-                  onChangeText={value =>
-                    updateSettings({
-                      offline: { ...ecommerceSettings.offline, storeName: value },
-                    })
-                  }
-                  placeholder={t('settings.ecommerce.storeNamePlaceholder')}
-                  editable={ecommerceSettings.enabled}
-                />
-              </View>
-            </>
-          )}
+          {/* Store URL, API key and per-platform credential fields */}
+          <PlatformCredentialFields settings={ecommerceSettings} updateSettings={updateSettings} />
 
           {/* Sync Inventory Toggle */}
-          <View style={styles.optionRow}>
-            <Text style={styles.label}>{t('settings.ecommerce.syncInventory')}</Text>
+          <View style={settingsFieldStyles.optionRow}>
+            <Text style={settingsFieldStyles.label}>{t('settings.ecommerce.syncInventory')}</Text>
             <TouchableOpacity
               style={[
-                styles.toggleButton,
-                ecommerceSettings.syncInventory ? styles.toggleActive : styles.toggleInactive,
-                !ecommerceSettings.enabled && styles.disabled,
+                settingsFieldStyles.toggleButton,
+                ecommerceSettings.syncInventory ? settingsFieldStyles.toggleActive : settingsFieldStyles.toggleInactive,
+                !ecommerceSettings.enabled && settingsFieldStyles.disabled,
               ]}
               onPress={() =>
                 ecommerceSettings.enabled &&
@@ -678,7 +149,7 @@ const EcommerceSettingsTab: React.FC = () => {
               }
               disabled={!ecommerceSettings.enabled}
             >
-              <Text style={styles.toggleText}>{ecommerceSettings.syncInventory ? 'ON' : 'OFF'}</Text>
+              <Text style={settingsFieldStyles.toggleText}>{ecommerceSettings.syncInventory ? 'ON' : 'OFF'}</Text>
             </TouchableOpacity>
           </View>
 
@@ -725,86 +196,6 @@ const styles = StyleSheet.create({
     borderBottomColor: lightColors.divider,
     paddingBottom: spacing.sm,
   },
-  optionRow: {
-    flexDirection: 'row' as const,
-    justifyContent: 'space-between' as const,
-    alignItems: 'center' as const,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: lightColors.divider,
-  },
-  label: {
-    fontSize: typography.fontSize.md,
-    color: lightColors.textPrimary,
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  input: {
-    flex: 2,
-    borderWidth: 1,
-    borderColor: lightColors.border,
-    borderRadius: borderRadius.sm,
-    padding: spacing.sm,
-    backgroundColor: lightColors.surface,
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textPrimary,
-  },
-  toggleButton: {
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.round,
-    borderWidth: 1,
-    minWidth: 80,
-    alignItems: 'center' as const,
-  },
-  toggleActive: {
-    backgroundColor: lightColors.success,
-    borderColor: lightColors.success,
-  },
-  toggleInactive: {
-    backgroundColor: lightColors.background,
-    borderColor: lightColors.border,
-  },
-  toggleText: {
-    color: lightColors.textPrimary,
-    fontWeight: typography.fontWeight.semiBold as '600',
-    fontSize: typography.fontSize.sm,
-  },
-  toggleActiveText: {
-    color: lightColors.textOnPrimary,
-  },
-  disabled: {
-    opacity: 0.6,
-  },
-  radioContainer: {
-    marginTop: spacing.xs,
-  },
-  radioWrapper: {
-    flexDirection: 'row' as const,
-    alignItems: 'center' as const,
-    marginBottom: spacing.sm,
-  },
-  radioOuter: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: lightColors.primary,
-    marginRight: spacing.sm,
-    justifyContent: 'center' as const,
-    alignItems: 'center' as const,
-  },
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: lightColors.primary,
-  },
-  radioLabel: {
-    fontSize: typography.fontSize.md,
-    color: lightColors.textPrimary,
-  },
   actionButtons: {
     flexDirection: 'row' as const,
     justifyContent: 'flex-end' as const,
@@ -822,25 +213,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center' as const,
     minWidth: 120,
     ...elevation.low,
-  },
-  infoBox: {
-    backgroundColor: semanticColors.infoBackground,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    borderLeftWidth: 4,
-    borderLeftColor: lightColors.primary,
-  },
-  infoTitle: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semiBold as '600',
-    color: semanticColors.infoText,
-    marginBottom: spacing.xs,
-  },
-  infoText: {
-    fontSize: typography.fontSize.sm,
-    color: lightColors.textPrimary,
-    lineHeight: 20,
   },
 });
 

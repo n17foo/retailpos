@@ -1,32 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Modal, Image } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useOfflineProducts, Product } from '../../catalogue/hooks/useOfflineProducts';
 import { useOfflineCategories } from '../../catalogue/hooks/useOfflineCategories';
-import { formatMoney } from '../../../shared/utils/money';
 import { useCurrency } from '../../platform-clients/hooks/useCurrency';
-import { elevation, lightColors } from '../../../shared/utils/theme';
-
-interface ProductFormData {
-  title: string;
-  description: string;
-  price: string;
-  sku: string;
-  barcode: string;
-  stock: string;
-  categoryId: string;
-  imageUrl: string;
-}
-
-const emptyFormData: ProductFormData = {
-  title: '',
-  description: '',
-  price: '',
-  sku: '',
-  barcode: '',
-  stock: '',
-  categoryId: '',
-  imageUrl: '',
-};
+import { productManagementStyles as styles } from '../components/productManagementStyles';
+import { ProductCard } from '../components/ProductCard';
+import { ProductFormModal } from '../components/ProductFormModal';
+import { EMPTY_PRODUCT_FORM, ProductFormData } from '../utils/productFormData';
 
 const ProductManagementTab: React.FC = () => {
   const currency = useCurrency();
@@ -36,11 +16,11 @@ const ProductManagementTab: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [formData, setFormData] = useState<ProductFormData>(emptyFormData);
+  const [formData, setFormData] = useState<ProductFormData>({ ...EMPTY_PRODUCT_FORM });
   const [searchQuery, setSearchQuery] = useState('');
 
   const resetForm = () => {
-    setFormData(emptyFormData);
+    setFormData({ ...EMPTY_PRODUCT_FORM });
     setSelectedProduct(null);
     setIsEditing(false);
   };
@@ -139,154 +119,6 @@ const ProductManagementTab: React.FC = () => {
       p.variants?.some(v => v.barcode?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const renderProductCard = (product: Product) => {
-    const defaultVariant = product.variants?.[0];
-    const primaryImage = product.images?.[0];
-
-    return (
-      <View key={product.id} style={styles.productCard}>
-        <View style={styles.productImageContainer}>
-          {primaryImage?.url ? (
-            <Image source={{ uri: primaryImage.url }} style={styles.productImage} resizeMode="cover" />
-          ) : (
-            <View style={styles.productImagePlaceholder}>
-              <Text style={styles.placeholderText}>No Image</Text>
-            </View>
-          )}
-        </View>
-        <View style={styles.productInfo}>
-          <Text style={styles.productTitle} numberOfLines={2}>
-            {product.title}
-          </Text>
-          <Text style={styles.productPrice}>{formatMoney(defaultVariant?.price || 0, currency.code)}</Text>
-          {defaultVariant?.sku && <Text style={styles.productSku}>SKU: {defaultVariant.sku}</Text>}
-          <Text style={styles.productStock}>Stock: {defaultVariant?.inventoryQuantity || 0}</Text>
-          {product.productType && <Text style={styles.productCategory}>{product.productType}</Text>}
-        </View>
-        <View style={styles.productActions}>
-          <TouchableOpacity style={styles.editButton} onPress={() => handleEditProduct(product)}>
-            <Text style={styles.editButtonText}>Edit</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.deleteButton} onPress={() => handleDeleteProduct(product)}>
-            <Text style={styles.deleteButtonText}>Delete</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  };
-
-  const renderModal = () => (
-    <Modal visible={showModal} animationType="slide" transparent>
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalContent}>
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.modalTitle}>{isEditing ? 'Edit Product' : 'Add New Product'}</Text>
-
-            <Text style={styles.inputLabel}>Title *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.title}
-              onChangeText={text => setFormData({ ...formData, title: text })}
-              placeholder="Product title"
-            />
-
-            <Text style={styles.inputLabel}>Description</Text>
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              value={formData.description}
-              onChangeText={text => setFormData({ ...formData, description: text })}
-              placeholder="Product description"
-              multiline
-              numberOfLines={3}
-            />
-
-            <Text style={styles.inputLabel}>Price *</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.price}
-              onChangeText={text => setFormData({ ...formData, price: text })}
-              placeholder="0.00"
-              keyboardType="decimal-pad"
-            />
-
-            <Text style={styles.inputLabel}>SKU</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.sku}
-              onChangeText={text => setFormData({ ...formData, sku: text })}
-              placeholder="Stock keeping unit"
-              autoCapitalize="characters"
-            />
-
-            <Text style={styles.inputLabel}>Barcode</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.barcode}
-              onChangeText={text => setFormData({ ...formData, barcode: text })}
-              placeholder="Barcode / UPC"
-              keyboardType="number-pad"
-            />
-
-            <Text style={styles.inputLabel}>Stock Quantity</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.stock}
-              onChangeText={text => setFormData({ ...formData, stock: text })}
-              placeholder="0"
-              keyboardType="number-pad"
-            />
-
-            <Text style={styles.inputLabel}>Category</Text>
-            <View style={styles.categorySelector}>
-              <TouchableOpacity
-                style={[styles.categoryOption, !formData.categoryId && styles.categoryOptionSelected]}
-                onPress={() => setFormData({ ...formData, categoryId: '' })}
-              >
-                <Text style={[styles.categoryOptionText, !formData.categoryId && styles.categoryOptionTextSelected]}>None</Text>
-              </TouchableOpacity>
-              {categories.map(cat => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[styles.categoryOption, formData.categoryId === cat.name && styles.categoryOptionSelected]}
-                  onPress={() => setFormData({ ...formData, categoryId: cat.name })}
-                >
-                  <Text style={[styles.categoryOptionText, formData.categoryId === cat.name && styles.categoryOptionTextSelected]}>
-                    {cat.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={styles.inputLabel}>Image URL</Text>
-            <TextInput
-              style={styles.input}
-              value={formData.imageUrl}
-              onChangeText={text => setFormData({ ...formData, imageUrl: text })}
-              placeholder="https://example.com/image.jpg"
-              autoCapitalize="none"
-              keyboardType="url"
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowModal(false);
-                  resetForm();
-                }}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalButton, styles.saveButton]} onPress={handleSaveProduct}>
-                <Text style={styles.saveButtonText}>{isEditing ? 'Update' : 'Create'}</Text>
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
-  );
-
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
@@ -314,7 +146,15 @@ const ProductManagementTab: React.FC = () => {
             {searchQuery ? 'No products match your search.' : 'No products found. Add your first product above.'}
           </Text>
         ) : (
-          filteredProducts.map(renderProductCard)
+          filteredProducts.map(product => (
+            <ProductCard
+              key={product.id}
+              product={product}
+              currencyCode={currency.code}
+              onEdit={handleEditProduct}
+              onDelete={handleDeleteProduct}
+            />
+          ))
         )}
       </View>
 
@@ -322,247 +162,20 @@ const ProductManagementTab: React.FC = () => {
         <Text style={styles.statsText}>Total Products: {products.length}</Text>
       </View>
 
-      {renderModal()}
+      <ProductFormModal
+        visible={showModal}
+        isEditing={isEditing}
+        formData={formData}
+        categories={categories}
+        onFormChange={setFormData}
+        onCancel={() => {
+          setShowModal(false);
+          resetForm();
+        }}
+        onSubmit={handleSaveProduct}
+      />
     </ScrollView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: lightColors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-    backgroundColor: lightColors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: lightColors.border,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  addButton: {
-    backgroundColor: lightColors.primary,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: lightColors.textOnPrimary,
-    fontWeight: '600',
-  },
-  searchContainer: {
-    padding: 15,
-    backgroundColor: lightColors.surface,
-  },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: lightColors.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-  },
-  productList: {
-    padding: 15,
-  },
-  productCard: {
-    backgroundColor: lightColors.surface,
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 10,
-    flexDirection: 'row',
-    ...elevation.low,
-  },
-  productImageContainer: {
-    width: 80,
-    height: 80,
-    marginRight: 12,
-  },
-  productImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-  },
-  productImagePlaceholder: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: lightColors.inputBackground,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderText: {
-    fontSize: 10,
-    color: lightColors.textHint,
-  },
-  productInfo: {
-    flex: 1,
-  },
-  productTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  productPrice: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: lightColors.primary,
-    marginBottom: 4,
-  },
-  productSku: {
-    fontSize: 12,
-    color: lightColors.textSecondary,
-  },
-  productStock: {
-    fontSize: 12,
-    color: lightColors.textSecondary,
-  },
-  productCategory: {
-    fontSize: 11,
-    color: lightColors.textHint,
-    marginTop: 4,
-    backgroundColor: lightColors.inputBackground,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-  },
-  productActions: {
-    justifyContent: 'center',
-    gap: 8,
-  },
-  editButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: lightColors.inputBackground,
-  },
-  editButtonText: {
-    fontSize: 14,
-    color: lightColors.textPrimary,
-  },
-  deleteButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: lightColors.error + '15',
-  },
-  deleteButtonText: {
-    fontSize: 14,
-    color: lightColors.error,
-  },
-  statsContainer: {
-    padding: 15,
-    alignItems: 'center',
-  },
-  statsText: {
-    fontSize: 14,
-    color: lightColors.textSecondary,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: lightColors.overlay,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: lightColors.surface,
-    borderRadius: 15,
-    padding: 20,
-    width: '90%',
-    maxHeight: '90%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 5,
-    color: lightColors.textPrimary,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: lightColors.border,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 15,
-    fontSize: 16,
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  categorySelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 15,
-    gap: 8,
-  },
-  categoryOption: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: lightColors.border,
-  },
-  categoryOptionSelected: {
-    backgroundColor: lightColors.primary,
-    borderColor: lightColors.primary,
-  },
-  categoryOptionText: {
-    fontSize: 12,
-    color: lightColors.textPrimary,
-  },
-  categoryOptionTextSelected: {
-    color: lightColors.textOnPrimary,
-    fontWeight: '600',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 20,
-  },
-  modalButton: {
-    paddingHorizontal: 25,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  cancelButton: {
-    backgroundColor: lightColors.inputBackground,
-  },
-  cancelButtonText: {
-    color: lightColors.textPrimary,
-  },
-  saveButton: {
-    backgroundColor: lightColors.primary,
-  },
-  saveButtonText: {
-    color: lightColors.textOnPrimary,
-    fontWeight: '600',
-  },
-  errorText: {
-    color: lightColors.error,
-    padding: 15,
-    textAlign: 'center',
-  },
-  loadingText: {
-    color: lightColors.textSecondary,
-    padding: 15,
-    textAlign: 'center',
-  },
-  emptyText: {
-    color: lightColors.textSecondary,
-    textAlign: 'center',
-    padding: 30,
-  },
-});
 
 export default ProductManagementTab;
