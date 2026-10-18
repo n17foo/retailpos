@@ -7647,6 +7647,11 @@ react-native-logs@5.6.0:
   resolved "https://registry.yarnpkg.com/react-native-logs/-/react-native-logs-5.6.0.tgz#4abb199a746c429e901290c5cdac1dcc38f1cd1c"
   integrity sha512-+5A/AlepSGvaT2RE8YpoLOUNxfra8WBqUOM/GBjggCnfH5+RaCDThpKL6QnengAf+Limmoidm9YXPFzQ9cj3bQ==
 
+react-native-nitro-image@0.15.2:
+  version "0.15.2"
+  resolved "https://registry.yarnpkg.com/react-native-nitro-image/-/react-native-nitro-image-0.15.2.tgz#d7807f4a12ee7ecbc94990b2290d83b16fef9165"
+  integrity sha512-WiaGnORmfNIIqtRJW76TWYNet1YZx1MWDlSOxd0jfcIBN4KjkVVMDVpvO01eCfpxKVG0ez9nA2iLQkPVlGFj+A==
+
 react-native-nitro-modules@^0.37.1:
   version "0.37.1"
   resolved "https://registry.yarnpkg.com/react-native-nitro-modules/-/react-native-nitro-modules-0.37.1.tgz#368bda3038ebe796b219d98e0a364f9166e2cc7c"
