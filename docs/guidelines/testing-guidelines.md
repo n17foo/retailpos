@@ -10,7 +10,6 @@ Place tests adjacent to source, inside the feature slice:
 features/basket/services/
 ├── BasketService.ts
 ├── BasketService.test.ts                    ← unit
-├── BasketService.integration.test.ts        ← integration (optional)
 
 shared/utils/
 ├── money.ts
@@ -20,7 +19,6 @@ shared/utils/
 **Configs**:
 
 - `tests/jest.config.js` — unit tests (`yarn test`)
-- `tests/jest.integration.config.js` — integration tests (`yarn test:integration`)
 
 ---
 
@@ -116,8 +114,6 @@ describe('BasketService', () => {
 
 ```bash
 yarn test                  # unit tests
-yarn test:integration      # integration tests
-yarn test:all              # unit + integration
 yarn test:watch            # watch mode
 yarn test:coverage         # coverage report
 

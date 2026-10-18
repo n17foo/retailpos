@@ -4,8 +4,7 @@ module.exports = {
   testEnvironment: 'node',
   roots: ['<rootDir>/..'],
   testMatch: ['**/__tests__/**/*.test.ts?(x)', '**/*.test.ts?(x)'],
-  // Exclude integration tests from default test runs
-  testPathIgnorePatterns: ['/node_modules/', '/tests/integration/'],
+  testPathIgnorePatterns: ['/node_modules/'],
   moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
   globals: {
     // React Native global — not defined in the node test environment

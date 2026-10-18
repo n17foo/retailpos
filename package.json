@@ -17,8 +17,6 @@
     "desktop:build-linux": "expo export --platform web && electron-builder --linux --publish=never",
     "test": "jest --config tests/jest.config.js --no-coverage --no-cache",
     "test:unit": "jest --config tests/jest.config.js --no-coverage --no-cache",
-    "test:integration": "jest --config tests/jest.integration.config.js --no-coverage --no-cache",
-    "test:all": "npm run test:unit && npm run test:integration",
     "test:watch": "jest --config tests/jest.config.js --watch --no-cache",
     "test:coverage": "jest --config tests/jest.config.js --coverage --no-cache",
     "release": "standard-version",
