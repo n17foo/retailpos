@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { TextInput, StyleSheet, Platform } from 'react-native';
+import { TextInput, StyleSheet, Platform, type TextInputInstance } from 'react-native';
 import { HidBurstDetector } from '../utils/hidBurst';
 import { scannerSettingsService } from '../../hardware/services/scanner/ScannerSettingsService';
 
@@ -24,7 +24,7 @@ const REFOCUS_MS = 400;
  * the same job, so this renders nothing.
  */
 export const HidCaptureField: React.FC<HidCaptureFieldProps> = ({ onScan }) => {
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const onScanRef = useRef(onScan);
   onScanRef.current = onScan;
 

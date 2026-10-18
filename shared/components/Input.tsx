@@ -1,5 +1,15 @@
 import React, { useState, forwardRef } from 'react';
-import { View, Text, TextInput, StyleSheet, ViewStyle, TextStyle, TextInputProps, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+  TextInputProps,
+  TouchableOpacity,
+  type TextInputInstance,
+} from 'react-native';
 import { lightColors, spacing, borderRadius, typography } from '../utils/theme';
 
 export type InputSize = 'sm' | 'md' | 'lg';
@@ -36,7 +46,7 @@ interface InputProps extends TextInputProps {
 /**
  * Reusable Input component with label, error states, and icons
  */
-export const Input = forwardRef<TextInput, InputProps>(
+export const Input = forwardRef<TextInputInstance, InputProps>(
   (
     {
       label,

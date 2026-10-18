@@ -30,6 +30,7 @@ module.exports = {
     '^react-native-logs$': '<rootDir>/__mocks__/react-native-logs.ts',
     '^expo-sqlite$': '<rootDir>/__mocks__/expo-sqlite.ts',
     '^react-native-http-bridge$': '<rootDir>/__mocks__/react-native-http-bridge.ts',
+    '^react-native-get-random-values$': '<rootDir>/__mocks__/react-native-get-random-values.ts',
     '^@env$': '<rootDir>/__mocks__/@env.ts',
     '^uuid$': '<rootDir>/__mocks__/uuid.ts',
     '^@expo/vector-icons$': '<rootDir>/__mocks__/uiMocks.ts',

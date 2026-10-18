@@ -1,5 +1,5 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { View, TextInput, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, TextInput, Pressable, StyleSheet, ActivityIndicator, type TextInputInstance } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, borderRadius, typography, interactionStyle } from '../../../shared/utils/theme';
 
@@ -42,7 +42,7 @@ export const Omnibar = forwardRef<OmnibarHandle, OmnibarProps>(function Omnibar(
   },
   ref
 ) {
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const [expanded, setExpanded] = useState(!collapsed);
 
   useImperativeHandle(ref, () => ({

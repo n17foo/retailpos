@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "types": ["jest"],
-    "strict": true
+    "strict": true,
+    "isolatedModules": true
   },
   "extends": "expo/tsconfig.base"
 }

@@ -159,7 +159,7 @@ const CustomerSearchModal: React.FC<CustomerSearchModalProps> = ({ visible, plat
                       <Text style={styles.emptyTitle}>{t('customerSearch.searchPrompt')}</Text>
                       <Text style={styles.emptyDescription}>{t('customerSearch.searchPromptDescription')}</Text>
                     </View>
-                  ) : null
+                  ) : undefined
                 }
                 onEndReached={hasMore ? loadMore : undefined}
                 onEndReachedThreshold={0.3}

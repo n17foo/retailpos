@@ -14,7 +14,7 @@ export { OrderSyncService } from './services/sync/OrderSyncService';
 export type { OrderSyncServiceInterface } from './services/sync/OrderSyncServiceInterface';
 export { BackgroundSyncService, backgroundSyncService } from './services/sync/BackgroundSyncService';
 export { SyncServiceFactory } from './services/sync/SyncServiceFactory';
-export { OrderRepository, orderRepository, getOrderRepository } from './repositories/OrderRepository';
+export { type OrderRepository, orderRepository, getOrderRepository } from './repositories/OrderRepository';
 export type { OrderRow, CreateOrderInput } from './repositories/OrderRepository';
 export { OrderItemRepository, orderItemRepository } from './repositories/OrderItemRepository';
 export type { OrderItemRow } from './repositories/OrderItemRepository';
