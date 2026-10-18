@@ -177,11 +177,14 @@ Three fixed, immutable roles. Role rank: `admin (3) > manager (2) > cashier (1)`
 
 ## Register Modes (Multi-Register)
 
-| Mode         | Data source    | Hosts Instore API | Store-API Connection |
-| ------------ | -------------- | ----------------- | -------------------- |
-| `standalone` | Local SQLite   | No                | None                 |
-| `server`     | Local SQLite   | Yes — LAN HTTP    | WebSocket + REST     |
-| `client`     | Server via LAN | No                | WebSocket + REST     |
+| Mode         | Data source    | Hosts Instore API                 | Store-API Connection |
+| ------------ | -------------- | --------------------------------- | -------------------- |
+| `standalone` | Local SQLite   | No                                | None                 |
+| `server`     | Local SQLite   | Yes — LAN HTTP (desktop app only) | WebSocket + REST     |
+| `client`     | Server via LAN | No                                | WebSocket + REST     |
+
+The `server` HTTP listener runs in the Electron main process — Android/iOS
+registers are client-only and never open a listening socket.
 
 In `client` or `server` mode the POS also establishes a **WebSocket connection** to the store-api (`/ws`) for real-time outbox delivery. The connection uses the HELLO/replay/snapshot state machine:
 

@@ -2,9 +2,11 @@
 
 ## R1 — Exactly one server; clients never touch SQLite directly
 
-**Rule.** `mode=server` hosts the API + owns the DB; `mode=client` sends every
-read/write through `InstoreApiTransport`; `standalone` (default) disables
-networking entirely.
+**Rule.** `mode=server` hosts the API + owns the DB and is only selectable on
+the desktop (Electron) app — the HTTP listener lives in the Electron main
+process, and mobile registers never host; `mode=client` sends every
+read/write through signed HTTP to the server; `standalone` (default)
+disables networking entirely.
 
 **Evidence.** `features/multi-register/services/InstoreApiConfig.ts`,
 `InstoreApiServer.ts`.
@@ -123,13 +125,15 @@ validation inside the handler (verify — Q1).
 ## Feature Context Summary
 
 **Feature**: Multi-register (Instore API)
-**Responsibility**: server/client/standalone modes; LAN HTTP API over shared
-SQLite; HMAC-signed requests with nonce replay protection; subnet discovery;
-websocket + poller event sync; PED payment orchestration endpoint.
+**Responsibility**: server/client/standalone modes (server is desktop-only —
+the HTTP listener runs in the Electron main process); LAN HTTP API over
+shared SQLite; HMAC-signed requests with nonce replay protection; subnet
+discovery; websocket + poller event sync; PED payment orchestration
+endpoint.
 
 **Core rules**
 
-- R1 One server owns the DB; clients call it.
+- R1 One server owns the DB (desktop app only); clients call it.
 - R2 Every call signed; replayed nonces rejected; 2 exempt routes.
 - R3 Empty secret auto-generates on server start.
 - R4 PIN-verify is rate-guarded.

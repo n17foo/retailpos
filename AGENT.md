@@ -62,26 +62,26 @@ Each `features/<domain>/` may contain `components/`, `contexts/`, `hooks/`, `rep
 
 ### Key `features/` directories
 
-| Feature             | Purpose                                                                                                                          |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `authentication/`   | Pluggable multi-method auth (PIN, biometric, password, magstripe, RFID/NFC, platform) + users & permissions                      |
-| `basket/`           | BasketService — cart CRUD; basket state/actions providers                                                                        |
-| `catalogue/`        | Product + category services (9 platforms + offline); CategoryProvider                                                            |
-| `checkout/`         | CheckoutService, tax quote, sale/checkout providers + screens                                                                    |
-| `customers/`        | Customer lookup (9 platforms), loyalty, store credit                                                                             |
-| `discounts/`        | Coupon / discount validation (9 platforms + local)                                                                               |
-| `hardware/`         | Receipt printers, cash drawer, scanner drivers, KDS, customer display                                                            |
-| `inventory/`        | Inventory read/write (9 platforms), barcode labels                                                                               |
-| `multi-register/`   | In-store LAN API — server/client config, HMAC-signed transport, discovery, WebSocket + sync, PED orchestration                   |
-| `onboarding/`       | First-run wizard                                                                                                                 |
-| `orders-sync/`      | Order repositories + platform order services; OrderSyncService + BackgroundSyncService; order screens                            |
-| `payments/`         | Payment terminals — Stripe NFC, Stripe, Square, Adyen, Tap Payments, Instore API provider                                        |
-| `platform-clients/` | BaseApiClient + per-platform clients; config (POSConfigService, credentials, ProtectedValueStore); token lifecycle; tax profiles |
-| `procurement/`      | Purchase orders, vendors, stock-takes, transfer orders                                                                           |
-| `reporting/`        | Sales analytics, CSV export                                                                                                      |
-| `returns/`          | Returns + refunds (platform refund adapters), exchanges                                                                          |
-| `scanning/`         | Scan-input hooks/components(drivers live in `hardware/services/scanner`)                                                         |
-| `settings/`         | Settings screens + `SettingsTabComposer` (role-gated tabs)                                                                       |
+| Feature             | Purpose                                                                                                                           |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `authentication/`   | Pluggable multi-method auth (PIN, biometric, password, magstripe, RFID/NFC, platform) + users & permissions                       |
+| `basket/`           | BasketService — cart CRUD; basket state/actions providers                                                                         |
+| `catalogue/`        | Product + category services (9 platforms + offline); CategoryProvider                                                             |
+| `checkout/`         | CheckoutService, tax quote, sale/checkout providers + screens                                                                     |
+| `customers/`        | Customer lookup (9 platforms), loyalty, store credit                                                                              |
+| `discounts/`        | Coupon / discount validation (9 platforms + local)                                                                                |
+| `hardware/`         | Receipt printers, cash drawer, scanner drivers, KDS, customer display                                                             |
+| `inventory/`        | Inventory read/write (9 platforms), barcode labels                                                                                |
+| `multi-register/`   | In-store LAN API — server (desktop app only)/client config, HMAC-signed transport, discovery, WebSocket + sync, PED orchestration |
+| `onboarding/`       | First-run wizard                                                                                                                  |
+| `orders-sync/`      | Order repositories + platform order services; OrderSyncService + BackgroundSyncService; order screens                             |
+| `payments/`         | Payment terminals — Stripe NFC, Stripe, Square, Adyen, Tap Payments, Instore API provider                                         |
+| `platform-clients/` | BaseApiClient + per-platform clients; config (POSConfigService, credentials, ProtectedValueStore); token lifecycle; tax profiles  |
+| `procurement/`      | Purchase orders, vendors, stock-takes, transfer orders                                                                            |
+| `reporting/`        | Sales analytics, CSV export                                                                                                       |
+| `returns/`          | Returns + refunds (platform refund adapters), exchanges                                                                           |
+| `scanning/`         | Scan-input hooks/components(drivers live in `hardware/services/scanner`)                                                          |
+| `settings/`         | Settings screens + `SettingsTabComposer` (role-gated tabs)                                                                        |
 
 ---
 

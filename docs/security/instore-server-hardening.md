@@ -18,8 +18,8 @@
       `docs/features/multi-register/rules.md`).
 - [ ] The server has a **static DHCP reservation**; clients need a stable
       `serverAddress`.
-- [ ] Wired Ethernet preferred. A tablet server must have a permanent
-      charging plan — the server dying stops all client registers.
+- [ ] Wired Ethernet preferred. The server runs on the desktop app — keep it
+      on mains power/UPS; the server dying stops all client registers.
 - [ ] Device is enrolled in MDM / kiosk mode: no unrelated apps, screen-lock
       enforced, OS auto-updates scheduled off-hours.
 - [ ] OS firewall allows only TCP 8787 inbound (plus VPN management).

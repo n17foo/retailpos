@@ -14,7 +14,7 @@ Website: [retailpos.org](https://retailpos.org)
 
 - **Multi-Platform Support** — Shopify, WooCommerce, BigCommerce, Magento, Sylius, Wix, PrestaShop, Commercefull, Offline
 - **Offline-First** — Full POS functionality without internet; background sync with retry and exponential backoff
-- **Multi-Register** — Server/client mode over LAN with event-driven sync (SyncEventBus + SyncPoller)
+- **Multi-Register** — In-store server (hosted by the desktop app) plus client registers over LAN, with event-driven sync (SyncEventBus + SyncPoller)
 - **Product Variants** — Option-based variants with inventory tracking and barcode lookup
 - **Tax Profiles** — Configurable tax rates; platform-authoritative tax for online orders
 - **Checkout Flow** — Draft order creation, payment recording, cash drawer integration
@@ -344,7 +344,7 @@ RetailPOS is built and maintained by **[N17](https://n17.foo)** — a software s
 
 - **Platform integration** — Shopify, WooCommerce, BigCommerce, Magento, and more
 - **Custom hardware setup** — scanners, printers, cash drawers, card terminals
-- **Multi-register deployment** — server/client mode across multiple registers
+- **Multi-register deployment** — desktop-hosted in-store server plus client registers
 - **Custom feature development** — loyalty, custom reporting, bespoke payment flows
 - **Production hardening** — PIN hashing, encrypted credentials, PCI guidance
 - **Staff training & onboarding**

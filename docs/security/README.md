@@ -6,11 +6,11 @@
 
 ## Documents
 
-| Document                                                   | Covers                                                                                                                                        |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| [network-segmentation.md](network-segmentation.md)         | Dedicated POS network / VLAN design, firewall rule matrix, peripheral segmentation, remote access. **Start here.**                            |
-| [instore-server-hardening.md](instore-server-hardening.md) | Checklist for operating the in-store server (register-as-server or dedicated store-api host): secrets, clock, upgrades, monitoring, failover. |
-| [security-controls.md](security-controls.md)               | Implemented code-level controls (signed LAN requests, authz, auto-lock, CSV/SQL injection, redaction, Electron fuses) + residual risks.       |
+| Document                                                   | Covers                                                                                                                                                                                          |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [network-segmentation.md](network-segmentation.md)         | Dedicated POS network / VLAN design, firewall rule matrix, peripheral segmentation, remote access. **Start here.**                                                                              |
+| [instore-server-hardening.md](instore-server-hardening.md) | Checklist for operating the in-store server (desktop app in `server` mode or dedicated store-api host — Android/iOS registers are client-only): secrets, clock, upgrades, monitoring, failover. |
+| [security-controls.md](security-controls.md)               | Implemented code-level controls (signed LAN requests, authz, auto-lock, CSV/SQL injection, redaction, Electron fuses) + residual risks.                                                         |
 
 ## Threat model (short version)
 

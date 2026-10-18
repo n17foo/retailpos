@@ -2,12 +2,15 @@
 
 ## Purpose
 
-Several registers share one local database over the LAN. One device runs as
-**server** (hosts an HTTP API on its SQLite data), others run as **clients**
-(call it instead of touching a local DB). Discovery finds servers on the
-subnet, HMAC request signing authenticates every call, and a WebSocket/sync
-layer pushes order/product events so client registers see each other's work
-in real time. `standalone` mode = single register, no networking.
+Several registers share one local database over the LAN. The **server** role
+runs only on the desktop (Electron) app — or a dedicated store-api host —
+which owns the SQLite data and hosts the HTTP API on port 8787 (the listener
+lives in the Electron main process; requests reach the renderer over IPC).
+Android/iOS registers always run as **clients** — they never open a
+listening socket. Discovery finds servers on the subnet, HMAC request
+signing authenticates every call, and a WebSocket/sync layer pushes
+order/product events so client registers see each other's work in real
+time. `standalone` mode = single register, no networking.
 
 ## Scope
 
@@ -21,7 +24,10 @@ in real time. `standalone` mode = single register, no networking.
   sync events, snapshot, commercefull webhook).
 - `InstoreApiDiscovery` — subnet scan for `/api/health` responders
   (no mDNS dependency).
-- `InstoreApiTransport` — client-side signed HTTP calls.
+- `InstoreApiTransport` — server-side transport: binds `InstoreApiServer` to
+  the Electron main-process HTTP listener over IPC (`instore-server-start`
+  / `instore-server-request` / `instore-server-respond`). Throws on
+  non-Electron platforms — server mode is desktop-only.
 - `requestSigning` — `x-instore-signature` HMAC-SHA256 over
   `method\npath\ntimestamp\nnonce\nsha256(body)`; nonce replay cache;
   verify-pin brute-force guard.
@@ -41,7 +47,8 @@ in real time. `standalone` mode = single register, no networking.
 ## Entry Points
 
 - **Settings → Instore API tab** — pick mode, generate/copy shared secret,
-  name the register, set server address/port.
+  name the register, set server address/port. The `server` option is only
+  shown on the desktop app; mobile registers offer `standalone`/`client`.
 - **Discovery** — client registers scan the subnet for `/api/health`.
 - **App start** — `App.tsx` starts/stops `instoreApiServer`,
   `storeApiConnectionManager`, `syncPoller` based on mode.
@@ -49,12 +56,14 @@ in real time. `standalone` mode = single register, no networking.
 ## Feature Flow
 
 ```
-Server register (mode=server):
-  InstoreApiServer.start(port) → routes serve local repos
-    + auth on every route except /api/health + /api/webhooks/commercefull
+Desktop app (mode=server):
+  InstoreApiTransport.start(port)
+    → Electron main process binds HTTP :8787, forwards requests via IPC
+    → InstoreApiServer routes serve local repos
+      + auth on every route except /api/health + /api/webhooks/commercefull
   websocket broadcasts domain events
 
-Client register (mode=client):
+Client register (mode=client — the only networked mode on Android/iOS):
   Discovery.scanSubnet → list of {address, registerId, registerName}
     → configure serverAddress:port + sharedSecret
     → every call: signRequest(secret, method, path, body)
