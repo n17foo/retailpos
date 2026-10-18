@@ -94,10 +94,10 @@ non-443 egress denied.
 
 Two ways to run multi-register (see `docs/features/multi-register/README.md`):
 
-| Option                                         | When to use                                                    | Network notes                                                                                                                                                                   |
-| ---------------------------------------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Register in `server` mode**                  | Small sites, 2–4 registers                                     | A tablet/desktop hosts port 8787. Give it a **DHCP reservation / static IP** — clients point at `serverAddress` and discovery probes it. Prefer wired Ethernet for this device. |
-| **Dedicated store-api / integration-hub host** | Larger sites, PED orchestration (ADR-015), webhook termination | Small always-on box/VM inside VLAN 10. Better uptime than a tablet, and the right place to terminate Commercefull webhooks (§4).                                                |
+| Option                                         | When to use                                                    | Network notes                                                                                                                                                                                                                                               |
+| ---------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Register in `server` mode**                  | Small sites, 2–4 registers                                     | The desktop (Electron) app hosts port 8787 — Android/iOS registers are client-only and never listen. Give the desktop a **DHCP reservation / static IP** — clients point at `serverAddress` and discovery probes it. Prefer wired Ethernet for this device. |
+| **Dedicated store-api / integration-hub host** | Larger sites, PED orchestration (ADR-015), webhook termination | Small always-on box/VM inside VLAN 10. Better uptime than a tablet, and the right place to terminate Commercefull webhooks (§4).                                                                                                                            |
 
 Rules that apply to both:
 

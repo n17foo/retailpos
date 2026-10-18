@@ -9,6 +9,7 @@ import { instoreApiDiscovery, DiscoveredServer } from '../../multi-register/serv
 import { BasketServiceFactory } from '../../basket/services/BasketServiceFactory';
 import { syncPoller } from '../../multi-register/services/sync/SyncPoller';
 import { generateUUID } from '../../../shared/utils/uuid';
+import { isElectron } from '../../../shared/utils/electron';
 import { useTranslate } from '../../../shared/hooks/useTranslate';
 
 const MODE_OPTION_KEYS: { value: InstoreApiMode; labelKey: string; descKey: string }[] = [
@@ -16,6 +17,10 @@ const MODE_OPTION_KEYS: { value: InstoreApiMode; labelKey: string; descKey: stri
   { value: 'server', labelKey: 'settings.instoreApi.server', descKey: 'settings.instoreApi.serverDesc' },
   { value: 'client', labelKey: 'settings.instoreApi.client', descKey: 'settings.instoreApi.clientDesc' },
 ];
+
+// Only the desktop app can host the in-store HTTP API — mobile registers are
+// always clients and never open a listening socket.
+const modeOptions = () => MODE_OPTION_KEYS.filter(opt => opt.value !== 'server' || isElectron());
 
 const InstoreApiSettingsTab: React.FC = () => {
   const { t } = useTranslate();
@@ -125,7 +130,7 @@ const InstoreApiSettingsTab: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('settings.instoreApi.mode')}</Text>
         <View style={styles.modeRow}>
-          {MODE_OPTION_KEYS.map(opt => (
+          {modeOptions().map(opt => (
             <TouchableOpacity
               key={opt.value}
               style={[styles.modeCard, mode === opt.value && styles.modeCardActive]}

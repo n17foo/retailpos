@@ -92,7 +92,8 @@ Client register (mode=client):
 
 ## Side Effects
 
-- HTTP server bound to port 8787 on the server device.
+- HTTP server bound to port 8787 on the server device — hosted by the Electron
+  main process on desktop; Android/iOS registers are client-only.
 - Every client mutation hits server SQLite (the authoritative store).
 - WebSocket events broadcast to clients → UI re-fetches.
 - Auto-generated shared secret logged once for operator to copy.

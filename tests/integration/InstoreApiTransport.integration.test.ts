@@ -2,10 +2,11 @@
  * InstoreApiTransport Integration Test
  *
  * Tests the HTTP transport layer for multi-register functionality.
- * Note: This test requires react-native-http-bridge to be properly linked.
+ * The listening socket lives in the Electron main process; these tests mock
+ * the `electronAPI` IPC surface the renderer-side transport binds to.
  */
 
-import { Platform } from 'react-native';
+import type { ElectronInstoreServerRequest } from '../../shared/utils/electron';
 import { instoreApiConfig } from '../../features/multi-register/services/InstoreApiConfig';
 import { instoreApiServer } from '../../features/multi-register/services/InstoreApiServer';
 import { instoreApiTransport } from '../../features/multi-register/services/InstoreApiTransport';
@@ -13,6 +14,27 @@ import { CommercefullWebhookReceiver } from '../../features/platform-clients/ser
 import { SIGNATURE_HEADERS, signRequest } from '../../features/multi-register/services/requestSigning';
 
 const TEST_SECRET = 'test-secret';
+
+// Mock the Electron IPC surface — the transport's only platform dependency.
+const mockElectronApi = {
+  instoreServerStart: jest.fn(async (_port: number) => true),
+  instoreServerStop: jest.fn(async () => true),
+  instoreServerRespond: jest.fn(async (_requestId: string, _status: number, _mimeType: string, _body: string) => true),
+  onInstoreServerRequest: jest.fn((_callback: (request: ElectronInstoreServerRequest) => void) => () => {}),
+};
+let mockElectronAvailable = true;
+
+jest.mock('../../shared/utils/electron', () => ({
+  ...jest.requireActual('../../shared/utils/electron'),
+  getElectronAPI: () => (mockElectronAvailable ? mockElectronApi : null),
+}));
+
+/** The request listener the transport registered via onInstoreServerRequest. */
+function requestListener(): (request: ElectronInstoreServerRequest) => void {
+  const callback = mockElectronApi.onInstoreServerRequest.mock.calls[0]?.[0];
+  if (!callback) throw new Error('No in-store request listener registered');
+  return callback;
+}
 
 /** Build the HMAC signature headers a real client would send. */
 function signedHeaders(method: string, pathWithQuery: string, rawBody = '', secret = TEST_SECRET): Record<string, string> {
@@ -25,25 +47,11 @@ function signedHeaders(method: string, pathWithQuery: string, rawBody = '', secr
   };
 }
 
-// Mock react-native-http-bridge for testing
-jest.mock('react-native-http-bridge', () => ({
-  start: jest.fn((_port: number, _serviceName: string, _callback: Function) => {
-    // Simulate successful start
-    // eslint-disable-next-line no-console
-    console.log(`Mock HTTP bridge started on port ${_port}`);
-  }),
-  stop: jest.fn(() => {
-    // eslint-disable-next-line no-console
-    console.log('Mock HTTP bridge stopped');
-  }),
-  respond: jest.fn((_requestId: string, status: number, _contentType: string, _body: string) => {
-    // eslint-disable-next-line no-console
-    console.log(`Mock response: ${status} ${_body}`);
-  }),
-}));
-
 describe('InstoreApiTransport', () => {
   beforeEach(async () => {
+    mockElectronAvailable = true;
+    jest.clearAllMocks();
+
     // Reset to server mode for testing
     await instoreApiConfig.save({
       mode: 'server',
@@ -113,54 +121,39 @@ describe('InstoreApiTransport', () => {
   });
 
   describe('Platform Support', () => {
-    it('should handle web platform gracefully', async () => {
-      // Mock Platform.OS to be 'web'
-      const originalOS = Platform.OS;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (Platform as any).OS = 'web';
+    it('should refuse server mode outside the desktop app', async () => {
+      mockElectronAvailable = false;
 
-      // Should not throw, but should warn
-      await instoreApiTransport.start();
+      await expect(instoreApiTransport.start()).rejects.toThrow('desktop app');
       expect(instoreApiTransport.isListening).toBe(false);
-
-      // Restore original OS
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (Platform as any).OS = originalOS;
     });
   });
 
   describe('Error Handling', () => {
     it('should handle transport start failure', async () => {
-      // Mock http-bridge to throw error
-      const httpBridge = require('react-native-http-bridge');
-      httpBridge.start.mockImplementationOnce(() => {
-        throw new Error('Port already in use');
-      });
+      mockElectronApi.instoreServerStart.mockRejectedValueOnce(new Error('Port already in use'));
 
       await expect(instoreApiTransport.start()).rejects.toThrow('Port already in use');
       expect(instoreApiTransport.isListening).toBe(false);
     });
 
-    it('should handle missing http-bridge gracefully', async () => {
-      // This test would need to be run in an environment where the module is not available
-      // For now, we just verify the error handling path exists
-      expect(instoreApiTransport.isListening).toBe(false);
+    it('should unsubscribe request listener when start fails', async () => {
+      const unsubscribe = jest.fn();
+      mockElectronApi.onInstoreServerRequest.mockReturnValueOnce(unsubscribe);
+      mockElectronApi.instoreServerStart.mockRejectedValueOnce(new Error('Port already in use'));
+
+      await expect(instoreApiTransport.start()).rejects.toThrow('Port already in use');
+      expect(unsubscribe).toHaveBeenCalled();
     });
   });
 });
 
 describe('HTTP Request Handling', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let mockRequest: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let httpBridge: any;
+  let mockRequest: ElectronInstoreServerRequest;
 
   beforeEach(async () => {
-    // Get the http-bridge mock
-    httpBridge = require('react-native-http-bridge');
-
-    // Only clear the start mock to avoid accumulating callbacks
-    httpBridge.start.mockClear();
+    mockElectronAvailable = true;
+    jest.clearAllMocks();
 
     // Reset to server mode for testing
     await instoreApiConfig.save({
@@ -177,7 +170,7 @@ describe('HTTP Request Handling', () => {
       method: 'GET',
       url: 'http://localhost:8787/api/health',
       headers: {},
-      data: null,
+      data: '',
     };
   });
 
@@ -185,16 +178,14 @@ describe('HTTP Request Handling', () => {
     // Clean up
     await instoreApiTransport.stop();
     await instoreApiServer.stop();
-    // Clear respond mock after test
-    httpBridge.respond.mockClear();
   });
 
   it('should handle GET /api/health request', async () => {
     // Start the server (which starts the transport)
     await instoreApiServer.start();
 
-    // Get the callback function that was passed to httpBridge.start
-    const callback = httpBridge.start.mock.calls[0][2];
+    // Get the callback function registered via onInstoreServerRequest
+    const callback = requestListener();
 
     // Simulate an incoming request
     await callback(mockRequest);
@@ -203,12 +194,17 @@ describe('HTTP Request Handling', () => {
     await new Promise(resolve => setImmediate(resolve));
 
     // Verify response was sent
-    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 200, 'application/json', expect.stringContaining('"ok":true'));
+    expect(mockElectronApi.instoreServerRespond).toHaveBeenCalledWith(
+      'test-123',
+      200,
+      'application/json',
+      expect.stringContaining('"ok":true')
+    );
   });
 
   it('should reject the legacy shared-secret header', async () => {
     await instoreApiServer.start();
-    const callback = httpBridge.start.mock.calls[0][2];
+    const callback = requestListener();
 
     // Legacy auth is gone — a correct secret in the old header must still 401
     const unauthRequest = {
@@ -220,12 +216,17 @@ describe('HTTP Request Handling', () => {
     await callback(unauthRequest);
     await new Promise(resolve => setImmediate(resolve));
 
-    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 401, 'application/json', expect.stringContaining('"error":"Unauthorized"'));
+    expect(mockElectronApi.instoreServerRespond).toHaveBeenCalledWith(
+      'test-123',
+      401,
+      'application/json',
+      expect.stringContaining('"error":"Unauthorized"')
+    );
   });
 
   it('should accept a validly signed request', async () => {
     await instoreApiServer.start();
-    const callback = httpBridge.start.mock.calls[0][2];
+    const callback = requestListener();
 
     await callback({
       ...mockRequest,
@@ -234,12 +235,17 @@ describe('HTTP Request Handling', () => {
     });
     await new Promise(resolve => setImmediate(resolve));
 
-    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 200, 'application/json', expect.stringContaining('"ok":true'));
+    expect(mockElectronApi.instoreServerRespond).toHaveBeenCalledWith(
+      'test-123',
+      200,
+      'application/json',
+      expect.stringContaining('"ok":true')
+    );
   });
 
   it('should reject a signature computed with the wrong secret', async () => {
     await instoreApiServer.start();
-    const callback = httpBridge.start.mock.calls[0][2];
+    const callback = requestListener();
 
     await callback({
       ...mockRequest,
@@ -248,12 +254,17 @@ describe('HTTP Request Handling', () => {
     });
     await new Promise(resolve => setImmediate(resolve));
 
-    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 401, 'application/json', expect.stringContaining('"error":"Unauthorized"'));
+    expect(mockElectronApi.instoreServerRespond).toHaveBeenCalledWith(
+      'test-123',
+      401,
+      'application/json',
+      expect.stringContaining('"error":"Unauthorized"')
+    );
   });
 
   it('should reject a replayed nonce', async () => {
     await instoreApiServer.start();
-    const callback = httpBridge.start.mock.calls[0][2];
+    const callback = requestListener();
 
     const request = {
       ...mockRequest,
@@ -263,17 +274,27 @@ describe('HTTP Request Handling', () => {
 
     await callback({ ...request, requestId: 'first' });
     await new Promise(resolve => setImmediate(resolve));
-    expect(httpBridge.respond).toHaveBeenCalledWith('first', 200, 'application/json', expect.stringContaining('"ok":true'));
+    expect(mockElectronApi.instoreServerRespond).toHaveBeenCalledWith(
+      'first',
+      200,
+      'application/json',
+      expect.stringContaining('"ok":true')
+    );
 
     // Same signature headers — identical nonce must be rejected as replay
     await callback({ ...request, requestId: 'second' });
     await new Promise(resolve => setImmediate(resolve));
-    expect(httpBridge.respond).toHaveBeenCalledWith('second', 401, 'application/json', expect.stringContaining('"error":"Unauthorized"'));
+    expect(mockElectronApi.instoreServerRespond).toHaveBeenCalledWith(
+      'second',
+      401,
+      'application/json',
+      expect.stringContaining('"error":"Unauthorized"')
+    );
   });
 
   it('should handle JSON parsing for POST requests', async () => {
     await instoreApiServer.start();
-    const callback = httpBridge.start.mock.calls[0][2];
+    const callback = requestListener();
 
     const rawBody = JSON.stringify({
       order: { id: 'test-order', subtotal: 10.0, tax: 0, total: 10.0 },
@@ -293,12 +314,12 @@ describe('HTTP Request Handling', () => {
     await new Promise(resolve => setImmediate(resolve));
 
     // Should attempt to handle the request (may fail due to missing data, but should parse JSON)
-    expect(httpBridge.respond).toHaveBeenCalled();
+    expect(mockElectronApi.instoreServerRespond).toHaveBeenCalled();
   });
 
   it('should reject an order with invalid fields', async () => {
     await instoreApiServer.start();
-    const callback = httpBridge.start.mock.calls[0][2];
+    const callback = requestListener();
 
     const rawBody = JSON.stringify({ order: { id: 'x' }, items: [] });
     await callback({
@@ -310,12 +331,17 @@ describe('HTTP Request Handling', () => {
     });
     await new Promise(resolve => setImmediate(resolve));
 
-    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 400, 'application/json', expect.stringContaining('error'));
+    expect(mockElectronApi.instoreServerRespond).toHaveBeenCalledWith(
+      'test-123',
+      400,
+      'application/json',
+      expect.stringContaining('error')
+    );
   });
 
   it('should reject a tampered signed body', async () => {
     await instoreApiServer.start();
-    const callback = httpBridge.start.mock.calls[0][2];
+    const callback = requestListener();
 
     const signed = signedHeaders('POST', '/api/orders', '{"order":{"id":"a"},"items":[]}');
     await callback({
@@ -327,12 +353,17 @@ describe('HTTP Request Handling', () => {
     });
     await new Promise(resolve => setImmediate(resolve));
 
-    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 401, 'application/json', expect.stringContaining('"error":"Unauthorized"'));
+    expect(mockElectronApi.instoreServerRespond).toHaveBeenCalledWith(
+      'test-123',
+      401,
+      'application/json',
+      expect.stringContaining('"error":"Unauthorized"')
+    );
   });
 
   it('should preserve the exact signed webhook body', async () => {
     await instoreApiServer.start();
-    const callback = httpBridge.start.mock.calls[0][2];
+    const callback = requestListener();
     const rawBody = '{ "event": "product.updated", "data": { "id": "p1" } }';
     const receiver = CommercefullWebhookReceiver.getInstance();
     const handler = jest.spyOn(receiver, 'handleRequest').mockResolvedValue({ status: 200, body: { success: true } });
@@ -352,17 +383,22 @@ describe('HTTP Request Handling', () => {
 
   it('should reject oversized request bodies', async () => {
     await instoreApiServer.start();
-    const callback = httpBridge.start.mock.calls[0][2];
+    const callback = requestListener();
 
     await callback({ ...mockRequest, method: 'POST', url: 'http://localhost:8787/api/orders', data: 'x'.repeat(1024 * 1024 + 1) });
     await new Promise(resolve => setImmediate(resolve));
 
-    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 413, 'application/json', expect.stringContaining('too large'));
+    expect(mockElectronApi.instoreServerRespond).toHaveBeenCalledWith(
+      'test-123',
+      413,
+      'application/json',
+      expect.stringContaining('too large')
+    );
   });
 
   it('should handle query parameters for GET requests', async () => {
     await instoreApiServer.start();
-    const callback = httpBridge.start.mock.calls[0][2];
+    const callback = requestListener();
 
     const getWithQuery = {
       ...mockRequest,
@@ -375,12 +411,17 @@ describe('HTTP Request Handling', () => {
     // Wait for async operations to complete
     await new Promise(resolve => setImmediate(resolve));
 
-    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 200, 'application/json', expect.stringContaining('"events"'));
+    expect(mockElectronApi.instoreServerRespond).toHaveBeenCalledWith(
+      'test-123',
+      200,
+      'application/json',
+      expect.stringContaining('"events"')
+    );
   });
 
   it('should route /api/orders/unsynced to the literal route', async () => {
     await instoreApiServer.start();
-    const callback = httpBridge.start.mock.calls[0][2];
+    const callback = requestListener();
 
     await callback({
       ...mockRequest,
@@ -390,6 +431,11 @@ describe('HTTP Request Handling', () => {
     await new Promise(resolve => setImmediate(resolve));
 
     // Must reach findUnsynced (200 + orders array), not /api/orders/:id (404)
-    expect(httpBridge.respond).toHaveBeenCalledWith('test-123', 200, 'application/json', expect.stringContaining('"orders"'));
+    expect(mockElectronApi.instoreServerRespond).toHaveBeenCalledWith(
+      'test-123',
+      200,
+      'application/json',
+      expect.stringContaining('"orders"')
+    );
   });
 });

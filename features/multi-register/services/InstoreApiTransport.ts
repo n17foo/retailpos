@@ -1,34 +1,30 @@
 /**
  * InstoreApiTransport
  *
- * HTTP transport layer for InstoreApiServer using react-native-http-bridge.
- * Binds the server route logic to an actual HTTP listener on mobile/tablet.
+ * HTTP transport layer for InstoreApiServer. The listening socket lives in
+ * the Electron main process (Node `http`) and requests reach the renderer
+ * over IPC — Android/iOS registers run as clients only and never host the
+ * in-store API.
  */
 
-import { Platform } from 'react-native';
+import { getElectronAPI } from '../../../shared/utils/electron';
+import type { ElectronAPI, ElectronInstoreServerRequest } from '../../../shared/utils/electron';
 import { instoreApiConfig } from './InstoreApiConfig';
 import { instoreApiServer } from './InstoreApiServer';
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
 
 const MAX_REQUEST_BODY_LENGTH = 1024 * 1024;
 const HTTP_METHODS = ['GET', 'POST', 'PUT', 'DELETE'] as const;
+type HttpMethod = (typeof HTTP_METHODS)[number];
 
-// Import react-native-http-bridge only on native platforms
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let httpBridge: any = null;
-if (Platform.OS !== 'web') {
-  try {
-    httpBridge = require('react-native-http-bridge');
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.warn('react-native-http-bridge not available:', error);
-  }
-}
+const isHttpMethod = (method: string): method is HttpMethod => (HTTP_METHODS as readonly string[]).includes(method);
 
 export class InstoreApiTransport {
   private static instance: InstoreApiTransport;
   private logger = LoggerFactory.getInstance().createLogger('InstoreApiTransport');
   private listening = false;
+  private electronApi: ElectronAPI | null = null;
+  private unsubscribeRequests: (() => void) | null = null;
 
   private constructor() {}
 
@@ -57,29 +53,28 @@ export class InstoreApiTransport {
       return;
     }
 
-    // Web platform uses different approach (would need Express or similar)
-    if (Platform.OS === 'web') {
-      this.logger.warn('HTTP transport not supported on web platform');
-      return;
-    }
-
-    if (!httpBridge) {
-      this.logger.error('react-native-http-bridge not available');
-      throw new Error('HTTP bridge not available');
+    const api = getElectronAPI();
+    if (!api) {
+      const message = 'In-store server mode requires the RetailPOS desktop app';
+      this.logger.error(message);
+      throw new Error(message);
     }
 
     try {
       const port = instoreApiConfig.current.port;
 
-      // Start the HTTP bridge server
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      httpBridge.start(port, 'http_service', (request: any) => {
-        this.handleHttpRequest(request);
+      this.electronApi = api;
+      this.unsubscribeRequests = api.onInstoreServerRequest(request => {
+        void this.handleHttpRequest(request);
       });
+      await api.instoreServerStart(port);
 
       this.listening = true;
       this.logger.info(`HTTP transport started on port ${port}`);
     } catch (error) {
+      this.unsubscribeRequests?.();
+      this.unsubscribeRequests = null;
+      this.electronApi = null;
       this.logger.error('Failed to start HTTP transport:', error instanceof Error ? error : new Error(String(error)));
       throw error;
     }
@@ -89,18 +84,23 @@ export class InstoreApiTransport {
    * Stop the HTTP server transport
    */
   async stop(): Promise<void> {
+    this.unsubscribeRequests?.();
+    this.unsubscribeRequests = null;
+
     if (!this.listening) {
       return;
     }
 
-    if (Platform.OS === 'web' || !httpBridge) {
-      this.listening = false;
+    const api = this.electronApi;
+    this.electronApi = null;
+    this.listening = false;
+
+    if (!api) {
       return;
     }
 
     try {
-      httpBridge.stop();
-      this.listening = false;
+      await api.instoreServerStop();
       this.logger.info('HTTP transport stopped');
     } catch (error) {
       this.logger.error('Failed to stop HTTP transport:', error instanceof Error ? error : new Error(String(error)));
@@ -108,11 +108,20 @@ export class InstoreApiTransport {
     }
   }
 
+  private respond(requestId: string, status: number, body: unknown): void {
+    if (!this.electronApi) {
+      this.logger.warn(`Cannot respond to ${requestId} — in-store server transport not running`);
+      return;
+    }
+    this.electronApi.instoreServerRespond(requestId, status, 'application/json', JSON.stringify(body)).catch(() => {
+      // Request already timed out or the server stopped — nothing to recover.
+    });
+  }
+
   /**
-   * Handle incoming HTTP request from react-native-http-bridge
+   * Handle an incoming HTTP request forwarded by the Electron main process.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async handleHttpRequest(request: any): Promise<void> {
+  private async handleHttpRequest(request: ElectronInstoreServerRequest): Promise<void> {
     try {
       const { requestId, method, url, headers, data } = request;
 
@@ -122,12 +131,12 @@ export class InstoreApiTransport {
       const path = urlObj.pathname + urlObj.search;
       const rawBody = typeof data === 'string' ? data : '';
 
-      if (!HTTP_METHODS.includes(method)) {
-        httpBridge.respond(requestId, 405, 'application/json', JSON.stringify({ error: 'Method not allowed' }));
+      if (!isHttpMethod(method)) {
+        this.respond(requestId, 405, { error: 'Method not allowed' });
         return;
       }
-      if (typeof data === 'string' && data.length > MAX_REQUEST_BODY_LENGTH) {
-        httpBridge.respond(requestId, 413, 'application/json', JSON.stringify({ error: 'Request body too large' }));
+      if (rawBody.length > MAX_REQUEST_BODY_LENGTH) {
+        this.respond(requestId, 413, { error: 'Request body too large' });
         return;
       }
 
@@ -140,7 +149,7 @@ export class InstoreApiTransport {
           try {
             body = JSON.parse(data);
           } catch {
-            httpBridge.respond(requestId, 400, 'application/json', JSON.stringify({ error: 'Invalid JSON body' }));
+            this.respond(requestId, 400, { error: 'Invalid JSON body' });
             return;
           }
         }
@@ -159,26 +168,17 @@ export class InstoreApiTransport {
 
       // Call the server logic — rawBody is passed so signature verification
       // covers the exact bytes on the wire, not a re-serialized object.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const response = await instoreApiServer.handleRequest(method as any, path, body, headers, rawBody);
+      const response = await instoreApiServer.handleRequest(method, path, body, headers, rawBody);
 
-      // Send response back through the bridge
-      httpBridge.respond(requestId, response.status, 'application/json', JSON.stringify(response.body));
+      // Send response back through the main-process server
+      this.respond(requestId, response.status, response.body);
 
       this.logger.debug(`${method} ${path} → ${response.status}`);
     } catch (error) {
       this.logger.error('Error handling HTTP request:', error instanceof Error ? error : new Error(String(error)));
 
       // Send error response — don't leak internal error details to the LAN
-      try {
-        const errorResponse = { error: 'Internal server error' };
-        httpBridge.respond(request.requestId, 500, 'application/json', JSON.stringify(errorResponse));
-      } catch (responseError) {
-        this.logger.error(
-          'Failed to send error response:',
-          responseError instanceof Error ? responseError : new Error(String(responseError))
-        );
-      }
+      this.respond(request.requestId, 500, { error: 'Internal server error' });
     }
   }
 }

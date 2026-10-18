@@ -31,8 +31,9 @@ interface RouteHandler {
  *
  * In React Native / Expo, we can't run a traditional Express server.
  * This service provides the *logic layer* — route definitions and handlers —
- * that can be mounted on top of a transport (e.g. a polled HTTP server via
- * `react-native-http-bridge`, or a WebSocket relay).
+ * that can be mounted on top of a transport (the Electron main-process HTTP
+ * server, or a WebSocket relay). Server mode runs on the desktop app only;
+ * Android/iOS registers are always clients.
  *
  * The actual transport binding is in `InstoreApiTransport.ts`.
  */

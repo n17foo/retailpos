@@ -68,7 +68,6 @@
     "react-native-ble-plx": "3.5.1",
     "react-native-gesture-handler": "~3.3.0",
     "react-native-get-random-values": "~2.0.0",
-    "react-native-http-bridge": "^0.6.1",
     "react-native-keychain": "10.0.0",
     "react-native-logs": "5.6.0",
     "react-native-nitro-modules": "^0.37.1",
@@ -166,8 +165,7 @@
           "@stripe/stripe-terminal-react-native",
           "@tillpos/rn-receipt-printer-utils",
           "react-native-square-in-app-payments",
-          "react-native-esc-pos-printer",
-          "react-native-http-bridge"
+          "react-native-esc-pos-printer"
         ]
       }
     }

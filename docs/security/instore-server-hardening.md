@@ -1,10 +1,12 @@
 # In-Store Server Hardening Checklist
 
 > Operating checklist for the multi-register `server` mode — the device that
-> hosts port 8787 and owns the authoritative SQLite database. Applies equally
-> to a register tablet running `mode=server` and to a dedicated
-> store-api / integration-hub host (ADR-015). Network placement rules live in
-> `network-segmentation.md` — this doc covers the device and the app.
+> hosts port 8787 and owns the authoritative SQLite database. Only the desktop
+> (Electron) app can host the HTTP listener — Android/iOS registers are
+> client-only — so this means a desktop register running `mode=server` or a
+> dedicated store-api / integration-hub host (ADR-015). Network placement
+> rules live in `network-segmentation.md` — this doc covers the device and
+> the app.
 
 ---
 
