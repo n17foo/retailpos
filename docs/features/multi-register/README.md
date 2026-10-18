@@ -66,13 +66,13 @@ Client register (mode=client):
 
 ## Implementation Map
 
-| Layer    | Responsibility                                | Implementation                                                                                                      |
-| -------- | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Services | Config, server, discovery, transport, signing | `services/instoreapi/{InstoreApiConfig,InstoreApiServer,InstoreApiDiscovery,InstoreApiTransport,requestSigning}.ts` |
-| Services | Realtime                                      | `services/instoreapi/{websocket,sync}/`                                                                             |
-| Services | PED payments                                  | `services/instoreapi/payment/`                                                                                      |
-| Screens  | Settings tab                                  | `screens/settings/InstoreApiSettingsTab.tsx`                                                                        |
-| App      | Lifecycle start/stop                          | `App.tsx`                                                                                                           |
+| Layer    | Responsibility                                | Implementation                                                                                                                   |
+| -------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Services | Config, server, discovery, transport, signing | `features/multi-register/services/{InstoreApiConfig,InstoreApiServer,InstoreApiDiscovery,InstoreApiTransport,requestSigning}.ts` |
+| Services | Realtime                                      | `features/multi-register/services/{websocket,sync}/`                                                                             |
+| Services | PED payments                                  | `features/multi-register/services/payment/`                                                                                      |
+| Screens  | Settings tab                                  | `features/settings/screens/InstoreApiSettingsTab.tsx`                                                                            |
+| App      | Lifecycle start/stop                          | `App.tsx`                                                                                                                        |
 
 ## State Ownership
 
@@ -86,7 +86,7 @@ Client register (mode=client):
 ## Dependencies
 
 - `ProtectedValueStore` — shared secret storage.
-- `utils/crypto.ts` — `sha256Hex` for signing (hand-rolled SHA-256).
+- `shared/utils/crypto.ts` — `sha256Hex` for signing (hand-rolled SHA-256).
 - Repositories/services on the server register — routes are thin wrappers.
 - LAN connectivity for all client operations.
 

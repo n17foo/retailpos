@@ -3,9 +3,9 @@
 ## Purpose
 
 The plumbing that lets the POS talk to 8 ecommerce platforms: per-platform
-API clients (`services/clients/*`), credential storage + resolution
-(`services/config/*`), token acquisition/refresh (`services/token/*`), and
-offline tax resolution (`services/tax/*`).
+API clients (`features/platform-clients/services/clients/*`), credential storage + resolution
+(`features/platform-clients/services/config/*`), token acquisition/refresh (`features/platform-clients/services/token/*`), and
+offline tax resolution (`features/platform-clients/services/tax/*`).
 
 ## Scope
 
@@ -63,15 +63,15 @@ product.taxProfileId? → profile.rate
 
 ## Implementation Map
 
-| Layer        | Responsibility       | Implementation                                                                                                                                                 |
-| ------------ | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Services     | API clients          | `services/clients/*`                                                                                                                                           |
-| Services     | Config + credentials | `services/config/{EcommerceSettingsStorage,PlatformCredentialsResolver,ProtectedValueStore,POSConfigService,ServiceConfigBridge,StoreCurrency,apiVersions}.ts` |
-| Services     | Tokens               | `services/token/{TokenService,TokenServiceFactory,TokenInitializer,TokenIntegration}.ts`                                                                       |
-| Services     | Tax                  | `services/tax/{OfflineTaxResolver,TaxProfileService}.ts`                                                                                                       |
-| Services     | Capability runtime   | `services/platform/PlatformCapabilityService.ts`                                                                                                               |
-| Repositories | Tax profiles         | `repositories/TaxProfileRepository`                                                                                                                            |
-| Secrets      | Credential storage   | `services/secrets/*` (see system-infra)                                                                                                                        |
+| Layer        | Responsibility       | Implementation                                                                                                                                                                           |
+| ------------ | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Services     | API clients          | `features/platform-clients/services/clients/*`                                                                                                                                           |
+| Services     | Config + credentials | `features/platform-clients/services/config/{EcommerceSettingsStorage,PlatformCredentialsResolver,ProtectedValueStore,POSConfigService,ServiceConfigBridge,StoreCurrency,apiVersions}.ts` |
+| Services     | Tokens               | `features/platform-clients/services/token/{TokenService,TokenServiceFactory,TokenInitializer,TokenIntegration}.ts`                                                                       |
+| Services     | Tax                  | `features/platform-clients/services/tax/{OfflineTaxResolver,TaxProfileService}.ts`                                                                                                       |
+| Services     | Capability runtime   | `features/platform-clients/services/platform/PlatformCapabilityService.ts`                                                                                                               |
+| Repositories | Tax profiles         | `features/platform-clients/repositories/TaxProfileRepository.ts`                                                                                                                         |
+| Secrets      | Credential storage   | `shared/services/secrets/*` (see system-infra)                                                                                                                                           |
 
 ## State Ownership
 
@@ -84,9 +84,9 @@ product.taxProfileId? → profile.rate
 
 ## Dependencies
 
-- `services/secrets/*` — credential/token backends.
-- `services/audit` — `auth:platform_token` warm-up event.
-- `utils/platforms.ts`, `platformCapabilities.ts` — platform identity.
+- `shared/services/secrets/*` — credential/token backends.
+- `shared/services/audit` — `auth:platform_token` warm-up event.
+- `shared/utils/platforms.ts`, `platformCapabilities.ts` — platform identity.
 - Store address (onboarding-captured) — offline tax destination.
 
 ## Side Effects

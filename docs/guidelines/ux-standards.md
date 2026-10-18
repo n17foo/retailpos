@@ -6,10 +6,10 @@
 
 ## Theme System
 
-Import from `utils/theme.ts`:
+Import from `shared/utils/theme.ts`:
 
 ```typescript
-import { lightColors, spacing, typography, borderRadius, elevation } from '../utils/theme';
+import { lightColors, spacing, typography, borderRadius, elevation } from '../../shared/utils/theme';
 
 const styles = StyleSheet.create({
   container: {
@@ -110,7 +110,7 @@ Always show persistent context:
 
 ### User-Facing States
 
-Map technical states via `utils/orderStateMapper.ts`:
+Map technical states via `features/checkout/utils/orderStateMapper.ts`:
 
 ```typescript
 const saleState = getUserFacingSaleState({ basket, order, blockers, paymentLines });

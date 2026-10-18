@@ -1,7 +1,7 @@
 # Sale Domain Rules
 
-**Files:** `utils/sellability.ts`, `utils/categorySelection.ts`,
-`utils/categoryFilter.ts`, `utils/hidBurst.ts`
+**Files:** `features/catalogue/utils/sellability.ts`, `features/catalogue/utils/categorySelection.ts`,
+`features/catalogue/utils/categoryFilter.ts`, `features/scanning/utils/hidBurst.ts`
 **Tests:** all four have `*.test.ts` | **Docs:**
 sales fast-path spec §4.3/§4.5.3 — retired into `docs/features/sale`
 **Parent:** [`rules.md`](rules.md)
@@ -20,8 +20,8 @@ the sale feature doc should reference them.
 `getAvailableQuantity` returns `undefined` when untracked (unbounded),
 else `max(0, stock)`; `clampToAvailable` enforces it on quantity changes.
 
-**Evidence** — `utils/sellability.ts` (decision D1 in spec); consumed by
-`hooks/useAddToBasket`, basket quantity paths, `VariantPicker`.
+**Evidence** — `features/catalogue/utils/sellability.ts` (decision D1 in spec); consumed by
+`features/basket/hooks/useAddToBasket.ts`, basket quantity paths, `VariantPicker`.
 
 🟢 **E1.1** — tracked variant with `inventoryQuantity 0` → not sellable,
 not addable by any path (tile/scan/search/variant).
@@ -44,8 +44,8 @@ the filter; on a parent it selects **and** drills row 2 into its children.
 `goUp` first steps back to the drilled parent, then un-drills.
 `effectiveCategoryId` = `subId ?? rootId`.
 
-**Evidence** — `utils/categorySelection.ts`, `categorySelection.test.ts`;
-consumed by `contexts/CategoryProvider.tsx` → `CategoryBar`.
+**Evidence** — `features/catalogue/utils/categorySelection.ts`, `categorySelection.test.ts`;
+consumed by `features/catalogue/contexts/CategoryProvider.tsx` → `CategoryBar`.
 
 🟢 **E2.1** — tap root "Drinks" → `rootId=drinks`, row 2 = children of drinks;
 `effectiveCategoryId` = `drinks`.
@@ -67,8 +67,8 @@ it un-drilled immediately — fixed and covered by test.)
 Sylius/Wix/PrestaShop ⇒ client-side `matches(product)` over the whole subtree
 by `categoryIds`, `productType`, or `tags` (name, lowercase-trimmed).
 
-**Evidence** — `utils/categoryFilter.ts` (`SERVICE_FILTER_PLATFORMS`),
-`categoryFilter.test.ts`; used by `hooks/useProductsForDisplay`.
+**Evidence** — `features/catalogue/utils/categoryFilter.ts` (`SERVICE_FILTER_PLATFORMS`),
+`categoryFilter.test.ts`; used by `useProductsForDisplay` in `features/catalogue/hooks/useProducts.ts`.
 
 🟢 **E3.1** — leaf on Shopify → service gets the category id, grid shows
 service-filtered rows.
@@ -91,7 +91,7 @@ are a burst (swallowed + buffered); `suffixChar` (Enter/Tab) closes a valid
 A `scanIntervalMs*2` grace window after a completed scan swallows the next
 burst's first chars.
 
-**Evidence** — `utils/hidBurst.ts`, `hidBurst.test.ts`; consumers:
+**Evidence** — `features/scanning/utils/hidBurst.ts`, `hidBurst.test.ts`; consumers:
 `USBScannerService`, `ElectronScannerService`, `HidCaptureField`.
 Timing thresholds come from `posConfig.values` (e.g. `saleScanDedupMs`).
 
@@ -120,4 +120,4 @@ window the first key is swallowed (documented trade-off for back-to-back scans).
 ## Coverage
 
 All four rules are covered by dedicated `*.test.ts` files (the strongest
-coverage in `utils/`).
+coverage in `shared/utils/` and feature `utils/`).

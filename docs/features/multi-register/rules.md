@@ -6,7 +6,7 @@
 read/write through `InstoreApiTransport`; `standalone` (default) disables
 networking entirely.
 
-**Evidence.** `services/instoreapi/InstoreApiConfig.ts`,
+**Evidence.** `features/multi-register/services/InstoreApiConfig.ts`,
 `InstoreApiServer.ts`.
 
 🟢 **E1.1** — client `createOrder` → `POST /api/orders` on the server → the
@@ -24,7 +24,7 @@ Server rejects bad signatures, stale timestamps, and **replayed nonces**
 `GET /api/health` (discovery needs it) and `POST /api/webhooks/commercefull`
 (external caller can't share our secret).
 
-**Evidence.** `services/instoreapi/requestSigning.ts`,
+**Evidence.** `features/multi-register/services/requestSigning.ts`,
 `InstoreApiServer.ts:140-160`.
 
 🟢 **E2.1** — tampered body → signature mismatch → rejected before routing.
@@ -72,7 +72,7 @@ shadows it — no test protects the ordering (PG2).
 clients via WebSocket (or `SyncPoller`); `useOrders` and other hooks
 re-fetch on events — see orders-sync doc for the consumer side.
 
-**Evidence.** `services/instoreapi/{sync,websocket}/*`, `hooks/useOrders.ts`.
+**Evidence.** `features/multi-register/services/{sync,websocket}/*`, `features/orders-sync/hooks/useOrders.ts`.
 
 🟢 **E6.1** — server takes a payment → `order:paid` → client order lists
 refresh without manual reload.
@@ -114,11 +114,11 @@ validation inside the handler (verify — Q1).
 
 ## Test Coverage Mapping
 
-| Example              | Coverage                                     |
-| -------------------- | -------------------------------------------- |
-| R2 signing/verify    | `services/instoreapi/requestSigning.test.ts` |
-| R4 brute-force guard | Not found                                    |
-| R5 route ordering    | Not found                                    |
+| Example              | Coverage                                                  |
+| -------------------- | --------------------------------------------------------- |
+| R2 signing/verify    | `features/multi-register/services/requestSigning.test.ts` |
+| R4 brute-force guard | Not found                                                 |
+| R5 route ordering    | Not found                                                 |
 
 ## Feature Context Summary
 

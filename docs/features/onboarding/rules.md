@@ -11,8 +11,8 @@
 wizard as its initial route when not completed. Once `'completed'`, the wizard
 is unreachable — no re-run path exists in UI.
 
-**Evidence** — `contexts/OnboardingProvider.tsx`, `navigation/AuthNavigator.tsx:27`,
-`navigation/RootNavigator.tsx:87`; spec §1.1/2.3/2.4.
+**Evidence** — `features/onboarding/contexts/OnboardingProvider.tsx`, `app/navigation/AuthNavigator.tsx:27`,
+`app/navigation/RootNavigator.tsx:87`; spec §1.1/2.3/2.4.
 
 🟢 **E1.1 — First launch**
 Given `onboarding_status` absent
@@ -39,7 +39,7 @@ even though onboarding data was saved. Observed: `OnboardingProvider.tsx:40-47`.
 platform_configuration|offline_setup` sub-steps; phase-3 has
 `payment → printer → scanner`.
 
-**Evidence** — `screens/OnboardingScreen.tsx:47-61`; spec §1A, §2.1.
+**Evidence** — `features/onboarding/screens/OnboardingScreen.tsx:47-61`; spec §1A, §2.1.
 
 🟢 **E2.1** — selecting an online platform shows the credential form;
 selecting `offline` shows `OfflineSetupStep` instead — never both.
@@ -57,7 +57,7 @@ bigcommerce: storeHash+accessToken; magento/sylius/prestashop:
 storeUrl+token/key; wix: apiKey+siteId) then completes — **no connection test
 is performed**.
 
-**Evidence** — `screens/onboarding/PlatformConfigurationStep.tsx:25-76`.
+**Evidence** — `features/onboarding/screens/PlatformConfigurationStep.tsx:25-76`.
 
 🟢 **E3.1** — all required fields filled → `Finish Setup` saves settings and
 advances.
@@ -73,8 +73,8 @@ connection test before continue"; no test exists in the step.
 (D10) and is persisted to `posConfig` on complete; currency picked from the
 55-code table; ≥1 category and ≥1 product required to continue.
 
-**Evidence** — `screens/onboarding/OfflineSetupStep.tsx:126-141`;
-`screens/OnboardingScreen.tsx:147-169` (`posConfig.updateAll`).
+**Evidence** — `features/onboarding/screens/OfflineSetupStep.tsx:126-141`;
+`features/onboarding/screens/OnboardingScreen.tsx:147-169` (`posConfig.updateAll`).
 
 🟢 **E4.1** — store name + 1 category + 1 product + address → Continue →
 settings saved, `storeName/storeAddress/currencySymbol` written to posConfig.
@@ -85,7 +85,7 @@ country — Contradiction C2 (partial D10).
 writes each category via `offlineCategoryService.addCategory` and each
 product via `offlineProductService.createProduct` (`productType` set to the
 category name — the offline category-matching convention in
-`utils/categoryFilter.ts`). Per-category failures are logged, not fatal.
+`features/catalogue/utils/categoryFilter.ts`). Per-category failures are logged, not fatal.
 🟠 **E4.4** — duplicate category names (case-insensitive) rejected; category
 removal cascades to its products with a confirm dialog.
 
@@ -98,7 +98,7 @@ guards uniqueness — **but** if the taken PIN already belongs to an admin,
 the step treats onboarding as resumed and advances without creating a
 duplicate user.
 
-**Evidence** — `screens/onboarding/AdminUserStep.tsx:77-134`.
+**Evidence** — `features/onboarding/screens/AdminUserStep.tsx:77-134`.
 
 🟢 **E5.1** — name + 6-digit PIN + matching confirm → `createUser(role:
 'admin')` → alert → peripherals.
@@ -117,7 +117,7 @@ is the implicit skip). Skipped or not, `completePhase('peripherals')` runs
 and onboarding completes. Settings entered save via the same
 `use*Settings` hooks Settings uses — no separate code path.
 
-**Evidence** — `screens/OnboardingScreen.tsx:185-200`; the three step files.
+**Evidence** — `features/onboarding/screens/OnboardingScreen.tsx:185-200`; the three step files.
 Spec §2.2, §3.1–3.3 (mock flags).
 
 🟢 **E6.1** — skip printer and scanner → onboarding completes.
@@ -133,8 +133,8 @@ feature keys (discounts/giftcards/refunds/loyalty/store_credit when
 `supported|custom`) + always `staff`, `pos_config`, `auth_methods`. Then
 `setIsOnboarded(true)` → KV `'completed'` → Login.
 
-**Evidence** — `screens/OnboardingScreen.tsx:68-93,204-209`;
-`services/setup/SetupProgressService.ts`.
+**Evidence** — `features/onboarding/screens/OnboardingScreen.tsx:68-93,204-209`;
+`features/onboarding/services/SetupProgressService.ts`.
 
 🟢 **E7.1** — offline platform → `loyalty`+`store_credit` deferred (both
 `supported` on offline), refunds deferred, giftcards **not** (=
@@ -149,8 +149,8 @@ blob is only a permitted legacy/dev fallback and is migrated to secrets on
 next read where the backend exists; platforms without fallback permission
 fail closed and the legacy blob is **deleted**.
 
-**Evidence** — `services/config/EcommerceSettingsStorage.ts`,
-`services/config/ProtectedValueStore.ts`, `services/config/PlatformCredentialsResolver.ts`.
+**Evidence** — `features/platform-clients/services/config/EcommerceSettingsStorage.ts`,
+`features/platform-clients/services/config/ProtectedValueStore.ts`, `features/platform-clients/services/config/PlatformCredentialsResolver.ts`.
 
 🟢 **E8.1** — save → `secrets.storeSecret`; later reads by
 `PlatformCredentialsResolver`/`TokenUtils` come back from the secret backend.

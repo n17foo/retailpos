@@ -75,17 +75,17 @@ OrderHistoryScreen
 
 ## Implementation Map
 
-| Layer        | Responsibility                                | Implementation                                                                                                                            |
-| ------------ | --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Screens      | Day browser, queue manager                    | `screens/OrderHistoryScreen.tsx`, `screens/SyncQueueScreen.tsx` + `screens/order-history/*`                                               |
-| Hooks        | Order lists, queue, shifts                    | `hooks/useOrders.ts`, `useOrderHistory.ts`, `useSyncQueue.ts`, `useDailyReport.ts`                                                        |
-| Contexts     | `unsyncedOrdersCount`, `syncAllPendingOrders` | `contexts/CheckoutProvider.tsx`                                                                                                           |
-| Services     | Sync lifecycle                                | `services/sync/OrderSyncService.ts`, `BackgroundSyncService.ts`, `BaseSyncService.ts`, `CompositeSyncService.ts`, `SyncServiceFactory.ts` |
-| Services     | Multi-register events                         | `services/instoreapi/sync/{SyncEventBus,SyncPoller}.ts`, `websocket/*`                                                                    |
-| Repositories | Order rows, unsynced query                    | `repositories/{OrderRepository,OrderItemRepository}.ts`                                                                                   |
-| Libs         | Row mapping, day-nav rules, ID mapping        | `utils/{orderRow.utils,orderHistory.utils,platformIds}.ts`                                                                                |
-| Locales      | Screen text                                   | `locales/*` order-history / sync keys                                                                                                     |
-| Docs         | EARS specs                                    | EARS specs retired into this doc                                                                                                          |
+| Layer        | Responsibility                                | Implementation                                                                                                                                                 |
+| ------------ | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screens      | Day browser, queue manager                    | `features/orders-sync/screens/OrderHistoryScreen.tsx`, `features/orders-sync/screens/SyncQueueScreen.tsx` + `features/orders-sync/screens/*`                   |
+| Hooks        | Order lists, queue, shifts                    | `features/orders-sync/hooks/useOrders.ts`, `useOrderHistory.ts`, `useSyncQueue.ts`, `useDailyReport.ts`                                                        |
+| Contexts     | `unsyncedOrdersCount`, `syncAllPendingOrders` | `features/checkout/contexts/CheckoutProvider.tsx`                                                                                                              |
+| Services     | Sync lifecycle                                | `features/orders-sync/services/sync/OrderSyncService.ts`, `BackgroundSyncService.ts`, `BaseSyncService.ts`, `CompositeSyncService.ts`, `SyncServiceFactory.ts` |
+| Services     | Multi-register events                         | `features/multi-register/services/sync/{SyncEventBus,SyncPoller}.ts`, `websocket/*`                                                                            |
+| Repositories | Order rows, unsynced query                    | `features/orders-sync/repositories/{OrderRepository,OrderItemRepository}.ts`                                                                                   |
+| Libs         | Row mapping, day-nav rules, ID mapping        | `features/orders-sync/utils/{orderRow.utils,orderHistory.utils}.ts`, `shared/utils/platformIds.ts`                                                             |
+| Locales      | Screen text                                   | `shared/locales/*` order-history / sync keys                                                                                                                   |
+| Docs         | EARS specs                                    | EARS specs retired into this doc                                                                                                                               |
 
 ## State Ownership
 
@@ -101,9 +101,9 @@ OrderHistoryScreen
 
 ## Dependencies
 
-- `utils/db.ts` backbone — every order lives in SQLite first.
+- `shared/utils/db.ts` backbone — every order lives in SQLite first.
 - `OrderServiceFactory` — per-platform `createOrder`/`completeOrder`.
-- `utils/platformIds.ts` — maps app IDs back to raw platform IDs for sync.
+- `shared/utils/platformIds.ts` — maps app IDs back to raw platform IDs for sync.
 - `MAX_SYNC_RETRIES()` — `posConfig.values.maxSyncRetries` (default 3).
 - `kdsServiceFactory` — kitchen-display ticket dispatched on each synced order.
 - `syncEventBus` + WebSocket — multi-register live updates (client registers).

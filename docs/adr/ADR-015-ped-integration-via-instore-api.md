@@ -143,6 +143,6 @@ Allow both direct PED (for Electron) and API-based PED (for mobile).
 ## References
 
 - Payment behaviour: docs/features/payments/ (EARS spec retired)
-- Instore API transport: `services/instoreapi/InstoreApiTransport.ts`
-- Payment service factory: `services/payment/PaymentServiceFactory.ts`
+- Instore API transport: `features/multi-register/services/InstoreApiTransport.ts`
+- Payment service factory: `features/payments/services/PaymentServiceFactory.ts`
 - PCI DSS requirements: https://www.pcisecuritystandards.org/

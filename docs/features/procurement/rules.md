@@ -7,8 +7,8 @@ happens exactly twice: `receivePO` and `finaliseCount` push
 `{adjustment:true}` updates through `InventoryServiceFactory`, gated by the
 `inventory` capability — `not_recommended` ⇒ local-only.
 
-**Evidence.** `services/procurement/ProcurementService.ts:99-135`,
-`repositories/ProcurementRepository.ts`.
+**Evidence.** `features/procurement/services/ProcurementService.ts:99-135`,
+`features/procurement/repositories/ProcurementRepository.ts`.
 
 🟢 **E1.1 — Offline platform**
 Entire workflow runs; receive writes local stock rows — no API call.
@@ -47,7 +47,7 @@ the result carries `platformSyncPending:true`; the queue replays on the next
 successful inventory call. `finaliseCount` follows the same pattern.
 
 **Evidence.** `ProcurementService.receivePO`, `InventoryCountService.finaliseCount`,
-`services/inventory/{RetryingInventoryService,PendingInventoryStore}.ts`.
+`features/inventory/services/{RetryingInventoryService,PendingInventoryStore}.ts`.
 
 � **E3.1 — Push fails mid-receive**
 Local `received_qty` commits; the platform updates queue and replay later →
@@ -62,7 +62,7 @@ Local `received_qty` commits; the platform updates queue and replay later →
 counted line and pushes adjustments; uncounted lines (`counted_qty IS NULL`)
 are excluded; status → `completed`, or `discarded` to abandon.
 
-**Evidence.** `services/procurement/InventoryCountService.ts:46-90`.
+**Evidence.** `features/procurement/services/InventoryCountService.ts:46-90`.
 
 🟢 **E4.1 — Counted 8, expected 10** → adjustment −2 pushed.
 
@@ -79,7 +79,7 @@ default_vendor_id})` — the Inventory screen merges configs keyed
 `reorder_qty`.
 
 **Evidence.** `ProcurementService.setReorderPoint`,
-`screens/InventoryScreen.tsx`.
+`features/inventory/screens/InventoryScreen.tsx`.
 
 🟠 **E5.1** — no config → item never shows "low" (see inventory doc PG2).
 
@@ -90,7 +90,7 @@ default_vendor_id})` — the Inventory screen merges configs keyed
 integration observed — receiving a transfer doesn't push stock between
 locations (single-location stock anyway).
 
-**Evidence.** `repositories/ProcurementRepository.ts`, screens.
+**Evidence.** `features/procurement/repositories/ProcurementRepository.ts`, screens.
 
 🟠 **E6.1** — a "received" transfer changes nothing at the platform — purely
 a bookkeeping record (Q2).

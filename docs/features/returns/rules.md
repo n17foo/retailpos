@@ -5,7 +5,7 @@
 **Rule.** `validateReturnRequest` rejects unless `orderStatus` is `paid` (or
 `synced`): `'Order must be paid before processing a return'`.
 
-**Evidence.** `services/refunds/returnValidation.ts`.
+**Evidence.** `features/returns/services/refunds/returnValidation.ts`.
 
 🔴 **E1.1** — draft/pending/processing order → validation error, no return row.
 
@@ -17,7 +17,7 @@ quantity so concurrent returns can't double-submit; the reservation releases
 when the row is rejected or deleted. Cumulative refund amount ≤ order total.
 ≤200 lines per request.
 
-**Evidence.** `services/refunds/returnValidation.ts` (`MAX_RETURN_LINES`,
+**Evidence.** `features/returns/services/refunds/returnValidation.ts` (`MAX_RETURN_LINES`,
 `COUNTED_RETURN_STATUSES`).
 
 🔴 **E2.1 — Double-return** — 2 of 3 already returned → requesting 2 more fails
@@ -41,7 +41,7 @@ validate against the same remaining quantity.
 the platform's refund adapter (or `OfflineRefundService`). `restock` flags
 restore inventory. Rows transition pending → approved/rejected → completed.
 
-**Evidence.** `services/refunds/RefundService.ts:154-215`, `platforms/*`.
+**Evidence.** `features/returns/services/refunds/RefundService.ts:154-215`, `platforms/*`.
 
 🟢 **E3.1 — Local + push**
 Validate → rows → adapter refund → `platformRefundId` stored → completed.
@@ -60,7 +60,7 @@ upstream call.
 Confirm writes returns (linked to the exchange) + creates the new order via
 `CheckoutService` + audits `exchange:completed`.
 
-**Evidence.** `services/exchange/ExchangeService.ts` (`calcTotals`, confirm).
+**Evidence.** `features/returns/services/exchange/ExchangeService.ts` (`calcTotals`, confirm).
 
 🟢 **E4.1 — Even swap** — netDue 0 → confirm with no payment → new order +
 returns recorded.
@@ -93,7 +93,7 @@ validation errors a local cashier would.
 'pending'|'completed'|'failed'}` — money movement provenance is tracked per
 refund.
 
-**Evidence.** `services/refunds/RefundService.ts` `RefundRecord`.
+**Evidence.** `features/returns/services/refunds/RefundService.ts` `RefundRecord`.
 
 🟠 **E6.1** — terminal-source refunds exist independent of returns — the
 service supports standalone payment refunds (e.g. `refundTransaction`).
@@ -130,7 +130,7 @@ service supports standalone payment refunds (e.g. `refundTransaction`).
 
 | Example          | Coverage                                                     |
 | ---------------- | ------------------------------------------------------------ |
-| R1/R2 validation | `services/refunds/returnValidation.test.ts`                  |
+| R1/R2 validation | `features/returns/services/refunds/returnValidation.test.ts` |
 | R3 return flow   | `RefundService.integration.test.ts`, `ReturnService.test.ts` |
 | R4 exchange      | Not found for ExchangeService                                |
 

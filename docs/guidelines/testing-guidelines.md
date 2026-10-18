@@ -4,17 +4,17 @@
 
 ## File Location
 
-Place tests adjacent to source:
+Place tests adjacent to source, inside the feature slice:
 
 ```
-services/basket/
+features/basket/services/
 ├── BasketService.ts
 ├── BasketService.test.ts                    ← unit
 ├── BasketService.integration.test.ts        ← integration (optional)
 
-utils/
+shared/utils/
 ├── money.ts
-├── __tests__/money.test.ts
+├── money.test.ts
 ```
 
 **Configs**:
@@ -31,21 +31,21 @@ Native modules unavailable in Jest. Always mock:
 ```typescript
 // UUID (avoids react-native crypto)
 let counter = 0;
-jest.mock('../../utils/uuid', () => ({
+jest.mock('../../shared/utils/uuid', () => ({
   generateUUID: () => `mock-uuid-${++counter}`,
 }));
 
 // POSConfigService (avoids expo-sqlite)
-jest.mock('../../services/config/POSConfigService', () => ({
+jest.mock('../../features/platform-clients/services/config/POSConfigService', () => ({
   DEFAULT_TAX_RATE: () => 0.2,
   posConfig: { values: { taxRate: 0.2 }, load: jest.fn() },
 }));
 
 // AuditLogService (avoids expo-sqlite)
-jest.mock('../../services/audit/AuditLogService');
+jest.mock('../../shared/services/audit/AuditLogService');
 
 // Database (for repository tests)
-jest.mock('../../utils/db', () => ({
+jest.mock('../../shared/utils/db', () => ({
   db: {
     getFirstAsync: jest.fn(),
     getAllAsync: jest.fn(),
@@ -122,7 +122,7 @@ yarn test:watch            # watch mode
 yarn test:coverage         # coverage report
 
 # Single file
-npx jest services/basket/BasketService.test.ts
+npx jest features/basket/services/BasketService.test.ts
 
 # Single test
 npx jest -t "creates basket"

@@ -58,7 +58,7 @@ Key architectural decisions are documented in [`docs/adr/`](docs/adr/) and the f
 | State      | React Context + Zustand (sync queue) |
 | Database   | SQLite via `expo-sqlite`             |
 | Desktop    | Electron                             |
-| Styling    | StyleSheet + `utils/theme.ts`        |
+| Styling    | StyleSheet + `shared/utils/theme.ts` |
 | i18n       | react-i18next + expo-localization    |
 | Logging    | Custom LoggerFactory + transports    |
 | Testing    | Jest                                 |
@@ -189,80 +189,75 @@ WOOCOMMERCE_URL=https://yourstore.com
 
 ## Project Structure
 
+The codebase is **feature-sliced** — each domain owns its screens, components, hooks, contexts, services and repositories under `features/<domain>/`. Cross-feature code lives in `shared/`.
+
 ```
 retailpos/
 ├── App.tsx                    # Root — providers, startup init
-├── repositories/              # Data access layer
-│   ├── OrderRepository.ts     # Interface + factory
-│   ├── OfflineOrderRepository.ts  # SQLite implementation
-│   ├── InstoreApiOrderRepository.ts # HTTP implementation (multi-register)
-│   └── ...
-├── services/
-│   ├── audit/                 # Audit log (KV-backed, append-only)
-│   ├── auth/                  # Pluggable auth providers
-│   ├── basket/                # Cart CRUD + service wiring factory
-│   ├── checkout/              # Checkout flow + order queries
-│   ├── config/                # POSConfigService + ServiceConfigBridge
-│   ├── customer/              # Platform customer lookup (9 platforms)
-│   ├── display/               # Customer-facing display (WebSocket, serial, Electron)
-│   ├── drawer/                # Cash drawer peripheral
-│   ├── inventory/             # Inventory queries + updates
-│   ├── kds/                   # Kitchen Display System (HTTP, WebSocket, Electron)
-│   ├── localapi/              # Multi-register local HTTP API
-│   ├── logger/                # Pluggable structured logger
-│   ├── notifications/         # In-app notification event bus
-│   ├── order/                 # Platform order services (9 platforms)
-│   ├── payment/               # Payment terminal providers
-│   ├── printer/               # Receipt printing + daily reports
-│   ├── product/               # Product management (9 platforms)
-│   ├── refunds/               # Returns + refund orchestration
-│   ├── reporting/             # Sales analytics
-│   ├── scanner/               # Barcode/QR scanner abstraction
-│   ├── search/                # Product search
-│   ├── sync/                  # Order sync + background sync
-│   └── tax/                   # Tax profile management
-├── screens/
-│   ├── settings/              # Settings tab screens
-│   ├── order/                 # Order screen sub-components
-│   ├── order-history/         # Order history sub-components
-│   └── onboarding/            # Onboarding wizard steps
-├── hooks/                     # Custom React hooks
-├── contexts/                  # React Context providers
-├── navigation/                # React Navigation setup
-├── components/                # Shared UI components
-├── locales/                   # i18n translation files
-├── utils/                     # Theme, money math, platform helpers
+├── app/
+│   ├── app/navigation/# Root, Auth, MainTab, More navigators + MoreMenuComposer
+│   └── providers/             # App-level providers (DataProvider)
+├── features/                  # Feature slices — one folder per domain
+│   ├── authentication/        # PIN/biometric/magstripe/RFID auth + users & permissions
+│   ├── basket/                # Cart CRUD + basket providers
+│   ├── catalogue/             # Products + categories (9 platforms + offline)
+│   ├── checkout/              # CheckoutService, tax quote, sale/checkout screens
+│   ├── customers/             # Customer lookup, loyalty, store credit
+│   ├── discounts/             # Coupon/discount validation
+│   ├── hardware/              # Printer, drawer, scanner drivers, KDS, customer display
+│   ├── inventory/             # Stock read/write, barcode labels
+│   ├── multi-register/        # In-store LAN API: signed transport, discovery, sync, PED
+│   ├── onboarding/            # First-run wizard
+│   ├── orders-sync/           # Order repositories + platform sync + order screens
+│   ├── payments/              # Stripe, Square, Adyen, Tap, Instore API provider
+│   ├── platform-clients/      # Platform API clients, config, tokens, tax profiles
+│   ├── procurement/           # Purchase orders, vendors, stock-takes, transfers
+│   ├── reporting/             # Sales analytics, CSV export
+│   ├── returns/               # Returns + refunds (platform adapters)
+│   ├── scanning/              # Scan-input hooks/components
+│   └── settings/              # Settings screens + role-gated tab composer
+├── shared/                    # Cross-feature code
+│   ├── components/# UI primitives (Button, Card, Toast, ErrorBoundary, …)
+│   ├── contexts/# Theme + Notification providers
+│   ├── hooks/# useTranslate, useLogger, useResponsive, useSyncStore, …
+│   ├── shared/locales/# i18n — en/es/fr/de
+│   ├── repositories/# KeyValue + WebhookDelivery stores
+│   ├── services/# audit, logger, notifications, queue, search, secrets
+│   └── utils/# theme, money, crypto, db + dbSchema, platforms, csv, sql, …
+├── electron/                  # Electron desktop shell
+├── tests/                     # Jest setup, mocks, integration tests
 └── docs/
-    ├── adr/                   # Architecture Decision Records (15 ADRs)
-    ├── specs/                 # EARS requirements specs
-    └── steering/              # Canonical development rules
-        ├── ubiquitous-language.md      # Domain vocabulary
-        ├── architecture-patterns.md    # Implementation patterns
-        ├── coding-standards.md         # TypeScript & naming rules
-        ├── ux-standards.md             # Theme & component structure
-        └── testing-guidelines.md       # Test structure & mocks
+    ├── adr/                   # Architecture Decision Records (17 ADRs)
+    ├── features/              # Per-feature README + rules.md
+    ├── guidelines/            # Canonical development rules
+    │   ├── ubiquitous-language.md      # Domain vocabulary
+    │   ├── architecture-patterns.md    # Implementation patterns
+    │   ├── coding-standards.md         # TypeScript & naming rules
+    │   ├── ux-standards.md             # Theme & component structure
+    │   └── testing-guidelines.md       # Test structure & mocks
+    └── security/              # Network segmentation, hardening, controls inventory
 ```
 
 ---
 
 ## Documentation
 
-| Document                                                                               | Purpose                                                  |
-| -------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md)                                                   | Technical architecture, patterns, database schema        |
-| [`AGENT.md`](AGENT.md)                                                                 | Quick-start context guide for developers and AI agents   |
-| [`docs/adr/`](docs/adr/)                                                               | Architecture Decision Records (15 ADRs)                  |
-| [`docs/specs/`](docs/specs/)                                                           | EARS requirements specs for all features                 |
-| [`docs/specs/EARS-GUIDE.md`](docs/specs/EARS-GUIDE.md)                                 | How to write EARS specs                                  |
-| [`docs/guidelines/`](docs/guidelines/)                                                 | **Canonical development rules** (see below)              |
-| [`docs/guidelines/ubiquitous-language.md`](docs/guidelines/ubiquitous-language.md)     | Domain vocabulary — single source of truth for all terms |
-| [`docs/guidelines/architecture-patterns.md`](docs/guidelines/architecture-patterns.md) | Implementation patterns with code examples               |
-| [`docs/guidelines/coding-standards.md`](docs/guidelines/coding-standards.md)           | TypeScript, naming, file structure, common tasks         |
-| [`docs/guidelines/ux-standards.md`](docs/guidelines/ux-standards.md)                   | Theme system, component structure, accessibility         |
-| [`docs/guidelines/testing-guidelines.md`](docs/guidelines/testing-guidelines.md)       | Test structure, mocks, running tests                     |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md)                                                   | Contribution guidelines                                  |
-| [`CHANGELOG.md`](CHANGELOG.md)                                                         | Version history                                          |
-| [`SECURITY.md`](SECURITY.md)                                                           | Security policy                                          |
+| Document                                                                               | Purpose                                                       |
+| -------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md)                                                   | Technical architecture, patterns, database schema             |
+| [`AGENT.md`](AGENT.md)                                                                 | Quick-start context guide for developers and AI agents        |
+| [`docs/adr/`](docs/adr/)                                                               | Architecture Decision Records (17 ADRs)                       |
+| [`docs/features/`](docs/features/)                                                     | Per-feature docs — README (what/where) + rules.md (behaviour) |
+| [`docs/security/`](docs/security/)                                                     | Network segmentation, in-store server hardening, controls     |
+| [`docs/guidelines/`](docs/guidelines/)                                                 | **Canonical development rules** (see below)                   |
+| [`docs/guidelines/ubiquitous-language.md`](docs/guidelines/ubiquitous-language.md)     | Domain vocabulary — single source of truth for all terms      |
+| [`docs/guidelines/architecture-patterns.md`](docs/guidelines/architecture-patterns.md) | Implementation patterns with code examples                    |
+| [`docs/guidelines/coding-standards.md`](docs/guidelines/coding-standards.md)           | TypeScript, naming, file structure, common tasks              |
+| [`docs/guidelines/ux-standards.md`](docs/guidelines/ux-standards.md)                   | Theme system, component structure, accessibility              |
+| [`docs/guidelines/testing-guidelines.md`](docs/guidelines/testing-guidelines.md)       | Test structure, mocks, running tests                          |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md)                                                   | Contribution guidelines                                       |
+| [`CHANGELOG.md`](CHANGELOG.md)                                                         | Version history                                               |
+| [`SECURITY.md`](SECURITY.md)                                                           | Security policy                                               |
 
 ### Steering Docs (Canonical Rules)
 
@@ -271,7 +266,7 @@ The `docs/guidelines/` directory contains the **single source of truth** for dev
 - **ubiquitous-language.md** — Domain vocabulary used across specs, code, tests, and ADRs. Use terms exactly as defined.
 - **architecture-patterns.md** — Service layer, repository pattern, context providers, factories, background jobs (with code examples).
 - **coding-standards.md** — TypeScript rules, naming conventions, file organization, the 14 non-negotiable rules.
-- **ux-standards.md** — Theme system (`utils/theme.ts`), component structure, accessibility, responsive layout.
+- **ux-standards.md** — Theme system (`shared/utils/theme.ts`), component structure, accessibility, responsive layout.
 - **testing-guidelines.md** — Test file location, required mocks, test structure, running tests.
 
 ### Architecture Decision Records
@@ -293,18 +288,21 @@ The `docs/guidelines/` directory contains the **single source of truth** for dev
 | [ADR-013](docs/adr/ADR-013-scanner-hardware-abstraction.md)           | Scanner hardware abstraction — four types, one interface   |
 | [ADR-014](docs/adr/ADR-014-spec-first-development.md)                 | Spec-first development with EARS format                    |
 | [ADR-015](docs/adr/ADR-015-ped-integration-via-instore-api.md)        | PED integration via Instore API — not direct provider      |
+| [ADR-016](docs/adr/ADR-016-platform-token-lifecycle.md)               | Platform token lifecycle                                   |
+| [ADR-017](docs/adr/ADR-017-sale-screen-fast-path.md)                  | Sale screen fast path                                      |
 
-### Hardware Specs
+### Feature Docs
 
-| Spec                                                        | Purpose                                         |
-| ----------------------------------------------------------- | ----------------------------------------------- |
-| [Scanner](docs/specs/hardware/scanner.md)                   | Camera, BT, USB, QR hardware                    |
-| [Cash Drawer](docs/specs/hardware/cash-drawer.md)           | ESC/POS, Electron IPC, no-op                    |
-| [Printer](docs/specs/hardware/printer.md)                   | Thermal receipt + daily reports                 |
-| [Payment Terminal](docs/specs/hardware/payment.md)          | Stripe NFC, Stripe, Square, Adyen, Tap Payments |
-| [Authentication](docs/specs/hardware/auth.md)               | PIN, biometric, magstripe, RFID/NFC             |
-| [KDS](docs/specs/hardware/kds.md)                           | Kitchen display — HTTP, WebSocket, Electron     |
-| [Customer Display](docs/specs/hardware/customer-display.md) | Customer-facing display — WebSocket, serial     |
+Hardware- and platform-facing behaviour is specified per feature in `docs/features/<name>/` (README + rules.md):
+
+| Doc                                                 | Purpose                                              |
+| --------------------------------------------------- | ---------------------------------------------------- |
+| [Hardware](docs/features/hardware/)                 | Printer, cash drawer, scanner, KDS, customer display |
+| [Scanning](docs/features/scanning/)                 | Camera, BT, USB, QR scan input                       |
+| [Payments](docs/features/payments/)                 | Stripe NFC, Stripe, Square, Adyen, Tap Payments      |
+| [Authentication](docs/features/authentication/)     | PIN, biometric, magstripe, RFID/NFC, permissions     |
+| [Multi-register](docs/features/multi-register/)     | LAN API, signed requests, discovery, sync            |
+| [Platform clients](docs/features/platform-clients/) | API clients, config, tokens, tax profiles            |
 
 ---
 
@@ -330,7 +328,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). In brief:
 
 ## Security
 
-See [SECURITY.md](SECURITY.md). Known gap: PINs are currently stored as plaintext in SQLite — hash with bcrypt/Argon2 before production deployment.
+See [SECURITY.md](SECURITY.md) for reporting and [docs/security/](docs/security/) for deployment guidance — dedicated POS network segmentation, in-store server hardening, and the implemented controls inventory. Known residual risks (including the plaintext LAN transport — a dedicated VLAN is required) are tracked in [`docs/security/security-controls.md`](docs/security/security-controls.md).
 
 ---
 

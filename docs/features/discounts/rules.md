@@ -7,7 +7,7 @@
 metadata (`minimumPurchase`, `maximumDiscount`, `expiresAt`, `usageLimit`,
 `usageCount`). `error` explains invalid codes.
 
-**Evidence.** `services/discount/DiscountServiceInterface.ts`.
+**Evidence.** `features/discounts/services/DiscountServiceInterface.ts`.
 
 🟢 **E1.1** — valid 10% code on £20 subtotal → `discountAmount` 200 (cents).
 
@@ -19,8 +19,8 @@ metadata (`minimumPurchase`, `maximumDiscount`, `expiresAt`, `usageLimit`,
 `minimumPurchase`, stay under `usageLimit`; success increments
 `usageCount` in the same flow.
 
-**Evidence.** `services/discount/LocalDiscountService.ts:25-47`,
-`repositories/DiscountRepository.ts`.
+**Evidence.** `features/discounts/services/LocalDiscountService.ts:25-47`,
+`features/discounts/repositories/DiscountRepository.ts`.
 
 🔴 **E2.1 — Exhausted code** — `usageCount >= usageLimit` → invalid result.
 
@@ -33,7 +33,7 @@ a validated-then-abandoned checkout still consumed a use (PG1).
 `basket.discountCode`/`discountAmount` on the whole basket; the order +
 sync payload carries it as `discounts: [{code, amount, type:'fixed_amount'}]`.
 
-**Evidence.** `services/basket/BasketService.ts:70`,
+**Evidence.** `features/basket/services/BasketService.ts:70`,
 `OrderSyncService.basketItemsToLineItems`/`platformOrder.discounts`.
 
 🟠 **E3.1** — synced discount is always mapped as `fixed_amount` — a
@@ -45,7 +45,7 @@ percentage discount loses its type upstream (observed mapping — Q1).
 `applyDiscount('CREDIT_<amt>')` for ledger redemptions — observed coupling,
 not an intended contract (discount/loyalty redesign is deferred).
 
-**Evidence.** `screens/sale/BasketPanel.tsx:422,443`.
+**Evidence.** `features/basket/components/BasketPanel.tsx:422,443`.
 
 🟠 **E4.1** — `LOYALTY_5.00` must resolve through `BasketService.applyDiscount`
 — check whether these pseudo-codes bypass validation or hit the discount
@@ -57,7 +57,7 @@ table (PG2/Q2).
 platforms fall back to base/local behaviour — the `discounts` capability in
 the matrix claims more than the adapters deliver.
 
-**Evidence.** `services/discount/platforms/` (single adapter),
+**Evidence.** `shared/utils/` (single adapter),
 `DiscountServiceFactory.ts`.
 
 🔴 **E5.1** — on a platform whose matrix says `discounts: supported` but has

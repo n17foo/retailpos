@@ -4,7 +4,8 @@
 
 The shared libraries are the app's cross-cutting infrastructure layer: every
 behavioural rule that must hold identically across screens, hooks, services, and
-repositories is implemented once in `utils/` (there is no `libs/` directory) and
+repositories is implemented once in `shared/utils/` (cross-feature) or a
+feature's own `utils/` (domain-scoped — there is no `libs/` directory) and
 consumed by features. They include money math, the design-token/theme system,
 the platform capability matrix, the SQLite persistence backbone, credential
 hashing, role/capability gating, and pure domain rules extracted from hooks so
@@ -17,7 +18,8 @@ the _consumers_ are other features, and misbehaviour propagates everywhere.
 
 ### Included
 
-- `utils/*.ts` — all 27 non-test modules (see Implementation Map).
+- `shared/utils/*.ts` plus per-feature `features/*/utils/*.ts` — all non-test
+  modules (see Implementation Map).
 - Behavioural contracts other features rely on: cent-based money, sellability,
   category selection, HID burst detection, layout classes, role/capability
   gating, order state mapping, persistence schema/migrations, PIN hashing,
@@ -25,13 +27,15 @@ the _consumers_ are other features, and misbehaviour propagates everywhere.
 
 ### Excluded
 
-- `services/` business logic (BasketService, CheckoutService, factories) —
-  documented per feature. Utils only _serve_ them.
-- `contexts/` state ownership — utils are stateless (or instance-scoped) by
-  convention; shared state lives in providers.
-- `hooks/` — hooks consume utils; they are feature-owned.
-- `repositories/` — consume `utils/db.ts`/`dbSchema.ts`/`sql.ts` but own the
-  table access code itself.
+- `features/*/services/` business logic (BasketService, CheckoutService,
+  factories) — documented per feature. Utils only _serve_ them.
+- `features/*/contexts/` + `shared/contexts/` state ownership — utils are
+  stateless (or instance-scoped) by convention; shared state lives in providers.
+- `features/*/hooks/` + `shared/hooks/` — hooks consume utils; they are
+  feature-owned.
+- `features/*/repositories/` + `shared/repositories/` — consume
+  `shared/utils/db.ts`/`dbSchema.ts`/`sql.ts` but own the table access code
+  itself.
 
 ## Entry Points
 
@@ -43,11 +47,11 @@ Utils are entered by import, not navigation. Highest-fan-in entry points:
 | `platforms.ts`            | ~97 files           | Services, navigation, repositories          |
 | `money.ts`                | ~34 files           | Basket, checkout, order, printer services   |
 | `electron.ts`             | ~12 files           | Printer/scanner/drawer/payment services     |
-| `db.ts`                   | ~19 files           | All `repositories/`                         |
+| `db.ts`                   | ~19 files           | All feature + shared `repositories/`        |
 | `platformCapabilities.ts` | ~11 files           | Menu composers, service guards, settings UI |
 
-Module-load side effects (relevant to lifecycle): `utils/db.ts` opens
-`retailPOS.db` at import; `utils/crypto.ts` and `utils/uuid.ts` install the
+Module-load side effects (relevant to lifecycle): `shared/utils/db.ts` opens
+`retailPOS.db` at import; `shared/utils/crypto.ts` and `shared/utils/uuid.ts` install the
 `crypto.getRandomValues` polyfill at import.
 
 ## Feature Flow
@@ -71,54 +75,54 @@ Screen / Component / Hook / Context / Service / Repository
 
 ## Implementation Map
 
-| Layer   | Responsibility                                                    | Relevant implementation                                                                              |
-| ------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| Libs    | Money & currency                                                  | `utils/money.ts`, `utils/currency.ts`                                                                |
-| Libs    | Design tokens, presets, interaction states, breakpoints           | `utils/theme.ts`, `utils/themes.ts`, `utils/responsive.utils.ts`                                     |
-| Libs    | Platform registry, ID mapping, capability matrix, Electron bridge | `utils/platforms.ts`, `utils/platformIds.ts`, `utils/platformCapabilities.ts`, `utils/electron.ts`   |
-| Libs    | SQLite singleton, schema v1–v11, update allowlist                 | `utils/db.ts`, `utils/dbSchema.ts`, `utils/sql.ts`                                                   |
-| Libs    | SHA-256/HMAC, PIN hashing, validation, UUID, base64               | `utils/crypto.ts`, `utils/userPin.utils.ts`, `utils/base64.ts`, `utils/uuid.ts`                      |
-| Libs    | Role gating, action registry, capability gating                   | `utils/roleAccess.ts`, `utils/actionRegistry.ts`, `utils/menuCapabilityAccess.ts`                    |
-| Libs    | Sale domain rules                                                 | `utils/sellability.ts`, `utils/categorySelection.ts`, `utils/categoryFilter.ts`, `utils/hidBurst.ts` |
-| Libs    | Order domain mapping/rules                                        | `utils/orderRow.utils.ts`, `utils/orderStateMapper.ts`, `utils/orderHistory.utils.ts`                |
-| Libs    | Validation & export helpers                                       | `utils/printerSettings.utils.ts`, `utils/inventoryScanner.utils.ts`, `utils/csv.ts`                  |
-| Locales | Validation messages (partially unused — see C2 in rules.md)       | `locales/*/common.json`                                                                              |
-| Docs    | Money ADR; feature rules for sale/platform/access-control         | `docs/adr/ADR-006-*.md`, `docs/features/sale/`, `platform.md`, `access-control.md`                   |
+| Layer   | Responsibility                                                    | Relevant implementation                                                                                                                                                         |
+| ------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Libs    | Money & currency                                                  | `shared/utils/money.ts`, `shared/utils/currency.ts`                                                                                                                             |
+| Libs    | Design tokens, presets, interaction states, breakpoints           | `shared/utils/theme.ts`, `shared/utils/themes.ts`, `shared/utils/responsive.utils.ts`                                                                                           |
+| Libs    | Platform registry, ID mapping, capability matrix, Electron bridge | `shared/utils/platforms.ts`, `shared/utils/platformIds.ts`, `shared/utils/platformCapabilities.ts`, `shared/utils/electron.ts`                                                  |
+| Libs    | SQLite singleton, schema v1–v11, update allowlist                 | `shared/utils/db.ts`, `shared/utils/dbSchema.ts`, `shared/utils/sql.ts`                                                                                                         |
+| Libs    | SHA-256/HMAC, PIN hashing, validation, UUID, base64               | `shared/utils/crypto.ts`, `features/authentication/utils/userPin.utils.ts`, `shared/utils/base64.ts`, `shared/utils/uuid.ts`                                                    |
+| Libs    | Role gating, action registry, capability gating                   | `shared/utils/roleAccess.ts`, `shared/utils/actionRegistry.ts`, `shared/utils/menuCapabilityAccess.ts`                                                                          |
+| Libs    | Sale domain rules                                                 | `features/catalogue/utils/sellability.ts`, `features/catalogue/utils/categorySelection.ts`, `features/catalogue/utils/categoryFilter.ts`, `features/scanning/utils/hidBurst.ts` |
+| Libs    | Order domain mapping/rules                                        | `features/orders-sync/utils/orderRow.utils.ts`, `features/checkout/utils/orderStateMapper.ts`, `features/orders-sync/utils/orderHistory.utils.ts`                               |
+| Libs    | Validation & export helpers                                       | `features/hardware/utils/printerSettings.utils.ts`, `features/inventory/utils/inventoryScanner.utils.ts`, `shared/utils/csv.ts`                                                 |
+| Locales | Validation messages (partially unused — see C2 in rules.md)       | `shared/locales/*/common.json`                                                                                                                                                  |
+| Docs    | Money ADR; feature rules for sale/platform/access-control         | `docs/adr/ADR-006-*.md`, `docs/features/sale/`, `platform.md`, `access-control.md`                                                                                              |
 
 ## State Ownership
 
 By convention these modules are pure or hold only module-level/process-level
 state:
 
-| State                             | Owner                                     | Persistence                | Reset condition                 |
-| --------------------------------- | ----------------------------------------- | -------------------------- | ------------------------------- |
-| DB connection (`dbInstance`)      | `utils/db.ts`                             | SQLite file `retailPOS.db` | App termination                 |
-| Schema version                    | `utils/dbSchema.ts`                       | `PRAGMA user_version`      | Never (migrations forward-only) |
-| `crypto.getRandomValues` polyfill | `utils/crypto.ts`, `utils/uuid.ts`        | None                       | Process restart (idempotent)    |
-| HID burst buffer                  | `HidBurstDetector` instance               | None                       | `reset()` / instance lifetime   |
-| Theme preset choice               | `contexts/ThemeProvider.tsx` (not a util) | settings                   | User change                     |
-| Everything else                   | Stateless pure functions                  | n/a                        | n/a                             |
+| State                             | Owner                                            | Persistence                | Reset condition                 |
+| --------------------------------- | ------------------------------------------------ | -------------------------- | ------------------------------- |
+| DB connection (`dbInstance`)      | `shared/utils/db.ts`                             | SQLite file `retailPOS.db` | App termination                 |
+| Schema version                    | `shared/utils/dbSchema.ts`                       | `PRAGMA user_version`      | Never (migrations forward-only) |
+| `crypto.getRandomValues` polyfill | `shared/utils/crypto.ts`, `shared/utils/uuid.ts` | None                       | Process restart (idempotent)    |
+| HID burst buffer                  | `HidBurstDetector` instance                      | None                       | `reset()` / instance lifetime   |
+| Theme preset choice               | `shared/contexts/ThemeProvider.tsx` (not a util) | settings                   | User change                     |
+| Everything else                   | Stateless pure functions                         | n/a                        | n/a                             |
 
 ## Dependencies
 
 - `expo-sqlite` — `db.ts`/`dbSchema.ts`.
 - `react-native-get-random-values`, `uuid` — `crypto.ts`, `uuid.ts`.
 - `react-native` `Platform` — `electron.ts`, `theme.ts` (types only).
-- `services/logger/LoggerFactory` — `dbSchema.ts` only (notable: `db.ts` uses
+- `shared/services/logger/LoggerFactory.ts` — `dbSchema.ts` only (notable: `db.ts` uses
   `console.log` instead — see Contradiction C1).
 - Domain types — `sellability.ts`, `categorySelection.ts`, `categoryFilter.ts`
-  import `services/product/types`, `services/category/types`;
+  import `features/catalogue/services/product/types`, `features/catalogue/services/category/types`;
   `orderRow.utils.ts`/`orderStateMapper.ts`/`orderHistory.utils.ts` import
   repository/service types. These are _type-only_ dependencies; the logic stays
   pure.
-- `repositories/UserRepository` — `roleAccess.ts`, `actionRegistry.ts` import
+- `features/authentication/repositories/UserRepository.ts` — `roleAccess.ts`, `actionRegistry.ts` import
   `UserRole` (type dependency in the wrong direction; noted as Q1).
 
 ## Side Effects
 
-- Importing `utils/db.ts` opens the SQLite database eagerly and (outside tests)
+- Importing `shared/utils/db.ts` opens the SQLite database eagerly and (outside tests)
   runs `initializeSchema` — migrations execute on first DB use.
-- Importing `utils/crypto.ts`/`uuid.ts` installs a global crypto polyfill.
+- Importing `shared/utils/crypto.ts`/`uuid.ts` installs a global crypto polyfill.
 - `initializeSchema` may `ALTER`/`CREATE` many tables inside one transaction;
   failure aborts the app bootstrap path that called it.
 

@@ -5,7 +5,7 @@
 **Rule.** Every aggregation filters to orders with status `paid` or `synced` —
 drafts, pending, failed, cancelled are excluded from sales metrics.
 
-**Evidence.** `services/reporting/ReportingService.ts`, tests
+**Evidence.** `features/reporting/services/ReportingService.ts`, tests
 ("counts only paid and synced orders").
 
 🟢 **E1.1** — a failed/draft order never inflates totals.
@@ -40,7 +40,7 @@ order history (shared-libs PG8).
 **Rule.** `exportOrdersCsv` cells go through `escapeCsvCell` — `= + - @` etc.
 prefixed unless a plain number; RFC 4180 quoting.
 
-**Evidence.** `utils/csv.ts` (X-R3), `ReportingService.exportOrdersCsv`.
+**Evidence.** `shared/utils/csv.ts` (X-R3), `ReportingService.exportOrdersCsv`.
 
 🟢 **E4.1** — product named `=cmd…` exports as text, not a formula.
 
@@ -49,7 +49,7 @@ prefixed unless a plain number; RFC 4180 quoting.
 **Rule.** CSV → `Share.share({message: csv})`; share failure →
 `'Export Failed'` alert.
 
-**Evidence.** `screens/ReportingScreen.tsx:61-64`.
+**Evidence.** `features/reporting/screens/ReportingScreen.tsx:61-64`.
 
 🔴 **E5.1** — large ranges build the whole CSV in memory — no streaming (PG1).
 

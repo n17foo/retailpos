@@ -6,10 +6,10 @@
 
 ## Service Layer Pattern (ADR-005)
 
-Four-layer structure for platform-integrating domains:
+Four-layer structure for platform-integrating domains, inside the feature slice:
 
 ```
-services/[domain]/
+features/[domain]/services/
 ├── [Domain]ServiceInterface.ts          # Contract
 ├── [domain]ServiceFactory.ts            # Singleton factory
 └── platforms/
@@ -19,6 +19,8 @@ services/[domain]/
     ├── Offline[Domain]Service.ts        # Always present — SQLite fallback
     └── ...
 ```
+
+(Cross-feature services use the same shape under `shared/services/`.)
 
 ### Interface
 
@@ -254,7 +256,7 @@ remote_cart    (Woo, Magento, BigCommerce,    → orderService.quoteTax()       
 local_only     (Offline)                      → basket totals + resolveOfflineTaxRate()
 ```
 
-If an online platform cannot return the tax, checkout stops. Platform API calls use raw ids (`utils/platformIds.ts`).
+If an online platform cannot return the tax, checkout stops. Platform API calls use raw ids (`shared/utils/platformIds.ts`).
 See docs/features/platform-clients/ (platform-tax spec retired).
 
 ---

@@ -8,8 +8,8 @@ Sync status machine: `pending → synced | pending(retry) | failed → (discard)
 attempted. Sync is always a second, retriable step — never a precondition of
 saving the sale.
 
-**Evidence.** `repositories/OrderRepository.ts`, `services/checkout/CheckoutService.ts`,
-`services/sync/OrderSyncService.ts`, spec `sync.md §7`.
+**Evidence.** `features/orders-sync/repositories/OrderRepository.ts`, `features/checkout/services/CheckoutService.ts`,
+`features/orders-sync/services/sync/OrderSyncService.ts`, spec `sync.md §7`.
 
 🟢 **E1.1 — Sale survives sync failure**
 Given a paid order whose platform call fails, when sync runs, the order
@@ -27,7 +27,7 @@ non-retryable (HTTP 4xx, unknown). Retryable errors keep the order `pending`
 and increment a KV-persisted counter until `MAX_SYNC_RETRIES()` (default 3);
 then the order becomes `failed`. `synced` orders are never re-synced.
 
-**Evidence.** `services/sync/OrderSyncService.ts` (`isRetryable`, KV `sync:retries:*`),
+**Evidence.** `features/orders-sync/services/sync/OrderSyncService.ts` (`isRetryable`, KV `sync:retries:*`),
 `POSConfigService.MAX_SYNC_RETRIES`, spec `sync.md §1.7`.
 
 🟢 **E2.1 — Success**
@@ -96,7 +96,7 @@ Consecutive failures exponentially back off (`base × 2ⁿ`, cap 15 min); any
 success resets the interval. The service pauses while the app is backgrounded
 and triggers a sync on foreground.
 
-**Evidence.** `services/sync/BackgroundSyncService.ts`, `App.tsx`.
+**Evidence.** `features/orders-sync/services/sync/BackgroundSyncService.ts`, `App.tsx`.
 
 📱 **E5.1 — App backgrounded**
 Timer keeps running but sync work is skipped; on `AppState → 'active'` an
@@ -117,7 +117,7 @@ the durable state; `failed` orders stay failed (no auto-reset).
 failed orders with counts (total / pending / failed). Per order: **Retry**
 (always) and **Discard** (failed only). "Retry All" re-queues everything.
 
-**Evidence.** `screens/SyncQueueScreen.tsx`, `hooks/useSyncQueue.ts`,
+**Evidence.** `features/orders-sync/screens/SyncQueueScreen.tsx`, `features/orders-sync/hooks/useSyncQueue.ts`,
 `OrderSyncService.{retrySingleOrder,discardFailedOrder}`, spec `sync.md §2`.
 
 🟢 **E6.1 — Retry one**
@@ -148,7 +148,7 @@ are locked to today (`dayOffset` can't navigate) and see **only their own
 orders** (`cashierFilter = user.id`). Managers/admins see all cashiers and
 any past/future day.
 
-**Evidence.** `hooks/useOrderHistory.ts`, `utils/orderHistory.utils.ts`,
+**Evidence.** `features/orders-sync/hooks/useOrderHistory.ts`, `features/orders-sync/utils/orderHistory.utils.ts`,
 `OrderRepository.findByDateRange`.
 
 🟢 **E7.1 — Cashier today**
@@ -171,8 +171,8 @@ removes `order_items`).
 `printerService.printReceipt`) and shifts can be opened/closed with a
 daily report (`useDailyReport` → `DailyReportService`).
 
-**Evidence.** `screens/order-history/{ReceiptModal,ReceiptTemplate,ShiftModal,ReportModal}.tsx`,
-`hooks/useDailyReport.ts`.
+**Evidence.** `features/orders-sync/screens/{ReceiptModal,ReceiptTemplate,ShiftModal,ReportModal}.tsx`,
+`features/orders-sync/hooks/useDailyReport.ts`.
 
 🟢 **E8.1 — Reprint**
 Any listed order → Receipt preview modal → Print → thermal printer.
@@ -190,7 +190,7 @@ Print attempt fails → alert; order data unaffected.
 `syncEventBus` `order:created / order:updated / order:paid` events and
 refreshes the list — so orders taken on the server register appear live.
 
-**Evidence.** `hooks/useOrders.ts`, `services/instoreapi/sync/{SyncEventBus,SyncPoller}.ts`,
+**Evidence.** `features/orders-sync/hooks/useOrders.ts`, `features/multi-register/services/sync/{SyncEventBus,SyncPoller}.ts`,
 `instoreApiConfig.isClient`.
 
 🟢 **E9.1 — Server takes order, client sees it**
@@ -206,7 +206,7 @@ listen to itself).
 for each unsynced order calls `orderSyncService.syncOrderToPlatform` —
 fire-and-forget; failures simply leave `sync_status` for the queue.
 
-**Evidence.** `contexts/CheckoutProvider.tsx:133-141`, spec `sync.md §7`.
+**Evidence.** `features/checkout/contexts/CheckoutProvider.tsx:133-141`, spec `sync.md §7`.
 
 🟢 **E10.1 — Happy path**
 Payment succeeds → order syncs within seconds → `unsyncedOrdersCount` drops
@@ -252,12 +252,12 @@ disconnected printer just errors.
 
 ## Test Coverage Mapping
 
-| Example  | Behaviour                  | Coverage                                                    |
-| -------- | -------------------------- | ----------------------------------------------------------- |
-| E2.3/2.4 | retryable vs non-retryable | Not found for `OrderSyncService` directly                   |
-| E5.x     | backoff loop               | `services/sync/BackgroundSyncService.notifications.test.ts` |
-| E6.x     | queue actions              | spec `sync.md §2` mirrors screen logic                      |
-| E9.x     | event bus refresh          | Not found                                                   |
+| Example  | Behaviour                  | Coverage                                                                         |
+| -------- | -------------------------- | -------------------------------------------------------------------------------- |
+| E2.3/2.4 | retryable vs non-retryable | Not found for `OrderSyncService` directly                                        |
+| E5.x     | backoff loop               | `features/orders-sync/services/sync/BackgroundSyncService.notifications.test.ts` |
+| E6.x     | queue actions              | spec `sync.md §2` mirrors screen logic                                           |
+| E9.x     | event bus refresh          | Not found                                                                        |
 
 ## Feature Context Summary
 
@@ -289,5 +289,5 @@ self-syncs; online failures queue and retry automatically on reconnect.
 **Lifecycle**: background sync pauses in background, syncs on foreground;
 retry counters persist in KV (DB `sync_status` is durable).
 
-**Dependencies**: `utils/db.ts`, `OrderServiceFactory`, `platformIds`,
+**Dependencies**: `shared/utils/db.ts`, `OrderServiceFactory`, `platformIds`,
 `MAX_SYNC_RETRIES`, KDS factory, `syncEventBus`/WebSocket, auth role.

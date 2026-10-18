@@ -41,13 +41,13 @@ ReportingScreen → pick range → useReporting
 
 ## Implementation Map
 
-| Layer        | Responsibility                  | Implementation                                          |
-| ------------ | ------------------------------- | ------------------------------------------------------- |
-| Screens      | Report UI, range picker, export | `screens/ReportingScreen.tsx`                           |
-| Hooks        | Hook wrapper                    | `hooks/useReporting.ts`                                 |
-| Services     | Aggregations + CSV              | `services/reporting/ReportingService.ts`                |
-| Repositories | Source rows                     | `repositories/{OrderRepository,OrderItemRepository}.ts` |
-| Libs         | CSV escaping                    | `utils/csv.ts` (X-R3)                                   |
+| Layer        | Responsibility                  | Implementation                                                               |
+| ------------ | ------------------------------- | ---------------------------------------------------------------------------- |
+| Screens      | Report UI, range picker, export | `features/reporting/screens/ReportingScreen.tsx`                             |
+| Hooks        | Hook wrapper                    | `features/reporting/hooks/useReporting.ts`                                   |
+| Services     | Aggregations + CSV              | `features/reporting/services/ReportingService.ts`                            |
+| Repositories | Source rows                     | `features/orders-sync/repositories/{OrderRepository,OrderItemRepository}.ts` |
+| Libs         | CSV escaping                    | `shared/utils/csv.ts` (X-R3)                                                 |
 
 ## Rules (summary — see rules.md)
 
@@ -67,7 +67,7 @@ ReportingScreen → pick range → useReporting
 
 ## Dependencies
 
-- `utils/csv.ts` — safe CSV cell escaping.
+- `shared/utils/csv.ts` — safe CSV cell escaping.
 - `Share` API — export delivery.
 - Order repositories — the data source.
 

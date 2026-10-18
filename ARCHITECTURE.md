@@ -8,47 +8,51 @@
 
 | Layer          | Technology                                    | Version |
 | -------------- | --------------------------------------------- | ------- |
-| **Framework**  | React Native + Expo                           | SDK 55  |
-| **Language**   | TypeScript                                    | 5.x     |
+| **Framework**  | React Native + Expo                           | SDK 57  |
+| **Language**   | TypeScript (strict mode)                      | 6.x     |
 | **Navigation** | React Navigation                              | 7.x     |
 | **State**      | React Context (app state) + Zustand (queue)   | —       |
 | **Database**   | SQLite via `expo-sqlite`                      | —       |
 | **Desktop**    | Electron                                      | —       |
-| **Styling**    | StyleSheet + `utils/theme.ts`                 | —       |
+| **Styling**    | StyleSheet + `shared/utils/theme.ts`          | —       |
 | **i18n**       | react-i18next + expo-localization             | —       |
 | **Logging**    | Custom `LoggerFactory` + pluggable transports | —       |
 | **Testing**    | Jest                                          | —       |
-| **Linting**    | ESLint (flat config) + Prettier               | —       |
+| **Linting**    | ESLint 10 (flat config) + Prettier            | —       |
 
 ---
 
+## Codebase Layout
+
+The codebase is **feature-sliced**. Each domain lives under `features/<domain>/` and owns its `screens/`, `components/`, `hooks/`, `contexts/`, `services/`, `repositories/` and `utils/` (whichever apply). Code shared across features lives in `shared/` (UI primitives, providers, cross-feature hooks, audit/logger/notifications/queue/search/secrets services, and all core `utils/` — theme, money, crypto, db, platforms). `app/` holds the root wiring: `app/navigation/` (Root, Auth, MainTab, More navigators) and `app/providers/`. See `AGENT.md` for the per-feature directory table.
+
 ## Layer Architecture
 
-The application is organised in four strict layers. **Dependencies only flow downward** — a layer may only call into the layer directly below it. No layer may skip levels or call upward.
+Within each feature (and in `shared/`), the code is organised in four strict layers. **Dependencies only flow downward** — a layer may only call into the layer directly below it. No layer may skip levels or call upward.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Screens  (screens/)                                    │
+│  Screens  (features/<domain>/screens/)                  │
 │  Full-screen views. Compose components, call hooks.     │
 │  No direct service calls. No business logic.            │
 ├─────────────────────────────────────────────────────────┤
-│  Components  (components/)                              │
+│  Components  (features/<domain>/components/, shared/)   │
 │  Reusable UI fragments. Props-in / callbacks-out.       │
 │  No hooks that call services. No state beyond local UI. │
 ├─────────────────────────────────────────────────────────┤
-│  Hooks  (hooks/)                                        │
+│  Hooks  (features/<domain>/hooks/, shared/hooks/)       │
 │  One hook per domain. Owns async state, error state,    │
 │  loading flag. Calls service factories. Returns stable  │
 │  callbacks via useCallback.                             │
 ├─────────────────────────────────────────────────────────┤
-│  Services  (services/)                                  │
+│  Services  (features/<domain>/services/, shared/serv.)  │
 │  All business logic and platform integration.           │
 │  No React imports. No UI state.                         │
 │  Interface → Factory → Platform implementations.        │
 └─────────────────────────────────────────────────────────┘
           ↕  (cross-cutting)
 ┌─────────────────────────────────────────────────────────┐
-│  Contexts  (contexts/)                                  │
+│  Contexts  (features/<domain>/contexts/, shared/)       │
 │  Global state shared across many screens (Basket,       │
 │  Auth, Category). Provided at the root; consumed via    │
 │  the companion useX hook. Internally call services.     │
@@ -116,7 +120,7 @@ Repositories abstract both SQLite (`OfflineOrderRepository`) and HTTP-to-server 
 
 ### Platform Capability Model
 
-`utils/platformCapabilities.ts` is the single source of truth for what each platform supports. It gates checkout behaviour (`basketMode`), sync strategy, and UI visibility. See `docs/features/shared-libs/platform.md`.
+`shared/utils/platformCapabilities.ts` is the single source of truth for what each platform supports. It gates checkout behaviour (`basketMode`), sync strategy, and UI visibility. See `docs/features/shared-libs/platform.md`.
 
 ### Tax — Platform-Authoritative (ADR-009)
 
@@ -128,13 +132,13 @@ Online platforms own tax and the POS never assumes a rate. At `startCheckout()`,
 
 `shopify` · `woocommerce` · `bigcommerce` · `magento` · `sylius` · `wix` · `prestashop` · `commercefull` · `offline`
 
-Defined in `utils/platforms.ts` → `ECommercePlatform` enum. Each platform has a capability profile in `utils/platformCapabilities.ts`.
+Defined in `shared/utils/platforms.ts` → `ECommercePlatform` enum. Each platform has a capability profile in `shared/utils/platformCapabilities.ts`.
 
 ---
 
 ## Database Schema
 
-SQLite managed by `SQLiteStorageService` (`services/storage/SQLiteStorageService.ts`). Current schema version: **v3** (migrations in `utils/dbSchema.ts`).
+SQLite managed by `shared/utils/db.ts` (opens `retailPOS.db`) with migrations in `shared/utils/dbSchema.ts`. Current schema version: **v11** (`LATEST_DB_VERSION`).
 
 | Table                   | Purpose                                                                    |
 | ----------------------- | -------------------------------------------------------------------------- |
@@ -261,15 +265,16 @@ yarn test / lint / lint:fix / format    # quality gates
 
 ## Security
 
-- **Credentials** — stored via `SecretsService` (`react-native-keychain` in production; in-memory mock in dev)
+- **Credentials** — stored via `SecretsService` (`react-native-keychain` in production; Electron `safeStorage` on desktop; in-memory mock in dev)
 - **Environment** — `.env` is gitignored; never commit secrets
-- **Auth** — pluggable multi-method; PIN is always the fallback (ADR-008)
+- **Auth** — pluggable multi-method; PIN is always the fallback (ADR-008). PINs are stored salted+hashed; credential-bearing settings tabs are admin-only; inactivity auto-lock defaults to 5 min
+- **LAN API** — every multi-register request is HMAC-signed (no secret on the wire); replayed nonces and stale timestamps rejected. Transport is plaintext HTTP — a dedicated POS VLAN (or WireGuard/Tailscale overlay) is a **deployment requirement**
 - **Payments** — delegated to PCI-compliant SDKs (Stripe, Square, Adyen, Tap Payments); non-SDK providers go through the Instore API
-- **Known gap** — PINs stored as plaintext in `users.pin`; must be hashed before production
+- **Deployment** — network segmentation, in-store server hardening and the full controls inventory: `docs/security/`
 
 ---
 
 ## Internationalisation
 
 `react-i18next` + `expo-localization` for automatic locale detection.
-Translation files: `locales/en.json`, `locales/es.json`, `locales/fr.json`, `locales/de.json`.
+Translation files: `shared/locales/{en,es,fr,de}/common.json`; setup in `shared/locales/i18n.ts`.

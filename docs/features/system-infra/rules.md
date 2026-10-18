@@ -8,7 +8,7 @@ an `AuditEntry` to a persisted JSON store; queries: `getAll`, `getByAction`,
 `AuditAction`s cover orders, refunds, auth, settings, shifts, drawer,
 permissions, customers, procurement, sync, exchange.
 
-**Evidence.** `services/audit/AuditLogService.ts`.
+**Evidence.** `shared/services/audit/AuditLogService.ts`.
 
 🟢 **E1.1** — drawer open → `drawer:opened` row with pin/method metadata.
 
@@ -25,7 +25,7 @@ runs on: NetInfo connectivity-restore, `AppState → active`, and a 30s poll.
 Each retry: `attempts++`, delay `min(30s·2^(n−1), 5min)`. Success removes the
 request; `maxAttempts` exhausts it.
 
-**Evidence.** `hooks/useSyncStore.ts`, `services/queue/QueueManager.ts:19-43`.
+**Evidence.** `shared/hooks/useSyncStore.ts`, `shared/services/queue/QueueManager.ts:19-43`.
 
 🟢 **E2.1 — Offline POST** — call fails → queued → next connectivity triggers
 the pass → request replays.
@@ -42,7 +42,7 @@ processQueue is re-entrant-guarded by `isProcessing` (verify — PG2).
 Electron → `safeStorage`; browser → `BrowserSecretsService`; Expo Go →
 `Memory` (non-persistent).
 
-**Evidence.** `services/secrets/*`.
+**Evidence.** `shared/services/secrets/*`.
 
 🟢 **E3.1** — platform API key saved on iOS lands in the keychain; same call
 in Expo Go lands in memory (lost on restart — expected for dev).
@@ -55,7 +55,7 @@ mis-detection would silently degrade to memory (PG3).
 **Rule.** `notificationService.notify(title, body, severity)` emits to
 listeners; no persistence, no dedup — callers decide frequency.
 
-**Evidence.** `services/notifications/NotificationService.ts`.
+**Evidence.** `shared/services/notifications/NotificationService.ts`.
 
 🟠 **E4.1** — background sync notifies every failing pass (see orders-sync
 PG4) — the service itself doesn't throttle.
@@ -66,7 +66,7 @@ PG4) — the service itself doesn't throttle.
 omnibar's resolution path; adapter availability mirrors the `catalog`
 capability.
 
-**Evidence.** `services/search/*`, `catalogue/rules.md` (consumer rules).
+**Evidence.** `shared/services/search/*`, `catalogue/rules.md` (consumer rules).
 
 🟠 **E5.1** — OFFLINE → local search over the seeded catalogue (which has
 the onboarding-seeding gap noted in the onboarding doc).
@@ -74,7 +74,7 @@ the onboarding-seeding gap noted in the onboarding doc).
 ## I-R6 — Logging goes through LoggerFactory, never console
 
 **Rule.** `LoggerFactory.getInstance().createLogger(tag)` + pluggable
-`LogTransport`s — the AGENT.md non-negotiable; `utils/db.ts` is the known
+`LogTransport`s — the AGENT.md non-negotiable; `shared/utils/db.ts` is the known
 exception (C1 in shared-libs).
 
 ## I-R7 — The More menu is composed, not hardcoded
@@ -83,13 +83,13 @@ exception (C1 in shared-libs).
 More-menu list with per-item `MenuItemStatus` (enabled/disabled/hidden) from
 four inputs: user role (`canAccessMoreMenuItem`), platform capability,
 custom-adapter readiness, and permission-set access
-(`evaluateCombinedAccess`). `MoreNavigator` renders it; `screens/sale/
+(`evaluateCombinedAccess`). `MoreNavigator` renders it; `features/checkout/screens/
 MainMenu.tsx` and `SetupProgressService` also consume the same composition —
 menu truth is single-sourced.
 
-**Evidence.** `services/navigation/MoreMenuComposer.ts`,
-`navigation/MoreNavigator.tsx`, `utils/{roleAccess,menuCapabilityAccess,
-platformCapabilities}.ts`, `services/permissions/PermissionService.ts`.
+**Evidence.** `app/navigation/MoreMenuComposer.ts`,
+`app/navigation/MoreNavigator.tsx`, `shared/utils/{roleAccess,menuCapabilityAccess,
+platformCapabilities}.ts`, `features/authentication/services/permissions/PermissionService.ts`.
 
 🟢 **E7.1** — cashier on WooCommerce → capability-gated items (e.g. features
 the platform doesn't support) render disabled with `getUnavailableReason`,
@@ -105,19 +105,19 @@ here and in `docs/features/authentication`.
 **Rule.** These surfaces exist but have no live consumers — treat as dead
 code pending removal, not behaviour to rely on:
 
-- `contexts/DataProvider.tsx` — mounted in `App.tsx:184`, but **zero** files
+- `app/providers/DataProvider.tsx` — mounted in `App.tsx:184`, but **zero** files
   call `useData()`. Its `useOrders`/`useOfflineProducts`/`useOfflineCategories`
   hooks still fire their effects at mount (possible wasted loads).
-- `hooks/useKeyboardShortcuts.ts` — zero consumers; the desktop-shortcut
-  intent lives in `screens/sale/*` key handlers instead (sale R8).
-- `screens/search/*` (`SearchHeader`, `SearchHistory`, `FilterPanel`,
+- `shared/hooks/useKeyboardShortcuts.ts` — zero consumers; the desktop-shortcut
+  intent lives in `features/checkout/screens/*` key handlers instead (sale R8).
+- `shared/components/search/*` (`SearchHeader`, `SearchHistory`, `FilterPanel`,
   `ProductResultItem`) — orphaned by the unified sale surface; only
-  `hooks/useSearch.ts` still names them.
-- `services/jobs/LoyaltyExpiryJob` — was never `start()`ed; **fixed** —
+  `shared/hooks/useSearch.ts` still names them.
+- `features/customers/services/loyalty/LoyaltyExpiryJob.ts` — was never `start()`ed; **fixed** —
   started/stopped in `App.tsx` (see customers rules).
 
-**Evidence.** grep over `screens/`, `components/`, `contexts/`, `App.tsx`,
-`navigation/` — no importers.
+**Evidence.** grep over `features/*/screens/`, `features/*/components/`,
+`features/*/contexts/`, `App.tsx`, `app/navigation/` — no importers.
 
 ## ❓ Open Questions
 
@@ -144,7 +144,7 @@ code pending removal, not behaviour to rely on:
 
 | Example      | Coverage                                         |
 | ------------ | ------------------------------------------------ |
-| I-R1 audit   | `services/audit/AuditLogService.test.ts`         |
+| I-R1 audit   | `shared/services/audit/AuditLogService.test.ts`  |
 | I-R2 queue   | Not found                                        |
 | I-R3 secrets | mock backend used in tests; per-backend untested |
 
@@ -166,7 +166,7 @@ backends, logging, platform search adapters, More-menu composition.
 - I-R7 More menu composed from role + capability + permission + adapter
   readiness.
 - I-R8 Dead surfaces inventoried (DataProvider, useKeyboardShortcuts,
-  screens/search/*).
+  shared/components/search/*).
 
 **Critical unhappy paths**: audit persist lag (PG1); queue replay without
 idempotency (PG4); memory-backend secret loss (PG3).

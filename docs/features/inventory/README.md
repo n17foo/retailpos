@@ -17,7 +17,7 @@ and scan-driven stock counting. Platform reads/writes go through
   inline quantity edit, summary footer.
 - `useInventory` — `getInventory(productIds)` + `updateInventory(updates)` +
   `adjustInventory(productId, ±n)`.
-- Per-platform adapters (`services/inventory/platforms/*` — 9 platforms +
+- Per-platform adapters (`shared/utils/*` — 9 platforms +
   `OfflineInventoryService`, `CompositeInventoryService`).
 - `RetryingInventoryService` + `PendingInventoryStore` — factory-applied
   decorator: failed online writes persist to KV and replay on the next
@@ -25,12 +25,12 @@ and scan-driven stock counting. Platform reads/writes go through
 - Reorder-point config (`ReorderPointConfigScreen`, driven by
   `procurementService.getAllReorderConfigs`) and "Create PO" hand-off.
 - `BarcodeLabelScreen` — print barcode labels for items.
-- `useInventoryScanner` + `utils/inventoryScanner.utils.ts` — scan→item match
+- `useInventoryScanner` + `features/inventory/utils/inventoryScanner.utils.ts` — scan→item match
   during stock counting.
 
 ### Excluded
 
-- Selling/stock gating at sale time — `utils/sellability.ts` (sale feature;
+- Selling/stock gating at sale time — `features/catalogue/utils/sellability.ts` (sale feature;
   `isVariantSellable` reads `inventoryQuantity`/`isAvailable`).
 - Purchase orders, vendors, stock-takes, transfers — **procurement** feature
   (this screen links into it).
@@ -38,8 +38,8 @@ and scan-driven stock counting. Platform reads/writes go through
 
 ## Entry Points
 
-- **Inventory tab** — `navigation/MainTabNavigator` (role-gated:
-  admin+manager only; cashiers never see it — `utils/roleAccess.ts`).
+- **Inventory tab** — `app/navigation/MainTabNavigator.tsx` (role-gated:
+  admin+manager only; cashiers never see it — `shared/utils/roleAccess.ts`).
 - **Inventory → Reorder config** — `ReorderPointConfigScreen`.
 - **Inventory → Create PO** — navigates to More → PurchaseOrders.
 - **Inventory → Barcode labels** — `BarcodeLabelScreen`.
@@ -63,15 +63,15 @@ Low stock → "Create PO" → More→PurchaseOrders (procurement feature)
 
 ## Implementation Map
 
-| Layer    | Responsibility                                      | Implementation                                                                                                                                                    |
-| -------- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Screens  | List, filters, edit, reorder cfg, labels            | `screens/InventoryScreen.tsx`, `screens/inventory/{InventoryItemCard,InventoryFilterTabs,InventorySummaryFooter,ReorderPointConfigScreen,BarcodeLabelScreen}.tsx` |
-| Hooks    | Platform access, scan match                         | `hooks/{useInventory,useInventoryScanner}.ts`                                                                                                                     |
-| Services | Factory + 9 platform adapters + offline + composite | `services/inventory/{InventoryServiceFactory,InventoryServiceInterface,platforms/*}`                                                                              |
-| Services | Reorder config read                                 | `services/procurement/ProcurementService.getAllReorderConfigs`                                                                                                    |
-| Libs     | Scan matching                                       | `utils/inventoryScanner.utils.ts`                                                                                                                                 |
-| Libs     | Tab role gating                                     | `utils/roleAccess.ts` (`canAccessTab`)                                                                                                                            |
-| Locales  | Tab/filter/labels                                   | `locales/*`                                                                                                                                                       |
+| Layer    | Responsibility                                      | Implementation                                                                                                                                                                                |
+| -------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screens  | List, filters, edit, reorder cfg, labels            | `features/inventory/screens/InventoryScreen.tsx`, `features/inventory/screens/{InventoryItemCard,InventoryFilterTabs,InventorySummaryFooter,ReorderPointConfigScreen,BarcodeLabelScreen}.tsx` |
+| Hooks    | Platform access, scan match                         | `features/inventory/hooks/{useInventory,useInventoryScanner}.ts`                                                                                                                              |
+| Services | Factory + 9 platform adapters + offline + composite | `features/inventory/services/{InventoryServiceFactory,InventoryServiceInterface,platforms/*}`                                                                                                 |
+| Services | Reorder config read                                 | `features/procurement/services/ProcurementService.getAllReorderConfigs`                                                                                                                       |
+| Libs     | Scan matching                                       | `features/inventory/utils/inventoryScanner.utils.ts`                                                                                                                                          |
+| Libs     | Tab role gating                                     | `shared/utils/roleAccess.ts` (`canAccessTab`)                                                                                                                                                 |
+| Locales  | Tab/filter/labels                                   | `locales/*`                                                                                                                                                                                   |
 
 ## State Ownership
 
@@ -84,10 +84,10 @@ Low stock → "Create PO" → More→PurchaseOrders (procurement feature)
 
 ## Dependencies
 
-- `utils/roleAccess.ts` — tab hidden from cashiers.
-- `services/product` — product list provides names/SKUs the stock rows render.
-- `services/procurement` — reorder configs + Create-PO hand-off.
-- `utils/inventoryScanner.utils.ts` — barcode→item resolution.
+- `shared/utils/roleAccess.ts` — tab hidden from cashiers.
+- `features/catalogue/services/product` — product list provides names/SKUs the stock rows render.
+- `features/procurement/services` — reorder configs + Create-PO hand-off.
+- `features/inventory/utils/inventoryScanner.utils.ts` — barcode→item resolution.
 - Platform credentials/connectivity for online adapters.
 
 ## Side Effects

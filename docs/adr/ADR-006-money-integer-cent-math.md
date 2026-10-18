@@ -10,8 +10,8 @@ IEEE 754 floating-point arithmetic produces errors in monetary calculations (e.g
 
 ## Decision
 
-All monetary operations go through `utils/money.ts`, which converts values to integer cents internally before performing arithmetic and converts back to decimal for display. The module exposes: `multiplyMoney`, `addMoney`, `subtractMoney`, `sumMoney`, `calculateTax`, `calculateLineTotal`, `roundMoney`, and `formatMoney`. Raw float arithmetic on money values is prohibited throughout the codebase.
+All monetary operations go through `shared/utils/money.ts`, which converts values to integer cents internally before performing arithmetic and converts back to decimal for display. The module exposes: `multiplyMoney`, `addMoney`, `subtractMoney`, `sumMoney`, `calculateTax`, `calculateLineTotal`, `roundMoney`, and `formatMoney`. Raw float arithmetic on money values is prohibited throughout the codebase.
 
 ## Consequences
 
-Totals are correct across all calculations regardless of the number of line items or tax rate. All monetary code must import from `utils/money.ts` — this constraint is enforced by convention and documented in `AGENT.md`. There is no runtime enforcement, so code review is the primary guard against violations.
+Totals are correct across all calculations regardless of the number of line items or tax rate. All monetary code must import from `shared/utils/money.ts` — this constraint is enforced by convention and documented in `AGENT.md`. There is no runtime enforcement, so code review is the primary guard against violations.

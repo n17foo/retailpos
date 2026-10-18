@@ -60,7 +60,7 @@ can restart the device bypasses it. Deliberate (avoids persistent lockout DoS).
 `UserRepository.findByPin` scans **all active users**, `verifyPin` each —
 matching a legacy plaintext row transparently re-hashes it (`v1$` format).
 
-**Evidence** — `repositories/UserRepository.ts:90-103`, `utils/crypto.ts`.
+**Evidence** — `features/authentication/repositories/UserRepository.ts:90-103`, `shared/utils/crypto.ts`.
 
 🟢 **E4.1** — new user → `hashPin` stored; login verifies via salted hash.
 🟠 **E4.2 — Migration** — plaintext row from an old schema verifies, then the
@@ -75,7 +75,7 @@ When `instoreApiConfig.isClient`, `PinAuthProvider` calls
 `instoreApiClient.verifyPin` instead of the local users table — user
 management is centralised on the server register.
 
-**Evidence** — `services/auth/providers/PinAuthProvider.ts:39-47,85-99`.
+**Evidence** — `features/authentication/services/auth/providers/PinAuthProvider.ts:39-47,85-99`.
 
 🟢 **E5.1** — client register, server reachable → PIN verified centrally.
 🔴 **E5.2 — LAN down on a client register** → `verifyPin` fails →
@@ -89,7 +89,7 @@ No local fallback. Potential gap PG1.
 inactivity lock both call `handleLogout(details)` → clear user → audit
 `auth:logout`. After any app restart the staff member must re-authenticate.
 
-**Evidence** — `contexts/AuthProvider.tsx`, `navigation/RootNavigator.tsx:55-68`;
+**Evidence** — `features/authentication/contexts/AuthProvider.tsx`, `app/navigation/RootNavigator.tsx:55-68`;
 spec `logout.md`.
 
 🟢 **E6.1** — logout → `auth:logout` with the triggering detail
@@ -105,8 +105,8 @@ spec `logout.md`.
 lock. Touch capture + (web) `keydown` reset the timer — **HID barcode scans
 count as activity**. `autoLockMinutes = 0` disables. Background time counts.
 
-**Evidence** — `hooks/useInactivityLock.ts`,
-`services/config/POSConfigService.ts:142`, `RootNavigator` responder capture.
+**Evidence** — `features/authentication/hooks/useInactivityLock.ts`,
+`features/platform-clients/services/config/POSConfigService.ts:142`, `RootNavigator` responder capture.
 
 🟢 **E7.1** — default N minutes idle → auto-logout with audit detail.
 🟠 **E7.2 — Scanning keeps the session alive** — deliberate (a busy till is
@@ -123,7 +123,7 @@ the action's `defaultMinRole === 'admin'` (ceiling); else registry default
 role rank; unknown action → deny. 60s per-user cache; fails closed on error.
 `canByRole` is a synchronous role-only variant (no overrides) for composers.
 
-**Evidence** — `services/permissions/PermissionService.ts`; spec §1, §6.1.
+**Evidence** — `features/authentication/services/permissions/PermissionService.ts`; spec §1, §6.1.
 
 🟢 **E8.1** — cashier + `discount:apply` (min cashier) → true.
 🔴 **E8.2** — cashier + `order:void` (min manager) → false → caller triggers
@@ -143,8 +143,8 @@ PIN via `authService` → `permissionService.can(managerId, actionKey)` →
 log approval + audit → resolve `{approved:true}`. Cancel → `{approved:false}`.
 5 bad PINs (keyed to the **requesting** user) → 60s lockout + notification.
 
-**Evidence** — `services/permissions/ManagerApprovalService.ts`,
-`components/ManagerApprovalModal.tsx`, `hooks/useManagerApproval.ts`.
+**Evidence** — `features/authentication/services/permissions/ManagerApprovalService.ts`,
+`features/authentication/components/ManagerApprovalModal.tsx`, `features/authentication/hooks/useManagerApproval.ts`.
 
 🟢 **E9.1** — cashier taps price-override → modal → manager enters PIN →
 approved → action proceeds; `permission:approved` audited.

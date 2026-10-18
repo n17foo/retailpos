@@ -6,7 +6,7 @@
 itself returns an access-denied view when `role` is `cashier`/undefined —
 defence in depth, not just menu hiding.
 
-**Evidence.** `utils/roleAccess.ts`, `screens/SettingsScreen.tsx:58`.
+**Evidence.** `shared/utils/roleAccess.ts`, `features/settings/screens/SettingsScreen.tsx:58`.
 
 🔴 **E1.1** — cashier deep-links/deep-navigates → denied screen, not a crash.
 
@@ -20,8 +20,8 @@ ordered tabs each with `MenuItemStatus`: core tabs always enabled;
 capability-keyed tabs `enabled | disabled(+reason) | hidden`.
 `hidden` tabs never render; `disabled` render with a reason but no content.
 
-**Evidence.** `services/navigation/SettingsTabComposer.ts`,
-`utils/menuCapabilityAccess.ts` (A-R3).
+**Evidence.** `features/settings/services/SettingsTabComposer.ts`,
+`shared/utils/menuCapabilityAccess.ts` (A-R3).
 
 🟢 **E2.1** — platform with `payment: not_recommended` → Payment tab hidden.
 
@@ -35,7 +35,7 @@ capability-keyed tabs `enabled | disabled(+reason) | hidden`.
 **Rule.** `updateSetting(key, value)` writes `KeyValueRepository` first, then
 updates the in-memory map; failure → refetch all + rethrow.
 
-**Evidence.** `hooks/useSettings.ts:44`, spec §1.4-1.5.
+**Evidence.** `features/settings/hooks/useSettings.ts:44`, spec §1.4-1.5.
 
 🟢 **E3.1** — save store name → KV row + map update; UI reflects instantly.
 
@@ -47,7 +47,7 @@ propagates to the caller (no silent swallow).
 **Rule.** Tab navigation is side-nav on desktop, scrollable tab bar on
 tablet, modal dropdown on phone.
 
-**Evidence.** `screens/SettingsScreen.tsx` layout code.
+**Evidence.** `features/settings/screens/SettingsScreen.tsx` layout code.
 
 📱 **E4.1** — rotate phone → nav style switches with the layout class.
 
@@ -57,8 +57,8 @@ tablet, modal dropdown on phone.
 admin-level gating — user CRUD + permission-set editing is manager/admin
 surface; `Users` menu item is admin-only (`manager` loses it per A-R1).
 
-**Evidence.** `screens/{UsersScreen,settings/UsersSettingsTab,
-settings/PermissionSetsScreen}.tsx`, `utils/roleAccess.ts`.
+**Evidence.** `features/settings/screens/{UsersScreen,UsersSettingsTab,
+PermissionSetsScreen}.tsx`, `shared/utils/roleAccess.ts`.
 
 🟢 **E5.1** — admin edits a PIN → `validatePinFormat` 6-digit rule applies
 (C-R2).

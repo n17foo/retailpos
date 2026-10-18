@@ -61,15 +61,15 @@ Checkout tender (store_credit):
 
 ## Implementation Map
 
-| Layer        | Responsibility                                | Implementation                                                                  |
-| ------------ | --------------------------------------------- | ------------------------------------------------------------------------------- |
-| Screens      | List + profile                                | `screens/{CustomersScreen,CustomerProfileScreen}.tsx`                           |
-| Components   | Sale attach UI                                | `screens/sale/BasketPanel.tsx` (customer modal, badge)                          |
-| Hooks        | Search debounce/pagination, profile aggregate | `hooks/{useCustomerSearch,useCustomerProfile}.ts`                               |
-| Services     | Search adapters + factory                     | `services/customer/{CustomerServiceFactory,LocalCustomerService,platforms/*}`   |
-| Services     | Ledgers                                       | `services/loyalty/LoyaltyService.ts`, `services/customer/StoreCreditService.ts` |
-| Repositories | Ledger entries, local customers               | `repositories/*` (store-credit entries, local customer table)                   |
-| Libs         | Capability gating                             | `utils/platformCapabilities.ts` (`customers` key)                               |
+| Layer        | Responsibility                                | Implementation                                                                                                        |
+| ------------ | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Screens      | List + profile                                | `features/customers/screens/{CustomersScreen,CustomerProfileScreen}.tsx`                                              |
+| Components   | Sale attach UI                                | `features/basket/components/BasketPanel.tsx` (customer modal, badge)                                                  |
+| Hooks        | Search debounce/pagination, profile aggregate | `features/customers/hooks/{useCustomerSearch,useCustomerProfile}.ts`                                                  |
+| Services     | Search adapters + factory                     | `features/customers/services/customer/{CustomerServiceFactory,LocalCustomerService,platforms/*}`                      |
+| Services     | Ledgers                                       | `features/customers/services/loyalty/LoyaltyService.ts`, `features/customers/services/customer/StoreCreditService.ts` |
+| Repositories | Ledger entries, local customers               | `features/customers/repositories/*` (store-credit entries, local customer table)                                      |
+| Libs         | Capability gating                             | `shared/utils/platformCapabilities.ts` (`customers` key)                                                              |
 
 ## State Ownership
 
@@ -84,8 +84,8 @@ Checkout tender (store_credit):
 ## Dependencies
 
 - `platformCapabilities.customers` — `isAvailable` gates search UI.
-- `services/audit` — `store_credit:redeemed` and ledger mutations audited.
-- `utils/money.ts` — credit ledger is cents-based.
+- `shared/services/audit` — `store_credit:redeemed` and ledger mutations audited.
+- `shared/utils/money.ts` — credit ledger is cents-based.
 - Basket context — `setCustomer` lives there.
 
 ## Side Effects

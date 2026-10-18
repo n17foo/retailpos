@@ -1,7 +1,7 @@
 # Persistence Backbone
 
-**Files:** `utils/db.ts`, `utils/dbSchema.ts`, `utils/sql.ts`
-**Consumers:** all ~23 `repositories/*.ts` (19 import `utils/db` directly)
+**Files:** `shared/utils/db.ts`, `shared/utils/dbSchema.ts`, `shared/utils/sql.ts`
+**Consumers:** all ~23 `repositories/*.ts` (19 import `shared/utils/db.ts` directly)
 **Tests:** none (schema is exercised indirectly via repository tests)
 **Parent:** [`rules.md`](rules.md)
 
@@ -10,12 +10,12 @@
 ## DB-R1 — One lazily-proxied SQLite database backs every repository
 
 **Rule**
-`utils/db.ts` opens `retailPOS.db` **at module import** and exports a `Proxy`
+`shared/utils/db.ts` opens `retailPOS.db` **at module import** and exports a `Proxy`
 that forwards method calls to the real `SQLiteDatabase` once ready; calls made
 before readiness return promises chained on `dbPromise`. Outside test env the
 open chain also runs `initializeSchema` (migrations).
 
-**Evidence** — `utils/db.ts` (`dbInstance`, `dbPromise`, Proxy `get`).
+**Evidence** — `shared/utils/db.ts` (`dbInstance`, `dbPromise`, Proxy `get`).
 
 🟢 **E1.1 — Early call** — a repository calling `db.runAsync` during startup
 queues on `dbPromise` and executes after open+schema, transparently.
@@ -39,7 +39,7 @@ each `v1…v11` block inside **one** `withTransactionAsync` and then stamps
 merge/add (e.g. v8 `register_id`, v9 order-item snapshots, v10 webhook
 delivery, v11 `sale_mode`).
 
-**Evidence** — `utils/dbSchema.ts` (739 lines; `initializeSchema`,
+**Evidence** — `shared/utils/dbSchema.ts` (739 lines; `initializeSchema`,
 `migrateDatabase`, `LATEST_DB_VERSION = 11`).
 
 🟢 **E2.1 — Fresh install** — `user_version = 0` → all 11 blocks run inside one
@@ -60,7 +60,7 @@ sale_mode` guarded by `pragma_table_info`).
 `undefined` values and `id/created_at/updated_at` are skipped; a key outside
 `allowedColumns` **throws** instead of being ignored; booleans become 0/1.
 
-**Evidence** — `utils/sql.ts`.
+**Evidence** — `shared/utils/sql.ts`.
 
 🟢 **E3.1** — `buildUpdateAssignments({name:'x', price:1.5}, ['name','price'])`
 → `['name = ?','price = ?'], ['x',1.5]`.

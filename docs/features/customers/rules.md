@@ -6,7 +6,7 @@
 `PlatformCustomer` records are read models of platform customers (or local
 customers on OFFLINE). No create/update push to the platform.
 
-**Evidence.** `services/customer/CustomerServiceInterface.ts` ("The POS
+**Evidence.** `features/customers/services/customer/CustomerServiceInterface.ts` ("The POS
 consumes customers — it does not create them locally" [upstream]),
 `platforms/*`, `LocalCustomerService.ts`.
 
@@ -22,7 +22,7 @@ with email, name, tags, orderCount, totalSpent.
 **Rule.** `useCustomerSearch` waits 300ms after the last keystroke, returns
 paged results; `loadMore()` appends the next page, `hasMore` tracks it.
 
-**Evidence.** `hooks/useCustomerSearch.ts:26-128`.
+**Evidence.** `features/customers/hooks/useCustomerSearch.ts:26-128`.
 
 🟢 **E2.1** — type "mar" → one API call after 300ms idle → first page renders.
 
@@ -39,7 +39,7 @@ existing results stay until `clear()`/new search.
 loyalty tender without a customer) auto-opens the picker and blocks checkout
 until resolved.
 
-**Evidence.** `screens/sale/BasketPanel.tsx:131-154`, checkout blockers
+**Evidence.** `features/basket/components/BasketPanel.tsx:131-154`, checkout blockers
 (checkout doc).
 
 🟢 **E3.1** — pick "Jane" → badge shows name/email; checkout blocker clears.
@@ -53,7 +53,7 @@ until resolved.
 `'Insufficient store credit balance'`. Every entry appends
 (`issue|redeem|expire`) and audits.
 
-**Evidence.** `services/customer/StoreCreditService.ts:73-88`.
+**Evidence.** `features/customers/services/customer/StoreCreditService.ts:73-88`.
 
 🟢 **E4.1 — Partial redemption**
 Balance £5, request £8 → charges £5 (clamped); `discountDollars` reflects £5 —
@@ -71,8 +71,8 @@ the shortfall rather than assume full coverage.
 **Rule.** Loyalty delta + reason required for manual adjustments on the
 profile screen; earn/redeem flows run through `LoyaltyService`.
 
-**Evidence.** `screens/CustomerProfileScreen.tsx:47-90`,
-`services/loyalty/LoyaltyService.ts`.
+**Evidence.** `features/customers/screens/CustomerProfileScreen.tsx:47-90`,
+`features/customers/services/loyalty/LoyaltyService.ts`.
 
 🟢 **E5.1** — manager enters `+50` + "goodwill" → balance updates + audit row.
 
@@ -85,8 +85,8 @@ input validation rejects it (PG2).
 
 - loyalty balance + store-credit balance — one reloadable unit.
 
-**Evidence.** `hooks/useCustomerProfile.ts`,
-`screens/CustomerProfileScreen.tsx:36`.
+**Evidence.** `features/customers/hooks/useCustomerProfile.ts`,
+`features/customers/screens/CustomerProfileScreen.tsx:36`.
 
 🟠 **E6.1** — any leg failing leaves `isLoading`/partial state — observe which
 sections render empty vs error (PG3).

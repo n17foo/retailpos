@@ -8,8 +8,8 @@
 service for `currentProvider` (default `STRIPE_NFC`). `setPaymentProvider`
 rejects unsupported values.
 
-**Evidence.** `services/payment/{PaymentService,PaymentServiceFactory}.ts`,
-`services/payment/mock/MockPaymentService.ts`.
+**Evidence.** `features/payments/services/{PaymentService,PaymentServiceFactory}.ts`,
+`features/payments/services/mock/MockPaymentService.ts`.
 
 🟢 **E1.1 — Resolution**
 Given provider `STRIPE` configured, when a payment runs, `StripeService` gets
@@ -31,7 +31,7 @@ paymentMethod?, cardBrand?, last4?, amount?, timestamp}`. Optional methods
 (`getTransactionStatus`, `voidTransaction`, `refundTransaction`) may be absent —
 callers must handle `'not supported'`.
 
-**Evidence.** `services/payment/PaymentServiceInterface.ts`.
+**Evidence.** `features/payments/services/PaymentServiceInterface.ts`.
 
 🟢 **E2.1 — Success payload**
 transactionId, brand, last4 available for receipts/audit.
@@ -51,7 +51,7 @@ rejection the caller must catch.
 a tap-to-pay provider → `tap_to_pay`. PED providers (`INSTORE_API`) route via
 store-api endpoints, not this layer.
 
-**Evidence.** `hooks/usePayment.ts`, `services/instoreapi/payment/*`, ADR-015.
+**Evidence.** `features/payments/hooks/usePayment.ts`, `features/multi-register/services/payment/*`, ADR-015.
 
 📱 **E3.1 — Desktop register**
 Electron checkout → card tender unavailable as tap-to-pay (`cash_only`); card
@@ -67,8 +67,8 @@ a selected id, then offers charge. Screen unmount disconnects. Retries are
 capped by `MAX_RETRY_ATTEMPTS`; when `STRIPE_NFC` is the provider the entire
 screen is replaced by `StripeNfcPaymentTerminal`.
 
-**Evidence.** `screens/PaymentTerminalScreen.tsx`,
-`components/StripeNfcPaymentTerminal.tsx`.
+**Evidence.** `features/payments/screens/PaymentTerminalScreen.tsx`,
+`features/payments/components/StripeNfcPaymentTerminal.tsx`.
 
 🟢 **E4.1 — Happy path**
 Scan finds terminals → tap → connected badge → charge → success.
@@ -97,8 +97,8 @@ UXs behind one route.
 **Rule.** `PaymentSettingsTab` edits per-provider credential fields via
 `usePaymentSettings` → settings storage; `testConnection` validates.
 
-**Evidence.** `screens/settings/PaymentSettingsTab.tsx`,
-`hooks/usePaymentSettings.ts`.
+**Evidence.** `features/settings/screens/PaymentSettingsTab.tsx`,
+`features/payments/hooks/usePaymentSettings.ts`.
 
 🟢 **E5.1 — Save**
 Provider + keys persist; `saveStatus` reflects the write.
@@ -112,7 +112,7 @@ Provider + keys persist; `saveStatus` reflects the write.
 `transactionId` per line so a line can be `voidTransaction`-ed. Payment outcomes
 are audited. Order status transitions belong to the checkout feature.
 
-**Evidence.** `hooks/useCheckout.ts:130,239-241,412`, `services/audit/`.
+**Evidence.** `features/checkout/hooks/useCheckout.ts:130,239-241,412`, `shared/services/audit/`.
 
 🟢 **E6.1 — Split reversal**
 A split line's transaction can be voided individually by transactionId.
@@ -143,24 +143,24 @@ A split line's transaction can be voided individually by transactionId.
 - ~~**PG5**~~ **RESOLVED** — `StripeTerminalBridgeProvider` was commented out in
   `App.tsx` because the file imported `@stripe/stripe-terminal-react-native`
   at module top level — the import crashed Expo Go at load. Split into a safe
-  shell (`contexts/StripeTerminalBridge.tsx`: types, context,
+  shell (`features/payments/contexts/StripeTerminalBridge.tsx`: types, context,
   `StripeTerminalBridgeManager`, gated provider) and an impl file
   (`StripeTerminalBridgeImpl.tsx`, holds the SDK import). The provider is
   restored in `App.tsx` and lazily `require()`s the impl only on real
   iOS/Android builds — never Expo Go, web, or Electron.
 - **PG6** — **`giftCards` capability is advertised but unimplemented**: the
-  matrix rows (`utils/platformCapabilities.ts`) and onboarding/settings
-  surfaces reference gift-card support, yet there is no `services/giftcard`,
+  matrix rows (`shared/utils/platformCapabilities.ts`) and onboarding/settings
+  surfaces reference gift-card support, yet there is no giftcard service under `features/`,
   no tender in `CheckoutModal`/`TenderBar`, and no redemption path. Capability
   truth and feature reality diverge.
 
 ## Test Coverage Mapping
 
-| Example            | Coverage                                                                                           |
-| ------------------ | -------------------------------------------------------------------------------------------------- |
-| R1 resolution/mock | Factory tests via DI — partial; check `services/payment` for `*.test.*` (none found at this level) |
-| R4 screen flow     | Not found                                                                                          |
-| R6 split void      | `CheckoutService.test.ts` covers order side, not terminal calls                                    |
+| Example            | Coverage                                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ |
+| R1 resolution/mock | Factory tests via DI — partial; check `features/payments/services` for `*.test.*` (none found at this level) |
+| R4 screen flow     | Not found                                                                                                    |
+| R6 split void      | `CheckoutService.test.ts` covers order side, not terminal calls                                              |
 
 ## Feature Context Summary
 
@@ -186,7 +186,7 @@ connect failure → error message; no terminals → guidance message.
 **Offline**: mock provider works fully offline; real providers need provider
 connectivity — a card charge cannot succeed with no network to the provider.
 
-**Dependencies**: `utils/electron.ts`, instore-api transport, settings storage,
+**Dependencies**: `shared/utils/electron.ts`, instore-api transport, settings storage,
 audit, logger, `@env`.
 
 **Gaps**: no timeout/cancel contract; retry resets on unmount; ambiguous-charge

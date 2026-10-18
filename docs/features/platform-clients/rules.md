@@ -21,7 +21,7 @@ in-flight → await the shared promise (`tokenRefreshPromises` keyed
 `platform:type:refresh`); else `refreshTokenUsingProvider` → persist
 `token:<platform>:<tokenType>` in the secrets backend + memory cache.
 
-**Evidence.** `services/token/TokenService.ts:73-101,188`.
+**Evidence.** `features/platform-clients/services/token/TokenService.ts:73-101,188`.
 
 🟢 **E2.1** — 5 parallel calls needing a refreshed token → one exchange
 request, all await the same promise.
@@ -47,7 +47,7 @@ provisioned value can shadow an operator's edit (PG2).
 access token (permanent, no expiry); others exchange credentials per their
 auth model with platform-defined expiry.
 
-**Evidence.** `services/token/TokenServiceFactory.ts`, spec table.
+**Evidence.** `features/platform-clients/services/token/TokenServiceFactory.ts`, spec table.
 
 🟠 **E4.1** — a platform with no provider registered → token resolution
 fails → its API calls can't authenticate (Q2).
@@ -58,7 +58,7 @@ fails → its API calls can't authenticate (Q2).
 profile → store tax. Online platforms compute tax themselves (POS doesn't
 replicate it — see checkout "tax comes from the platform").
 
-**Evidence.** `services/tax/OfflineTaxResolver.ts:10-15`,
+**Evidence.** `features/platform-clients/services/tax/OfflineTaxResolver.ts:10-15`,
 `TaxProfileService.ts`.
 
 🟢 **E5.1** — line with profile "Reduced 8%" → 8% regardless of default.
@@ -73,7 +73,7 @@ in OrderSyncService). For offline there's no platform → tax may be 0 (PG3).
 ms, sale modes, note chips, currency…) consumed across features; settings
 write through `ServiceConfigBridge`.
 
-**Evidence.** `services/config/{POSConfigService,ServiceConfigBridge}.ts`.
+**Evidence.** `features/platform-clients/services/config/{POSConfigService,ServiceConfigBridge}.ts`.
 
 ## ❓ Open Questions
 

@@ -5,7 +5,7 @@
 **Rule.** The Inventory tab is admin+manager only — `canAccessTab('cashier',
 'Inventory')` → `false`; the tab is absent from a cashier's navigation.
 
-**Evidence.** `utils/roleAccess.ts` TAB_ACCESS, `navigation/MainTabNavigator`.
+**Evidence.** `shared/utils/roleAccess.ts` TAB_ACCESS, `app/navigation/MainTabNavigator.tsx`.
 
 🟢 **E1.1** — cashier session → no Inventory tab, no deep-link route listed in
 their More menu.
@@ -17,8 +17,8 @@ their More menu.
 `{productId}-{variantId}` — each row shows quantity + reorder point + suggested
 reorder qty.
 
-**Evidence.** `screens/InventoryScreen.tsx:50-75`,
-`hooks/useInventory.ts`, `services/procurement`.
+**Evidence.** `features/inventory/screens/InventoryScreen.tsx:50-75`,
+`features/inventory/hooks/useInventory.ts`, `features/procurement/services`.
 
 🟢 **E2.1** — items render quantity, sku, reorderPoint, reorderQty,
 defaultVendorId.
@@ -33,8 +33,8 @@ defaultVendorId.
 `InventoryUpdateResult` returns `{successful, failed, errors[]}` — partial
 success is normal.
 
-**Evidence.** `services/inventory/InventoryServiceInterface.ts`,
-`hooks/useInventory.ts:45-68`.
+**Evidence.** `features/inventory/services/InventoryServiceInterface.ts`,
+`features/inventory/hooks/useInventory.ts:45-68`.
 
 🟢 **E3.1 — Increment** — `adjustInventory(id, +2, variantId)` → update row
 `{adjustment:true, quantity:2}`.
@@ -52,7 +52,7 @@ queued for retry (`PendingInventoryStore`, KV `inventory:pendingUpdates`).
 **Rule.** `filter: 'all'|'low'|'out'` + free-text search filter the already-
 loaded list; "low" is derived from each row's reorder point, "out" is qty 0.
 
-**Evidence.** `screens/InventoryScreen.tsx:33,104-113`.
+**Evidence.** `features/inventory/screens/InventoryScreen.tsx:33,104-113`.
 
 🟢 **E4.1** — qty ≤ reorderPoint → appears under "low"; qty 0 under "out".
 
@@ -65,7 +65,7 @@ falls out of the low-stock view entirely (PG2).
 local product/inventory tables — identical interface. `CompositeInventoryService`
 can aggregate.
 
-**Evidence.** `services/inventory/platforms/{Offline,Composite}InventoryService.ts`.
+**Evidence.** `features/inventory/services/platforms/{Offline,Composite}InventoryService.ts`.
 
 📴 **E5.1 — Offline platform adjustments** — persist locally; never leave the
 device.
@@ -80,7 +80,7 @@ subsequent inventory call succeeds (see R8).
 **Rule.** "Create PO" on a low item navigates to More→PurchaseOrders with the
 suggested qty — purchase-order creation itself is procurement's job.
 
-**Evidence.** `screens/InventoryScreen.tsx` `handleCreatePO`.
+**Evidence.** `features/inventory/screens/InventoryScreen.tsx` `handleCreatePO`.
 
 🟢 **E6.1** — tap Create PO → navigate + alert naming product and suggested qty.
 
@@ -89,7 +89,7 @@ suggested qty — purchase-order creation itself is procurement's job.
 **Rule.** `findInventoryScanMatch(barcode, items)` → first item with
 `sku === barcode` **or** `productId === barcode`; `null` when no match.
 
-**Evidence.** `utils/inventoryScanner.utils.ts` (X-R2), `hooks/useInventoryScanner.ts`.
+**Evidence.** `features/inventory/utils/inventoryScanner.utils.ts` (X-R2), `features/inventory/hooks/useInventoryScanner.ts`.
 
 🟢 **E7.1** — barcode hits an item's SKU → row resolves for counting.
 
@@ -105,9 +105,9 @@ proof of connectivity — queued updates replay oldest-first in the background;
 entries that fail again stay queued. Absolute writes coalesce per item
 (latest wins); deltas append.
 
-**Evidence.** `services/inventory/RetryingInventoryService.ts`,
-`services/inventory/PendingInventoryStore.ts`,
-`services/inventory/InventoryServiceFactory.ts` (`wrapForRetry`).
+**Evidence.** `features/inventory/services/RetryingInventoryService.ts`,
+`features/inventory/services/PendingInventoryStore.ts`,
+`features/inventory/services/InventoryServiceFactory.ts` (`wrapForRetry`).
 
 🟢 **E8.1** — adjust while offline → error shown → reconnect → next
 `getInventory` replays the queued delta; store entry removed.
@@ -151,7 +151,7 @@ twice (at-least-once, no idempotency key on the wire).
 | ------------------ | ---------------------------------------------------------------- |
 | R5 offline adapter | `CommercefullInventoryService.test.ts` exists (platform adapter) |
 | R3 update result   | Not found at hook level                                          |
-| R7 scan match      | `utils/inventoryScanner.utils.test.ts`                           |
+| R7 scan match      | `features/inventory/utils/inventoryScanner.utils.test.ts`        |
 
 ## Feature Context Summary
 

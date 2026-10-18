@@ -68,17 +68,17 @@ HardwareStatusScreen → useHardwareStatus polls all five drivers → status UI
 
 ## Implementation Map
 
-| Layer    | Responsibility                                 | Implementation                                                                                                                                                                                  |
-| -------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Screens  | Printer mgmt, status panel, hardware settings  | `screens/{PrinterScreen,HardwareStatusScreen}.tsx`, `screens/settings/HardwareSettingsScreen.tsx`                                                                                               |
-| Hooks    | Status polling, printer/scanner settings       | `hooks/{useHardwareStatus,usePrinterSettings,useScannerSettings,useCashDrawerStatus,useInventoryScanner}.ts`                                                                                    |
-| Services | Printer                                        | `services/printer/{PrinterServiceFactory,UnifiedPrinterService,ElectronPrinterService,MobilePrinterDiscovery,BasePrinterService,PrinterCommandSets,DailyReportService,ReceiptConfigService}.ts` |
-| Services | Drawer                                         | `services/drawer/{CashDrawerServiceFactory,PrinterCashDrawerService,ElectronDrawerDriver}.ts`                                                                                                   |
-| Services | Scanner                                        | `services/scanner/{ScannerServiceFactory,USBScannerService,BluetoothScannerService,CameraScannerService,QRHardwareScannerService,ElectronScannerService,ScannerSettingsService}.ts`             |
-| Services | Customer display                               | `services/display/{CustomerDisplayServiceFactory,WebSocketDisplayService,NoOpDisplayService}.ts`                                                                                                |
-| Services | KDS                                            | `services/kds/{KdsServiceFactory,HttpKdsService,NoOpKdsService,KdsVendorPresets}.ts`                                                                                                            |
-| Libs     | Printer validation, Electron bridge, HID burst | `utils/{printerSettings.utils,electron,hidBurst}.ts`                                                                                                                                            |
-| Locales  | Printer settings validation keys (dead — C2)   | `locales/*/common.json`                                                                                                                                                                         |
+| Layer    | Responsibility                                 | Implementation                                                                                                                                                                                                    |
+| -------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screens  | Printer mgmt, status panel, hardware settings  | `features/hardware/screens/{PrinterScreen,HardwareStatusScreen}.tsx`, `features/settings/screens/HardwareSettingsScreen.tsx`                                                                                      |
+| Hooks    | Status polling, printer/scanner settings       | `features/hardware/hooks/{useHardwareStatus,usePrinterSettings,useScannerSettings,useCashDrawerStatus}.ts`, `features/inventory/hooks/useInventoryScanner.ts`                                                     |
+| Services | Printer                                        | `features/hardware/services/printer/{PrinterServiceFactory,UnifiedPrinterService,ElectronPrinterService,MobilePrinterDiscovery,BasePrinterService,PrinterCommandSets,DailyReportService,ReceiptConfigService}.ts` |
+| Services | Drawer                                         | `features/hardware/services/drawer/{CashDrawerServiceFactory,PrinterCashDrawerService,ElectronDrawerDriver}.ts`                                                                                                   |
+| Services | Scanner                                        | `features/hardware/services/scanner/{ScannerServiceFactory,USBScannerService,BluetoothScannerService,CameraScannerService,QRHardwareScannerService,ElectronScannerService,ScannerSettingsService}.ts`             |
+| Services | Customer display                               | `features/hardware/services/display/{CustomerDisplayServiceFactory,WebSocketDisplayService,NoOpDisplayService}.ts`                                                                                                |
+| Services | KDS                                            | `features/hardware/services/kds/{KdsServiceFactory,HttpKdsService,NoOpKdsService,KdsVendorPresets}.ts`                                                                                                            |
+| Libs     | Printer validation, Electron bridge, HID burst | `features/hardware/utils/printerSettings.utils.ts`, `shared/utils/electron.ts`, `features/scanning/utils/hidBurst.ts`                                                                                             |
+| Locales  | Printer settings validation keys (dead — C2)   | `shared/locales/*/common.json`                                                                                                                                                                                    |
 
 ## State Ownership
 
@@ -93,11 +93,11 @@ HardwareStatusScreen → useHardwareStatus polls all five drivers → status UI
 
 ## Dependencies
 
-- `utils/electron.ts` — Electron builds take the IPC driver path for
+- `shared/utils/electron.ts` — Electron builds take the IPC driver path for
   printer/drawer/scanner/display.
-- `utils/printerSettings.utils.ts` — per-connection-type validation.
-- `services/audit` — drawer-open events audited.
-- `services/logger` — every driver logs through LoggerFactory.
+- `features/hardware/utils/printerSettings.utils.ts` — per-connection-type validation.
+- `shared/services/audit` — drawer-open events audited.
+- `shared/services/logger` — every driver logs through LoggerFactory.
 - Order sync path — KDS dispatch happens in `OrderSyncService`.
 
 ## Side Effects

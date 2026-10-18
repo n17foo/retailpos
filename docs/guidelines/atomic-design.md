@@ -10,9 +10,9 @@
 
 For RetailPOS, we use a **hybrid approach**:
 
-- **Shared design system** → `components/` (atoms, molecules)
-- **Feature-specific UI** → `screens/{feature}/components/`
-- **Screens** → Composition and data fetching
+- **Shared design system** → `shared/components/` (atoms, molecules)
+- **Feature-specific UI** → `features/<domain>/components/`
+- **Screens** → `features/<domain>/screens/` — composition and data fetching
 
 **Golden Rule**: Extract components when reused or when screens get hard to read. Keep it inline otherwise.
 
@@ -23,7 +23,7 @@ For RetailPOS, we use a **hybrid approach**:
 ### Atoms (Generic Reusable UI)
 
 **What**: Single UI elements used across the app.  
-**Where**: `components/`  
+**Where**: `shared/components/`  
 **Examples**: `Button.tsx`, `Input.tsx`, `Card.tsx`, `StatusBadge.tsx`
 
 ```typescript
@@ -31,7 +31,7 @@ For RetailPOS, we use a **hybrid approach**:
 <Button title="Save" variant="primary" />
 
 // ❌ Bad: Over-splitting
-// components/LoginSubmitButton.tsx (not reusable)
+// shared/components/LoginSubmitButton.tsx (not reusable)
 ```
 
 **Rules**:
@@ -45,7 +45,7 @@ For RetailPOS, we use a **hybrid approach**:
 ### Molecules (Reusable Combinations)
 
 **What**: Small groups of atoms functioning together.  
-**Where**: `components/` (if reused across features)  
+**Where**: `shared/components/` (if reused across features)  
 **Examples**: `SearchBar.tsx`, `PinKeypad.tsx`, `ProgressIndicator.tsx`
 
 ```typescript
@@ -64,27 +64,27 @@ For RetailPOS, we use a **hybrid approach**:
 ### Feature Components (Screen-Specific)
 
 **What**: Components used by a single feature.  
-**Where**: `screens/{feature}/components/`  
-**Examples**: `BasketSummary.tsx`, `OrderTimeline.tsx`, `StockAdjustmentForm.tsx`
+**Where**: `features/<domain>/components/`  
+**Examples**: `BasketPanel.tsx`, `OrderTimeline.tsx`, `StockAdjustmentForm.tsx`
 
 ```typescript
 // ✅ Good: Feature-specific, lives with feature
-// screens/sale/components/BasketSummary.tsx
-export const BasketSummary = ({ items, onRemove }) => { ... };
+// features/basket/components/BasketPanel.tsx
+export const BasketPanel = ({ items, onRemove }) => { ... };
 ```
 
 **Rules**:
 
 - Can use hooks, context, business logic
 - Keep close to the screen that uses them
-- Move to `components/` only when reused by 2+ features
+- Move to `shared/components/` only when reused by 2+ features
 
 ---
 
 ### Screens (Composition + Data)
 
 **What**: Complete screens that fetch data and compose components.  
-**Where**: `screens/`  
+**Where**: `features/<domain>/screens/`  
 **Examples**: `SaleScreen.tsx`, `OrderHistoryScreen.tsx`
 
 ```typescript
@@ -115,40 +115,42 @@ export function SaleScreen() {
 
 ```
 retailpos/
-├── components/                    # Shared design system
-│   ├── Button.tsx                # Atom
-│   ├── Input.tsx                 # Atom
-│   ├── Card.tsx                  # Atom
-│   ├── SearchBar.tsx             # Molecule
-│   ├── PinKeypad.tsx             # Molecule
-│   ├── CheckoutModal.tsx         # Shared across features
-│   └── ManagerApprovalModal.tsx  # Shared across features
+├── shared/
+│   └── components/# Shared design system
+│       ├── Button.tsx                # Atom
+│       ├── Input.tsx                 # Atom
+│       ├── Card.tsx                  # Atom
+│       ├── ProgressIndicator.tsx     # Molecule
+│       ├── BottomSheet.tsx           # Molecule
+│       ├── RecoveryModal.tsx         # Shared across features
+│       └── Toast.tsx                 # Shared across features
 │
-├── screens/                      # Feature-based organization
-│   ├── SaleScreen.tsx            # Screen
-│   ├── sale/
-│   │   ├── components/           # Sale-specific components
-│   │   │   ├── BasketSummary.tsx
-│   │   │   ├── QuickAddPanel.tsx
-│   │   │   └── ProductFilters.tsx
-│   │   ├── SaleHeader.tsx        # Layout component
-│   │   └── ProductGrid.tsx       # Layout component
+├── features/
+│   ├── checkout/
+│   │   ├── screens/
+│   │   │   └── SaleScreen.tsx        # Screen
+│   │   └── components/# Sale-specific components
+│   │       ├── QuickAddPanel.tsx
+│   │       └── ProductFilters.tsx
 │   │
-│   ├── OrderHistoryScreen.tsx
-│   ├── orders/
+│   ├── orders-sync/
+│   │   ├── screens/
+│   │   │   └── OrderHistoryScreen.tsx
 │   │   └── components/
 │   │       ├── OrderTimeline.tsx
 │   │       └── OrderActions.tsx
 │   │
-│   └── InventoryScreen.tsx
-│       └── inventory/
-│           └── components/
-│               └── StockAdjustmentForm.tsx
+│   └── inventory/
+│       ├── screens/
+│       │   └── InventoryScreen.tsx
+│       └── components/
+│           └── StockAdjustmentForm.tsx
 │
-├── hooks/                        # Custom hooks
-├── contexts/                     # Global state
-└── services/                     # Business logic
+└── app/
+    └── app/navigation/# Navigators compose feature screens
 ```
+
+Each feature may also have `hooks/`, `contexts/`, `services/`, `repositories/`, `utils/` beside `screens/` and `components/`.
 
 ---
 
@@ -179,9 +181,9 @@ export function LoginScreen() {
 }
 
 // ❌ Bad: Over-splitting
-// components/LoginTitleText.tsx (only used once, 5 lines)
-// components/LoginEmailInput.tsx (not reusable)
-// components/LoginPasswordInput.tsx (not reusable)
+// shared/components/LoginTitleText.tsx (only used once, 5 lines)
+// shared/components/LoginEmailInput.tsx (not reusable)
+// shared/components/LoginPasswordInput.tsx (not reusable)
 ```
 
 ---
@@ -190,10 +192,10 @@ export function LoginScreen() {
 
 **Decision flow**:
 
-1. **Is it a basic UI element (button, input)?** → `components/` (atom)
-2. **Is it used by 2+ features?** → `components/` (shared)
-3. **Is it used by 1 feature?** → `screens/{feature}/components/` (feature-specific)
-4. **Is it a complete screen?** → `screens/` (screen)
+1. **Is it a basic UI element (button, input)?** → `shared/components/` (atom)
+2. **Is it used by 2+ features?** → `shared/components/` (shared)
+3. **Is it used by 1 feature?** → `features/<domain>/components/` (feature-specific)
+4. **Is it a complete screen?** → `features/<domain>/screens/` (screen)
 
 **Rule of thumb**: Start in feature folder. Move to shared only when actually reused.
 
@@ -214,20 +216,20 @@ ProfileUsernameText.tsx; // Not reusable
 
 ```typescript
 // ❌ Bad: Feature-specific in shared
-components / BasketSummary.tsx; // Only used in SaleScreen
+shared / components / BasketPanel.tsx; // Only used in SaleScreen
 
 // ✅ Good: Feature-specific in feature folder
-screens / sale / components / BasketSummary.tsx;
+features / basket / components / BasketPanel.tsx;
 ```
 
 ### ❌ Premature Sharing
 
 ```typescript
 // ❌ Bad: Moving to shared before reuse
-components / OrderTimeline.tsx; // Only used once
+shared / components / OrderTimeline.tsx; // Only used once
 
 // ✅ Good: Keep in feature until actually reused
-screens / orders / components / OrderTimeline.tsx;
+features / orders - sync / components / OrderTimeline.tsx;
 ```
 
 ---
@@ -241,9 +243,9 @@ screens / orders / components / OrderTimeline.tsx;
 
 **Location**:
 
-- Shared (2+ features) → `components/`
-- Feature-specific (1 feature) → `screens/{feature}/components/`
-- Screens → `screens/`
+- Shared (2+ features) → `shared/components/`
+- Feature-specific (1 feature) → `features/<domain>/components/`
+- Screens → `features/<domain>/screens/`
 
 **Extract when**: Reused, screen too long, clear responsibility  
 **Keep inline when**: Used once, <30 lines, simple

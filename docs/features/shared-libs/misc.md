@@ -1,7 +1,7 @@
 # Misc Domain Helpers
 
-**Files:** `utils/printerSettings.utils.ts`, `utils/inventoryScanner.utils.ts`,
-`utils/csv.ts`
+**Files:** `features/hardware/utils/printerSettings.utils.ts`, `features/inventory/utils/inventoryScanner.utils.ts`,
+`shared/utils/csv.ts`
 **Tests:** `printerSettings.utils.test.ts`, `inventoryScanner.utils.test.ts`,
 `csv.test.ts`
 **Parent:** [`rules.md`](rules.md)
@@ -16,8 +16,8 @@
 vendorId+productId required. Unknown connection type ⇒ falls through the
 switch → valid (only the name check applied).
 
-**Evidence** — `utils/printerSettings.utils.ts`; consumed by
-`hooks/usePrinterSettings`.
+**Evidence** — `features/hardware/utils/printerSettings.utils.ts`; consumed by
+`features/hardware/hooks/usePrinterSettings.ts`.
 
 🟢 **E1.1** — NETWORK + `192.168.1.50` + `9100` → valid.
 
@@ -36,7 +36,7 @@ switch → valid (only the name check applied).
 **or** `productId === barcode` (single `find` — SKU precedence only because it
 appears in the same predicate); returns `{itemKey: productId-variantId, name, quantity}` or null.
 
-**Evidence** — `utils/inventoryScanner.utils.ts`; used by `useInventoryScanner`.
+**Evidence** — `features/inventory/utils/inventoryScanner.utils.ts`; used by `useInventoryScanner`.
 
 🟢 **E2.1** — barcode `SKU-42` → matches the item with `sku='SKU-42'`.
 
@@ -54,7 +54,7 @@ hits first wins. Edge, unlikely in practice.
 gets a `'` prefix **unless** it's a plain number (`-?\d+(\.\d+)?`); cells
 containing `"` `,` or newlines are double-quoted with `"`→`""`.
 
-**Evidence** — `utils/csv.ts`; consumed by `AuditLogService` CSV export.
+**Evidence** — `shared/utils/csv.ts`; consumed by `AuditLogService` CSV export.
 
 🟢 **E3.1** — `=cmd|'/c calc'!A1` → `'=cmd…` (Excel renders as text).
 

@@ -106,16 +106,16 @@ export default ProductCard;
 11. **Logger over console** — use `LoggerInterface`, no `console.*` in services
 12. **Drawer is UI-driven** — `CheckoutService` sets `openDrawer` flag; UI calls drawer service
 13. **Role defaults to least privilege** — `canAccessTab` defaults to `'cashier'` when undefined
-14. **Security gap — PIN plaintext** — Hash with bcrypt/Argon2 before production
+14. **PIN storage** — PINs are salted+SHA-256 hashed, but without a KDF; bcrypt/Argon2 remains the production target
 
 ---
 
 ## Money Arithmetic
 
-**All money math uses `utils/money.ts`** — never raw float arithmetic (ADR-006).
+**All money math uses `shared/utils/money.ts`** — never raw float arithmetic (ADR-006).
 
 ```typescript
-import { multiplyMoney, addMoney, calculateTax, formatMoney } from '../utils/money';
+import { multiplyMoney, addMoney, calculateTax, formatMoney } from '../../../shared/utils/money';
 
 // ✅ Good
 const lineTotal = multiplyMoney(9.99, 3); // 29.97
@@ -133,21 +133,23 @@ const bad = 9.99 * 3; // 29.970000000000002
 
 ### Add Service Domain
 
-1. Create `services/[domain]/[Domain]ServiceInterface.ts`
-2. Create `services/[domain]/[domain]ServiceFactory.ts`
-3. Create `services/[domain]/platforms/Base[Domain]Service.ts`
+1. Create `features/[domain]/services/[Domain]ServiceInterface.ts`
+2. Create `features/[domain]/services/[domain]ServiceFactory.ts`
+3. Create `features/[domain]/services/platforms/Base[Domain]Service.ts`
 4. Add platform classes in `platforms/`
-5. Create `hooks/use[Domain].ts`
+5. Create `features/[domain]/hooks/use[Domain].ts`
+
+(Cross-feature infrastructure goes in `shared/services/` + `shared/hooks/` instead.)
 
 ### Add Screen
 
-1. Create `screens/[Name]Screen.tsx`
-2. Add to navigator in `navigation/`
-3. Add param type to `navigation/types.ts`
+1. Create `features/[domain]/screens/[Name]Screen.tsx`
+2. Add to navigator in `app/navigation/`
+3. Add param type to `app/navigation/types.ts`
 
 ### Add Repository
 
-1. Create `repositories/[Entity]Repository.ts`
+1. Create `features/[domain]/repositories/[Entity]Repository.ts`
 2. Export interface `[Entity]Repository`
 3. Export class `Offline[Entity]Repository implements [Entity]Repository`
 4. Export singleton `export const [entity]Repository = new Offline[Entity]Repository()`
@@ -156,7 +158,7 @@ const bad = 9.99 * 3; // 29.970000000000002
 
 ### Add Platform
 
-1. Create implementations in `services/[domain]/platforms/NewPlatform[Domain]Service.ts`
+1. Create implementations in `features/[domain]/services/platforms/NewPlatform[Domain]Service.ts`
 2. Register in factory `switch` blocks
-3. Add enum to `ECommercePlatform` in `utils/platforms.ts`
-4. Add capability profile to `PLATFORM_CAPABILITY_MATRIX`
+3. Add enum to `ECommercePlatform` in `shared/utils/platforms.ts`
+4. Add capability profile to `PLATFORM_CAPABILITY_MATRIX` in `shared/utils/platformCapabilities.ts`

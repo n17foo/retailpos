@@ -27,7 +27,7 @@ Product and category browsing, category drill-down navigation, omnibar search, v
 
 - `CategoryBar`, `ProductGrid`, `SearchResults`, and `Omnibar` mounted on `SaleScreen`.
 - `useOfflineProducts` and `useOfflineCategories` consumed by `Settings → Offline Management` and `Onboarding → Offline Setup`.
-- `useProductsForDisplay` consumed by `InventoryScreen`, `BarcodeLabelScreen`, `ReorderPointConfigScreen`, and `TransferOrdersScreen`.
+- `useProductsForDisplay` (`features/catalogue/hooks/useProducts.ts`) consumed by `InventoryScreen`, `BarcodeLabelScreen`, `ReorderPointConfigScreen`, and `TransferOrdersScreen`.
 
 ## Implementation Map
 

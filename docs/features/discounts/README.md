@@ -51,13 +51,13 @@ Enter code → validateDiscountCode(code, subtotal)
 
 ## Implementation Map
 
-| Layer        | Responsibility            | Implementation                                                                                                                                                             |
-| ------------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Services     | Validation + factory      | `services/discount/{DiscountServiceInterface,DiscountServiceFactory,BaseDiscountService,LocalDiscountService}.ts`, `services/discount/platforms/ShopifyDiscountService.ts` |
-| Services     | Basket application        | `services/basket/BasketService.ts` (`applyDiscount`), `contexts/BasketActionsProvider.tsx`                                                                                 |
-| Components   | Code entry + pseudo-codes | `components/CheckoutModal.tsx`, `screens/sale/BasketPanel.tsx`                                                                                                             |
-| Repositories | Local discount table      | `repositories/DiscountRepository.ts`                                                                                                                                       |
-| Libs         | Capability gating         | `utils/platformCapabilities.ts` (`discounts` key)                                                                                                                          |
+| Layer        | Responsibility            | Implementation                                                                                                                                                                                 |
+| ------------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Services     | Validation + factory      | `features/discounts/services/{DiscountServiceInterface,DiscountServiceFactory,BaseDiscountService,LocalDiscountService}.ts`, `features/discounts/services/platforms/ShopifyDiscountService.ts` |
+| Services     | Basket application        | `features/basket/services/BasketService.ts` (`applyDiscount`), `features/basket/contexts/BasketActionsProvider.tsx`                                                                            |
+| Components   | Code entry + pseudo-codes | `features/checkout/components/CheckoutModal.tsx`, `features/basket/components/BasketPanel.tsx`                                                                                                 |
+| Repositories | Local discount table      | `features/discounts/repositories/DiscountRepository.ts`                                                                                                                                        |
+| Libs         | Capability gating         | `shared/utils/platformCapabilities.ts` (`discounts` key)                                                                                                                                       |
 
 ## State Ownership
 

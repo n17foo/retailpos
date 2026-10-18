@@ -10,7 +10,7 @@ Complex features (checkout, sync, multi-register) needed clear requirements befo
 
 ## Decision
 
-All features are documented using EARS (Easy Approach to Requirements Syntax) format in `docs/specs/`. Each spec covers: Context, Ubiquitous Requirements, Event-Driven Requirements, State-Driven Requirements, Optional Features, Edge Cases, and Component Traceability. Specs are written from the actual code, not aspirationally — they describe what the system does, not what it might do.
+All features are documented using EARS (Easy Approach to Requirements Syntax) format in `docs/features/<feature>/` (README + rules.md; the former `docs/specs/` tree was retired into these). Each spec covers: Context, Ubiquitous Requirements, Event-Driven Requirements, State-Driven Requirements, Optional Features, Edge Cases, and Component Traceability. Specs are written from the actual code, not aspirationally — they describe what the system does, not what it might do.
 
 ## Consequences
 

@@ -1,7 +1,7 @@
 # Theme & Layout
 
-**Files:** `utils/theme.ts`, `utils/themes.ts`, `utils/responsive.utils.ts`
-**Tests:** `utils/responsive.utils.test.ts` (theme files have none)
+**Files:** `shared/utils/theme.ts`, `shared/utils/themes.ts`, `shared/utils/responsive.utils.ts`
+**Tests:** `shared/utils/responsive.utils.test.ts` (theme files have none)
 **Parent:** [`rules.md`](rules.md)
 
 ---
@@ -12,13 +12,13 @@
 Colours, spacing, typography, border-radius, elevation, and hit-target sizes
 are exported tokens; component code must not hardcode them (AGENT.md rule 4).
 
-**Evidence** — `utils/theme.ts` (~97 importers); `hitTarget = {touchMin:48,
+**Evidence** — `shared/utils/theme.ts` (~97 importers); `hitTarget = {touchMin:48,
 touchTender:56, pointerMin:40, pointerTender:44}` (spec §4.8.3).
 
 🟢 **E1.1** — Tender buttons size from `hitTarget.touchTender`/`pointerTender`
 per input mode.
 
-🔴 **E1.2** — `utils/orderStateMapper.ts` itself hardcodes hex colours —
+🔴 **E1.2** — `features/checkout/utils/orderStateMapper.ts` itself hardcodes hex colours —
 see C3 / O-R2 ([order-domain.md](order-domain.md)).
 
 ## T-R2 — `interactionStyle` renders pressed/focus/hover without layout shift
@@ -29,7 +29,7 @@ see C3 / O-R2 ([order-domain.md](order-domain.md)).
 used so rings never reflow layout. `hovered`/`focused` exist at runtime only on
 web/Electron (the cast is contained in theme.ts).
 
-**Evidence** — `utils/theme.ts:249`.
+**Evidence** — `shared/utils/theme.ts:249`.
 
 🟢 **E2.1 — Electron hover** — a `Pressable` under the mouse gets a 1px
 `focusRing` outline.
@@ -40,13 +40,13 @@ only `pressed` applies. Documented limitation, not a gap.
 ## T-R3 — Theme presets replace the palette only for `useTheme().colors` consumers
 
 **Rule**
-`utils/themes.ts` defines 8 presets (`default|dark|ocean|forest|sunset|slate|
+`shared/utils/themes.ts` defines 8 presets (`default|dark|ocean|forest|sunset|slate|
 rose|amber`); `defaultColors` _is_ `lightColors` (no duplication); presets
 spread-override it. `ThemeColors = typeof lightColors` so missing keys fail
 typecheck.
 
-**Evidence** — `utils/themes.ts` header + preset construction;
-`contexts/ThemeProvider.tsx`, `screens/settings/ThemeSettingsTab.tsx` are the
+**Evidence** — `shared/utils/themes.ts` header + preset construction;
+`shared/contexts/ThemeProvider.tsx`, `features/settings/screens/ThemeSettingsTab.tsx` are the
 only consumers.
 
 🟠 **E3.1 — Partial recolour**
@@ -68,7 +68,7 @@ Layout class is decided by width _and_ height — never by device model:
 | desktop         | 1024≤w<1440              | split   | 340            |
 | wide            | w≥1440                   | split   | 420            |
 
-**Evidence** — `utils/responsive.utils.ts` (`SHORT_HEIGHT=500`,
+**Evidence** — `shared/utils/responsive.utils.ts` (`SHORT_HEIGHT=500`,
 `SHORT_MIN_WIDTH=568`, `PHONE_MAX_WIDTH=600`), spec §4.8, tests.
 
 🟢 **E4.1** — `getSaleLayout(390,844)` → `phone`/stacked, 2 tile columns.
@@ -86,7 +86,7 @@ falls to `tablet` (split shell on a narrow window). Deliberate; tested.
 ## ❓ Questions
 
 - **T-Q1** — `themes.ts` exports `darkHoverTokens` separately from preset
-  colors; is any consumer expected to use it? Grep found none in `utils/`
+  colors; is any consumer expected to use it? Grep found none among `shared/utils/`
   consumers (worth verifying before use).
 
 ## Coverage

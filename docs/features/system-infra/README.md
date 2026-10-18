@@ -55,16 +55,16 @@ Search: omnibar → SearchServiceFactory.getService(platform).search(query)
 
 ## Implementation Map
 
-| Layer          | Responsibility          | Implementation                                                                                                                        |
-| -------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Services       | Audit                   | `services/audit/AuditLogService.ts`                                                                                                   |
-| Services       | Toasts                  | `services/notifications/{NotificationService,NotificationTypes}.ts`                                                                   |
-| Services+Hooks | Request queue           | `services/queue/{QueueManager,QueuedApiService}.ts`, `hooks/useSyncStore.ts`                                                          |
-| Services       | Secrets backends        | `services/secrets/{SecretsService,SecretsServiceInterface,KeychainSecretsService,ElectronSecretsService,BrowserSecretsService,mock/}` |
-| Services       | Logging                 | `services/logger/` (LoggerFactory + transports)                                                                                       |
-| Services       | Platform search         | `services/search/{SearchServiceFactory,SearchServiceInterface,platforms/*}`                                                           |
-| Repositories   | KV store (audit, queue) | `repositories/KeyValueRepository.ts`                                                                                                  |
-| Libs           | CSV export              | `utils/csv.ts`                                                                                                                        |
+| Layer          | Responsibility          | Implementation                                                                                                                               |
+| -------------- | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Services       | Audit                   | `shared/services/audit/AuditLogService.ts`                                                                                                   |
+| Services       | Toasts                  | `shared/services/notifications/{NotificationService,NotificationTypes}.ts`                                                                   |
+| Services+Hooks | Request queue           | `shared/services/queue/{QueueManager,QueuedApiService}.ts`, `shared/hooks/useSyncStore.ts`                                                   |
+| Services       | Secrets backends        | `shared/services/secrets/{SecretsService,SecretsServiceInterface,KeychainSecretsService,ElectronSecretsService,BrowserSecretsService,mock/}` |
+| Services       | Logging                 | `shared/services/logger/` (LoggerFactory + transports)                                                                                       |
+| Services       | Platform search         | `shared/services/search/{SearchServiceFactory,SearchServiceInterface,platforms/*}`                                                           |
+| Repositories   | KV store (audit, queue) | `shared/repositories/KeyValueRepository.ts`                                                                                                  |
+| Libs           | CSV export              | `shared/utils/csv.ts`                                                                                                                        |
 
 ## State Ownership
 
@@ -78,7 +78,7 @@ Search: omnibar → SearchServiceFactory.getService(platform).search(query)
 ## Dependencies
 
 - `KeyValueRepository` — audit + queue persistence.
-- `utils/csv.ts` — audit CSV export.
+- `shared/utils/csv.ts` — audit CSV export.
 - NetInfo — queue's connectivity trigger.
 
 ## Side Effects

@@ -21,7 +21,7 @@ new order atomically-ish.
 - `ExchangeService` — exchange session: return credit, new items, net due,
   payments, confirm → returns + new order + audit.
 - `RefundScreen`, `ExchangeScreen` (More → Refund / Exchange).
-- Per-platform refund adapters (`services/refunds/platforms/*`) +
+- Per-platform refund adapters (`shared/utils/*`) +
   `OfflineRefundService`.
 
 ### Excluded
@@ -62,14 +62,14 @@ ExchangeSession(originalOrderId, returnItems) → returnCredit
 
 ## Implementation Map
 
-| Layer        | Responsibility          | Implementation                                                                         |
-| ------------ | ----------------------- | -------------------------------------------------------------------------------------- |
-| Screens      | Refund + Exchange flows | `screens/{RefundScreen,ExchangeScreen}.tsx`                                            |
-| Hooks        | Refund form/state       | `hooks/useRefund.ts`                                                                   |
-| Services     | Returns + refunds       | `services/refunds/{RefundService,returnValidation}.ts`, `services/refunds/platforms/*` |
-| Services     | Exchange sessions       | `services/exchange/ExchangeService.ts`                                                 |
-| Repositories | Return rows             | `repositories/ReturnRepository.ts`                                                     |
-| Libs         | Money math (netDue)     | `utils/money.ts` (cents rounding in `calcTotals`)                                      |
+| Layer        | Responsibility          | Implementation                                                                            |
+| ------------ | ----------------------- | ----------------------------------------------------------------------------------------- |
+| Screens      | Refund + Exchange flows | `features/returns/screens/{RefundScreen,ExchangeScreen}.tsx`                              |
+| Hooks        | Refund form/state       | `features/returns/hooks/useRefund.ts`                                                     |
+| Services     | Returns + refunds       | `features/returns/services/refunds/{RefundService,returnValidation}.ts`, `shared/utils/*` |
+| Services     | Exchange sessions       | `features/returns/services/exchange/ExchangeService.ts`                                   |
+| Repositories | Return rows             | `features/returns/repositories/ReturnRepository.ts`                                       |
+| Libs         | Money math (netDue)     | `shared/utils/money.ts` (cents rounding in `calcTotals`)                                  |
 
 ## State Ownership
 
@@ -82,11 +82,11 @@ ExchangeSession(originalOrderId, returnItems) → returnCredit
 
 ## Dependencies
 
-- `services/checkout` — exchange confirm creates the new order.
-- `services/refunds/platforms/*` — platform refund pushes.
-- `services/audit` — `exchange:completed`, return events.
+- `features/checkout` — exchange confirm creates the new order.
+- `shared/utils/*` — platform refund pushes.
+- `shared/services/audit` — `exchange:completed`, return events.
 - Platform `refunds` capability gates menu entries.
-- `utils/money.ts` — cent rounding for credits/net due.
+- `shared/utils/money.ts` — cent rounding for credits/net due.
 
 ## Side Effects
 

@@ -28,7 +28,7 @@ key-value store and are read app-wide via `SettingsProvider`/`posConfig`.
 - The _behaviour_ the settings control lives in each owning feature
   (payments, hardware, auth, multi-register, theme…).
 - `posConfig.values` — the runtime-config facade used by code paths
-  (`services/config/POSConfigService`).
+  (`features/platform-clients/services/config/POSConfigService.ts`).
 
 ## Entry Points
 
@@ -52,15 +52,15 @@ Open Settings → role check (cashier → denied screen)
 
 ## Implementation Map
 
-| Layer        | Responsibility                           | Implementation                                                                                                                      |
-| ------------ | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Screens      | Hub + tab components + Users/Permissions | `screens/SettingsScreen.tsx`, `screens/settings/*Tab.tsx`, `screens/{UsersScreen}.tsx`, `screens/settings/PermissionSetsScreen.tsx` |
-| Hooks        | KV read/write                            | `hooks/useSettings.ts`                                                                                                              |
-| Contexts     | Settings context                         | `contexts/SettingsProvider.tsx`                                                                                                     |
-| Services     | Tab composition                          | `services/navigation/SettingsTabComposer.ts`                                                                                        |
-| Repositories | KV store                                 | `repositories/KeyValueRepository.ts`                                                                                                |
-| Libs         | Role + capability gating                 | `utils/{roleAccess,menuCapabilityAccess}.ts`                                                                                        |
-| Locales      | Tab labels `settings.tabs.*`             | `locales/*`                                                                                                                         |
+| Layer        | Responsibility                           | Implementation                                                                                                                                                                            |
+| ------------ | ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screens      | Hub + tab components + Users/Permissions | `features/settings/screens/SettingsScreen.tsx`, `features/settings/screens/*Tab.tsx`, `features/settings/screens/{UsersScreen}.tsx`, `features/settings/screens/PermissionSetsScreen.tsx` |
+| Hooks        | KV read/write                            | `features/settings/hooks/useSettings.ts`                                                                                                                                                  |
+| Contexts     | Settings context                         | `features/settings/contexts/SettingsProvider.tsx`                                                                                                                                         |
+| Services     | Tab composition                          | `features/settings/services/SettingsTabComposer.ts`                                                                                                                                       |
+| Repositories | KV store                                 | `shared/repositories/KeyValueRepository.ts`                                                                                                                                               |
+| Libs         | Role + capability gating                 | `shared/utils/{roleAccess,menuCapabilityAccess}.ts`                                                                                                                                       |
+| Locales      | Tab labels `settings.tabs.*`             | `locales/*`                                                                                                                                                                               |
 
 ## State Ownership
 
@@ -73,8 +73,8 @@ Open Settings → role check (cashier → denied screen)
 
 ## Dependencies
 
-- `utils/roleAccess.ts` — cashier denial (screen AND menu item).
-- `utils/menuCapabilityAccess.ts` + `platformCapabilities` — tab status.
+- `shared/utils/roleAccess.ts` — cashier denial (screen AND menu item).
+- `shared/utils/menuCapabilityAccess.ts` + `platformCapabilities` — tab status.
 - `KeyValueRepository` — every setting is a KV row.
 - `t()` translations for tab labels.
 

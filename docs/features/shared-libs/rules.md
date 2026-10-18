@@ -23,15 +23,15 @@ Per-module rule IDs are prefixed (`M-`, `T-`, `P-`, `DB-`, `C-`, `A-`, `S-`,
 ## R1 — Shared logic is pure and node-testable
 
 **Rule**
-A `utils/` module that encodes a behavioural rule is a pure function/class with
+A `shared/utils/` or feature `utils/` module that encodes a behavioural rule is a pure function/class with
 no React or RN dependency, so it can be unit-tested under node. Any injectable
 nondeterminism (clock, randomness) is a parameter, not a global read.
 
 **Evidence**
 
-- `utils/hidBurst.ts` — `now: () => number` injected into `HidBurstDetector`.
-- `utils/responsive.utils.ts`, `utils/categorySelection.ts`,
-  `utils/sellability.ts`, `utils/orderHistory.utils.ts` — header comments state
+- `features/scanning/utils/hidBurst.ts` — `now: () => number` injected into `HidBurstDetector`.
+- `shared/utils/responsive.utils.ts`, `features/catalogue/utils/categorySelection.ts`,
+  `features/catalogue/utils/sellability.ts`, `features/orders-sync/utils/orderHistory.utils.ts` — header comments state
   "No React, no RN … fully testable in node".
 - 14 `*.test.ts` files in `utils/` run under Jest/node.
 
@@ -39,18 +39,18 @@ nondeterminism (clock, randomness) is a parameter, not a global read.
 Given `getSaleLayout(390, 844)` (portrait phone)
 When the function runs under plain node
 Then it returns `layoutClass: 'phone'`, `shell: 'stacked'` with no RN imports.
-Covered by `utils/responsive.utils.test.ts`.
+Covered by `shared/utils/responsive.utils.test.ts`.
 
 🟠 **E1.2 — Hidden platform dependency**
-Given `utils/theme.ts` (`interactionStyle` returns `ViewStyle`, type-only RN
-use) and `utils/electron.ts` (reads `Platform.OS`)
+Given `shared/utils/theme.ts` (`interactionStyle` returns `ViewStyle`, type-only RN
+use) and `shared/utils/electron.ts` (reads `Platform.OS`)
 When a test imports them under node
 Then `electron.ts` still needs RN's `Platform` — it is _not_ pure; only
 type-imported RN symbols are acceptable under R1.
 Status: observed variance, not a defect — `electron.ts` is a platform bridge,
 not a rule module.
 
-## R2 — All monetary arithmetic goes through `utils/money.ts`
+## R2 — All monetary arithmetic goes through `shared/utils/money.ts`
 
 **Rule**
 No raw float arithmetic on money anywhere in the app (ADR-006; AGENT.md rule
@@ -59,29 +59,29 @@ No raw float arithmetic on money anywhere in the app (ADR-006; AGENT.md rule
 **Evidence**
 
 - `docs/adr/ADR-006-money-integer-cent-math.md`.
-- `utils/money.ts` — `toCents/toDollars/roundMoney/multiplyMoney/addMoney/subtractMoney/sumMoney/formatMoney`.
-- `utils/money.test.ts` — cent rounding incl. IEEE-754 notes (`1.005 → 100`).
+- `shared/utils/money.ts` — `toCents/toDollars/roundMoney/multiplyMoney/addMoney/subtractMoney/sumMoney/formatMoney`.
+- `shared/utils/money.test.ts` — cent rounding incl. IEEE-754 notes (`1.005 → 100`).
 
 🟢 **E2.1** — `addMoney(19.99, 0.01)` → `20` (not `20.000000000000004`).
 🟢 **E2.2** — `formatMoney(1200.4, 'JPY')` → `¥1200`: ISO 4217 minor units are
 honoured (`CurrencyInfo.decimals`). See [money.md](money.md) M-R2.
 
-## R3 — No hardcoded colours/spacing/typography outside `utils/theme.ts`
+## R3 — No hardcoded colours/spacing/typography outside `shared/utils/theme.ts`
 
 **Rule**
-All visual constants come from `utils/theme.ts` tokens (AGENT.md rule 4/12).
+All visual constants come from `shared/utils/theme.ts` tokens (AGENT.md rule 4/12).
 
-**Evidence** — `utils/theme.ts` — `lightColors`, `spacing`, `typography`,
+**Evidence** — `shared/utils/theme.ts` — `lightColors`, `spacing`, `typography`,
 `hitTarget`, `interactionStyle`, `elevation`.
 
-⚠️ **Contradiction C3** — `utils/orderStateMapper.ts` embeds hardcoded hex
-colours (`#2196f3`, `#ff9800`, …) in `getSaleStateInfo` — a lib inside `utils/`
+⚠️ **Contradiction C3** — `features/checkout/utils/orderStateMapper.ts` embeds hardcoded hex
+colours (`#2196f3`, `#ff9800`, …) in `getSaleStateInfo` — a lib inside a feature `utils/`
 that itself violates R3. See [order-domain.md](order-domain.md) O-R2.
 
 🟠 **E3.1 — Theme presets do not reach `lightColors` importers**
-`utils/themes.ts` states components "call `useTheme().colors` instead of
+`shared/utils/themes.ts` states components "call `useTheme().colors` instead of
 importing `lightColors`", but ~92 `.tsx` files import `lightColors` directly
-and only `ThemeProvider`/`ThemeSettingsTab` consume `utils/themes.ts`.
+and only `ThemeProvider`/`ThemeSettingsTab` consume `shared/utils/themes.ts`.
 Observed: non-default presets recolour only `useTheme` consumers; the rest of
 the UI stays on the default palette. See [theme.md](theme.md) T-R3 / C4.
 
@@ -90,8 +90,8 @@ the UI stays on the default palette. See [theme.md](theme.md) T-R3 / C4.
 **Rule**
 Everywhere a role may be `undefined`, access resolves as `cashier`.
 
-**Evidence** — `utils/roleAccess.ts` (`effectiveRole = role ?? 'cashier'`),
-`utils/actionRegistry.ts` (`ROLE_RANK`), AGENT.md rule 11/12.
+**Evidence** — `shared/utils/roleAccess.ts` (`effectiveRole = role ?? 'cashier'`),
+`shared/utils/actionRegistry.ts` (`ROLE_RANK`), AGENT.md rule 11/12.
 
 🟢 **E4.1** — `canAccessTab(undefined, 'Inventory')` → `false` (cashier lacks
 Inventory tab).
@@ -106,7 +106,7 @@ see [platform.md](platform.md) P-R2 / PG10.
 `DEFAULT_PLATFORM = OFFLINE`; every feature reachable without credentials must
 fall back to local behaviour. `db.ts` is the backbone all repositories share.
 
-**Evidence** — `utils/platforms.ts:17`, `utils/db.ts`, `utils/` and `db.ts`.
+**Evidence** — `shared/utils/platforms.ts:17`, `shared/utils/db.ts`.
 
 📴 **E5.1 — App restart, offline**
 Given the app was terminated mid-sale
@@ -129,11 +129,11 @@ fall through.
 
 **Evidence**
 
-- `utils/crypto.ts` `verifyPin` — empty/malformed stored value → `false`;
+- `shared/utils/crypto.ts` `verifyPin` — empty/malformed stored value → `false`;
   a `v1$` prefix that fails the hash regex → `false`.
-- `utils/sql.ts` `buildUpdateAssignments` — non-allowlisted column → **throws**
+- `shared/utils/sql.ts` `buildUpdateAssignments` — non-allowlisted column → **throws**
   (`Column 'x' cannot be updated`), never silently dropped.
-- `utils/csv.ts` — formula-trigger cells are `'` prefixed.
+- `shared/utils/csv.ts` — formula-trigger cells are `'` prefixed.
 
 🟢 **E6.1** — `verifyPin('123456', '')` → `false`; a legacy plaintext row
 `'123456'` still verifies (documented transparent-rehash path — C-R1 / PG7).
@@ -149,8 +149,8 @@ app: SQL column names allowlisted (`sql.ts`), CSV formula triggers escaped
 (`csv.ts`), platform ID prefixes stripped at the platform boundary
 (`platformIds.ts`).
 
-**Evidence** — `utils/sql.ts:9` comment, `utils/csv.ts:4` comment,
-`utils/platformIds.ts` header.
+**Evidence** — `shared/utils/sql.ts:9` comment, `shared/utils/csv.ts:4` comment,
+`shared/utils/platformIds.ts` header.
 
 ---
 
@@ -159,7 +159,7 @@ app: SQL column names allowlisted (`sql.ts`), CSV formula triggers escaped
 - **Q1** — Should utils→repository type imports (`UserRole`) be inverted so
   `UserRole` lives in a types module? Currently `roleAccess.ts` and
   `actionRegistry.ts` depend on a repository file. (Also A-Q2.)
-- **Q2** — Is `utils/db.ts` skipping `initializeSchema` under `NODE_ENV=test`
+- **Q2** — Is `shared/utils/db.ts` skipping `initializeSchema` under `NODE_ENV=test`
   intentional isolation, or does it hide schema drift in tests? The `dbProxy`
   in tests is usually mocked, so real-schema coverage is absent.
 - **Q3** — `getAppVersion()` returns hardcoded `'1.0.0'` outside Electron —
@@ -200,7 +200,7 @@ app: SQL column names allowlisted (`sql.ts`), CSV formula triggers escaped
 
 ## ⚠️ Contradictions
 
-- ~~**C1**~~ **RESOLVED** — `utils/db.ts` now uses LoggerFactory.
+- ~~**C1**~~ **RESOLVED** — `shared/utils/db.ts` now uses LoggerFactory.
 - ~~**C2**~~ **RESOLVED** — `validatePrinterSettings` returns the
   `settings.printer.validation.*` keys; the hook translates them.
 - **C3** — `orderStateMapper.ts` hardcodes colours (see R3 / O-R2).
@@ -209,29 +209,29 @@ app: SQL column names allowlisted (`sql.ts`), CSV formula triggers escaped
 
 ## Test Coverage Mapping
 
-| Area                                                                                                                                                                                                                                               | Coverage                               |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| `money.ts`                                                                                                                                                                                                                                         | `utils/money.test.ts`                  |
-| `hidBurst.ts`                                                                                                                                                                                                                                      | `utils/hidBurst.test.ts`               |
-| `sellability.ts`                                                                                                                                                                                                                                   | `utils/sellability.test.ts`            |
-| `categorySelection.ts`                                                                                                                                                                                                                             | `utils/categorySelection.test.ts`      |
-| `categoryFilter.ts`                                                                                                                                                                                                                                | `utils/categoryFilter.test.ts`         |
-| `responsive.utils.ts`                                                                                                                                                                                                                              | `utils/responsive.utils.test.ts`       |
-| `orderRow.utils.ts`                                                                                                                                                                                                                                | `utils/orderRow.utils.test.ts`         |
-| `orderHistory.utils.ts`                                                                                                                                                                                                                            | `utils/orderHistory.utils.test.ts`     |
-| `csv.ts`                                                                                                                                                                                                                                           | `utils/csv.test.ts`                    |
-| `crypto.ts`                                                                                                                                                                                                                                        | `utils/crypto.test.ts`                 |
-| `platformIds.ts`                                                                                                                                                                                                                                   | `utils/platformIds.test.ts`            |
-| `userPin.utils.ts`                                                                                                                                                                                                                                 | `utils/userPin.utils.test.ts`          |
-| `printerSettings.utils.ts`                                                                                                                                                                                                                         | `utils/printerSettings.utils.test.ts`  |
-| `inventoryScanner.utils.ts`                                                                                                                                                                                                                        | `utils/inventoryScanner.utils.test.ts` |
-| `theme.ts`, `themes.ts`, `platforms.ts`, `platformCapabilities.ts`, `db.ts`, `dbSchema.ts`, `sql.ts`, `electron.ts`, `currency.ts`, `base64.ts`, `uuid.ts`, `roleAccess.ts`, `actionRegistry.ts`, `menuCapabilityAccess.ts`, `orderStateMapper.ts` | Not found                              |
+| Area                                                                                                                                                                                                                                               | Coverage                                                  |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `money.ts`                                                                                                                                                                                                                                         | `shared/utils/money.test.ts`                              |
+| `hidBurst.ts`                                                                                                                                                                                                                                      | `features/scanning/utils/hidBurst.test.ts`                |
+| `sellability.ts`                                                                                                                                                                                                                                   | `features/catalogue/utils/sellability.test.ts`            |
+| `categorySelection.ts`                                                                                                                                                                                                                             | `features/catalogue/utils/categorySelection.test.ts`      |
+| `categoryFilter.ts`                                                                                                                                                                                                                                | `features/catalogue/utils/categoryFilter.test.ts`         |
+| `responsive.utils.ts`                                                                                                                                                                                                                              | `shared/utils/responsive.utils.test.ts`                   |
+| `orderRow.utils.ts`                                                                                                                                                                                                                                | `features/orders-sync/utils/orderRow.utils.test.ts`       |
+| `orderHistory.utils.ts`                                                                                                                                                                                                                            | `features/orders-sync/utils/orderHistory.utils.test.ts`   |
+| `csv.ts`                                                                                                                                                                                                                                           | `shared/utils/csv.test.ts`                                |
+| `crypto.ts`                                                                                                                                                                                                                                        | `shared/utils/crypto.test.ts`                             |
+| `platformIds.ts`                                                                                                                                                                                                                                   | `shared/utils/platformIds.test.ts`                        |
+| `userPin.utils.ts`                                                                                                                                                                                                                                 | `features/authentication/utils/userPin.utils.test.ts`     |
+| `printerSettings.utils.ts`                                                                                                                                                                                                                         | `features/hardware/utils/printerSettings.utils.test.ts`   |
+| `inventoryScanner.utils.ts`                                                                                                                                                                                                                        | `features/inventory/utils/inventoryScanner.utils.test.ts` |
+| `theme.ts`, `themes.ts`, `platforms.ts`, `platformCapabilities.ts`, `db.ts`, `dbSchema.ts`, `sql.ts`, `electron.ts`, `currency.ts`, `base64.ts`, `uuid.ts`, `roleAccess.ts`, `actionRegistry.ts`, `menuCapabilityAccess.ts`, `orderStateMapper.ts` | Not found                                                 |
 
 ---
 
 ## Feature Context Summary
 
-**Feature** — Shared Libraries (`utils/`)
+**Feature** — Shared Libraries (`shared/utils/` + feature `utils/`)
 
 **Responsibility** — Single source of truth for cross-cutting rules: money
 math, theme/layout tokens, platform capabilities, persistence schema,
@@ -243,8 +243,8 @@ credentials, role/capability gating, and pure sale/order domain rules.
 **Core Rules**
 
 - R1 — Rule modules are pure and node-testable.
-- R2 — All money arithmetic via `utils/money.ts` (integer cents; ADR-006).
-- R3 — All visual constants via `utils/theme.ts` tokens.
+- R2 — All money arithmetic via `shared/utils/money.ts` (integer cents; ADR-006).
+- R3 — All visual constants via `shared/utils/theme.ts` tokens.
 - R4 — Undefined role ⇒ `cashier` (least privilege); unknown platform ⇒ OFFLINE.
 - R5 — Offline-first: `DEFAULT_PLATFORM = OFFLINE`; SQLite is the backbone.
 - R6 — Security helpers fail closed (verify-false / throw on unknown column).

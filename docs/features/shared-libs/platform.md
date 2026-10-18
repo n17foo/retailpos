@@ -1,8 +1,8 @@
 # Platform & Electron Bridge
 
-**Files:** `utils/platforms.ts`, `utils/platformIds.ts`,
-`utils/platformCapabilities.ts`, `utils/electron.ts`
-**Tests:** `utils/platformIds.test.ts` | **Docs:**
+**Files:** `shared/utils/platforms.ts`, `shared/utils/platformIds.ts`,
+`shared/utils/platformCapabilities.ts`, `shared/utils/electron.ts`
+**Tests:** `shared/utils/platformIds.test.ts` | **Docs:**
 capability-rollout rules — retired into `platform.md`
 **Parent:** [`rules.md`](rules.md)
 
@@ -15,7 +15,7 @@ capability-rollout rules — retired into `platform.md`
 `DEFAULT_PLATFORM = OFFLINE` so the app works with no credentials;
 `isOnlinePlatform` is the single check distinguishing them.
 
-**Evidence** — `utils/platforms.ts` (~97 importers).
+**Evidence** — `shared/utils/platforms.ts` (~97 importers).
 
 🟢 **E1.1** — `isOnlinePlatform(ECommercePlatform.OFFLINE)` → `false`; drives
 tax-at-checkout and local-only paths (e.g. `BasketPanel`).
@@ -30,7 +30,7 @@ orderSync, discounts, giftCards, refunds, loyalty, storeCredit, plus
 checkout talks to the platform (draft / remote cart / local-only). Unknown or
 null platform ⇒ OFFLINE profile (silent).
 
-**Evidence** — `utils/platformCapabilities.ts:71`; gating helpers
+**Evidence** — `shared/utils/platformCapabilities.ts:71`; gating helpers
 `supportsStrict/supportsWithCustom/isNotRecommended/getUnavailableReason`.
 
 🟢 **E2.1** — Shopify `basketMode: 'native_draft'` → checkout sends a platform
@@ -55,7 +55,7 @@ Internally products/variants are `platform-id` (`shopify-123`, `shopify-123-456`
 `toPlatformProductId` strips the prefix (or uses `originalId`);
 `toPlatformVariantId` also maps the synthetic `'default'` variant → `undefined`.
 
-**Evidence** — `utils/platformIds.ts`, `platformIds.test.ts`.
+**Evidence** — `shared/utils/platformIds.ts`, `platformIds.test.ts`.
 
 🟢 **E3.1** — `toPlatformVariantId('shopify', {productId:'shopify-123', variantId:'shopify-123-456'})` → `'456'`.
 🟠 **E3.2** — variantId `'default'` (product without real variants) → `undefined`
@@ -72,7 +72,7 @@ bridge (`printerSendRawData`, `onBarcodeScan`, `drawerOpen`, `paymentCollect`,
 `secureStorage`, window controls) or null. `getPlatformType()` maps to
 `ios|android|web|desktop`.
 
-**Evidence** — `utils/electron.ts`; ~12 consumers (printer/scanner/drawer/
+**Evidence** — `shared/utils/electron.ts`; ~12 consumers (printer/scanner/drawer/
 payment services).
 
 🟢 **E4.1 — Desktop hardware path** — under Electron, services call

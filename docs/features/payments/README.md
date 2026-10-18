@@ -70,15 +70,15 @@ Default provider: `STRIPE_NFC`.
 
 ## Implementation Map
 
-| Layer      | Responsibility                        | Implementation                                                                                                                                                                              |
-| ---------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Screens    | Terminal management, settings         | `screens/PaymentTerminalScreen.tsx`, `screens/settings/PaymentSettingsTab.tsx`                                                                                                              |
-| Components | Stripe-NFC dedicated terminal UI      | `components/StripeNfcPaymentTerminal.tsx`                                                                                                                                                   |
-| Hooks      | Memoised service access, mode         | `hooks/usePayment.ts`, `hooks/usePaymentSettings.ts`                                                                                                                                        |
-| Services   | Interface, facade, factory, providers | `services/payment/{PaymentServiceInterface,PaymentService,PaymentServiceFactory,StripeNfcService,StripeService,SquareService,AdyenService,TapPaymentsService}.ts`, `services/payment/mock/` |
-| Services   | Instore-api payment path              | `services/instoreapi/payment/{InstoreApiPaymentService,PaymentIntentClient,PaymentIntentTypes}.ts`                                                                                          |
-| Libs       | Platform detection for mode           | `utils/electron.ts` (`isElectron`, `isMobile`)                                                                                                                                              |
-| Docs       | ADR for instore-api payments          | `docs/adr/ADR-015-*.md`                                                                                                                                                                     |
+| Layer      | Responsibility                        | Implementation                                                                                                                                                                                                  |
+| ---------- | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screens    | Terminal management, settings         | `features/payments/screens/PaymentTerminalScreen.tsx`, `features/settings/screens/PaymentSettingsTab.tsx`                                                                                                       |
+| Components | Stripe-NFC dedicated terminal UI      | `features/payments/components/StripeNfcPaymentTerminal.tsx`                                                                                                                                                     |
+| Hooks      | Memoised service access, mode         | `features/payments/hooks/usePayment.ts`, `features/payments/hooks/usePaymentSettings.ts`                                                                                                                        |
+| Services   | Interface, facade, factory, providers | `features/payments/services/{PaymentServiceInterface,PaymentService,PaymentServiceFactory,StripeNfcService,StripeService,SquareService,AdyenService,TapPaymentsService}.ts`, `features/payments/services/mock/` |
+| Services   | Instore-api payment path              | `features/multi-register/services/payment/{InstoreApiPaymentService,PaymentIntentClient,PaymentIntentTypes}.ts`                                                                                                 |
+| Libs       | Platform detection for mode           | `shared/utils/electron.ts` (`isElectron`, `isMobile`)                                                                                                                                                           |
+| Docs       | ADR for instore-api payments          | `docs/adr/ADR-015-*.md`                                                                                                                                                                                         |
 
 ## State Ownership
 
@@ -91,10 +91,10 @@ Default provider: `STRIPE_NFC`.
 
 ## Dependencies
 
-- `utils/electron.ts` — Electron/web ⇒ `cash_only` (no RN SDKs on desktop).
+- `shared/utils/electron.ts` — Electron/web ⇒ `cash_only` (no RN SDKs on desktop).
 - `InstoreApiTransport` — `INSTORE_API` provider routes `/api/payment/*`.
-- `services/logger` — provider resolution + errors logged.
-- `services/audit` — payment outcomes audited.
+- `shared/services/logger` — provider resolution + errors logged.
+- `shared/services/audit` — payment outcomes audited.
 - `@env` `USE_MOCK_PAYMENT` — forces `MockPaymentService`.
 
 ## Side Effects

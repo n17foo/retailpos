@@ -29,8 +29,8 @@ key-value store means it is never shown again.
 ## Entry Points
 
 - **App start, `onboarding_status` absent/pending** → `AuthNavigator` mounts
-  `OnboardingScreen` as its initial route (`navigation/AuthNavigator.tsx:27-30`,
-  `navigation/RootNavigator.tsx:87`). There is no other way in — no deep link,
+  `OnboardingScreen` as its initial route (`app/navigation/AuthNavigator.tsx:27-30`,
+  `app/navigation/RootNavigator.tsx:87`). There is no other way in — no deep link,
   no menu entry, no re-run.
 - Exit: `completeOnboarding()` → `setIsOnboarded(true)` → AuthNavigator swaps
   to `Login`; after login → `Main` stack.
@@ -66,18 +66,18 @@ setIsOnboarded(true) → 'completed' → Login
 
 ## Implementation Map
 
-| Layer        | Responsibility                                 | Implementation                                                                                                                          |
-| ------------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Screens      | Wizard orchestration                           | `screens/OnboardingScreen.tsx`                                                                                                          |
-| Screens      | Step UIs                                       | `screens/onboarding/{PlatformSelection,PlatformConfiguration,OfflineSetup,AdminUser,PrinterSetup,ScannerSetup,PaymentProvider}Step.tsx` |
-| Contexts     | `isOnboarded` gate, KV persistence             | `contexts/OnboardingProvider.tsx`                                                                                                       |
-| Hooks        | Settings save, users, hardware                 | `hooks/useEcommerceSettings.ts`, `useUsers.ts`, `usePrinterSettings.ts`, `useScannerSettings.ts`, `usePaymentSettings.ts`               |
-| Services     | Progress tracking, capabilities, config        | `services/setup/SetupProgressService.ts`, `services/platform/PlatformCapabilityService.ts`, `services/config/POSConfigService.ts`       |
-| Services     | Credential persistence                         | `services/config/EcommerceSettingsStorage.ts` → `ProtectedValueStore` → `secrets/` backend                                              |
-| Repositories | KV keys, users table                           | `repositories/KeyValueRepository.ts` (`onboarding_status`, `setup.progress`), `repositories/UserRepository.ts`                          |
-| Libs         | Currency table, PIN format                     | `utils/currency.ts`, `utils/userPin.utils.ts`, `utils/crypto.ts`                                                                        |
-| Locales      | Step labels, validation, platform descriptions | `locales/*/…` (`onboarding.*`, `platformSelection.*`, `adminUser.*`)                                                                    |
-| Docs         | EARS spec                                      | EARS wizard spec — retired into this feature                                                                                            |
+| Layer        | Responsibility                                 | Implementation                                                                                                                                                                                      |
+| ------------ | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screens      | Wizard orchestration                           | `features/onboarding/screens/OnboardingScreen.tsx`                                                                                                                                                  |
+| Screens      | Step UIs                                       | `features/onboarding/screens/{PlatformSelection,PlatformConfiguration,OfflineSetup,AdminUser,PrinterSetup,ScannerSetup,PaymentProvider}Step.tsx`                                                    |
+| Contexts     | `isOnboarded` gate, KV persistence             | `features/onboarding/contexts/OnboardingProvider.tsx`                                                                                                                                               |
+| Hooks        | Settings save, users, hardware                 | `features/platform-clients/hooks/useEcommerceSettings.ts`, `useUsers.ts`, `usePrinterSettings.ts`, `useScannerSettings.ts`, `usePaymentSettings.ts`                                                 |
+| Services     | Progress tracking, capabilities, config        | `features/onboarding/services/SetupProgressService.ts`, `features/platform-clients/services/platform/PlatformCapabilityService.ts`, `features/platform-clients/services/config/POSConfigService.ts` |
+| Services     | Credential persistence                         | `features/platform-clients/services/config/EcommerceSettingsStorage.ts` → `ProtectedValueStore` → `secrets/` backend                                                                                |
+| Repositories | KV keys, users table                           | `shared/repositories/KeyValueRepository.ts` (`onboarding_status`, `setup.progress`), `features/authentication/repositories/UserRepository.ts`                                                       |
+| Libs         | Currency table, PIN format                     | `shared/utils/currency.ts`, `features/authentication/utils/userPin.utils.ts`, `shared/utils/crypto.ts`                                                                                              |
+| Locales      | Step labels, validation, platform descriptions | `locales/*/…` (`onboarding.*`, `platformSelection.*`, `adminUser.*`)                                                                                                                                |
+| Docs         | EARS spec                                      | EARS wizard spec — retired into this feature                                                                                                                                                        |
 
 ## State Ownership
 

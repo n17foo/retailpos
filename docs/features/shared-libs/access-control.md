@@ -1,7 +1,7 @@
 # Access Control
 
-**Files:** `utils/roleAccess.ts`, `utils/actionRegistry.ts`,
-`utils/menuCapabilityAccess.ts`
+**Files:** `shared/utils/roleAccess.ts`, `shared/utils/actionRegistry.ts`,
+`shared/utils/menuCapabilityAccess.ts`
 **Docs:** permissions + menu-capability rules — retired into `access-control.md` and `docs/features/authentication`
 **Tests:** none for these files
 **Parent:** [`rules.md`](rules.md)
@@ -16,8 +16,8 @@ matrices: admin gets all; manager loses `Users`; cashier gets `Sale`, `More`
 plus `OrderHistory`/`Printer`/`PaymentTerminal` only. `role === undefined` ⇒
 `cashier`.
 
-**Evidence** — `utils/roleAccess.ts` (TAB_ACCESS, MORE_MENU_ACCESS);
-consumers: `navigation/MainTabNavigator.tsx`, `screens/sale/MainMenu.tsx`,
+**Evidence** — `shared/utils/roleAccess.ts` (TAB_ACCESS, MORE_MENU_ACCESS);
+consumers: `app/navigation/MainTabNavigator.tsx`, `features/checkout/components/MainMenu.tsx`,
 More navigator.
 
 🟢 **E1.1** — cashier sees `Sale`+`More`; `canAccessMoreMenuItem('cashier','Users')` → `false`.
@@ -33,8 +33,8 @@ More navigator.
 `defaultMinRole`; `ROLE_RANK` ranks cashier<manager<admin. PermissionService
 resolves the effective role against overrides/manager-approval.
 
-**Evidence** — `utils/actionRegistry.ts`; consumed by
-`services/permissions/PermissionService`, `ManagerApprovalService`.
+**Evidence** — `shared/utils/actionRegistry.ts`; consumed by
+`features/authentication/services/permissions/PermissionService.ts`, `ManagerApprovalService`.
 
 🟢 **E2.1** — `discount:apply` min `cashier` (no approval); `discount:manual`
 min `manager` → cashier triggers the approval flow.
@@ -50,7 +50,7 @@ fallback visible here. Open question.
 `not_recommended` ⇒ `hidden`; `supported` ⇒ `enabled`; `custom` ⇒ `enabled`
 only when `adapterReady`, else `disabled` + reason.
 
-**Evidence** — `utils/menuCapabilityAccess.ts` (spec rule quoted in header);
+**Evidence** — `shared/utils/menuCapabilityAccess.ts` (spec rule quoted in header);
 consumers: More-menu composer, settings tabs.
 
 🟢 **E3.1** — WooCommerce `giftCards: custom` + adapter not ready → menu item
@@ -66,7 +66,7 @@ why a feature is absent (by design: hidden, not disabled).
 - **A-Q1** — Is there a deny-by-default path for actions missing from
   `ACTION_REGISTRY`, or does an unregistered sensitive action execute
   unchecked? Needs `PermissionService` resolution to confirm.
-- **A-Q2** — `UserRole` type comes from `repositories/UserRepository` —
+- **A-Q2** — `UserRole` type comes from `features/authentication/repositories/UserRepository.ts` —
   should the role enum live in a shared types module instead (parent Q1)?
 
 ## Coverage

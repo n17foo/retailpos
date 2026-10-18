@@ -30,7 +30,7 @@ in-context manager-approval challenge.
 
 ## Entry Points
 
-- `AuthNavigator` → `Login` after onboarding completes (`navigation/AuthNavigator.tsx`).
+- `AuthNavigator` → `Login` after onboarding completes (`app/navigation/AuthNavigator.tsx`).
 - Session end → back to `Login` (logout/lock in `RootNavigator.handleLogout`).
 - Any feature may call `permissionService.can()` or
   `managerApprovalService.requestApproval()` — ManagerApprovalModal is mounted
@@ -67,22 +67,22 @@ In-session:
 
 ## Implementation Map
 
-| Layer        | Responsibility                                               | Implementation                                                                                |
-| ------------ | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| Screens      | Login UI, method switching, shake                            | `screens/LoginScreen.tsx`                                                                     |
-| Components   | PIN pad/display, approval modal                              | `components/PinKeypad.tsx`, `PinDisplay.tsx`, `ManagerApprovalModal.tsx`                      |
-| Contexts     | Session user + isAuthenticated (memory only)                 | `contexts/AuthProvider.tsx`                                                                   |
-| Hooks        | Idle lock                                                    | `hooks/useInactivityLock.ts`, `hooks/useManagerApproval.ts`                                   |
-| Services     | Provider registry & dispatch                                 | `services/auth/AuthService.ts`, `services/auth/AuthMethodInterface.ts`                        |
-| Services     | Method config persistence                                    | `services/auth/AuthConfigService.ts`                                                          |
-| Services     | Method implementations                                       | `services/auth/providers/{Pin,Biometric,Password,Magstripe,RfidNfc,PlatformAuth}Provider.ts`  |
-| Services     | Brute-force                                                  | `services/auth/AuthAttemptLimiter.ts`                                                         |
-| Services     | Permission resolution + approval                             | `services/permissions/{PermissionService,ManagerApprovalService}.ts`                          |
-| Repositories | Users, permission overrides, approvals                       | `repositories/{UserRepository,PermissionRepository}.ts`                                       |
-| Libs         | Credential hashing, PIN format, action registry, role matrix | `utils/crypto.ts`, `utils/userPin.utils.ts`, `utils/actionRegistry.ts`, `utils/roleAccess.ts` |
-| Services     | Audit                                                        | `services/audit/AuditLogService.ts`                                                           |
-| Locales      | Login labels/errors                                          | `locales/*/…` `login.*`                                                                       |
-| Docs         | EARS specs                                                   | EARS specs retired into this feature                                                          |
+| Layer        | Responsibility                                               | Implementation                                                                                                                             |
+| ------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Screens      | Login UI, method switching, shake                            | `features/authentication/screens/LoginScreen.tsx`                                                                                          |
+| Components   | PIN pad/display, approval modal                              | `features/authentication/components/PinKeypad.tsx`, `PinDisplay.tsx`, `ManagerApprovalModal.tsx`                                           |
+| Contexts     | Session user + isAuthenticated (memory only)                 | `features/authentication/contexts/AuthProvider.tsx`                                                                                        |
+| Hooks        | Idle lock                                                    | `features/authentication/hooks/useInactivityLock.ts`, `features/authentication/hooks/useManagerApproval.ts`                                |
+| Services     | Provider registry & dispatch                                 | `features/authentication/services/auth/AuthService.ts`, `features/authentication/services/auth/AuthMethodInterface.ts`                     |
+| Services     | Method config persistence                                    | `features/authentication/services/auth/AuthConfigService.ts`                                                                               |
+| Services     | Method implementations                                       | `features/authentication/services/auth/providers/{Pin,Biometric,Password,Magstripe,RfidNfc,PlatformAuth}Provider.ts`                       |
+| Services     | Brute-force                                                  | `features/authentication/services/auth/AuthAttemptLimiter.ts`                                                                              |
+| Services     | Permission resolution + approval                             | `features/authentication/services/permissions/{PermissionService,ManagerApprovalService}.ts`                                               |
+| Repositories | Users, permission overrides, approvals                       | `features/authentication/repositories/{UserRepository,PermissionRepository}.ts`                                                            |
+| Libs         | Credential hashing, PIN format, action registry, role matrix | `shared/utils/crypto.ts`, `features/authentication/utils/userPin.utils.ts`, `shared/utils/actionRegistry.ts`, `shared/utils/roleAccess.ts` |
+| Services     | Audit                                                        | `shared/services/audit/AuditLogService.ts`                                                                                                 |
+| Locales      | Login labels/errors                                          | `locales/*/…` `login.*`                                                                                                                    |
+| Docs         | EARS specs                                                   | EARS specs retired into this feature                                                                                                       |
 
 ## State Ownership
 
@@ -98,10 +98,10 @@ In-session:
 
 ## Dependencies
 
-- `utils/crypto.ts` — `hashPin`/`verifyPin`/`timingSafeEqual` (PINs stored
+- `shared/utils/crypto.ts` — `hashPin`/`verifyPin`/`timingSafeEqual` (PINs stored
   `v1$salt$hash`; legacy plaintext rows transparently rehashed on login).
-- `utils/userPin.utils.ts` — 6-digit format gate.
-- `utils/actionRegistry.ts` — action keys + `ROLE_RANK`; `roleAccess.ts` for
+- `features/authentication/utils/userPin.utils.ts` — 6-digit format gate.
+- `shared/utils/actionRegistry.ts` — action keys + `ROLE_RANK`; `roleAccess.ts` for
   UI-level tab gating (navigation feature consumes it).
 - `instoreApiConfig`/`instoreApiClient` — client-mode PIN verify against the
   server register.

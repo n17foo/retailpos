@@ -28,7 +28,7 @@ cancelled`; `receivePO` increments received qty, pushes adjustments to the
 ### Excluded
 
 - The Inventory screen itself (stock view/adjust) — **inventory** feature.
-- Sale-time stock gating — `utils/sellability.ts` (sale feature).
+- Sale-time stock gating — `features/catalogue/utils/sellability.ts` (sale feature).
 - Vendor financials — no invoicing/payments exist.
 
 ## Entry Points
@@ -62,14 +62,14 @@ Transfers / vendor returns: status transitions only (local records).
 
 ## Implementation Map
 
-| Layer        | Responsibility                      | Implementation                                                                                                                                 |
-| ------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Screens      | Hub + 5 workflows                   | `screens/procurement/{ProcurementScreen,PurchaseOrdersScreen,VendorsScreen,InventoryCountScreen,TransferOrdersScreen,VendorReturnsScreen}.tsx` |
-| Services     | PO/receive/reorder, vendors, counts | `services/procurement/{ProcurementService,VendorService,InventoryCountService}.ts`                                                             |
-| Repositories | All procurement tables              | `repositories/ProcurementRepository.ts`                                                                                                        |
-| Services     | Stock push on receive/finalise      | `services/inventory/InventoryServiceFactory`                                                                                                   |
-| Libs         | Capability check                    | `utils/platformCapabilities.ts` (`inventory`)                                                                                                  |
-| Services     | Audit + notify                      | `services/audit`, `services/notifications`                                                                                                     |
+| Layer        | Responsibility                      | Implementation                                                                                                                                          |
+| ------------ | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screens      | Hub + 5 workflows                   | `features/procurement/screens/{ProcurementScreen,PurchaseOrdersScreen,VendorsScreen,InventoryCountScreen,TransferOrdersScreen,VendorReturnsScreen}.tsx` |
+| Services     | PO/receive/reorder, vendors, counts | `features/procurement/services/{ProcurementService,VendorService,InventoryCountService}.ts`                                                             |
+| Repositories | All procurement tables              | `features/procurement/repositories/ProcurementRepository.ts`                                                                                            |
+| Services     | Stock push on receive/finalise      | `features/inventory/services/InventoryServiceFactory.ts`                                                                                                |
+| Libs         | Capability check                    | `shared/utils/platformCapabilities.ts` (`inventory`)                                                                                                    |
+| Services     | Audit + notify                      | `shared/services/audit`, `shared/services/notifications`                                                                                                |
 
 ## State Ownership
 
@@ -83,11 +83,11 @@ Transfers / vendor returns: status transitions only (local records).
 
 ## Dependencies
 
-- `utils/platformCapabilities.ts` — `inventory` capability gates the platform
+- `shared/utils/platformCapabilities.ts` — `inventory` capability gates the platform
   push, nothing else.
-- `services/inventory` — `updateInventory(adjustment:true)` on receive.
-- `services/audit` — receiving events audited.
-- `services/notifications` — "Purchase Order Received" toast.
+- `features/inventory/services` — `updateInventory(adjustment:true)` on receive.
+- `shared/services/audit` — receiving events audited.
+- `shared/services/notifications` — "Purchase Order Received" toast.
 - SQLite tables: `vendors`, `purchase_orders`, `purchase_order_items`,
   `inventory_counts`, `inventory_count_items`, `transfer_orders`,
   vendor-return + reorder-config tables.

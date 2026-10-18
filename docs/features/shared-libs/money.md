@@ -1,7 +1,7 @@
 # Money & Currency
 
-**Files:** `utils/money.ts`, `utils/currency.ts`
-**Tests:** `utils/money.test.ts` | **Docs:** `docs/adr/ADR-006-*`
+**Files:** `shared/utils/money.ts`, `shared/utils/currency.ts`
+**Tests:** `shared/utils/money.test.ts` | **Docs:** `docs/adr/ADR-006-*`
 **Parent:** [`rules.md`](rules.md)
 
 ---
@@ -12,7 +12,7 @@
 Every public helper converts dollars→cents (`Math.round(d * 100)`), computes in
 integers, and converts back. Callers must not do raw float math.
 
-**Evidence** — `utils/money.ts`, `utils/money.test.ts`, ADR-006, ~34 consumers.
+**Evidence** — `shared/utils/money.ts`, `shared/utils/money.test.ts`, ADR-006, ~34 consumers.
 
 🟢 **E1.1 — Exact totals**
 `sumMoney([19.99, 0.01])` → `20` exactly.
@@ -36,7 +36,7 @@ system does not prevent it. Potential gap (PG11).
 `amount + symbol` when `symbolPlacement === 'after'`. Unknown code ⇒ the code
 itself becomes the symbol.
 
-**Evidence** — `utils/money.ts:44`, `utils/currency.ts` (55-currency table;
+**Evidence** — `shared/utils/money.ts:44`, `shared/utils/currency.ts` (55-currency table;
 `after` only for VND, RUB, UAH, CZK, HUF, RON, BGN, HRK, ISK, LEK).
 
 🟢 **E2.1** — `formatMoney(19.99,'USD')` → `$19.99`; `formatMoney(19.99,'RUB')` → `19.99₽`.

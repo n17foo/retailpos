@@ -16,28 +16,28 @@ The requirements in the original sales fast-path EARS spec (since retired into d
 
 ### Key structural decisions
 
-1. **Merged top bar** (`screens/sale/TopBar.tsx`)
+1. **Merged top bar** (`features/checkout/components/TopBar.tsx`)
    One bar carries the menu button, register/cashier identity, the omnibar, the sync badge, the cash-drawer warning and the sale-state chip. The bottom tab bar is hidden on the Sale route; `MainMenu` (drawer) replaces the More tab and wires real handlers only (reprint, shift report, sync, lock, logout).
 
-2. **Omnibar** (`screens/sale/Omnibar.tsx`)
+2. **Omnibar** (`features/catalogue/components/Omnibar.tsx`)
    One field does typed search, SKU/barcode entry and scanner focus. Results replace the catalogue grid in place (`SearchResults`); Enter adds the single/exact match (`submitSearch` in `useSaleCatalog`). `useSearch` drops results from superseded requests so a slow platform search can never overwrite a newer query.
 
-3. **Persistent category buttons** (`screens/sale/CategoryBar.tsx`, `utils/categorySelection.ts`)
+3. **Persistent category buttons** (`features/catalogue/components/CategoryBar.tsx`, `features/catalogue/utils/categorySelection.ts`)
    Row 1 is always `All` + root categories; row 2 shows the selected root's children and drills one level at a time via a pure, unit-tested state machine (`CategorySelectionState` / `getSubRow` / `goUp`). The sale always opens on "All Products" (D2).
 
-4. **One basket component for every device class** (`screens/sale/BasketPanel.tsx`)
+4. **One basket component for every device class** (`features/basket/components/BasketPanel.tsx`)
    In the split shell it is the permanent right column; in the stacked (phone) shell it lives inside a `BottomSheet` opened by the sticky `BasketBar`. Line selection shows a ≥44px action strip (qty, note, remove); swipe-left removes on touch, Delete/Backspace removes the selected line in pointer mode. `TenderBar` (CASH / CARD / ⋯) is pinned at its bottom.
 
-5. **Scanner core** (`utils/hidBurst.ts`, `hooks/useSaleScanner.ts`, `components/HidCaptureField.tsx`, `components/CameraScanOverlay.tsx`)
+5. **Scanner core** (`features/scanning/utils/hidBurst.ts`, `features/scanning/hooks/useSaleScanner.ts`, `features/scanning/components/HidCaptureField.tsx`, `features/scanning/components/CameraScanOverlay.tsx`)
    A shared, pure `HidBurstDetector` identifies machine-speed keystroke bursts and lets USB/Electron services swallow them before they reach text inputs. On native, a hidden always-focused `HidCaptureField` receives HID input; it only takes focus when no real input owns it. `ScannerServiceFactory.connectForSale` keeps one ref-counted connection for the life of the sale screen, so scans keep working while sheets and the checkout modal are open. Scans resolve loaded-catalogue → local variant DB → platform barcode search, and surface as inline `ScanNoticeBar` banners, never blocking dialogs.
 
-6. **Responsive shells** (`utils/responsive.utils.ts` → `getSaleLayout`)
+6. **Responsive shells** (`shared/utils/responsive.utils.ts` → `getSaleLayout`)
    Layout class is derived from window width AND height (never the device model): `phone` (stacked), `phone-landscape`, `tablet`, `desktop`, `wide` (split). Tile density (`large`/`compact`/`text`) is driven by catalogue image coverage unless `posConfig.values.saleDensity` overrides it.
 
-7. **Fast-path tender** (`hooks/useCheckout.ts`, `components/CheckoutModal.tsx`)
+7. **Fast-path tender** (`features/checkout/hooks/useCheckout.ts`, `features/checkout/components/CheckoutModal.tsx`)
    `TenderBar` passes the picked tender into `CheckoutModal.initialTender`: `cash` opens straight into the cash keypad (physical keyboard types the amount); `card` fires a connected terminal immediately. The platform draft is created in parallel with the modal opening, and a failed payment reverts the order to draft (`CheckoutService.revertToDraft`) so it can be retried.
 
-8. **Single sale hook instance** (`hooks/useSaleScreen.ts` via `contexts/SaleProvider.tsx`)
+8. **Single sale hook instance** (`features/checkout/hooks/useSaleScreen.ts` via `features/checkout/contexts/SaleProvider.tsx`)
    `useSaleScreen` composes `useSaleCatalog` (categories, products, search, add paths), `useSaleScanner` (scan lifecycle), `useCheckout` (payment orchestration) and `useLoyaltyBasket` exactly once; every sale component reads the shared result through `useSale()`. Per-line notes persist through `BasketService.updateItemProperties` into the basket JSON blob.
 
 ### Deletions

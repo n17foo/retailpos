@@ -70,7 +70,7 @@
 
 **Capability Level**: `supported` (stable API), `custom` (adapter required), `not_recommended` (hidden/disabled)
 
-**Platform Capability Matrix** — Static table in `utils/platformCapabilities.ts` mapping Platform → Feature → CapabilityLevel
+**Platform Capability Matrix** — Static table in `shared/utils/platformCapabilities.ts` mapping Platform → Feature → CapabilityLevel
 
 **Sellable Unit** — Platform-specific inventory entity that `BasketItem.variantId` points to
 
@@ -192,7 +192,7 @@
 
 **Audit Log** — Append-only log of actions. Dot-namespaced keys (e.g. `auth:login`). CSV export (ADR-012)
 
-**Integer-Cent Math** — All money arithmetic in integer cents via `utils/money.ts` (ADR-006)
+**Integer-Cent Math** — All money arithmetic in integer cents via `shared/utils/money.ts` (ADR-006)
 
 ---
 

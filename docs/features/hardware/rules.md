@@ -6,9 +6,9 @@
 `NoOpKdsService`, scanner `mock` driver, drawer returns `false` when no
 driver. The POS never hard-depends on a peripheral.
 
-**Evidence.** `services/display/NoOpDisplayService.ts`,
-`services/kds/NoOpKdsService.ts`, `services/scanner/mock/`,
-`services/drawer/PrinterCashDrawerService.ts`.
+**Evidence.** `features/hardware/services/display/NoOpDisplayService.ts`,
+`features/hardware/services/kds/NoOpKdsService.ts`, `features/hardware/services/scanner/mock/`,
+`features/hardware/services/drawer/PrinterCashDrawerService.ts`.
 
 🟢 **E1.1 — No printer**
 `printReceipt` throws `'Not connected to a printer'` at the factory boundary —
@@ -21,14 +21,14 @@ no-ops.
 ## R2 — Printer connectivity is per-connection-type; Electron takes IPC
 
 **Rule.** `PrinterConfig.connectionType ∈ {usb, bluetooth, network}` —
-validated per type by `utils/printerSettings.utils.ts` (name required; BT⇒MAC,
+validated per type by `features/hardware/utils/printerSettings.utils.ts` (name required; BT⇒MAC,
 network⇒IP+port 1–65535, USB⇒vendorId+productId). On Electron, discovery and
 printing delegate to the main process; on mobile the RN printer SDKs are
 lazy-loaded so unused transports aren't bundled.
 
-**Evidence.** `services/printer/{UnifiedPrinterService,ElectronPrinterService,
+**Evidence.** `features/hardware/services/printer/{UnifiedPrinterService,ElectronPrinterService
 PrinterServiceFactory,MobilePrinterDiscovery}.ts`,
-`utils/printerSettings.utils.ts`, misc.md X-R1.
+`features/hardware/utils/printerSettings.utils.ts`, misc.md X-R1.
 
 🟢 **E2.1 — Network printer**
 `192.168.1.50:9100` validates → `connect` → `printReceipt` emits ESC/POS.
@@ -51,7 +51,7 @@ Loose IP regex accepts `999.999.999.999` — validation is shape-only.
 `ElectronDrawerDriver` (IPC); else no driver → `open()` returns false. Every
 successful open is audit-logged (`drawer:opened`).
 
-**Evidence.** `services/drawer/{CashDrawerServiceFactory,
+**Evidence.** `features/hardware/services/drawer/{CashDrawerServiceFactory
 PrinterCashDrawerService,ElectronDrawerDriver}.ts`, AGENT.md rule 10.
 
 🔴 **E3.1 — No printer connected**
@@ -69,8 +69,8 @@ that pops without an audit row means the driver path was bypassed.
 ref-counts the connection and feeds keys through `HidBurstDetector` — that
 behaviour is documented in `scanning/rules.md`.
 
-**Evidence.** `services/scanner/*`, `hooks/{useScanner,useSaleScanner}.ts`,
-`scanning/rules.md`.
+**Evidence.** `features/hardware/services/scanner/*`, `features/hardware/hooks/useScanner.ts`,
+`features/scanning/hooks/useSaleScanner.ts`, `scanning/rules.md`.
 
 🟢 **E4.1 — Electron**
 `ElectronScannerService` gets scans via `electronAPI.onBarcodeScan` IPC.
@@ -87,7 +87,7 @@ transport; `none` → No-Op. Settings persist under `customerDisplaySettings`
 `DisplayType` only lists shipped drivers — stale persisted values fall back
 to No-Op with a warning.
 
-**Evidence.** `services/display/{CustomerDisplayServiceInterface,
+**Evidence.** `features/hardware/services/display/{CustomerDisplayServiceInterface
 CustomerDisplayServiceFactory,WebSocketDisplayService}.ts`.
 
 🟢 **E5.1 — Sale lifecycle display**
@@ -110,8 +110,8 @@ notifies the cashier once, and replays oldest-first on the next successful
 send or reconnect. `KdsVendorPresets` hold vendor-specific endpoints; status
 can flow back (`received|preparing|ready|recalled`).
 
-**Evidence.** `services/sync/OrderSyncService.ts`,
-`services/kds/{KdsServiceInterface,HttpKdsService,RetryingKdsService,
+**Evidence.** `features/orders-sync/services/sync/OrderSyncService.ts`,
+`features/hardware/services/kds/{KdsServiceInterface,HttpKdsService,RetryingKdsService
 PendingKdsTicketStore,KdsVendorPresets}.ts`.
 
 🟢 **E6.1 — Synced order fires ticket**
@@ -128,7 +128,7 @@ at-least-once — a ticket sent-but-lost can re-display (duplicate on the KDS).
 state from `useHardwareStatus` polling; `useCashDrawerStatus` separately tracks
 the drawer.
 
-**Evidence.** `screens/HardwareStatusScreen.tsx`, `hooks/useHardwareStatus.ts`.
+**Evidence.** `features/hardware/screens/HardwareStatusScreen.tsx`, `features/hardware/hooks/useHardwareStatus.ts`.
 
 🟢 **E7.1 — Live panel**
 Connected/paper_low/error states render with colour/icon per component.
@@ -160,12 +160,12 @@ A printer that dies between polls shows Ready until the next refresh.
 
 ## Test Coverage Mapping
 
-| Example                         | Coverage                                                          |
-| ------------------------------- | ----------------------------------------------------------------- |
-| R1/R2 printer config validation | `utils/printerSettings.utils.test.ts`                             |
-| R2/E2.x connect paths           | Not found (needs hardware)                                        |
-| R6 KDS dispatch                 | Indirect via `OrderSyncService` tests                             |
-| R7 status                       | `services/printer/DailyReportService.test.ts` covers reports only |
+| Example                         | Coverage                                                                            |
+| ------------------------------- | ----------------------------------------------------------------------------------- |
+| R1/R2 printer config validation | `features/hardware/utils/printerSettings.utils.test.ts`                             |
+| R2/E2.x connect paths           | Not found (needs hardware)                                                          |
+| R6 KDS dispatch                 | Indirect via `OrderSyncService` tests                                               |
+| R7 status                       | `features/hardware/services/printer/DailyReportService.test.ts` covers reports only |
 
 ## Feature Context Summary
 

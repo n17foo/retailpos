@@ -1,7 +1,7 @@
 # Order Domain Rules
 
-**Files:** `utils/orderRow.utils.ts`, `utils/orderStateMapper.ts`,
-`utils/orderHistory.utils.ts`
+**Files:** `features/orders-sync/utils/orderRow.utils.ts`, `features/checkout/utils/orderStateMapper.ts`,
+`features/orders-sync/utils/orderHistory.utils.ts`
 **Tests:** `orderRow.utils.test.ts`, `orderHistory.utils.test.ts`
 (orderStateMapper has none) | **Docs:** sales UX spec §2.2
 **Parent:** [`rules.md`](rules.md)
@@ -15,7 +15,7 @@
 `sync_status`, `payment_method`, `customer_name`, `cashier_name` map 1:1;
 `created_at` → `Date`.
 
-**Evidence** — `utils/orderRow.utils.ts`; consumed by `hooks/useOrders`
+**Evidence** — `features/orders-sync/utils/orderRow.utils.ts`; consumed by `features/orders-sync/hooks/useOrders.ts`
 (order-history path).
 
 🟠 **E1.1** — `sale_mode` added in schema v11 flows through unchanged; old
@@ -35,7 +35,7 @@ rows → `null`.
 
 `getSaleStateInfo` supplies label/colour/bg per state.
 
-**Evidence** — `utils/orderStateMapper.ts`; consumed by `TopBar` (state chip).
+**Evidence** — `features/checkout/utils/orderStateMapper.ts`; consumed by `TopBar` (state chip).
 
 🟢 **E2.1** — draft order → top bar shows "Ready" (green).
 
@@ -58,7 +58,7 @@ stays `building`/`ready-for-payment`.
 (`false` always); non-cashiers go back freely and forward only to `offset<0`
 (can't view the future).
 
-**Evidence** — `utils/orderHistory.utils.ts`, test; consumed by
+**Evidence** — `features/orders-sync/utils/orderHistory.utils.ts`, test; consumed by
 `useOrderHistory` → OrderHistory screen.
 
 🟢 **E3.1** — cashier opens OrderHistory → today only, arrows disabled.
