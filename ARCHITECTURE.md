@@ -114,9 +114,9 @@ Every domain (product, order, inventory, customer, …) follows: **Interface →
 
 All business data is written to local SQLite first. Checkout never blocks on a network call. `OrderSyncService` syncs post-payment, asynchronously with retry. The `sync_status` field on each order tracks its sync state.
 
-### Repository Mode Switching (ADR-003)
+### Repository Mode Switching (ADR-003, ADR-018)
 
-Repositories abstract both SQLite (`OfflineOrderRepository`) and HTTP-to-server (`InstoreApiOrderRepository`) behind the same interface. A factory function (`getOrderRepository()`) returns the correct implementation based on `instoreApiConfig.isClient`. Services are unaware of the mode.
+Repositories abstract both SQLite (`OfflineOrderRepository`) and HTTP-to-server (`InstoreApiOrderRepository`) behind the same interface. A factory function (`getOrderRepository()`) returns the correct implementation based on `instoreApiConfig.isClient`. Services are unaware of the mode. The server-side HTTP listener runs in the Electron main process (ADR-018) — mobile registers are client-only.
 
 ### Platform Capability Model
 
@@ -183,8 +183,8 @@ Three fixed, immutable roles. Role rank: `admin (3) > manager (2) > cashier (1)`
 | `server`     | Local SQLite   | Yes — LAN HTTP (desktop app only) | WebSocket + REST     |
 | `client`     | Server via LAN | No                                | WebSocket + REST     |
 
-The `server` HTTP listener runs in the Electron main process — Android/iOS
-registers are client-only and never open a listening socket.
+The `server` HTTP listener runs in the Electron main process (ADR-018) —
+Android/iOS registers are client-only and never open a listening socket.
 
 In `client` or `server` mode the POS also establishes a **WebSocket connection** to the store-api (`/ws`) for real-time outbox delivery. The connection uses the HELLO/replay/snapshot state machine:
 

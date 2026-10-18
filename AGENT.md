@@ -39,7 +39,7 @@ app/
   providers/        # App-level providers (DataProvider)
 assets/             # Static images and icons
 docs/
-  adr/              # Architecture Decision Records (ADR-001 … ADR-017)
+  adr/              # Architecture Decision Records (ADR-001 … ADR-018)
   features/         # Feature docs — README (what/where) + rules.md (behaviour) per feature
   guidelines/       # Canonical rules: language, patterns, coding standards, UX, testing
   security/         # Deployment security — network segmentation, hardening, controls
