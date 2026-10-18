@@ -104,7 +104,7 @@ In-session:
 - `shared/utils/actionRegistry.ts` — action keys + `ROLE_RANK`; `roleAccess.ts` for
   UI-level tab gating (navigation feature consumes it).
 - `instoreApiConfig`/`instoreApiClient` — client-mode PIN verify against the
-  server register.
+  in-store server.
 - `expo-local-authentication` (biometric provider), HID readers (magstripe/rfid).
 - `posConfig.values.autoLockMinutes` — lock timeout (0 disables).
 - `auditLogService`, `notificationService` — logging + lockout toast.

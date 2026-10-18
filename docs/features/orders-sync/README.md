@@ -43,7 +43,7 @@ flow over the LAN so every till sees each other's sales.
 - **Sale screen** — sync status chip + "N unsynced" banner + Sync button in
   `MainMenu`/`BasketPanel`.
 - **Multi-register** — `syncEventBus` events refresh order lists on client
-  registers when the server register reports `order:created/updated/paid`.
+  registers when the in-store server reports `order:created/updated/paid`.
 
 ## Feature Flow
 

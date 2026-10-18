@@ -92,21 +92,22 @@ non-443 egress denied.
 
 ## 3. Placing the in-store server
 
-Two ways to run multi-register (see `docs/features/multi-register/README.md`):
+The in-store server is a **separate project** deployed on a dedicated
+always-on host (ADR-018). Registers — Android, iOS, and desktop — are
+client-only and never listen on 8787.
 
-| Option                                         | When to use                                                    | Network notes                                                                                                                                                                                                                                               |
-| ---------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Register in `server` mode**                  | Small sites, 2–4 registers                                     | The desktop (Electron) app hosts port 8787 — Android/iOS registers are client-only and never listen. Give the desktop a **DHCP reservation / static IP** — clients point at `serverAddress` and discovery probes it. Prefer wired Ethernet for this device. |
-| **Dedicated store-api / integration-hub host** | Larger sites, PED orchestration (ADR-015), webhook termination | Small always-on box/VM inside VLAN 10. Better uptime than a tablet, and the right place to terminate Commercefull webhooks (§4).                                                                                                                            |
+| Option                                                   | When to use                                                    | Network notes                                                                                                                                             |
+| -------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Dedicated in-store server host**                       | Every multi-register deployment                                | Small always-on box/VM inside VLAN 10 with a **DHCP reservation / static IP** — clients point at `serverAddress` and discovery probes it. Wired Ethernet. |
+| **Store-api / integration-hub variant of the same host** | Larger sites, PED orchestration (ADR-015), webhook termination | Same host shape; the right place to terminate Commercefull webhooks (§4).                                                                                 |
 
-Rules that apply to both:
+Rules that apply:
 
-- **Exactly one listener on 8787 per segment.** Two `mode=server` devices
-  cause silent split-brain (documented gap PG1). Enforce by procedure +
+- **Exactly one listener on 8787 per segment.** Two server instances cause
+  silent split-brain (documented gap PG1). Enforce by procedure +
   monitoring (§7), since nothing in code prevents it.
-- The server owns the authoritative SQLite DB — treat it as the system of
-  record: don't let it sleep, don't put it on battery-dependent hardware
-  without a UPS/charging plan.
+- The server owns the authoritative store DB — treat it as the system of
+  record: mains power + UPS, no sleep.
 - Keep the server's OS firewalled so only 8787 (and VPN management) is open.
 
 ## 4. The Commercefull webhook — the only inbound internet flow
@@ -179,7 +180,7 @@ Mitigations if you want tighter:
 - [ ] POS VLAN exists; registers, server, printers, PEDs, KDS are on it; nothing else is.
 - [ ] Separate WPA3/WPA2 SSID mapped to the POS VLAN; no corporate/guest bridging.
 - [ ] Inter-VLAN ACLs deny all except the §2 matrix; egress restricted to 443/123/53.
-- [ ] Exactly one device in `mode=server`; static DHCP reservation; wired if possible.
+- [ ] Exactly one in-store server instance; static DHCP reservation; wired.
 - [ ] Port 8787 unreachable from internet except pinned webhook path via proxy — or webhooks terminated on the hub.
 - [ ] Printers reachable only on 9100–9109 from POS devices.
 - [ ] Admin access only via WireGuard/Tailscale; no flat SSH/RDP/VNC.

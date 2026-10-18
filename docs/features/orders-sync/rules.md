@@ -188,7 +188,7 @@ Print attempt fails → alert; order data unaffected.
 
 **Rule.** On **client** registers, `useOrders` subscribes to
 `syncEventBus` `order:created / order:updated / order:paid` events and
-refreshes the list — so orders taken on the server register appear live.
+refreshes the list — so orders taken on other registers appear live.
 
 **Evidence.** `features/orders-sync/hooks/useOrders.ts`, `features/multi-register/services/sync/{SyncEventBus,SyncPoller}.ts`,
 `instoreApiConfig.isClient`.

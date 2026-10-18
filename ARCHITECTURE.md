@@ -116,7 +116,7 @@ All business data is written to local SQLite first. Checkout never blocks on a n
 
 ### Repository Mode Switching (ADR-003, ADR-018)
 
-Repositories abstract both SQLite (`OfflineOrderRepository`) and HTTP-to-server (`InstoreApiOrderRepository`) behind the same interface. A factory function (`getOrderRepository()`) returns the correct implementation based on `instoreApiConfig.isClient`. Services are unaware of the mode. The server-side HTTP listener runs in the Electron main process (ADR-018) — mobile registers are client-only.
+Repositories abstract both SQLite (`OfflineOrderRepository`) and HTTP-to-server (`InstoreApiOrderRepository`) behind the same interface. A factory function (`getOrderRepository()`) returns the correct implementation based on `instoreApiConfig.isClient`. Services are unaware of the mode. The API server is a separate project on a dedicated host (ADR-018) — registers only ever act as clients.
 
 ### Platform Capability Model
 
@@ -177,14 +177,14 @@ Three fixed, immutable roles. Role rank: `admin (3) > manager (2) > cashier (1)`
 
 ## Register Modes (Multi-Register)
 
-| Mode         | Data source    | Hosts Instore API                 | Store-API Connection |
-| ------------ | -------------- | --------------------------------- | -------------------- |
-| `standalone` | Local SQLite   | No                                | None                 |
-| `server`     | Local SQLite   | Yes — LAN HTTP (desktop app only) | WebSocket + REST     |
-| `client`     | Server via LAN | No                                | WebSocket + REST     |
+| Mode         | Data source    | Hosts Instore API | Store-API Connection |
+| ------------ | -------------- | ----------------- | -------------------- |
+| `standalone` | Local SQLite   | No                | None                 |
+| `client`     | Server via LAN | No                | WebSocket + REST     |
 
-The `server` HTTP listener runs in the Electron main process (ADR-018) —
-Android/iOS registers are client-only and never open a listening socket.
+The Instore API itself is a **separate project** running on a dedicated
+always-on host inside the store's POS VLAN (ADR-018). No POS register —
+Android, iOS, or desktop — ever hosts it or opens a listening socket.
 
 In `client` or `server` mode the POS also establishes a **WebSocket connection** to the store-api (`/ws`) for real-time outbox delivery. The connection uses the HELLO/replay/snapshot state machine:
 
@@ -196,7 +196,7 @@ If the WebSocket is unavailable, the POS falls back to polling `GET /api/sync/ev
 
 ### Authentication in Client Mode
 
-In client mode, PIN verification is delegated to the store-api (`POST /api/users/verify-pin`) so that user management is centralised on the server. In standalone/server mode, PINs are verified against local SQLite.
+In client mode, PIN verification is delegated to the in-store server (`POST /api/users/verify-pin`) so that user management is centralised. In standalone mode, PINs are verified against local SQLite.
 
 ---
 

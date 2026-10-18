@@ -2,14 +2,14 @@
 
 ## R1 — Exactly one server; clients never touch SQLite directly
 
-**Rule.** `mode=server` hosts the API + owns the DB and is only selectable on
-the desktop (Electron) app — the HTTP listener lives in the Electron main
-process, and mobile registers never host; `mode=client` sends every
-read/write through signed HTTP to the server; `standalone` (default)
-disables networking entirely.
+**Rule.** Exactly one in-store server — a separate project on a dedicated
+host — owns the authoritative database and the API (ADR-018). Registers run
+`mode=client`, sending every read/write through signed HTTP, or
+`standalone` (default), which disables networking entirely. No register
+ever hosts the API.
 
 **Evidence.** `features/multi-register/services/InstoreApiConfig.ts`,
-`InstoreApiServer.ts`.
+`InstoreApiTransport.ts`; ADR-018.
 
 🟢 **E1.1** — client `createOrder` → `POST /api/orders` on the server → the
 server's repositories write the row; all registers read the same data.
@@ -39,11 +39,11 @@ to anyone on the LAN (documented trade-off for discovery).
 
 ## R3 — Missing secret is auto-generated, not fatal
 
-**Rule.** Server start with empty `sharedSecret` generates one and logs where
-to copy it (Settings → Instore API); it persists via `ProtectedValueStore`
-(may live in secure storage, not plain KV).
+**Rule.** The server generates/owns `sharedSecret`; the operator copies it
+to each register (Settings → Instore API), where it persists via
+`ProtectedValueStore` (may live in secure storage, not plain KV).
 
-**Evidence.** `InstoreApiServer.ts:85-90`, `InstoreApiConfig` settingsStore.
+**Evidence.** `InstoreApiConfig` settingsStore.
 
 🟠 **E3.1** — first server boot → secret generated → operator must copy it to
 each client manually (no pairing flow).
@@ -76,8 +76,8 @@ re-fetch on events — see orders-sync doc for the consumer side.
 
 **Evidence.** `features/multi-register/services/{sync,websocket}/*`, `features/orders-sync/hooks/useOrders.ts`.
 
-🟢 **E6.1** — server takes a payment → `order:paid` → client order lists
-refresh without manual reload.
+🟢 **E6.1** — a register takes a payment → server broadcasts `order:paid` →
+other client order lists refresh without manual reload.
 
 🟠 **E6.2 — Socket drops** — `StoreApiConnectionManager` reconnects; gap in
 events is covered by polling/snapshot fallback (verify interval — PG3).
@@ -85,7 +85,7 @@ events is covered by polling/snapshot fallback (verify interval — PG3).
 ## R7 — The commercefull webhook is unauthenticated by necessity
 
 **Rule.** `POST /api/webhooks/commercefull` can't be signed with the LAN
-secret — it accepts platform webhook traffic directly on the server register.
+secret — it accepts platform webhook traffic directly on the server.
 
 **Evidence.** `InstoreApiServer.ts:142-146` comment + route.
 
@@ -104,7 +104,7 @@ validation inside the handler (verify — Q1).
 
 ## ⚠️ Potential Gaps
 
-- **PG1** — Two `mode=server` devices on one LAN → silent split-brain; no
+- **PG1** — Two server instances on one LAN → silent split-brain; no
   election/claim mechanism.
 - **PG2** — Route-order shadowing is comment-protected, not test-protected.
 - **PG3** — Event loss while the socket is down — client views stale until
@@ -125,15 +125,14 @@ validation inside the handler (verify — Q1).
 ## Feature Context Summary
 
 **Feature**: Multi-register (Instore API)
-**Responsibility**: server/client/standalone modes (server is desktop-only —
-the HTTP listener runs in the Electron main process); LAN HTTP API over
-shared SQLite; HMAC-signed requests with nonce replay protection; subnet
-discovery; websocket + poller event sync; PED payment orchestration
-endpoint.
+**Responsibility**: client/standalone register modes against a dedicated
+in-store server (separate project, ADR-018); LAN HTTP API protocol contract;
+HMAC-signed requests with nonce replay protection; subnet discovery;
+websocket + poller event sync; PED payment orchestration endpoint.
 
 **Core rules**
 
-- R1 One server owns the DB (desktop app only); clients call it.
+- R1 One dedicated server owns the DB; client registers call it.
 - R2 Every call signed; replayed nonces rejected; 2 exempt routes.
 - R3 Empty secret auto-generates on server start.
 - R4 PIN-verify is rate-guarded.

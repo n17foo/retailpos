@@ -6,11 +6,11 @@
 
 ## Documents
 
-| Document                                                   | Covers                                                                                                                                                                                          |
-| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [network-segmentation.md](network-segmentation.md)         | Dedicated POS network / VLAN design, firewall rule matrix, peripheral segmentation, remote access. **Start here.**                                                                              |
-| [instore-server-hardening.md](instore-server-hardening.md) | Checklist for operating the in-store server (desktop app in `server` mode or dedicated store-api host — Android/iOS registers are client-only): secrets, clock, upgrades, monitoring, failover. |
-| [security-controls.md](security-controls.md)               | Implemented code-level controls (signed LAN requests, authz, auto-lock, CSV/SQL injection, redaction, Electron fuses) + residual risks.                                                         |
+| Document                                                   | Covers                                                                                                                                                                                   |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [network-segmentation.md](network-segmentation.md)         | Dedicated POS network / VLAN design, firewall rule matrix, peripheral segmentation, remote access. **Start here.**                                                                       |
+| [instore-server-hardening.md](instore-server-hardening.md) | Checklist for operating the in-store server — a separate service on a dedicated always-on host (ADR-018); all registers are client-only: secrets, clock, upgrades, monitoring, failover. |
+| [security-controls.md](security-controls.md)               | Implemented code-level controls (signed LAN requests, authz, auto-lock, CSV/SQL injection, redaction, Electron fuses) + residual risks.                                                  |
 
 ## Threat model (short version)
 
@@ -47,8 +47,9 @@ Other VLANs (guest Wi-Fi, corporate, CCTV/IoT) — NO access to POS VLAN
 1. **The POS LAN must be a dedicated network segment.** Signing protects
    integrity, not confidentiality — order data, PINs-in-transit and receipts
    cross the LAN in plaintext. See `network-segmentation.md`.
-2. **Exactly one `mode=server` device per segment.** There is no election —
-   two servers silently split the data (PG1 in `docs/features/multi-register/rules.md`).
+2. **Exactly one in-store server instance per segment** — a dedicated host,
+   never a register (ADR-018). There is no election — two servers silently
+   split the data (PG1 in `docs/features/multi-register/rules.md`).
 3. **The shared secret is copied out-of-band**, never emailed/committed, and
    rotated when a register is decommissioned or staff change.
 4. **Clocks must be within ±5 minutes** (signature window). All POS devices
@@ -57,4 +58,4 @@ Other VLANs (guest Wi-Fi, corporate, CCTV/IoT) — NO access to POS VLAN
    authenticate (signed-requests-only rollout).
 6. **Never expose port 8787 to the internet** except the pinned webhook path
    behind a reverse proxy — prefer terminating webhooks on the
-   integration-hub instead of a register.
+   integration-hub instead of the in-store server.

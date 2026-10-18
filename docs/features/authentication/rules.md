@@ -68,12 +68,12 @@ row is re-hashed (fire-and-forget `updatePin().catch()`).
 🟠 **E4.3 — O(n·verify)** — every login checks every active user; fine for a
 POS (tens of users), noticeable at thousands.
 
-## R5 — Client-mode PIN verify goes to the server register
+## R5 — Client-mode PIN verify goes to the in-store server
 
 **Rule**
 When `instoreApiConfig.isClient`, `PinAuthProvider` calls
 `instoreApiClient.verifyPin` instead of the local users table — user
-management is centralised on the server register.
+management is centralised on the in-store server.
 
 **Evidence** — `features/authentication/services/auth/providers/PinAuthProvider.ts:39-47,85-99`.
 
@@ -174,7 +174,7 @@ the register (shared limiter; observed).
 - **Q2** — `AuthConfigService.setAuthMode` exists but **no caller** sets it —
   `authMode` is always `'offline'`. Should onboarding call it? (Spec says
   "set during onboarding"; `OnboardingScreen` never does.)
-- **Q3** — Client-mode login failure when the server register is offline —
+- **Q3** — Client-mode login failure when the in-store server is offline —
   intended hard dependency or should there be an emergency local PIN?
 - **Q4** — `findByPin` returns the _first_ matching user by `name ASC` — two
   users sharing a PIN is prevented by `isPinUnique` at creation, but a legacy

@@ -2,35 +2,33 @@
 
 ## Purpose
 
-Several registers share one local database over the LAN. The **server** role
-runs only on the desktop (Electron) app — or a dedicated store-api host —
-which owns the SQLite data and hosts the HTTP API on port 8787 (the listener
-lives in the Electron main process; requests reach the renderer over IPC).
-Android/iOS registers always run as **clients** — they never open a
-listening socket. Discovery finds servers on the subnet, HMAC request
-signing authenticates every call, and a WebSocket/sync layer pushes
-order/product events so client registers see each other's work in real
-time. `standalone` mode = single register, no networking.
+Several registers share one database over the LAN. The **in-store server is
+a separate project** running on a dedicated always-on host — it owns the
+authoritative store database and serves the HTTP API on port 8787 (ADR-018).
+Every POS register — Android, iOS, and desktop alike — runs as a **client**
+(or `standalone`); the POS app never opens a listening socket. Discovery
+finds the server on the subnet, HMAC request signing authenticates every
+call, and a WebSocket/sync layer pushes order/product events so client
+registers see each other's work in real time. `standalone` mode = single
+register, no networking.
 
 ## Scope
 
 ### Included
 
-- `InstoreApiConfig` — `mode: standalone|server|client`, serverAddress, port
-  (default 8787), `registerId`, `registerName`, `sharedSecret` (auto-generated
-  on server start if absent; stored via `ProtectedValueStore`).
-- `InstoreApiServer` — route table + handlers over local repositories/services
+- `InstoreApiConfig` — `mode: standalone|client`, serverAddress, port
+  (default 8787), `registerId`, `registerName`, `sharedSecret` (stored via
+  `ProtectedValueStore`; issued by the server operator).
+- `InstoreApiServer` / `requestSigning` — the in-repo reference for the
+  **protocol contract** the dedicated server implements: route table
   (orders, products, returns, users/PIN verify, categories, tax-profiles,
-  sync events, snapshot, commercefull webhook).
+  sync events, snapshot, commercefull webhook), `x-instore-signature`
+  HMAC-SHA256 over `method\npath\ntimestamp\nnonce\nsha256(body)`, nonce
+  replay cache, verify-pin brute-force guard. These server-side pieces are
+  being extracted into the separate server project (ADR-018).
 - `InstoreApiDiscovery` — subnet scan for `/api/health` responders
   (no mDNS dependency).
-- `InstoreApiTransport` — server-side transport: binds `InstoreApiServer` to
-  the Electron main-process HTTP listener over IPC (`instore-server-start`
-  / `instore-server-request` / `instore-server-respond`). Throws on
-  non-Electron platforms — server mode is desktop-only.
-- `requestSigning` — `x-instore-signature` HMAC-SHA256 over
-  `method\npath\ntimestamp\nnonce\nsha256(body)`; nonce replay cache;
-  verify-pin brute-force guard.
+- `InstoreApiTransport` — client-side signed HTTP calls to the server.
 - `websocket/` + `sync/` — `StoreApiWebSocket`, `StoreApiConnectionManager`,
   `SnapshotService`, `SyncEventBus`, `SyncPoller` — real-time events
   (`order:created|updated|paid`, …) to clients.
@@ -46,24 +44,22 @@ time. `standalone` mode = single register, no networking.
 
 ## Entry Points
 
-- **Settings → Instore API tab** — pick mode, generate/copy shared secret,
-  name the register, set server address/port. The `server` option is only
-  shown on the desktop app; mobile registers offer `standalone`/`client`.
+- **Settings → Instore API tab** — pick mode (`standalone`/`client`),
+  enter the shared secret issued by the server operator, name the register,
+  set server address/port.
 - **Discovery** — client registers scan the subnet for `/api/health`.
-- **App start** — `App.tsx` starts/stops `instoreApiServer`,
-  `storeApiConnectionManager`, `syncPoller` based on mode.
+- **App start** — `App.tsx` starts/stops `storeApiConnectionManager` and
+  `syncPoller` based on mode.
 
 ## Feature Flow
 
 ```
-Desktop app (mode=server):
-  InstoreApiTransport.start(port)
-    → Electron main process binds HTTP :8787, forwards requests via IPC
-    → InstoreApiServer routes serve local repos
-      + auth on every route except /api/health + /api/webhooks/commercefull
-  websocket broadcasts domain events
+In-store server (separate project, dedicated host):
+  HTTP :8787 → routes serve the authoritative store DB
+    + auth on every route except /api/health + /api/webhooks/commercefull
+  websocket broadcasts domain events to registers
 
-Client register (mode=client — the only networked mode on Android/iOS):
+Client register (mode=client — the only networked register mode):
   Discovery.scanSubnet → list of {address, registerId, registerName}
     → configure serverAddress:port + sharedSecret
     → every call: signRequest(secret, method, path, body)
@@ -88,23 +84,23 @@ Client register (mode=client — the only networked mode on Android/iOS):
 | State                    | Owner                       | Persistence                | Reset condition  |
 | ------------------------ | --------------------------- | -------------------------- | ---------------- |
 | Mode + settings + secret | `InstoreApiConfig`          | `ProtectedValueStore` (KV) | User edit        |
-| Nonce replay cache       | `InstoreApiServer`          | Memory                     | Expiry / restart |
+| Nonce replay cache       | in-store server             | Memory                     | Expiry / restart |
 | Socket connection        | `StoreApiConnectionManager` | None                       | Reconnect        |
-| Server route state       | repositories (shared DB)    | SQLite                     | —                |
+| Authoritative data       | in-store server             | Server's database          | —                |
 
 ## Dependencies
 
 - `ProtectedValueStore` — shared secret storage.
 - `shared/utils/crypto.ts` — `sha256Hex` for signing (hand-rolled SHA-256).
-- Repositories/services on the server register — routes are thin wrappers.
-- LAN connectivity for all client operations.
+- The dedicated in-store server (separate project) — all client operations
+  depend on it being reachable on the LAN.
 
 ## Side Effects
 
-- HTTP server bound to port 8787 on the server device — hosted by the Electron
-  main process on desktop; Android/iOS registers are client-only.
-- Every client mutation hits server SQLite (the authoritative store).
+- Every client mutation hits the server's database (the authoritative
+  store).
 - WebSocket events broadcast to clients → UI re-fetches.
-- Auto-generated shared secret logged once for operator to copy.
+- The shared secret is issued by the server operator and entered on each
+  register out-of-band.
 - PIN-verify calls go to the server (brute-force guarded) — client-side auth
   depends on LAN.

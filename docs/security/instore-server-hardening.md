@@ -1,42 +1,40 @@
 # In-Store Server Hardening Checklist
 
-> Operating checklist for the multi-register `server` mode — the device that
-> hosts port 8787 and owns the authoritative SQLite database. Only the desktop
-> (Electron) app can host the HTTP listener — Android/iOS registers are
-> client-only — so this means a desktop register running `mode=server` or a
-> dedicated store-api / integration-hub host (ADR-015). Network placement
-> rules live in `network-segmentation.md` — this doc covers the device and
-> the app.
+> Operating checklist for the in-store server — a **separate project** running
+> on a dedicated always-on host that serves port 8787 and owns the
+> authoritative store database (ADR-018). POS registers (Android, iOS,
+> desktop) are client-only and never host. Network placement rules live in
+> `network-segmentation.md` — this doc covers the server host and service.
 
 ---
 
-## 1. Before enabling server mode
+## 1. Before deploying the server
 
-- [ ] The device sits on the **dedicated POS VLAN** and nothing else shares it.
-- [ ] Exactly **one** device will run `mode=server`. A second one causes
+- [ ] The host sits on the **dedicated POS VLAN** and nothing else shares it.
+- [ ] Exactly **one** server instance runs per segment. A second one causes
       silent split-brain (no election exists — PG1 in
       `docs/features/multi-register/rules.md`).
 - [ ] The server has a **static DHCP reservation**; clients need a stable
       `serverAddress`.
-- [ ] Wired Ethernet preferred. The server runs on the desktop app — keep it
-      on mains power/UPS; the server dying stops all client registers.
-- [ ] Device is enrolled in MDM / kiosk mode: no unrelated apps, screen-lock
+- [ ] Wired Ethernet, mains power, and a UPS — the server dying stops all
+      client registers.
+- [ ] The host runs only the server service: no unrelated apps, screen-lock
       enforced, OS auto-updates scheduled off-hours.
 - [ ] OS firewall allows only TCP 8787 inbound (plus VPN management).
 
 ## 2. Shared secret management
 
-- [ ] On first `start()` with no secret, one is auto-generated
-      (`instore-<32 hex chars>`) and persisted via `ProtectedValueStore`
-      (`features/multi-register/services/InstoreApiServer.ts`). Surfaced in
-      **Settings → Instore API**.
+- [ ] The server generates/owns the shared secret (`instore-<32 hex chars>`
+      format) — the route/signing contract is defined by
+      `features/multi-register/services/{InstoreApiServer,requestSigning}.ts`
+      in this repo.
 - [ ] Copy it to each client register **out-of-band** — hand-entry or a
-      trusted channel. Never email, Slack, or commit it. There is no pairing
-      flow (PG4): whoever holds the secret can call every route except
-      health/webhook.
-- [ ] Verify storage mode: `ProtectedValueStore` may keep it in secure
-      storage (Keychain / safeStorage) rather than plain KV — confirm
-      `instoreapi.settings.storageMode` on each device.
+      trusted channel, into **Settings → Instore API**. Never email, Slack,
+      or commit it. There is no pairing flow (PG4): whoever holds the secret
+      can call every route except health/webhook.
+- [ ] Verify storage mode on each register: `ProtectedValueStore` may keep
+      the secret in secure storage (Keychain / safeStorage) rather than
+      plain KV — confirm `instoreapi.settings.storageMode` per device.
 - [ ] **Rotate** the secret when a register is decommissioned, lost, or staff
       with access leave. Rotation = change on the server, then re-copy to
       every client (they all break simultaneously — plan for a maintenance
@@ -68,8 +66,8 @@
 
 ## 5. Day-2 operations
 
-- [ ] **Backups:** the server's SQLite DB is the system of record — snapshot
-      it daily (file copy while the app is quiescent, or platform backup).
+- [ ] **Backups:** the server's database is the system of record — snapshot
+      it daily (file copy while the service is quiescent, or platform backup).
       Client registers hold no authoritative data.
 - [ ] **Health scan:** periodically run a subnet probe (or
       `InstoreApiDiscovery.scanSubnet`) — expect exactly **one** responder
@@ -80,19 +78,17 @@
 - [ ] **Audit export:** schedule `AuditLogService` CSV export — the in-app
       log is a mutable KV array capped ~2000 entries (ADR-012), not a forensic record.
 - [ ] **Failover plan:** server down ⇒ clients cannot transact (Q2 in the
-      feature rules — no write queue). Define the manual procedure: designate
-      a warm spare register, or temporarily switch critical lanes to
+      feature rules — no write queue). Define the manual procedure: keep a
+      warm spare host/image, or temporarily switch critical lanes to
       `standalone` + reconcile later.
-- [ ] **App config:** confirm `pos.autoLockMinutes` (default 5) is set on the
-      server register too — it still has a POS UI with admin surfaces.
 
 ## 6. Decommissioning a server
 
 1. Export audit log + final DB backup.
-2. Promote replacement (configure `mode=server`, new secret) — or confirm the
-   store moves to standalone.
-3. Rotate the shared secret; wipe platform credentials via Settings.
-4. Factory-reset the device; remove its DHCP reservation and MDM enrollment.
+2. Deploy the replacement server host (new secret) — or confirm the store
+   moves to standalone.
+3. Rotate the shared secret; wipe credentials on the old host.
+4. Wipe the host; remove its DHCP reservation.
 
 ## Known residual risks (accepted — verify they remain acceptable)
 

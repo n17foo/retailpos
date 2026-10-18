@@ -6,7 +6,7 @@
 
 ## Context
 
-The project needed to support two data backends — SQLite for offline/server mode and HTTP for client registers — for the same repository operations, without scattering `if (isClient)` checks through service code. Java-style `IOrderRepository` naming was considered but rejected as unnecessary noise in a TypeScript codebase where interfaces are a first-class concept.
+The project needed to support two data backends — SQLite for standalone mode and HTTP for client registers — for the same repository operations, without scattering `if (isClient)` checks through service code. Java-style `IOrderRepository` naming was considered but rejected as unnecessary noise in a TypeScript codebase where interfaces are a first-class concept.
 
 ## Decision
 
