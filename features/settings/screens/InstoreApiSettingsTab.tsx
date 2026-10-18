@@ -4,23 +4,18 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../../shared/utils/theme';
 import { instoreApiConfig, InstoreApiMode } from '../../multi-register/services/InstoreApiConfig';
 import { instoreApiClient } from '../../platform-clients/services/clients/instoreapi/InstoreApiClient';
-import { instoreApiServer } from '../../multi-register/services/InstoreApiServer';
 import { instoreApiDiscovery, DiscoveredServer } from '../../multi-register/services/InstoreApiDiscovery';
 import { BasketServiceFactory } from '../../basket/services/BasketServiceFactory';
 import { syncPoller } from '../../multi-register/services/sync/SyncPoller';
 import { generateUUID } from '../../../shared/utils/uuid';
-import { isElectron } from '../../../shared/utils/electron';
 import { useTranslate } from '../../../shared/hooks/useTranslate';
 
-const MODE_OPTION_KEYS: { value: InstoreApiMode; labelKey: string; descKey: string }[] = [
+// The in-store API is hosted by a separate server project on a dedicated
+// host (ADR-018) — registers are always standalone or client.
+const MODE_OPTIONS: { value: InstoreApiMode; labelKey: string; descKey: string }[] = [
   { value: 'standalone', labelKey: 'settings.instoreApi.standalone', descKey: 'settings.instoreApi.standaloneDesc' },
-  { value: 'server', labelKey: 'settings.instoreApi.server', descKey: 'settings.instoreApi.serverDesc' },
   { value: 'client', labelKey: 'settings.instoreApi.client', descKey: 'settings.instoreApi.clientDesc' },
 ];
-
-// Only the desktop app can host the in-store HTTP API — mobile registers are
-// always clients and never open a listening socket.
-const modeOptions = () => MODE_OPTION_KEYS.filter(opt => opt.value !== 'server' || isElectron());
 
 const InstoreApiSettingsTab: React.FC = () => {
   const { t } = useTranslate();
@@ -57,27 +52,16 @@ const InstoreApiSettingsTab: React.FC = () => {
     });
 
     try {
-      if (mode === 'server') {
-        await instoreApiServer.start();
-        syncPoller.stop();
-        BasketServiceFactory.getInstance().reset();
-        Alert.alert(t('common.saved'), t('settings.instoreApi.savedServer', { port }));
-      } else if (mode === 'client') {
-        await instoreApiServer.stop();
+      if (mode === 'client') {
         syncPoller.start();
-        BasketServiceFactory.getInstance().reset();
         Alert.alert(t('common.saved'), t('settings.instoreApi.savedClient'));
       } else {
-        await instoreApiServer.stop();
         syncPoller.stop();
-        BasketServiceFactory.getInstance().reset();
         Alert.alert(t('common.saved'), t('settings.instoreApi.savedStandalone'));
       }
+      BasketServiceFactory.getInstance().reset();
     } catch (error) {
-      Alert.alert(
-        t('common.error'),
-        `Failed to ${mode === 'server' ? 'start' : 'stop'} server: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      Alert.alert(t('common.error'), `Failed to apply settings: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }, [mode, port, sharedSecret, registerName, serverAddress, t]);
 
@@ -130,14 +114,14 @@ const InstoreApiSettingsTab: React.FC = () => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('settings.instoreApi.mode')}</Text>
         <View style={styles.modeRow}>
-          {modeOptions().map(opt => (
+          {MODE_OPTIONS.map(opt => (
             <TouchableOpacity
               key={opt.value}
               style={[styles.modeCard, mode === opt.value && styles.modeCardActive]}
               onPress={() => setMode(opt.value)}
             >
               <MaterialIcons
-                name={opt.value === 'standalone' ? 'devices' : opt.value === 'server' ? 'dns' : 'wifi'}
+                name={opt.value === 'standalone' ? 'devices' : 'wifi'}
                 size={24}
                 color={mode === opt.value ? lightColors.primary : lightColors.textSecondary}
               />

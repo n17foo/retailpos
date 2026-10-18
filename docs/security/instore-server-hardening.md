@@ -25,9 +25,9 @@
 ## 2. Shared secret management
 
 - [ ] The server generates/owns the shared secret (`instore-<32 hex chars>`
-      format) — the route/signing contract is defined by
-      `features/multi-register/services/{InstoreApiServer,requestSigning}.ts`
-      in this repo.
+      format) — the signing contract is defined by
+      `features/multi-register/services/requestSigning.ts` and the route
+      contract by `docs/features/multi-register/` in this repo.
 - [ ] Copy it to each client register **out-of-band** — hand-entry or a
       trusted channel, into **Settings → Instore API**. Never email, Slack,
       or commit it. There is no pairing flow (PG4): whoever holds the secret

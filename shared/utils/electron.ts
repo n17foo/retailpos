@@ -132,16 +132,6 @@ export interface ElectronAPI {
   /** Disconnect from reader */
   paymentDisconnect: () => Promise<void>;
 
-  // ── In-store API server IPC (server-mode registers) ────────
-  /** Bind the in-store HTTP API to a port in the main process */
-  instoreServerStart: (port: number) => Promise<boolean>;
-  /** Stop the in-store HTTP API */
-  instoreServerStop: () => Promise<boolean>;
-  /** Answer a request forwarded via onInstoreServerRequest */
-  instoreServerRespond: (requestId: string, status: number, mimeType: string, body: string) => Promise<boolean>;
-  /** Subscribe to HTTP requests received by the in-store server */
-  onInstoreServerRequest: (callback: (request: ElectronInstoreServerRequest) => void) => () => void;
-
   // ── OS-protected secret storage ─────────────────────────────
   secureStorage: {
     isAvailable: () => Promise<boolean>;
@@ -159,15 +149,6 @@ export interface ElectronPrinterConfig {
   vendorId?: string;
   productId?: string;
   macAddress?: string;
-}
-
-/** HTTP request forwarded from the main-process in-store server over IPC */
-export interface ElectronInstoreServerRequest {
-  requestId: string;
-  method: string;
-  url: string;
-  headers: Record<string, string>;
-  data: string;
 }
 
 /**

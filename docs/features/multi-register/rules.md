@@ -9,7 +9,8 @@ host — owns the authoritative database and the API (ADR-018). Registers run
 ever hosts the API.
 
 **Evidence.** `features/multi-register/services/InstoreApiConfig.ts`,
-`InstoreApiTransport.ts`; ADR-018.
+`features/platform-clients/services/clients/instoreapi/InstoreApiClient.ts`;
+ADR-018.
 
 🟢 **E1.1** — client `createOrder` → `POST /api/orders` on the server → the
 server's repositories write the row; all registers read the same data.
@@ -26,8 +27,9 @@ Server rejects bad signatures, stale timestamps, and **replayed nonces**
 `GET /api/health` (discovery needs it) and `POST /api/webhooks/commercefull`
 (external caller can't share our secret).
 
-**Evidence.** `features/multi-register/services/requestSigning.ts`,
-`InstoreApiServer.ts:140-160`.
+**Evidence.** `features/multi-register/services/requestSigning.ts` (client
+side); verification is the server's job — part of the protocol contract in
+this doc, implemented by the server project (ADR-018).
 
 🟢 **E2.1** — tampered body → signature mismatch → rejected before routing.
 
@@ -53,7 +55,8 @@ each client manually (no pairing flow).
 **Rule.** The server has an explicit rate guard on the PIN-verify route —
 a client holding the secret still can't try unlimited PINs.
 
-**Evidence.** `InstoreApiServer.ts:46` comment + route handler.
+**Evidence.** Protocol contract — `/api/users/verify-pin` route, implemented
+by the server project (ADR-018).
 
 🔴 **E4.1** — repeated wrong PINs from a client → throttled/rejected by the
 guard (see authentication doc for the auth side).
@@ -63,7 +66,7 @@ guard (see authentication doc for the auth side).
 **Rule.** `/api/orders/unsynced` is registered before `/api/orders/:id` —
 parameter routes would otherwise swallow literal segments.
 
-**Evidence.** `InstoreApiServer.ts:212-214` comment.
+**Evidence.** Protocol contract — server route table ordering (ADR-018).
 
 🟠 **E5.1** — adding a literal route _after_ a `:param` route silently
 shadows it — no test protects the ordering (PG2).
@@ -87,7 +90,7 @@ events is covered by polling/snapshot fallback (verify interval — PG3).
 **Rule.** `POST /api/webhooks/commercefull` can't be signed with the LAN
 secret — it accepts platform webhook traffic directly on the server.
 
-**Evidence.** `InstoreApiServer.ts:142-146` comment + route.
+**Evidence.** Protocol contract — webhook route exemption (ADR-018).
 
 🟠 **E7.1** — anything on the LAN can POST to it — trust relies on payload
 validation inside the handler (verify — Q1).

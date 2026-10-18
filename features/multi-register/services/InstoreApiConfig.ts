@@ -1,7 +1,7 @@
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
 import { ProtectedValueStore } from '../../platform-clients/services/config/ProtectedValueStore';
 
-export type InstoreApiMode = 'standalone' | 'server' | 'client';
+export type InstoreApiMode = 'standalone' | 'client';
 
 export interface InstoreApiSettings {
   mode: InstoreApiMode;
@@ -29,10 +29,11 @@ const settingsStore = new ProtectedValueStore({
 });
 
 /**
- * Configuration for the local shared API.
+ * Configuration for the in-store API connection.
  * - **standalone**: single register, no networking (default)
- * - **server**: this device runs the HTTP server; other registers connect to it
- * - **client**: this device connects to a server register over the LAN
+ * - **client**: this register connects to the dedicated in-store server over
+ *   the LAN. The server is a separate project on its own host (ADR-018) —
+ *   registers never host the API.
  */
 export class InstoreApiConfig {
   private static instance: InstoreApiConfig;
@@ -53,7 +54,13 @@ export class InstoreApiConfig {
     try {
       const raw = await settingsStore.load();
       if (raw) {
-        this.settings = { ...DEFAULTS, ...JSON.parse(raw) };
+        const stored = { ...DEFAULTS, ...(JSON.parse(raw) as InstoreApiSettings) };
+        // Server mode was removed in ADR-018 — a register that used to host
+        // falls back to standalone until it is re-pointed at the server.
+        if ((stored.mode as string) === 'server') {
+          stored.mode = 'standalone';
+        }
+        this.settings = stored;
       }
       this.loaded = true;
     } catch (error) {
@@ -71,10 +78,6 @@ export class InstoreApiConfig {
     return { ...this.settings };
   }
 
-  get isServer(): boolean {
-    return this.settings.mode === 'server';
-  }
-
   get isClient(): boolean {
     return this.settings.mode === 'client';
   }
@@ -88,9 +91,6 @@ export class InstoreApiConfig {
   }
 
   get baseUrl(): string {
-    if (this.isServer) {
-      return `http://localhost:${this.settings.port}`;
-    }
     return `http://${this.settings.serverAddress}:${this.settings.port}`;
   }
 }

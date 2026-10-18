@@ -520,45 +520,6 @@ function registerIpcHandlers() {
     }
   });
 
-  // ── In-store API server (server-mode registers) ───────────────────────────
-  // The desktop app is the only supported server host. The socket lives in the
-  // main process; requests are forwarded to the renderer over IPC and answered
-  // via instore-server-respond.
-
-  const MAX_INSTORE_RESPONSE_LENGTH = 8 * 1024 * 1024;
-
-  secureIpcHandle('instore-server-start', async (_event, port) => {
-    if (!Number.isInteger(port) || port < 1024 || port > 65535) {
-      throw new Error('Invalid instore-server port');
-    }
-    const { startInstoreServer } = require('./ipc/instoreServerBridge');
-    await startInstoreServer(port, request => {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('instore-server-request', request);
-      }
-    });
-    return true;
-  });
-
-  secureIpcHandle('instore-server-stop', async () => {
-    const { stopInstoreServer } = require('./ipc/instoreServerBridge');
-    await stopInstoreServer();
-    return true;
-  });
-
-  secureIpcHandle('instore-server-respond', async (_event, requestId, status, mimeType, body) => {
-    assertString(requestId, 'instore request ID', 128);
-    if (!Number.isInteger(status) || status < 100 || status > 599) {
-      throw new Error('Invalid instore response status');
-    }
-    assertString(mimeType, 'instore response MIME type', 128);
-    if (typeof body !== 'string' || body.length > MAX_INSTORE_RESPONSE_LENGTH) {
-      throw new Error('Invalid instore response body');
-    }
-    const { respondToInstoreRequest } = require('./ipc/instoreServerBridge');
-    return respondToInstoreRequest(requestId, status, mimeType, body);
-  });
-
   // ── OS-protected secret storage ───────────────────────────────────────────
   // safeStorage encrypts values with the OS credential store; only ciphertext
   // is persisted in userData. Key/value bounds keep this narrow API from being
@@ -640,16 +601,6 @@ app.whenReady().then(() => {
       createWindow();
     }
   });
-});
-
-app.on('before-quit', () => {
-  // Release the in-store API port before exit so restarts don't hit EADDRINUSE.
-  try {
-    const { stopInstoreServer } = require('./ipc/instoreServerBridge');
-    stopInstoreServer();
-  } catch {
-    // Best effort — the port is released by process exit regardless.
-  }
 });
 
 app.on('window-all-closed', () => {

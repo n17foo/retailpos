@@ -19,16 +19,17 @@ register, no networking.
 - `InstoreApiConfig` — `mode: standalone|client`, serverAddress, port
   (default 8787), `registerId`, `registerName`, `sharedSecret` (stored via
   `ProtectedValueStore`; issued by the server operator).
-- `InstoreApiServer` / `requestSigning` — the in-repo reference for the
-  **protocol contract** the dedicated server implements: route table
-  (orders, products, returns, users/PIN verify, categories, tax-profiles,
-  sync events, snapshot, commercefull webhook), `x-instore-signature`
-  HMAC-SHA256 over `method\npath\ntimestamp\nnonce\nsha256(body)`, nonce
-  replay cache, verify-pin brute-force guard. These server-side pieces are
-  being extracted into the separate server project (ADR-018).
+- **Protocol contract** — the route surface the dedicated server implements
+  is documented here and in `rules.md`: orders, products, returns,
+  users/PIN verify, categories, tax-profiles, sync events, snapshot,
+  commercefull webhook; `x-instore-signature` HMAC-SHA256 over
+  `method\npath\ntimestamp\nnonce\nsha256(body)`; nonce replay protection;
+  verify-pin brute-force guard (ADR-018). The server-side implementation
+  moved out of this repo.
 - `InstoreApiDiscovery` — subnet scan for `/api/health` responders
   (no mDNS dependency).
-- `InstoreApiTransport` — client-side signed HTTP calls to the server.
+- `InstoreApiClient` (platform-clients) — client-side signed HTTP calls to
+  the server.
 - `websocket/` + `sync/` — `StoreApiWebSocket`, `StoreApiConnectionManager`,
   `SnapshotService`, `SyncEventBus`, `SyncPoller` — real-time events
   (`order:created|updated|paid`, …) to clients.
@@ -71,13 +72,13 @@ Client register (mode=client — the only networked register mode):
 
 ## Implementation Map
 
-| Layer    | Responsibility                                | Implementation                                                                                                                   |
-| -------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Services | Config, server, discovery, transport, signing | `features/multi-register/services/{InstoreApiConfig,InstoreApiServer,InstoreApiDiscovery,InstoreApiTransport,requestSigning}.ts` |
-| Services | Realtime                                      | `features/multi-register/services/{websocket,sync}/`                                                                             |
-| Services | PED payments                                  | `features/multi-register/services/payment/`                                                                                      |
-| Screens  | Settings tab                                  | `features/settings/screens/InstoreApiSettingsTab.tsx`                                                                            |
-| App      | Lifecycle start/stop                          | `App.tsx`                                                                                                                        |
+| Layer    | Responsibility             | Implementation                                                                                                                      |
+| -------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Services | Config, discovery, signing | `features/multi-register/services/{InstoreApiConfig,InstoreApiDiscovery,requestSigning}.ts` + `InstoreApiClient` (platform-clients) |
+| Services | Realtime                   | `features/multi-register/services/{websocket,sync}/`                                                                                |
+| Services | PED payments               | `features/multi-register/services/payment/`                                                                                         |
+| Screens  | Settings tab               | `features/settings/screens/InstoreApiSettingsTab.tsx`                                                                               |
+| App      | Lifecycle start/stop       | `App.tsx`                                                                                                                           |
 
 ## State Ownership
 

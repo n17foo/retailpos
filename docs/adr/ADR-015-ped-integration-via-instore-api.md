@@ -21,7 +21,7 @@ The existing payment architecture uses `PaymentServiceFactory` to abstract provi
 **PED integration must be implemented through the Instore API**, not as a direct payment provider in the POS client. The architecture follows this flow:
 
 ```
-POS Client → InstoreApiTransport → Instore API → PED Hardware
+POS Client → InstoreApiClient → Instore API → PED Hardware
 ```
 
 ### Implementation Details
@@ -32,7 +32,7 @@ POS Client → InstoreApiTransport → Instore API → PED Hardware
    - `POST /api/ped/cancel/:sessionId` — Cancel in-progress payment
    - `GET /api/ped/devices` — List available PED devices
 
-2. **POS client uses existing `InstoreApiTransport`**:
+2. **POS client uses existing `InstoreApiClient`**:
    - No new payment provider needed
    - Payment flow remains consistent with other providers
    - `PaymentTerminalScreen` polls `/api/ped/status` for updates
@@ -98,7 +98,7 @@ const pollStatus = setInterval(async () => {
 ### Neutral
 
 - **No changes to existing payment architecture**: `PaymentServiceFactory` and provider pattern remain unchanged
-- **Reuses existing infrastructure**: `InstoreApiTransport` already handles API communication, retries, and error handling
+- **Reuses existing infrastructure**: `InstoreApiClient` already handles API communication, retries, and error handling
 - **Consistent with platform strategy**: Aligns with existing decision to centralize hardware integration in Instore API (see ADR-005: Platform Abstraction Factory)
 
 ## Alternatives Considered
@@ -143,6 +143,6 @@ Allow both direct PED (for Electron) and API-based PED (for mobile).
 ## References
 
 - Payment behaviour: docs/features/payments/ (EARS spec retired)
-- Instore API transport: `features/multi-register/services/InstoreApiTransport.ts`
+- Instore API transport: `features/platform-clients/services/clients/instoreapi/InstoreApiClient.ts`
 - Payment service factory: `features/payments/services/PaymentServiceFactory.ts`
 - PCI DSS requirements: https://www.pcisecuritystandards.org/

@@ -21,29 +21,11 @@ jest.mock('../../multi-register/services/InstoreApiConfig', () => ({
   },
 }));
 
-const mockIsElectron = jest.fn(() => false);
-jest.mock('../../../shared/utils/electron', () => ({
-  ...jest.requireActual('../../../shared/utils/electron'),
-  isElectron: () => mockIsElectron(),
-}));
-
 describe('InstoreApiSettingsTab', () => {
-  beforeEach(() => {
-    mockIsElectron.mockReturnValue(false);
-  });
-
-  it('hides server mode on mobile — registers are client-only', async () => {
+  it('offers only standalone and client modes — the server is a separate project (ADR-018)', async () => {
     const tree = await renderUi(<InstoreApiSettingsTab />);
     expect(hasText(tree, 'settings.instoreApi.standalone')).toBe(true);
+    expect(hasText(tree, 'settings.instoreApi.client')).toBe(true);
     expect(hasText(tree, 'settings.instoreApi.server')).toBe(false);
-    expect(hasText(tree, 'settings.instoreApi.client')).toBe(true);
-  });
-
-  it('shows server mode on the desktop app', async () => {
-    mockIsElectron.mockReturnValue(true);
-    const tree = await renderUi(<InstoreApiSettingsTab />);
-    expect(hasText(tree, 'settings.instoreApi.standalone')).toBe(true);
-    expect(hasText(tree, 'settings.instoreApi.server')).toBe(true);
-    expect(hasText(tree, 'settings.instoreApi.client')).toBe(true);
   });
 });

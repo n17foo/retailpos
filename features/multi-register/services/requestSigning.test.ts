@@ -1,64 +1,45 @@
-import { signRequest, verifyRequestSignature, SIGNATURE_HEADERS, SIGNATURE_WINDOW_MS } from './requestSigning';
+import { signRequest, SIGNATURE_HEADERS } from './requestSigning';
+import { hmacSha256Hex, sha256Hex } from '../../../shared/utils/crypto';
 
 const SECRET = 'instore-test-secret';
 
-function headersFrom(signed: { timestamp: string; nonce: string; signature: string }, registerId = 'reg-1') {
-  return {
-    [SIGNATURE_HEADERS.register]: registerId,
-    [SIGNATURE_HEADERS.timestamp]: signed.timestamp,
-    [SIGNATURE_HEADERS.nonce]: signed.nonce,
-    [SIGNATURE_HEADERS.signature]: signed.signature,
-  };
+function expectedSignature(secret: string, method: string, pathWithQuery: string, timestamp: string, nonce: string, rawBody: string) {
+  const payload = [method.toUpperCase(), pathWithQuery, timestamp, nonce, sha256Hex(rawBody)].join('\n');
+  return hmacSha256Hex(secret, payload);
 }
 
-describe('requestSigning', () => {
-  it('verifies a signature it produced', () => {
+describe('requestSigning (client side)', () => {
+  it('produces a signature over method, path+query, timestamp, nonce and body', () => {
     const signed = signRequest(SECRET, 'GET', '/api/orders?status=paid', '');
-    const result = verifyRequestSignature(SECRET, 'GET', '/api/orders?status=paid', '', headersFrom(signed));
-    expect(result).toEqual({ ok: true, registerId: 'reg-1' });
+    expect(signed.signature).toBe(expectedSignature(SECRET, 'GET', '/api/orders?status=paid', signed.timestamp, signed.nonce, ''));
+    expect(signed.signature).toMatch(/^[0-9a-f]{64}$/);
   });
 
   it('covers the request body', () => {
-    const signed = signRequest(SECRET, 'POST', '/api/orders', '{"a":1}');
-    expect(verifyRequestSignature(SECRET, 'POST', '/api/orders', '{"a":1}', headersFrom(signed)).ok).toBe(true);
-    // Tampered body must fail
-    expect(verifyRequestSignature(SECRET, 'POST', '/api/orders', '{"a":2}', headersFrom(signed)).ok).toBe(false);
+    const a = signRequest(SECRET, 'POST', '/api/orders', '{"a":1}');
+    const b = signRequest(SECRET, 'POST', '/api/orders', '{"a":2}');
+    expect(a.signature).not.toBe(b.signature);
   });
 
   it('covers the path, query and method', () => {
-    const signed = signRequest(SECRET, 'GET', '/api/orders/abc', '');
-    expect(verifyRequestSignature(SECRET, 'GET', '/api/orders/xyz', '', headersFrom(signed)).ok).toBe(false);
-    expect(verifyRequestSignature(SECRET, 'POST', '/api/orders/abc', '', headersFrom(signed)).ok).toBe(false);
+    const base = signRequest(SECRET, 'GET', '/api/orders/abc', '');
+    const otherPath = signRequest(SECRET, 'GET', '/api/orders/xyz', '');
+    const otherMethod = signRequest(SECRET, 'POST', '/api/orders/abc', '');
+    expect(base.signature).not.toBe(otherPath.signature);
+    expect(base.signature).not.toBe(otherMethod.signature);
   });
 
-  it('rejects a wrong secret', () => {
-    const signed = signRequest('other-secret', 'GET', '/api/users', '');
-    expect(verifyRequestSignature(SECRET, 'GET', '/api/users', '', headersFrom(signed)).ok).toBe(false);
-  });
-
-  it('rejects stale timestamps', () => {
-    const signed = signRequest(SECRET, 'GET', '/api/users', '');
-    const stale = { ...signed, timestamp: String(Date.now() - SIGNATURE_WINDOW_MS - 1000) };
-    expect(verifyRequestSignature(SECRET, 'GET', '/api/users', '', headersFrom(stale)).ok).toBe(false);
-  });
-
-  it('rejects future timestamps beyond the window', () => {
-    const signed = signRequest(SECRET, 'GET', '/api/users', '');
-    const future = { ...signed, timestamp: String(Date.now() + SIGNATURE_WINDOW_MS + 1000) };
-    expect(verifyRequestSignature(SECRET, 'GET', '/api/users', '', headersFrom(future)).ok).toBe(false);
-  });
-
-  it('rejects missing and malformed headers', () => {
-    expect(verifyRequestSignature(SECRET, 'GET', '/api/users', '', {}).ok).toBe(false);
-
-    const signed = signRequest(SECRET, 'GET', '/api/users', '');
-    expect(verifyRequestSignature(SECRET, 'GET', '/api/users', '', headersFrom({ ...signed, signature: 'nothex' })).ok).toBe(false);
-    expect(verifyRequestSignature(SECRET, 'GET', '/api/users', '', headersFrom({ ...signed, nonce: '' })).ok).toBe(false);
-  });
-
-  it('produces unique nonces', () => {
+  it('produces unique nonces and fresh timestamps', () => {
     const a = signRequest(SECRET, 'GET', '/api/users', '');
     const b = signRequest(SECRET, 'GET', '/api/users', '');
     expect(a.nonce).not.toBe(b.nonce);
+    expect(Math.abs(Date.now() - Number(a.timestamp))).toBeLessThan(5000);
+  });
+
+  it('exposes the wire header names', () => {
+    expect(SIGNATURE_HEADERS.register).toBe('x-instore-register');
+    expect(SIGNATURE_HEADERS.timestamp).toBe('x-instore-timestamp');
+    expect(SIGNATURE_HEADERS.nonce).toBe('x-instore-nonce');
+    expect(SIGNATURE_HEADERS.signature).toBe('x-instore-signature');
   });
 });

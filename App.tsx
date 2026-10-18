@@ -23,7 +23,6 @@ import { loyaltyExpiryJob } from './features/customers/services/loyalty/LoyaltyE
 import { posConfig } from './features/platform-clients/services/config/POSConfigService';
 import { authConfig } from './features/authentication/services/auth/AuthConfigService';
 import { instoreApiConfig } from './features/multi-register/services/InstoreApiConfig';
-import { instoreApiServer } from './features/multi-register/services/InstoreApiServer';
 import { syncPoller } from './features/multi-register/services/sync/SyncPoller';
 import { storeApiConnectionManager } from './features/multi-register/services/websocket/StoreApiConnectionManager';
 import RootNavigator from './app/navigation/RootNavigator';
@@ -125,16 +124,6 @@ const AppContent = () => {
         if (instoreApiConfig.isClient) {
           syncPoller.start();
           loggerRef.current.info({ message: 'SyncPoller started — client mode active' });
-        } else if (instoreApiConfig.isServer) {
-          try {
-            await instoreApiServer.start();
-            loggerRef.current.info({ message: 'InstoreApiServer started — server mode active' });
-          } catch (error) {
-            loggerRef.current.error(
-              { message: 'Failed to start InstoreApiServer' },
-              error instanceof Error ? error : new Error(String(error))
-            );
-          }
         }
 
         // Start WebSocket connection to store-api for real-time outbox delivery
@@ -170,7 +159,6 @@ const AppContent = () => {
       queueManager.dispose();
       syncPoller.stop();
       storeApiConnectionManager.stop().catch(() => {}); // Don't throw on cleanup
-      instoreApiServer.stop().catch(() => {}); // Don't throw on cleanup
     };
   }, []);
 

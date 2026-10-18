@@ -92,7 +92,7 @@ Default provider: `STRIPE_NFC`.
 ## Dependencies
 
 - `shared/utils/electron.ts` — Electron/web ⇒ `cash_only` (no RN SDKs on desktop).
-- `InstoreApiTransport` — `INSTORE_API` provider routes `/api/payment/*`.
+- `InstoreApiClient` — `INSTORE_API` provider routes `/api/payment/*` to the in-store server.
 - `shared/services/logger` — provider resolution + errors logged.
 - `shared/services/audit` — payment outcomes audited.
 - `@env` `USE_MOCK_PAYMENT` — forces `MockPaymentService`.

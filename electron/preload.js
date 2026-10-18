@@ -46,18 +46,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   paymentCancel: () => ipcRenderer.invoke('payment-cancel'),
   paymentDisconnect: () => ipcRenderer.invoke('payment-disconnect'),
 
-  // ── In-store API server IPC (server-mode registers) ──────────────────────
-  instoreServerStart: port => ipcRenderer.invoke('instore-server-start', port),
-  instoreServerStop: () => ipcRenderer.invoke('instore-server-stop'),
-  instoreServerRespond: (requestId, status, mimeType, body) =>
-    ipcRenderer.invoke('instore-server-respond', requestId, status, mimeType, body),
-  onInstoreServerRequest: callback => {
-    const listener = (_event, request) => callback(request);
-    ipcRenderer.on('instore-server-request', listener);
-    // Return a cleanup function the caller can invoke to unsubscribe
-    return () => ipcRenderer.removeListener('instore-server-request', listener);
-  },
-
   // ── OS-protected secret storage ───────────────────────────────────────────
   secureStorage: {
     isAvailable: () => ipcRenderer.invoke('secure-storage-available'),

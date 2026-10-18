@@ -91,30 +91,26 @@
 
 ## 6. LAN authentication — HMAC-signed requests
 
-- `requestSigning.ts` — shared sign/verify helpers. Signature covers
+- `requestSigning.ts` — client-side signing helper. Signature covers
   `METHOD \n PATH?QUERY \n TIMESTAMP \n NONCE \n sha256hex(rawBody)`.
 - Client sends `x-instore-register` / `x-instore-timestamp` /
   `x-instore-nonce` / `x-instore-signature`; the secret is never transmitted
-  and `x-shared-secret` is no longer sent or accepted.
-- `InstoreApiServer` verifies the signature (constant-time), enforces a
-  ±5-minute timestamp window, and rejects replayed nonces via a bounded
-  in-memory `(register, nonce)` cache.
-- `InstoreApiTransport` passes the full path with query string and the raw
-  body so the signature covers the exact wire bytes.
+  and `x-shared-secret` is no longer sent.
+- The in-store server (separate project, ADR-018) verifies the signature
+  constant-time, enforces a ±5-minute timestamp window, and rejects replayed
+  nonces — that behaviour is part of the protocol contract documented in
+  `docs/features/multi-register/`.
+- `InstoreApiClient` signs the full path with query string and the raw body
+  so the signature covers the exact wire bytes.
 - Discovery never sends the secret during subnet scans;
   `probeHealth`/`probeAddress` are unauthenticated.
 - `testConnection()` uses authenticated `GET /api/session` — it now detects
   a wrong secret.
-- Route order: `/api/orders/unsynced` registered before `/api/orders/:id`.
-- Write-route input validation: order shape/amounts/items, order-status
-  allowlist, payment field bounds, product/category allowlists and size
-  limits, return validation.
 - `StoreApiWebSocket`: non-text, oversized (>1 MiB), malformed and
   non-object frames dropped; `dedupe_key` bounded. The HELLO handshake is
   unauthenticated — it belongs to the external store-api protocol.
-- Tests: `requestSigning.test.ts`;
-  `tests/integration/InstoreApiTransport.integration.test.ts` (legacy-header
-  rejection, wrong-secret rejection, replay rejection, tampered body).
+- Tests: `requestSigning.test.ts` (signature coverage, nonce uniqueness,
+  header names).
 - **Rollout:** all registers must run a signing build — mixed versions
   cannot authenticate.
 
