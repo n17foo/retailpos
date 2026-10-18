@@ -1,0 +1,68 @@
+name: Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Gradle build type'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Expo
+        uses: expo/expo-github-action@v8
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile --network-timeout 100000 --network-concurrency 1 --mutex file
+        env:
+          YARN_ENABLE_GLOBAL_CACHE: 'false'
+          YARN_CACHE_FOLDER: ${{ runner.temp }}/yarn-cache
+
+      - name: Setup environment
+        run: cp .env.example .env
+
+      - name: Generate Android project (expo prebuild)
+        run: npx expo prebuild --platform android --non-interactive
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          if [ "${{ inputs.build_type }}" = "release" ]; then
+            ./gradlew assembleRelease --no-daemon
+          else
+            ./gradlew assembleDebug --no-daemon
+          fi
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: retailpos-${{ inputs.build_type }}-apk
+          path: android/app/build/outputs/apk/${{ inputs.build_type }}/*.apk
+          retention-days: 30
