@@ -4609,6 +4609,15 @@ expo-asset@~58.0.16:
     "@expo/image-utils" "^0.12.5"
     expo-constants "~58.0.12"
 
+expo-build-properties@^58.0.11:
+  version "58.0.11"
+  resolved "https://registry.yarnpkg.com/expo-build-properties/-/expo-build-properties-58.0.11.tgz#8a0ee43b7732fe4c70f610def1ae38e110b50812"
+  integrity sha512-8vjp+RSD7VW/VeEpG9l1YON4ZqOqQXPmtMYFqmh41I7cBGwELRYybHFrh2P3uBgzWlRBuQrRLO5UAtAYfT7HLg==
+  dependencies:
+    "@expo/schema-utils" "^58.0.2"
+    resolve-from "^5.0.0"
+    semver "^7.7.4"
+
 expo-camera@~58.0.10:
   version "58.0.10"
   resolved "https://registry.yarnpkg.com/expo-camera/-/expo-camera-58.0.10.tgz#f083085bad71ab35b3557cd897c4c2caefb2f705"
