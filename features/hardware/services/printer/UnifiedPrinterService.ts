@@ -3,13 +3,49 @@ import { AbstractPrinterService } from './BasePrinterService';
 import { PrinterStatus, ReceiptData } from './PrinterTypes';
 import { receiptConfigService } from './ReceiptConfigService';
 
-// We'll use dynamic imports for these native modules to avoid initialization issues
-// These variables will hold the imported modules when needed
-// eslint-disable-next-line @typescript-eslint/no-explicit-any -- third-party native printer SDK with no type definitions
-type PrinterSDKModule = any;
-let USBPrinter: PrinterSDKModule = null;
-let BLEPrinter: PrinterSDKModule = null;
-let NetPrinter: PrinterSDKModule = null;
+/**
+ * Minimal typed surface of react-native-esc-pos-printer used by this service.
+ * The module is loaded lazily — its constants resolve through the native
+ * module at import time, so requiring it unconditionally breaks Jest/web.
+ */
+interface EscPosStatusEntry {
+  status: string;
+  message: string;
+  statusCode: number;
+}
+
+interface EscPosPrinterStatus {
+  online?: EscPosStatusEntry;
+  paper?: EscPosStatusEntry;
+  drawer?: EscPosStatusEntry;
+}
+
+interface EscPosPrinterInstance {
+  addQueueTask<T>(task: () => Promise<T>): Promise<T | void>;
+  connect(timeout?: number): Promise<unknown>;
+  disconnect(): Promise<unknown>;
+  getStatus(): Promise<EscPosPrinterStatus>;
+  addText(text: string): Promise<unknown>;
+  addFeedLine(lines?: number): Promise<unknown>;
+  addTextAlign(param?: number): Promise<unknown>;
+  addTextStyle(params?: { em?: number }): Promise<unknown>;
+  addCut(type?: number): Promise<unknown>;
+  addCommand(data: Uint8Array): Promise<unknown>;
+  sendData(timeout?: number): Promise<unknown>;
+}
+
+interface EscPosPrinterModule {
+  Printer: new (params: { target: string; deviceName: string }) => EscPosPrinterInstance;
+  TextAlignType: { ALIGN_LEFT: number; ALIGN_CENTER: number; ALIGN_RIGHT: number };
+  CommonParams: { TRUE: number; FALSE: number };
+  PrinterPaperStatus: { PAPER_EMPTY: number };
+  PrinterDrawerStatus: { DRAWER_HIGH: number };
+}
+
+const CONNECT_TIMEOUT_MS = 10000;
+// Epson ePOS LAN printing is fixed at port 9100 — the SDK's TCP target
+// string cannot express a custom port.
+const EPOS_DEFAULT_PORT = 9100;
 
 /**
  * Printer connection types supported by the unified printer service
@@ -63,12 +99,42 @@ export type PrinterConfig = USBPrinterConfig | BluetoothPrinterConfig | NetworkP
 
 /**
  * Unified printer service that supports USB, Bluetooth, and Network printers
- * using the @tillpos/rn-receipt-printer-utils library
+ * using the react-native-esc-pos-printer library (Epson ePOS SDK — works with
+ * Epson TM printers and most ESC/POS compatibles over LAN/BT/USB).
  */
 export class UnifiedPrinterService extends AbstractPrinterService {
-  private printerInstance: PrinterSDKModule = null;
+  private printer: EscPosPrinterInstance | null = null;
   private printerType: PrinterConnectionType | null = null;
   private logger = LoggerFactory.getInstance().createLogger('UnifiedPrinterService');
+
+  private loadModule(): EscPosPrinterModule {
+    try {
+      return require('react-native-esc-pos-printer') as EscPosPrinterModule;
+    } catch (importError) {
+      this.logger.warn('Failed to import esc-pos-printer module:', importError);
+      throw new Error(
+        'Failed to initialize printer modules: ' + (importError instanceof Error ? importError.message : String(importError)),
+        { cause: importError }
+      );
+    }
+  }
+
+  /**
+   * Map a PrinterConfig to an ePOS target string.
+   * TCP:<ip> for LAN, BT:<mac> for Bluetooth, USB:<id> for USB.
+   */
+  private buildTarget(config: PrinterConfig): string {
+    switch (config.printerType) {
+      case PrinterConnectionType.USB: {
+        const usbConfig = config as USBPrinterConfig;
+        return `USB:${usbConfig.productId || usbConfig.vendorId}`;
+      }
+      case PrinterConnectionType.BLUETOOTH:
+        return `BT:${(config as BluetoothPrinterConfig).macAddress}`;
+      case PrinterConnectionType.NETWORK:
+        return `TCP:${(config as NetworkPrinterConfig).host}`;
+    }
+  }
 
   /**
    * Connect to a printer
@@ -83,88 +149,38 @@ export class UnifiedPrinterService extends AbstractPrinterService {
 
       this.logger.info(`Connecting to ${config.printerType} printer: ${config.printerName}`);
 
-      this.printerType = config.printerType;
+      const escPos = this.loadModule();
 
-      // Dynamically import the required printer modules
-      try {
-        if (!USBPrinter || !BLEPrinter || !NetPrinter) {
-          this.logger.info('Dynamically importing printer modules');
-          const printerUtils = require('@tillpos/rn-receipt-printer-utils');
-          USBPrinter = printerUtils.USBPrinter;
-          BLEPrinter = printerUtils.BLEPrinter;
-          NetPrinter = printerUtils.NetPrinter;
-        }
-      } catch (importError) {
-        this.logger.warn('Failed to import printer modules:', importError);
-        throw new Error(
-          'Failed to initialize printer modules: ' + (importError instanceof Error ? importError.message : String(importError)),
-          { cause: importError }
+      if (config.printerType === PrinterConnectionType.BLUETOOTH && !(config as BluetoothPrinterConfig).macAddress) {
+        this.logger.error('MAC address is required for Bluetooth printer connection');
+        return false;
+      }
+      if (config.printerType === PrinterConnectionType.NETWORK && (config as NetworkPrinterConfig).port !== EPOS_DEFAULT_PORT) {
+        this.logger.warn(
+          `Network printer port ${(config as NetworkPrinterConfig).port} ignored — ePOS LAN printing uses port ${EPOS_DEFAULT_PORT}`
         );
       }
 
-      switch (config.printerType) {
-        case PrinterConnectionType.USB: {
-          const usbConfig = config as USBPrinterConfig;
+      const printer = new escPos.Printer({
+        target: this.buildTarget(config),
+        deviceName: config.printerName,
+      });
 
-          // Use USBPrinter methods directly (it's an object with static methods)
-          this.printerInstance = USBPrinter;
+      await printer.connect(CONNECT_TIMEOUT_MS);
 
-          // For USB printers, we'll connect when sending data
-          // Just store the connection info for later use
-          this._isConnected = true;
-          this._connectionConfig = usbConfig;
+      this.printer = printer;
+      this.printerType = config.printerType;
+      this._isConnected = true;
+      this._connectionConfig = config;
 
-          return true;
-        }
-
-        case PrinterConnectionType.BLUETOOTH: {
-          const bleConfig = config as BluetoothPrinterConfig;
-
-          // Use BLEPrinter methods directly (it only has connectAndSend method)
-          this.printerInstance = BLEPrinter;
-
-          // Check if we have a valid MAC address for connection
-          if (!bleConfig.macAddress) {
-            this.logger.error('MAC address is required for Bluetooth printer connection');
-            return false;
-          }
-
-          // For BLEPrinter, we don't need to scan for devices
-          // Just store the MAC address for later use in printing
-
-          // Connect to the printer
-          const connected = await this.printerInstance.connectPrinter(bleConfig.deviceId, bleConfig.macAddress);
-
-          this._isConnected = connected;
-          this._connectionConfig = bleConfig;
-
-          return connected;
-        }
-
-        case PrinterConnectionType.NETWORK: {
-          const netConfig = config as NetworkPrinterConfig;
-
-          // Use NetPrinter methods directly (it's an object with static methods)
-          this.printerInstance = NetPrinter;
-
-          // For network printers, we don't actually connect until we send data
-          // Just store the connection info for later use
-          this._isConnected = true;
-          this._connectionConfig = netConfig;
-
-          return true;
-        }
-
-        default:
-          throw new Error(`Unsupported printer type.`);
-      }
+      return true;
     } catch (error) {
       // Safely access the printer type using a type guard
       const printerTypeName = config && 'printerType' in config ? String(config.printerType) : 'unknown';
 
       this.logger.error(`Failed to connect to ${printerTypeName} printer:`, error instanceof Error ? error : new Error(String(error)));
       this._isConnected = false;
-      this.printerInstance = null;
+      this.printer = null;
       return false;
     }
   }
@@ -174,9 +190,14 @@ export class UnifiedPrinterService extends AbstractPrinterService {
    * @param data Receipt data
    */
   async printReceipt(data: ReceiptData): Promise<boolean> {
-    if (!this._isConnected || !this.printerInstance) {
+    if (!this._isConnected || !this.printer) {
       throw new Error('Not connected to a printer');
     }
+
+    const printer = this.printer;
+    const escPos = this.loadModule();
+    const { ALIGN_LEFT, ALIGN_CENTER, ALIGN_RIGHT } = escPos.TextAlignType;
+    const { TRUE, FALSE } = escPos.CommonParams;
 
     try {
       this.logger.info(`Printing receipt for order ${data.orderId}`);
@@ -186,120 +207,122 @@ export class UnifiedPrinterService extends AbstractPrinterService {
       const divider = receiptConfigService.getDividerLine();
       const doubleDivider = receiptConfigService.getDoubleDividerLine();
 
-      // Initialize the printer
-      await this.printerInstance.init();
+      await printer.addQueueTask(async () => {
+        const print = (text: string) => printer.addText(text);
 
-      // Header — driven by ReceiptConfigService
-      await this.printerInstance.alignCenter();
-      await this.printerInstance.setBold(true);
-      await this.printerInstance.printText(`${config.header.businessName}\n`);
-      await this.printerInstance.setBold(false);
+        // Header — driven by ReceiptConfigService
+        await printer.addTextAlign(ALIGN_CENTER);
+        await printer.addTextStyle({ em: TRUE });
+        await print(`${config.header.businessName}\n`);
+        await printer.addTextStyle({ em: FALSE });
 
-      if (config.header.addressLine1) {
-        await this.printerInstance.printText(`${config.header.addressLine1}\n`);
-      }
-      if (config.header.addressLine2) {
-        await this.printerInstance.printText(`${config.header.addressLine2}\n`);
-      }
-      if (config.header.phone) {
-        await this.printerInstance.printText(`Tel: ${config.header.phone}\n`);
-      }
-      if (config.header.taxId) {
-        await this.printerInstance.printText(`Tax ID: ${config.header.taxId}\n`);
-      }
-
-      // Divider
-      await this.printerInstance.alignLeft();
-      await this.printerInstance.printText(`${divider}\n`);
-
-      // Order info
-      await this.printerInstance.printText(`Order #: ${data.orderId}\n`);
-      await this.printerInstance.printText(`Date: ${data.date.toLocaleString()}\n`);
-      await this.printerInstance.printText(`Cashier: ${data.cashierName}\n`);
-
-      if (data.saleMode) {
-        await this.printerInstance.printText(`Mode: ${data.saleMode}\n`);
-      }
-
-      if (data.customerName) {
-        await this.printerInstance.printText(`Customer: ${data.customerName}\n`);
-      }
-
-      // Divider
-      await this.printerInstance.printText(`${divider}\n`);
-
-      // Items
-      for (const item of data.items) {
-        const itemTotal = item.quantity * item.price;
-        if (item.quantity > 1) {
-          await this.printerInstance.printText(`${item.name}\n`);
-          await this.printerInstance.printText(
-            `${receiptConfigService.formatLine(`  ${item.quantity} x ${cs}${item.price.toFixed(2)}`, `${cs}${itemTotal.toFixed(2)}`)}\n`
-          );
-        } else {
-          await this.printerInstance.printText(`${receiptConfigService.formatLine(item.name, `${cs}${itemTotal.toFixed(2)}`)}\n`);
+        if (config.header.addressLine1) {
+          await print(`${config.header.addressLine1}\n`);
         }
-      }
+        if (config.header.addressLine2) {
+          await print(`${config.header.addressLine2}\n`);
+        }
+        if (config.header.phone) {
+          await print(`Tel: ${config.header.phone}\n`);
+        }
+        if (config.header.taxId) {
+          await print(`Tax ID: ${config.header.taxId}\n`);
+        }
 
-      // Divider
-      await this.printerInstance.printText(`${divider}\n`);
+        // Divider
+        await printer.addTextAlign(ALIGN_LEFT);
+        await print(`${divider}\n`);
 
-      // Totals
-      await this.printerInstance.alignRight();
-      const subtotal = data.subtotal;
-      await this.printerInstance.printText(`Subtotal: ${cs}${subtotal.toFixed(2)}\n`);
-      await this.printerInstance.printText(`Tax: ${cs}${data.tax.toFixed(2)}\n`);
+        // Order info
+        await print(`Order #: ${data.orderId}\n`);
+        await print(`Date: ${data.date.toLocaleString()}\n`);
+        await print(`Cashier: ${data.cashierName}\n`);
 
-      // Total — bold
-      await this.printerInstance.setBold(true);
-      await this.printerInstance.printText(`${doubleDivider}\n`);
-      await this.printerInstance.printText(`Total: ${cs}${data.total.toFixed(2)}\n`);
-      await this.printerInstance.setBold(false);
-      await this.printerInstance.printText(`${doubleDivider}\n`);
+        if (data.saleMode) {
+          await print(`Mode: ${data.saleMode}\n`);
+        }
 
-      // Payment method
-      await this.printerInstance.alignLeft();
+        if (data.customerName) {
+          await print(`Customer: ${data.customerName}\n`);
+        }
 
-      // Split tender: show payment breakdown
-      if (data.paymentMethod === 'split' && data.paymentLines && data.paymentLines.length > 0) {
-        await this.printerInstance.printText(`Payment Method: Split Tender\n`);
-        await this.printerInstance.printText(`${divider}\n`);
-        for (const line of data.paymentLines) {
-          let methodLabel = line.method;
-          if (line.method === 'card' || line.method === 'card_terminal') {
-            methodLabel = line.cardBrand ? `${line.cardBrand} ····${line.last4}` : 'Card';
-          } else if (line.method === 'cash') {
-            methodLabel = 'Cash';
-          } else if (line.method === 'store_credit') {
-            methodLabel = 'Store Credit';
-          } else if (line.method === 'loyalty') {
-            methodLabel = 'Loyalty Points';
+        // Divider
+        await print(`${divider}\n`);
+
+        // Items
+        for (const item of data.items) {
+          const itemTotal = item.quantity * item.price;
+          if (item.quantity > 1) {
+            await print(`${item.name}\n`);
+            await print(
+              `${receiptConfigService.formatLine(`  ${item.quantity} x ${cs}${item.price.toFixed(2)}`, `${cs}${itemTotal.toFixed(2)}`)}\n`
+            );
+          } else {
+            await print(`${receiptConfigService.formatLine(item.name, `${cs}${itemTotal.toFixed(2)}`)}\n`);
           }
-          await this.printerInstance.printText(`${receiptConfigService.formatLine(methodLabel, `${cs}${line.amount.toFixed(2)}`)}\n`);
         }
-        await this.printerInstance.printText(`${divider}\n\n`);
-      } else {
-        // Single payment method
-        await this.printerInstance.printText(`Payment Method: ${data.paymentMethod}\n\n`);
-      }
 
-      // Footer — driven by ReceiptConfigService
-      await this.printerInstance.alignCenter();
-      if (config.footer.line1) {
-        await this.printerInstance.printText(`${config.footer.line1}\n`);
-      }
-      if (config.footer.line2) {
-        await this.printerInstance.printText(`${config.footer.line2}\n`);
-      }
-      if (config.footer.line3) {
-        await this.printerInstance.printText(`${config.footer.line3}\n`);
-      }
-      await this.printerInstance.printText('\n\n');
+        // Divider
+        await print(`${divider}\n`);
 
-      // Cut paper (if supported)
-      if (config.options.cutPaper) {
-        await this.printerInstance.cutPaper();
-      }
+        // Totals
+        await printer.addTextAlign(ALIGN_RIGHT);
+        await print(`Subtotal: ${cs}${data.subtotal.toFixed(2)}\n`);
+        await print(`Tax: ${cs}${data.tax.toFixed(2)}\n`);
+
+        // Total — bold
+        await printer.addTextStyle({ em: TRUE });
+        await print(`${doubleDivider}\n`);
+        await print(`Total: ${cs}${data.total.toFixed(2)}\n`);
+        await printer.addTextStyle({ em: FALSE });
+        await print(`${doubleDivider}\n`);
+
+        // Payment method
+        await printer.addTextAlign(ALIGN_LEFT);
+
+        // Split tender: show payment breakdown
+        if (data.paymentMethod === 'split' && data.paymentLines && data.paymentLines.length > 0) {
+          await print(`Payment Method: Split Tender\n`);
+          await print(`${divider}\n`);
+          for (const line of data.paymentLines) {
+            let methodLabel = line.method;
+            if (line.method === 'card' || line.method === 'card_terminal') {
+              methodLabel = line.cardBrand ? `${line.cardBrand} ····${line.last4}` : 'Card';
+            } else if (line.method === 'cash') {
+              methodLabel = 'Cash';
+            } else if (line.method === 'store_credit') {
+              methodLabel = 'Store Credit';
+            } else if (line.method === 'loyalty') {
+              methodLabel = 'Loyalty Points';
+            }
+            await print(`${receiptConfigService.formatLine(methodLabel, `${cs}${line.amount.toFixed(2)}`)}\n`);
+          }
+          await print(`${divider}\n\n`);
+        } else {
+          // Single payment method
+          await print(`Payment Method: ${data.paymentMethod}\n\n`);
+        }
+
+        // Footer — driven by ReceiptConfigService
+        await printer.addTextAlign(ALIGN_CENTER);
+        if (config.footer.line1) {
+          await print(`${config.footer.line1}\n`);
+        }
+        if (config.footer.line2) {
+          await print(`${config.footer.line2}\n`);
+        }
+        if (config.footer.line3) {
+          await print(`${config.footer.line3}\n`);
+        }
+        await printer.addFeedLine(2);
+
+        // Cut paper (if supported)
+        if (config.options.cutPaper) {
+          await printer.addCut();
+        }
+
+        await printer.sendData();
+      });
 
       this.logger.info('Receipt printed successfully');
       return true;
@@ -313,7 +336,7 @@ export class UnifiedPrinterService extends AbstractPrinterService {
    * Get printer status
    */
   async getStatus(): Promise<PrinterStatus> {
-    if (!this._isConnected || !this.printerInstance) {
+    if (!this._isConnected || !this.printer) {
       return {
         isOnline: false,
         hasPaper: false,
@@ -322,61 +345,18 @@ export class UnifiedPrinterService extends AbstractPrinterService {
     }
 
     try {
-      // Check connection status
-      // Note: The @tillpos/rn-receipt-printer-utils library doesn't provide a direct method
-      // to check printer status, so we'll attempt a simple operation to verify connectivity
+      const escPos = this.loadModule();
+      const status = await this.printer.getStatus();
+      const online = status.online?.statusCode === escPos.CommonParams.TRUE;
 
-      // Use a type guard to safely access printerType property
-      const config = this._connectionConfig as PrinterConfig;
-      if (!config || !('printerType' in config)) {
-        throw new Error('Invalid printer configuration');
+      if (online) {
+        return {
+          isOnline: true,
+          hasPaper: status.paper ? status.paper.statusCode !== escPos.PrinterPaperStatus.PAPER_EMPTY : true,
+          drawerOpen: status.drawer?.statusCode === escPos.PrinterDrawerStatus.DRAWER_HIGH,
+        };
       }
 
-      switch (config.printerType) {
-        case PrinterConnectionType.USB: {
-          const usbConfig = config as USBPrinterConfig;
-          const connected = await this.printerInstance.connectPrinter(usbConfig.vendorId, usbConfig.productId);
-
-          if (connected) {
-            return {
-              isOnline: true,
-              hasPaper: true, // Cannot determine paper status with this library
-              drawerOpen: false,
-            };
-          }
-          break;
-        }
-
-        case PrinterConnectionType.BLUETOOTH: {
-          const bleConfig = config as BluetoothPrinterConfig;
-          const connected = await this.printerInstance.connectPrinter(bleConfig.deviceId, bleConfig.macAddress);
-
-          if (connected) {
-            return {
-              isOnline: true,
-              hasPaper: true,
-              drawerOpen: false,
-            };
-          }
-          break;
-        }
-
-        case PrinterConnectionType.NETWORK: {
-          const netConfig = config as NetworkPrinterConfig;
-          const connected = await this.printerInstance.connectPrinter(netConfig.host, netConfig.port);
-
-          if (connected) {
-            return {
-              isOnline: true,
-              hasPaper: true,
-              drawerOpen: false,
-            };
-          }
-          break;
-        }
-      }
-
-      // If we reach here, connection check failed
       this._isConnected = false;
       return {
         isOnline: false,
@@ -398,37 +378,16 @@ export class UnifiedPrinterService extends AbstractPrinterService {
    * This powers openDrawer() and any caller using formatReceiptBuffer().
    */
   protected async sendBytes(data: Uint8Array): Promise<boolean> {
-    if (!this._isConnected || !this.printerInstance) return false;
+    if (!this._isConnected || !this.printer) return false;
+
+    const printer = this.printer;
 
     try {
-      const config = this._connectionConfig as PrinterConfig;
-      if (!config || !('printerType' in config)) return false;
-
-      // Convert Uint8Array to base64 — works in React Native without Node.js Buffer polyfill
-      const binary = Array.from(data)
-        .map(b => String.fromCharCode(b))
-        .join('');
-      const base64 = btoa(binary);
-
-      switch (config.printerType) {
-        case PrinterConnectionType.USB: {
-          const usbConfig = config as USBPrinterConfig;
-          await this.printerInstance.printRawData(base64, usbConfig.vendorId, usbConfig.productId);
-          return true;
-        }
-        case PrinterConnectionType.BLUETOOTH: {
-          const bleConfig = config as BluetoothPrinterConfig;
-          await this.printerInstance.printRawData(base64, bleConfig.deviceId, bleConfig.macAddress);
-          return true;
-        }
-        case PrinterConnectionType.NETWORK: {
-          const netConfig = config as NetworkPrinterConfig;
-          await this.printerInstance.printRawData(base64, netConfig.host, netConfig.port);
-          return true;
-        }
-        default:
-          return false;
-      }
+      await printer.addQueueTask(async () => {
+        await printer.addCommand(data);
+        await printer.sendData();
+      });
+      return true;
     } catch (error) {
       this.logger.error({ message: 'sendBytes failed' }, error instanceof Error ? error : new Error(String(error)));
       return false;
@@ -439,11 +398,10 @@ export class UnifiedPrinterService extends AbstractPrinterService {
    * Disconnect from the printer
    */
   async disconnect(): Promise<void> {
-    if (this._isConnected && this.printerInstance) {
+    if (this._isConnected && this.printer) {
       try {
-        // Close the printer connection
-        await this.printerInstance.closeConn();
-        this.printerInstance = null;
+        await this.printer.disconnect();
+        this.printer = null;
         this.printerType = null;
       } catch (error) {
         this.logger.error('Error disconnecting from printer:', error instanceof Error ? error : new Error(String(error)));

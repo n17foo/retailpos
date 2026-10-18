@@ -8,7 +8,7 @@ The RetailPOS system now uses a unified printer service implementation that foll
 
 The printer service architecture consists of:
 
-1. **UnifiedPrinterService**: A single service that supports all printer types through the `@tillpos/rn-receipt-printer-utils` library
+1. **UnifiedPrinterService**: A single service that supports all printer types through the `react-native-esc-pos-printer` library
 2. **PrinterServiceFactory**: Factory that manages printer instances and provides a clean API for the rest of the application
 3. **BasePrinterService**: Abstract interface that defines the core printer functionality
 4. **PrinterTypes**: Common type definitions used across the printer services

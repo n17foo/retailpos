@@ -7,7 +7,7 @@ import { getElectronAPI, ElectronPrinterConfig } from '../../../../shared/utils/
 /**
  * Electron-specific printer service.
  *
- * On desktop (Electron) the React Native printer SDK (`@tillpos/rn-receipt-printer-utils`)
+ * On desktop (Electron) the React Native printer SDK (`react-native-esc-pos-printer`)
  * is unavailable because it relies on native Android/iOS modules. Instead this service
  * delegates all I/O to the Electron main process via IPC methods exposed through
  * `window.electronAPI` (see `utils/electron.ts → ElectronAPI`).
