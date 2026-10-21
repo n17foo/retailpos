@@ -86,6 +86,13 @@ Reports never read from the online platform. Web orders placed directly on
 the platform are not counted (POS-sales reports only), except Commercefull
 `order.created` webhooks which the sync layer writes into the order store.
 
+**LAN outage (client mode):** reports call the Store API, so they fail
+closed while the register is degraded — orders sold offline queue locally
+(`pending_upload`) and merge into order history immediately, but only join
+report aggregations once the pending queue flushes on recovery. The server
+preserves each replayed order's original `createdAt`/`paidAt`, so the sale
+is attributed to when it happened, not when the LAN returned.
+
 ## State Ownership
 
 | State                 | Owner                   | Persistence                 | Reset condition |

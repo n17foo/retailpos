@@ -34,7 +34,7 @@ always-on PC inside the store's POS VLAN.** RetailPOS — on every platform
   HTTP bridge (`electron/ipc/instoreServerBridge.js`) and
   `react-native-http-bridge`.
 - The server service owns the authoritative store database, exposes the
-  HTTP API on port 8787, terminates the Commercefull webhook, and
+  HTTP API on port 8080, terminates the Commercefull webhook, and
   orchestrates PED devices (ADR-015).
 - The route surface, HMAC signing scheme (`x-instore-signature`), nonce
   replay protection, and `/api/health` discovery contract defined by

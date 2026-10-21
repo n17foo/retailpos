@@ -15,7 +15,9 @@ export interface InstoreApiSettings {
 const DEFAULTS: InstoreApiSettings = {
   mode: 'standalone',
   serverAddress: '',
-  port: 8787,
+  // Match the store-api server default (STORE_PORT=8080) — discovery probes
+  // this port, so a wrong default means the server is never found.
+  port: 8080,
   sharedSecret: '',
   registerId: '',
   registerName: 'Register 1',

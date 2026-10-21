@@ -20,7 +20,7 @@ const MODE_OPTIONS: { value: InstoreApiMode; labelKey: string; descKey: string }
 const InstoreApiSettingsTab: React.FC = () => {
   const { t } = useTranslate();
   const [mode, setMode] = useState<InstoreApiMode>('standalone');
-  const [port, setPort] = useState('8787');
+  const [port, setPort] = useState('8080');
   const [sharedSecret, setSharedSecret] = useState('');
   const [registerName, setRegisterName] = useState('Register 1');
   const [serverAddress, setServerAddress] = useState('');
@@ -44,7 +44,7 @@ const InstoreApiSettingsTab: React.FC = () => {
     const registerId = instoreApiConfig.current.registerId || generateUUID();
     await instoreApiConfig.save({
       mode,
-      port: parseInt(port, 10) || 8787,
+      port: parseInt(port, 10) || 8080,
       sharedSecret,
       registerName,
       serverAddress,
@@ -152,7 +152,7 @@ const InstoreApiSettingsTab: React.FC = () => {
             value={port}
             onChangeText={setPort}
             keyboardType="number-pad"
-            placeholder="8787"
+            placeholder="8080"
             placeholderTextColor={lightColors.textSecondary}
           />
 

@@ -4,7 +4,7 @@
 
 Several registers share one database over the LAN. The **in-store server is
 a separate project** running on a dedicated always-on host — it owns the
-authoritative store database and serves the HTTP API on port 8787 (ADR-018).
+authoritative store database and serves the HTTP API on port 8080 (ADR-018).
 Every POS register — Android, iOS, and desktop alike — runs as a **client**
 (or `standalone`); the POS app never opens a listening socket. Discovery
 finds the server on the subnet, HMAC request signing authenticates every
@@ -17,11 +17,15 @@ register, no networking.
 ### Included
 
 - `InstoreApiConfig` — `mode: standalone|client`, serverAddress, port
-  (default 8787), `registerId`, `registerName`, `sharedSecret` (stored via
+  (default 8080, matching the server's `STORE_PORT` default),
+  `registerId`, `registerName`, `sharedSecret` (stored via
   `ProtectedValueStore`; issued by the server operator).
 - **Protocol contract** — the route surface the dedicated server implements
-  is documented here and in `rules.md`: orders, products, returns,
-  users/PIN verify, categories, tax-profiles, sync events, snapshot,
+  is documented here and in `rules.md`: `/api/session`, `/api/health`,
+  orders + order items + sync status/claim, products, categories,
+  tax-profiles, users CRUD + verify-pin + check-pin, returns (+delete/link),
+  shifts, ledgers (loyalty, store-credit, discounts), reports + orders CSV,
+  KDS tickets, payment intents + terminals, sync events, snapshot,
   commercefull webhook; `x-instore-signature` HMAC-SHA256 over
   `method\npath\ntimestamp\nnonce\nsha256(body)`; nonce replay protection;
   verify-pin brute-force guard (ADR-018). The server-side implementation
@@ -32,9 +36,17 @@ register, no networking.
   the server.
 - `websocket/` + `sync/` — `StoreApiWebSocket`, `StoreApiConnectionManager`,
   `SnapshotService`, `SyncEventBus`, `SyncPoller` — real-time events
-  (`order:created|updated|paid`, …) to clients.
+  (`order:created|updated|paid`, …) to clients via WS device outbox and
+  poller; `SyncEventBus` dedupes by event id.
 - `payment/` — `InstoreApiPaymentService` + `PaymentIntentClient` — PED
   payment orchestration via `/api/payment/*` (payments feature).
+- `StoreApiHealthService` + `useStoreApiHealth` + `StoreApiOfflineBanner` —
+  online/degraded detection (session probe + WS state) and the offline
+  banner.
+- `offline/` — `PendingOrderStore` (queue order writes locally during an
+  outage, FIFO flush on recovery), `ServerDataCache` (read-through
+  products/categories/tax profiles), `isStoreApiUnavailable` (fetch-level
+  error discriminator).
 - `InstoreApiSettingsTab` — mode/secret/register config UI.
 
 ### Excluded
@@ -56,7 +68,7 @@ register, no networking.
 
 ```
 In-store server (separate project, dedicated host):
-  HTTP :8787 → routes serve the authoritative store DB
+  HTTP :8080 → routes serve the authoritative store DB
     + auth on every route except /api/health + /api/webhooks/commercefull
   websocket broadcasts domain events to registers
 
@@ -65,9 +77,21 @@ Client register (mode=client — the only networked register mode):
     → configure serverAddress:port + sharedSecret
     → every call: signRequest(secret, method, path, body)
        → server verifies HMAC + timestamp window + nonce uniqueness
-    → data mutations POST to server (orders, returns, categories, products)
-    → reads via transport (orders, products, snapshot)
+    → data mutations POST to server (orders, returns, categories, products,
+      ledgers)
+    → reads via transport (orders, products, snapshot, reports)
     → realtime via websocket/SyncPoller → syncEventBus → UI refreshes
+
+LAN outage (client mode):
+  StoreApiHealthService flips online→degraded (session probe + WS state)
+    → StoreApiOfflineBanner shown; card tender drops to cash-only
+    → order writes queue in local SQLite (sync_status='pending_upload' +
+      pending_ops) and merge into order reads so history stays consistent
+    → catalogue/tax/users served from read-through caches
+    → loyalty earn queues; store-credit redemption fails closed
+  On recovery: pending ops flush FIFO → POST /api/orders (idempotent on
+    supplied order id; client-supplied createdAt/paidAt preserved so
+    reports attribute the sale to when it happened) → banner clears.
 ```
 
 ## Implementation Map
@@ -76,18 +100,25 @@ Client register (mode=client — the only networked register mode):
 | -------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | Services | Config, discovery, signing | `features/multi-register/services/{InstoreApiConfig,InstoreApiDiscovery,requestSigning}.ts` + `InstoreApiClient` (platform-clients) |
 | Services | Realtime                   | `features/multi-register/services/{websocket,sync}/`                                                                                |
+| Services | LAN health                 | `features/multi-register/services/StoreApiHealthService.ts` + `hooks/useStoreApiHealth.ts`                                          |
+| Services | Offline queue + caches     | `features/multi-register/services/offline/`                                                                                         |
+| UI       | Offline banner             | `features/multi-register/components/StoreApiOfflineBanner.tsx`                                                                      |
 | Services | PED payments               | `features/multi-register/services/payment/`                                                                                         |
 | Screens  | Settings tab               | `features/settings/screens/InstoreApiSettingsTab.tsx`                                                                               |
 | App      | Lifecycle start/stop       | `App.tsx`                                                                                                                           |
 
 ## State Ownership
 
-| State                    | Owner                       | Persistence                | Reset condition  |
-| ------------------------ | --------------------------- | -------------------------- | ---------------- |
-| Mode + settings + secret | `InstoreApiConfig`          | `ProtectedValueStore` (KV) | User edit        |
-| Nonce replay cache       | in-store server             | Memory                     | Expiry / restart |
-| Socket connection        | `StoreApiConnectionManager` | None                       | Reconnect        |
-| Authoritative data       | in-store server             | Server's database          | —                |
+| State                    | Owner                       | Persistence                       | Reset condition                          |
+| ------------------------ | --------------------------- | --------------------------------- | ---------------------------------------- |
+| Mode + settings + secret | `InstoreApiConfig`          | `ProtectedValueStore` (KV)        | User edit                                |
+| Nonce replay cache       | in-store server             | Memory                            | Expiry / restart                         |
+| Socket connection        | `StoreApiConnectionManager` | None                              | Reconnect                                |
+| LAN health               | `StoreApiHealthService`     | None                              | Probe/WS events                          |
+| Pending offline orders   | `PendingOrderStore`         | SQLite (`orders` + `pending_ops`) | Flushed on recovery                      |
+| Catalogue/tax cache      | `ServerDataCache`           | SQLite `server_data_cache`        | Overwritten on server hit                |
+| User credential cache    | `UserRepository`            | SQLite `users`                    | Warmed on verify, cleared on mode change |
+| Authoritative data       | in-store server             | Server's database                 | —                                        |
 
 ## Dependencies
 

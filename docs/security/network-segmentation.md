@@ -30,7 +30,7 @@
       ┌─────────────┐      (no route to POS VLAN)  (no route to anything
       │ registers   │                                except internet)
       │ in-store    │
-      │ server :8787│
+      │ server :8080│
       │ printers    │
       │ :9100-9109  │
       │ PED/KDS     │
@@ -58,11 +58,11 @@ all**, then permit the following.
 
 | Source           | Destination      | Port / Proto                                 | Purpose                        | Notes                                                                       |
 | ---------------- | ---------------- | -------------------------------------------- | ------------------------------ | --------------------------------------------------------------------------- |
-| POS VLAN         | in-store server  | TCP 8787                                     | Signed REST API + `/ws` events | Only device that may listen; pin by DHCP reservation (§3)                   |
+| POS VLAN         | in-store server  | TCP 8080                                     | Signed REST API + `/ws` events | Only device that may listen; pin by DHCP reservation (§3)                   |
 | POS VLAN         | receipt printers | TCP 9100–9109                                | Raw ESC/POS printing           | Electron build already refuses ports outside 9100–9109 (`electron/main.js`) |
 | POS VLAN         | KDS endpoint     | configured port (e.g. 8080)                  | Kitchen display, optional      | `KdsConnectionConfig.baseUrl`                                               |
 | Management host  | POS devices      | WireGuard UDP 51820                          | Remote admin **via VPN only**  | Never expose SSH/RDP/VNC flat on the VLAN (§5)                              |
-| Platform webhook | in-store server  | TCP 8787 → `/api/webhooks/commercefull` only | Commercefull push              | HMAC-verified by `CommercefullWebhookReceiver`; see §4                      |
+| Platform webhook | in-store server  | TCP 8080 → `/api/webhooks/commercefull` only | Commercefull push              | HMAC-verified by `CommercefullWebhookReceiver`; see §4                      |
 
 ### Outbound from the POS VLAN (egress)
 
@@ -83,7 +83,7 @@ non-443 egress denied.
 
 - Any device outside VLAN 10 → any POS device, any port.
 - POS devices → staff/guest/CCTV VLANs.
-- Inbound WAN → port 8787 directly (webhook goes through §4's pinned path).
+- Inbound WAN → port 8080 directly (webhook goes through §4's pinned path).
 - Peer-to-peer between client registers — nothing in the design needs it;
   client↔server only. (Optional enforcement: private VLAN / AP client
   isolation on the register SSID — this also blocks register-to-register
@@ -94,7 +94,7 @@ non-443 egress denied.
 
 The in-store server is a **separate project** deployed on a dedicated
 always-on host (ADR-018). Registers — Android, iOS, and desktop — are
-client-only and never listen on 8787.
+client-only and never listen on 8080.
 
 | Option                                                   | When to use                                                    | Network notes                                                                                                                                             |
 | -------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -103,12 +103,12 @@ client-only and never listen on 8787.
 
 Rules that apply:
 
-- **Exactly one listener on 8787 per segment.** Two server instances cause
+- **Exactly one listener on 8080 per segment.** Two server instances cause
   silent split-brain (documented gap PG1). Enforce by procedure +
   monitoring (§7), since nothing in code prevents it.
 - The server owns the authoritative store DB — treat it as the system of
   record: mains power + UPS, no sleep.
-- Keep the server's OS firewalled so only 8787 (and VPN management) is open.
+- Keep the server's OS firewalled so only 8080 (and VPN management) is open.
 
 ## 4. The Commercefull webhook — the only inbound internet flow
 
@@ -125,7 +125,7 @@ Expose it safely:
    `/api/webhooks/commercefull` (reject everything else, including
    `/api/health`), adds no other ports, and ideally source-restricts to the
    platform's published egress IPs.
-3. Never port-forward all of 8787: that would expose every signed route to
+3. Never port-forward all of 8080: that would expose every signed route to
    the internet for probing, and `/api/health` to the world.
 4. Configure a webhook secret on the sync service — without it the receiver
    fails closed (returns 401/500), but set it deliberately.
@@ -151,7 +151,7 @@ Expose it safely:
 
 ## 7. Monitoring & drift detection
 
-- Periodically scan the POS subnet for `/api/health` responders on 8787 —
+- Periodically scan the POS subnet for `/api/health` responders on 8080 —
   **more than one responder = two servers = split-brain in progress.**
   `InstoreApiDiscovery.scanSubnet` does exactly this probe.
 - Alert on new MACs joining the POS VLAN/SSID (port security or NAC).
@@ -163,7 +163,7 @@ Expose it safely:
 ## 8. Discovery and the unauthenticated health endpoint
 
 Client registers find the server by probing every address in the subnet on
-port 8787 (`InstoreApiDiscovery`). `GET /api/health` deliberately answers
+port 8080 (`InstoreApiDiscovery`). `GET /api/health` deliberately answers
 without a signature and returns `registerId` + `registerName` — presence
 information only, but it tells a LAN observer where the server is and what
 it's called. On a dedicated, small VLAN this trade-off is acceptable; it is
@@ -181,7 +181,7 @@ Mitigations if you want tighter:
 - [ ] Separate WPA3/WPA2 SSID mapped to the POS VLAN; no corporate/guest bridging.
 - [ ] Inter-VLAN ACLs deny all except the §2 matrix; egress restricted to 443/123/53.
 - [ ] Exactly one in-store server instance; static DHCP reservation; wired.
-- [ ] Port 8787 unreachable from internet except pinned webhook path via proxy — or webhooks terminated on the hub.
+- [ ] Port 8080 unreachable from internet except pinned webhook path via proxy — or webhooks terminated on the hub.
 - [ ] Printers reachable only on 9100–9109 from POS devices.
 - [ ] Admin access only via WireGuard/Tailscale; no flat SSH/RDP/VNC.
 - [ ] NTP and DNS allowed and working on every register and the server.

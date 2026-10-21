@@ -11,7 +11,7 @@ jest.mock('../../multi-register/services/InstoreApiConfig', () => ({
     current: { registerId: 'reg-1' },
     load: jest.fn().mockResolvedValue({
       mode: 'standalone',
-      port: 8787,
+      port: 8080,
       sharedSecret: 'sec-123',
       registerName: 'Register 1',
       serverAddress: '',

@@ -35,7 +35,7 @@ Internet (untrusted)
   │  outbound TCP 443 only — platform APIs, payment providers
   ▼
 POS VLAN (trusted, dedicated — see network-segmentation.md)
-  ├─ registers (client mode) ── signed HTTP+WS ──▶ in-store server :8787
+  ├─ registers (client mode) ── signed HTTP+WS ──▶ in-store server :8080
   ├─ registers ──▶ receipt printers :9100-9109
   ├─ registers ──▶ payment terminals (provider-dependent)
   └─ inbound: Commercefull webhook POST /api/webhooks/commercefull (HMAC-verified)
@@ -56,6 +56,6 @@ Other VLANs (guest Wi-Fi, corporate, CCTV/IoT) — NO access to POS VLAN
    need working NTP.
 5. **All registers run a signing-capable build** — mixed versions cannot
    authenticate (signed-requests-only rollout).
-6. **Never expose port 8787 to the internet** except the pinned webhook path
+6. **Never expose port 8080 to the internet** except the pinned webhook path
    behind a reverse proxy — prefer terminating webhooks on the
    integration-hub instead of the in-store server.

@@ -1,7 +1,7 @@
 # In-Store Server Hardening Checklist
 
 > Operating checklist for the in-store server — a **separate project** running
-> on a dedicated always-on host that serves port 8787 and owns the
+> on a dedicated always-on host that serves port 8080 and owns the
 > authoritative store database (ADR-018). POS registers (Android, iOS,
 > desktop) are client-only and never host. Network placement rules live in
 > `network-segmentation.md` — this doc covers the server host and service.
@@ -20,7 +20,7 @@
       client registers.
 - [ ] The host runs only the server service: no unrelated apps, screen-lock
       enforced, OS auto-updates scheduled off-hours.
-- [ ] OS firewall allows only TCP 8787 inbound (plus VPN management).
+- [ ] OS firewall allows only TCP 8080 inbound (plus VPN management).
 
 ## 2. Shared secret management
 
@@ -61,7 +61,7 @@
 | `GET /api/health`                 | none (by design, for discovery)       | Reveals `registerId`/`registerName` only — acceptable on an isolated VLAN                                                              |
 | `POST /api/webhooks/commercefull` | `x-webhook-signature` HMAC (receiver) | Pin this path behind a proxy if internet-facing — see §4 of the network doc                                                            |
 | `POST /api/users/verify-pin`      | signed + server rate guard            | 10 failures/min → 429 for **all** registers. A secret-holding client can DoS PIN login globally — treat the secret as admin-equivalent |
-| Everything else on 8787           | HMAC signature + nonce + timestamp    | Tamper/replay rejected; legacy header ignored                                                                                          |
+| Everything else on 8080           | HMAC signature + nonce + timestamp    | Tamper/replay rejected; legacy header ignored                                                                                          |
 | `/ws` (store-api deployments)     | HELLO handshake, unauthenticated      | External protocol — frames are validated/dropped defensively; messages are data events only                                            |
 
 ## 5. Day-2 operations
@@ -71,7 +71,7 @@
       Client registers hold no authoritative data.
 - [ ] **Health scan:** periodically run a subnet probe (or
       `InstoreApiDiscovery.scanSubnet`) — expect exactly **one** responder
-      on 8787. Two = split-brain.
+      on 8080. Two = split-brain.
 - [ ] **Log review:** watch for `PIN verify rate limit hit`, clusters of 401s,
       and repeated `Error handling …` entries — signs of a hostile or broken
       client.
