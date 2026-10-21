@@ -1,4 +1,4 @@
-import { userRepository } from '../../../repositories/UserRepository';
+import { getUserRepository } from '../../../repositories/UserRepository';
 import { instoreApiConfig } from '../../../../multi-register/services/InstoreApiConfig';
 import { instoreApiClient } from '../../../../platform-clients/services/clients/instoreapi/InstoreApiClient';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
@@ -55,7 +55,7 @@ export class PinAuthProvider implements AuthMethodProvider {
 
   async enroll(userId: string, credential: string): Promise<boolean> {
     try {
-      await userRepository.updatePin(userId, credential);
+      await getUserRepository().updatePin(userId, credential);
       return true;
     } catch {
       return false;
@@ -68,14 +68,14 @@ export class PinAuthProvider implements AuthMethodProvider {
   }
 
   async isEnrolled(userId: string): Promise<boolean> {
-    const user = await userRepository.findById(userId);
+    const user = await getUserRepository().findById(userId);
     return user !== null;
   }
 
   // ── Private ─────────────────────────────────────────────────────────
 
   private async authenticateLocally(credential: string): Promise<AuthResult> {
-    const user = await userRepository.findByPin(credential);
+    const user = await getUserRepository().findByPin(credential);
     if (user) {
       return { success: true, user };
     }

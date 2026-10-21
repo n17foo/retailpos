@@ -1,4 +1,4 @@
-import { userRepository } from '../../../repositories/UserRepository';
+import { getUserRepository } from '../../../repositories/UserRepository';
 import { keyValueRepository } from '../../../../../shared/repositories/KeyValueRepository';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
 import { cardReaderDetection } from '../CardReaderDetection';
@@ -73,7 +73,7 @@ export class MagstripeAuthProvider implements AuthMethodProvider {
       }
 
       // Look up all active users and check their stored card IDs
-      const users = await userRepository.findActive();
+      const users = await getUserRepository().findActive();
 
       for (const user of users) {
         const storedCardId = await keyValueRepository.getObject<string>(MAGSTRIPE_KEY_PREFIX + user.id);

@@ -6,8 +6,8 @@ export class InstoreApiReturnRepository implements ReturnRepository {
     return instoreApiClient.createReturn(input);
   }
 
-  async findById(_id: string): Promise<ReturnRow | null> {
-    return null; // not needed on client
+  async findById(id: string): Promise<ReturnRow | null> {
+    return instoreApiClient.getReturn(id);
   }
 
   async findByOrderId(orderId: string): Promise<ReturnRow[]> {
@@ -18,8 +18,8 @@ export class InstoreApiReturnRepository implements ReturnRepository {
     return instoreApiClient.getReturns(status);
   }
 
-  async findByDateRange(_from: number, _to: number): Promise<ReturnRow[]> {
-    return instoreApiClient.getReturns();
+  async findByDateRange(from: number, to: number): Promise<ReturnRow[]> {
+    return instoreApiClient.getReturns(undefined, { from, to });
   }
 
   async updateStatus(_id: string, _status: string, _processedBy?: string): Promise<void> {
@@ -30,5 +30,9 @@ export class InstoreApiReturnRepository implements ReturnRepository {
     // Exchange compensation runs wherever the cashier confirmed — forward the
     // delete to the server that owns the rows
     await instoreApiClient.deleteReturn(id);
+  }
+
+  async linkToExchange(returnId: string, exchangeOrderId: string): Promise<void> {
+    await instoreApiClient.linkReturnToExchange(returnId, exchangeOrderId);
   }
 }

@@ -183,7 +183,7 @@ export const BasketPanel: React.FC<BasketPanelProps> = ({ platform, onCheckout, 
     [saleState, blockingBlockers, onTender, openTender, onCheckout]
   );
 
-  const cardAvailable = checkout.paymentMode === 'tap_to_pay';
+  const cardAvailable = checkout.paymentMode !== 'cash_only';
   const tenderDisabled = basketItems.length === 0 || checkout.isProcessing;
   const tenderError = checkout.error;
 

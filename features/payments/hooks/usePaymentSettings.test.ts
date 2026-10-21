@@ -3,7 +3,6 @@ import { createRoot } from 'test-renderer';
 import { usePaymentSettings } from './usePaymentSettings';
 import { PaymentSettingsStorage } from '../../platform-clients/services/config/PaymentSettingsStorage';
 import { PaymentProvider } from '../services/PaymentServiceFactory';
-import { usePayment } from './usePayment';
 
 jest.mock('expo-constants', () => ({
   __esModule: true,
@@ -35,11 +34,14 @@ jest.mock('../../../shared/repositories/KeyValueRepository', () => ({
   },
 }));
 
-jest.mock('./usePayment', () => ({
-  usePayment: jest.fn(),
+const mockApplySettings = jest.fn();
+jest.mock('../services/PaymentService', () => ({
+  __esModule: true,
+  default: {
+    applySettings: (...args: unknown[]) => mockApplySettings(...args),
+    connectToTerminal: jest.fn().mockResolvedValue(true),
+  },
 }));
-
-const mockSetPaymentProvider = jest.fn();
 
 async function mountHook() {
   let latest: ReturnType<typeof usePaymentSettings> | null = null;
@@ -56,7 +58,7 @@ async function mountHook() {
 describe('usePaymentSettings', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (usePayment as jest.Mock).mockReturnValue({ setPaymentProvider: mockSetPaymentProvider });
+    mockApplySettings.mockResolvedValue(undefined);
     (PaymentSettingsStorage.load as jest.Mock).mockResolvedValue(null);
   });
 
@@ -87,7 +89,7 @@ describe('usePaymentSettings', () => {
 
     expect(ok).toBe(true);
     expect(PaymentSettingsStorage.save).toHaveBeenCalled();
-    expect(mockSetPaymentProvider).toHaveBeenCalledWith(PaymentProvider.SQUARE);
+    expect(mockApplySettings).toHaveBeenCalledWith(expect.objectContaining({ provider: PaymentProvider.SQUARE }));
     expect(get().saveStatus).toBe('saved');
   });
 });

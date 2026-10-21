@@ -1,4 +1,6 @@
 import { db } from '../../../shared/utils/db';
+import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
+import { InstoreApiUserRepository } from './InstoreApiUserRepository';
 import { generateUUID } from '../../../shared/utils/uuid';
 import { hashPin, isHashedPin, verifyPin } from '../../../shared/utils/crypto';
 import { validatePinFormat } from '../utils/userPin.utils';
@@ -58,7 +60,7 @@ export interface CreateUserInput {
   platform_user_id?: string | null;
 }
 
-export class UserRepository {
+export class UserRepository implements UserRepositoryInterface {
   async create(user: CreateUserInput): Promise<string> {
     const validation = validatePinFormat(user.pin);
     if (!validation.isValid) throw new Error(validation.error);
@@ -184,4 +186,36 @@ export class UserRepository {
   }
 }
 
+/** Public contract for user persistence — implemented by UserRepository
+ * (local SQLite) and InstoreApiUserRepository (Store API, client mode). */
+export interface UserRepositoryInterface {
+  create(user: CreateUserInput): Promise<string>;
+  findById(id: string): Promise<User | null>;
+  findByPin(pin: string): Promise<User | null>;
+  findByEmail(email: string): Promise<User | null>;
+  findAll(): Promise<User[]>;
+  findActive(): Promise<User[]>;
+  findAdmins(): Promise<User[]>;
+  update(id: string, data: Partial<Omit<User, 'id' | 'created_at' | 'updated_at'>>): Promise<void>;
+  updatePin(id: string, newPin: string): Promise<void>;
+  deactivate(id: string): Promise<void>;
+  activate(id: string): Promise<void>;
+  delete(id: string): Promise<void>;
+  isPinUnique(pin: string, excludeUserId?: string): Promise<boolean>;
+  hasAdminUser(): Promise<boolean>;
+}
+
 export const userRepository = new UserRepository();
+
+/**
+ * Factory — returns the right user repository for the current mode.
+ * Standalone → local SQLite; client → Store API (server is authoritative
+ * for user identity, PINs, roles and active state).
+ * Call at use time — instoreApiConfig resolves asynchronously.
+ */
+export function getUserRepository(): UserRepositoryInterface {
+  if (instoreApiConfig.isClient) {
+    return new InstoreApiUserRepository();
+  }
+  return userRepository;
+}

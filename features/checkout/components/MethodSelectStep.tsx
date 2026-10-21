@@ -55,8 +55,9 @@ function buildMethodList(paymentMode: PaymentMode, activeProvider: PaymentProvid
     description: 'Accept physical cash and calculate change',
   });
 
-  // Tap-to-pay is only available on mobile/tablet with an SDK provider.
-  if (paymentMode === 'tap_to_pay' && activeProvider) {
+  // A card terminal is available whenever a non-cash mode is active:
+  // tap-to-pay SDK on mobile, or a store-api PED on any platform.
+  if (paymentMode !== 'cash_only' && activeProvider) {
     const providerLabel = PROVIDER_LABEL[activeProvider] ?? activeProvider;
     const providerIcon = PROVIDER_ICON[activeProvider] ?? '📱';
     const isNfc = activeProvider === PaymentProvider.STRIPE_NFC || activeProvider === PaymentProvider.TAP_PAYMENTS;

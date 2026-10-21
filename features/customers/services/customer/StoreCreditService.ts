@@ -10,7 +10,7 @@
  * See: docs/specs/customer/crm-loyalty.md §2.6–2.8
  */
 
-import { storeCreditRepository } from '../../repositories/StoreCreditRepository';
+import { getStoreCreditRepository } from '../../repositories/StoreCreditRepository';
 import { keyValueRepository } from '../../../../shared/repositories/KeyValueRepository';
 import { auditLogService } from '../../../../shared/services/audit/AuditLogService';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
@@ -43,7 +43,7 @@ export class StoreCreditService {
   // ── Balance ───────────────────────────────────────────────────────────
 
   async getBalanceCents(email: string): Promise<number> {
-    return storeCreditRepository.getBalanceCents(email);
+    return getStoreCreditRepository().getBalanceCents(email);
   }
 
   async getBalanceDollars(email: string): Promise<number> {
@@ -55,7 +55,7 @@ export class StoreCreditService {
   async issue(email: string, amountCents: number, reason: string, issuedBy?: string): Promise<string> {
     if (amountCents <= 0) throw new Error('Issue amount must be positive');
 
-    const entryId = await storeCreditRepository.appendEntry(email, 'issue', amountCents, null, reason, issuedBy);
+    const entryId = await getStoreCreditRepository().appendEntry(email, 'issue', amountCents, null, reason, issuedBy);
 
     await auditLogService.log('store_credit:issued', {
       userId: issuedBy,
@@ -83,7 +83,15 @@ export class StoreCreditService {
 
     if (redeemedCents <= 0) throw new Error('Insufficient store credit balance');
 
-    const entryId = await storeCreditRepository.appendEntry(email, 'redeem', -redeemedCents, orderId, 'Store credit redemption');
+    let entryId: string;
+    try {
+      entryId = await getStoreCreditRepository().appendEntry(email, 'redeem', -redeemedCents, orderId, 'Store credit redemption');
+    } catch (err) {
+      // Another register may have consumed the balance between the read and
+      // the write — the server rejects the overdraw; surface it as the same
+      // insufficient-balance failure the local path raises.
+      throw new Error('Insufficient store credit balance', { cause: err });
+    }
 
     await auditLogService.log('store_credit:redeemed', {
       details: `Store credit redeemed by ${email}: ${toDollars(redeemedCents).toFixed(2)} on order ${orderId}`,
@@ -98,11 +106,17 @@ export class StoreCreditService {
    */
   async reverseRedemption(entryId: string): Promise<void> {
     try {
-      const entry = await storeCreditRepository.findEntryById(entryId);
+      const entry = await getStoreCreditRepository().findEntryById(entryId);
       if (!entry || entry.type !== 'redeem') return;
 
       const restoredCents = Math.abs(entry.amount_cents);
-      await storeCreditRepository.appendEntry(entry.customer_email, 'reversal', restoredCents, entry.order_id, `Reversal of ${entryId}`);
+      await getStoreCreditRepository().appendEntry(
+        entry.customer_email,
+        'reversal',
+        restoredCents,
+        entry.order_id,
+        `Reversal of ${entryId}`
+      );
       this.logger.info(`Reversed store credit redemption ${entryId} — restored ${restoredCents}¢`);
     } catch (err) {
       this.logger.error(
@@ -119,7 +133,7 @@ export class StoreCreditService {
     const toExpire = Math.min(amountCents, balance);
     if (toExpire <= 0) return;
 
-    await storeCreditRepository.appendEntry(email, 'expire', -toExpire, null, reason, expiredBy);
+    await getStoreCreditRepository().appendEntry(email, 'expire', -toExpire, null, reason, expiredBy);
 
     await auditLogService.log('store_credit:expired', {
       userId: expiredBy,
@@ -131,7 +145,7 @@ export class StoreCreditService {
   // ── History ───────────────────────────────────────────────────────────
 
   async getHistory(email: string, limit = 50) {
-    return storeCreditRepository.findEntriesByEmail(email, limit);
+    return getStoreCreditRepository().findEntriesByEmail(email, limit);
   }
 }
 

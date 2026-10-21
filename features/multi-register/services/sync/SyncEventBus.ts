@@ -21,6 +21,13 @@ export class SyncEventBus {
   /** Recent events kept for client polling (server mode only) */
   private recentEvents: SyncEvent[] = [];
   private readonly MAX_RECENT = 500;
+  /**
+   * Event ids already dispatched — the same server event can arrive via the
+   * WebSocket outbox and the sync-events poller; dedupe keeps handlers
+   * from firing twice.
+   */
+  private seenEventIds = new Set<string>();
+  private readonly MAX_SEEN = 1000;
 
   private constructor() {}
 
@@ -54,10 +61,20 @@ export class SyncEventBus {
     return event;
   }
 
-  /** Dispatch an externally received event (from server polling) */
+  /** Dispatch an externally received event (from server polling or WS outbox) */
   receive(event: SyncEvent): void {
     // Don't re-dispatch our own events
     if (event.registerId === instoreApiConfig.current.registerId) return;
+    // Dedupe — the same event can arrive over both transports
+    if (event.id) {
+      if (this.seenEventIds.has(event.id)) return;
+      this.seenEventIds.add(event.id);
+      if (this.seenEventIds.size > this.MAX_SEEN) {
+        // Bounded LRU-ish trim: drop the oldest half
+        const ids = [...this.seenEventIds];
+        this.seenEventIds = new Set(ids.slice(ids.length - this.MAX_SEEN / 2));
+      }
+    }
     this.dispatch(event);
   }
 

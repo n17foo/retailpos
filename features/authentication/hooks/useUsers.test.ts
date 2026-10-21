@@ -16,8 +16,8 @@ jest.mock('../../../shared/hooks/useLogger', () => ({
   useLogger: () => mockLogger,
 }));
 
-jest.mock('../repositories/UserRepository', () => ({
-  userRepository: {
+jest.mock('../repositories/UserRepository', () => {
+  const repo = {
     findAll: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
@@ -28,8 +28,9 @@ jest.mock('../repositories/UserRepository', () => ({
     findByPin: jest.fn(),
     isPinUnique: jest.fn(),
     hasAdminUser: jest.fn(),
-  },
-}));
+  };
+  return { userRepository: repo, getUserRepository: () => repo };
+});
 
 jest.mock('../services/permissions/PermissionService', () => ({
   permissionService: {

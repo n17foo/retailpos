@@ -1,4 +1,4 @@
-import { ReturnRepository, returnRepository, ReturnRow, CreateReturnInput } from '../../repositories/ReturnRepository';
+import { ReturnRepository, getReturnRepository, ReturnRow, CreateReturnInput } from '../../repositories/ReturnRepository';
 import { getOrderRepository } from '../../../orders-sync/repositories/OrderRepository';
 import { OrderItemRepository, getOrderItemRepository } from '../../../orders-sync/repositories/OrderItemRepository';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
@@ -132,8 +132,14 @@ export interface RefundRecord {
 export class ReturnService {
   private static instance: ReturnService;
   private logger = LoggerFactory.getInstance().createLogger('ReturnService');
-  private orderItemRepo: OrderItemRepository = getOrderItemRepository();
-  private returnRepo: ReturnRepository = returnRepository;
+  // Resolved at call time — instoreApiConfig.load() runs after module eval,
+  // so binding a repo here would latch the offline implementation on clients.
+  private get orderItemRepo(): OrderItemRepository {
+    return getOrderItemRepository();
+  }
+  private get returnRepo(): ReturnRepository {
+    return getReturnRepository();
+  }
   private platformRefundServices: Map<ECommercePlatform, PlatformRefundServiceInterface> = new Map();
   private offlineRefundService: OfflineRefundService | null = null;
   private refundInitialized = false;
@@ -145,10 +151,6 @@ export class ReturnService {
       ReturnService.instance = new ReturnService();
     }
     return ReturnService.instance;
-  }
-
-  setReturnRepository(repo: ReturnRepository): void {
-    this.returnRepo = repo;
   }
 
   /** Process a return for one or more items from an order */

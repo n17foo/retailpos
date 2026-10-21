@@ -21,6 +21,7 @@ import { storeApiWebSocket } from '../websocket/StoreApiWebSocket';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
 import type { PaymentIntent, PaymentIntentState } from './PaymentIntentTypes';
 import { isTerminalState } from './PaymentIntentTypes';
+import { toCents } from '../../../../shared/utils/money';
 
 export interface InstoreApiPaymentConfig {
   /** PED provider name as registered in the store-api (e.g. 'worldpay', 'worldline', 'adyen') */
@@ -101,7 +102,7 @@ export class InstoreApiPaymentService implements PaymentServiceInterface {
         terminal_id: this.config.terminalId,
         ped_device_id: this.config.pedDeviceId,
         currency: request.currency ?? this.config.currency,
-        amount_minor: request.amount,
+        amount_minor: toCents(request.amount),
         tip_minor: 0,
         surcharge_minor: 0,
       });
@@ -173,7 +174,7 @@ export class InstoreApiPaymentService implements PaymentServiceInterface {
     try {
       const result = await paymentIntentClient.refundPayment({
         payment_intent_id: transactionId,
-        amount_minor: amount,
+        amount_minor: toCents(amount),
       });
       return this.mapIntentToResponse(result.payment_intent);
     } catch (error) {

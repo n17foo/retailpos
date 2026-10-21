@@ -15,7 +15,9 @@
  * See: docs/specs/customer/crm-loyalty.md §2.3–2.5
  */
 
-import { loyaltyRepository } from '../../repositories/LoyaltyRepository';
+import { getLoyaltyRepository } from '../../repositories/LoyaltyRepository';
+import { instoreApiConfig } from '../../../multi-register/services/InstoreApiConfig';
+import { instoreApiClient } from '../../../platform-clients/services/clients/instoreapi/InstoreApiClient';
 import { keyValueRepository } from '../../../../shared/repositories/KeyValueRepository';
 import { auditLogService } from '../../../../shared/services/audit/AuditLogService';
 import { notificationService } from '../../../../shared/services/notifications/NotificationService';
@@ -78,7 +80,7 @@ export class LoyaltyService {
   // ── Balance ───────────────────────────────────────────────────────────
 
   async getBalance(email: string): Promise<LoyaltyBalance> {
-    const account = await loyaltyRepository.getOrCreateAccount(email);
+    const account = await getLoyaltyRepository().getOrCreateAccount(email);
     const config = await this.getConfig();
 
     // Calculate tier based on lifetime earned
@@ -112,11 +114,11 @@ export class LoyaltyService {
    */
   private async updateTier(email: string): Promise<void> {
     try {
-      const account = await loyaltyRepository.getOrCreateAccount(email);
+      const account = await getLoyaltyRepository().getOrCreateAccount(email);
       const newTier = this.calculateTier(account.lifetime_earned);
 
       if (account.tier !== newTier) {
-        await loyaltyRepository.updateTier(email, newTier);
+        await getLoyaltyRepository().updateTier(email, newTier);
         this.logger.info(`Updated tier for ${email}: ${account.tier} → ${newTier}`);
       }
     } catch (err) {
@@ -139,9 +141,8 @@ export class LoyaltyService {
       const pointsEarned = Math.floor(totalCents / config.earnRate);
       if (pointsEarned <= 0) return;
 
-      await loyaltyRepository.getOrCreateAccount(email);
-      await loyaltyRepository.appendTransaction(email, 'earn', pointsEarned, orderId, 'Order purchase');
-      await loyaltyRepository.updateBalance(email, pointsEarned);
+      await getLoyaltyRepository().getOrCreateAccount(email);
+      await getLoyaltyRepository().applyTransaction(email, 'earn', pointsEarned, orderId, 'Order purchase');
 
       // Update tier after earning points
       await this.updateTier(email);
@@ -162,13 +163,18 @@ export class LoyaltyService {
    */
   async redeemPoints(email: string, orderId: string, pointsToRedeem: number): Promise<{ transactionId: string; discountDollars: number }> {
     const config = await this.getConfig();
-    const account = await loyaltyRepository.getOrCreateAccount(email);
+    const account = await getLoyaltyRepository().getOrCreateAccount(email);
 
     const clamped = Math.min(pointsToRedeem, account.balance);
     if (clamped <= 0) throw new Error('Insufficient loyalty points balance');
 
-    const txId = await loyaltyRepository.appendTransaction(email, 'redeem', -clamped, orderId, 'Points redemption');
-    await loyaltyRepository.updateBalance(email, -clamped);
+    let txId: string;
+    try {
+      txId = await getLoyaltyRepository().applyTransaction(email, 'redeem', -clamped, orderId, 'Points redemption');
+    } catch (err) {
+      // A parallel register may have spent the points between read and write.
+      throw new Error('Insufficient loyalty points balance', { cause: err });
+    }
 
     const discountCents = clamped * config.redeemRate;
     const discountDollars = toDollars(discountCents);
@@ -182,12 +188,17 @@ export class LoyaltyService {
    */
   async reverseRedemption(transactionId: string): Promise<void> {
     try {
-      const tx = await loyaltyRepository.findTransactionById(transactionId);
+      const tx = await getLoyaltyRepository().findTransactionById(transactionId);
       if (!tx || tx.type !== 'redeem') return;
 
       const restoredPoints = Math.abs(tx.points);
-      await loyaltyRepository.appendTransaction(tx.customer_email, 'reversal', restoredPoints, tx.order_id, `Reversal of ${transactionId}`);
-      await loyaltyRepository.updateBalance(tx.customer_email, restoredPoints);
+      await getLoyaltyRepository().applyTransaction(
+        tx.customer_email,
+        'reversal',
+        restoredPoints,
+        tx.order_id,
+        `Reversal of ${transactionId}`
+      );
       this.logger.info(`Reversed redemption ${transactionId} — restored ${restoredPoints} points`);
     } catch (err) {
       this.logger.error({ message: `Failed to reverse redemption ${transactionId}` }, err instanceof Error ? err : new Error(String(err)));
@@ -198,9 +209,8 @@ export class LoyaltyService {
   // ── Manual Adjustment ─────────────────────────────────────────────────
 
   async adjustPoints(email: string, delta: number, reason: string, managerId?: string): Promise<void> {
-    await loyaltyRepository.getOrCreateAccount(email);
-    await loyaltyRepository.appendTransaction(email, 'adjustment', delta, null, reason, managerId);
-    await loyaltyRepository.updateBalance(email, delta);
+    await getLoyaltyRepository().getOrCreateAccount(email);
+    await getLoyaltyRepository().applyTransaction(email, 'adjustment', delta, null, reason, managerId);
 
     // Update tier after adjustment
     await this.updateTier(email);
@@ -215,7 +225,7 @@ export class LoyaltyService {
   // ── Transaction history ───────────────────────────────────────────────
 
   async getTransactions(email: string, limit = 50) {
-    return loyaltyRepository.findTransactionsByEmail(email, limit);
+    return getLoyaltyRepository().findTransactionsByEmail(email, limit);
   }
 
   // ── Points Expiry ─────────────────────────────────────────────────────
@@ -239,14 +249,21 @@ export class LoyaltyService {
     let customersProcessed = 0;
     let totalPointsExpired = 0;
 
+    // Multi-register: expiry runs once on the Store API — the first register
+    // to trigger it performs the pass, repeat calls find nothing to expire.
+    if (instoreApiConfig.isClient && !email) {
+      const result = await instoreApiClient.expireLoyaltyPoints(expiryThreshold, `Points expired after ${config.expiryDays} days`);
+      return { customersProcessed: result.customers_processed, pointsExpired: result.points_expired };
+    }
+
     try {
       // Get all customers with transactions older than expiry threshold
-      const customers = email ? [email] : await loyaltyRepository.findCustomersWithExpiredTransactions(expiryThreshold);
+      const customers = email ? [email] : await getLoyaltyRepository().findCustomersWithExpiredTransactions(expiryThreshold);
 
       for (const customerEmail of customers) {
         try {
           // Get expired transactions for this customer
-          const expiredTransactions = await loyaltyRepository.findExpiredEarnTransactions(customerEmail, expiryThreshold);
+          const expiredTransactions = await getLoyaltyRepository().findExpiredEarnTransactions(customerEmail, expiryThreshold);
 
           if (expiredTransactions.length === 0) continue;
 
@@ -256,13 +273,13 @@ export class LoyaltyService {
           if (pointsToExpire <= 0) continue;
 
           // Get current balance to ensure we don't expire more than available
-          const account = await loyaltyRepository.getOrCreateAccount(customerEmail);
+          const account = await getLoyaltyRepository().getOrCreateAccount(customerEmail);
           const actualPointsToExpire = Math.min(pointsToExpire, account.balance);
 
           if (actualPointsToExpire <= 0) continue;
 
           // Create expiry transaction
-          await loyaltyRepository.appendTransaction(
+          await getLoyaltyRepository().applyTransaction(
             customerEmail,
             'expire',
             -actualPointsToExpire,
@@ -270,9 +287,6 @@ export class LoyaltyService {
             `Points expired after ${config.expiryDays} days`,
             'system'
           );
-
-          // Update balance
-          await loyaltyRepository.updateBalance(customerEmail, -actualPointsToExpire);
 
           // Log the expiry
           await auditLogService.log('loyalty:expired', {
@@ -329,7 +343,7 @@ export class LoyaltyService {
     const warningThreshold = Date.now() - (config.expiryDays - warningDays) * 24 * 60 * 60 * 1000;
 
     try {
-      const expiringTransactions = await loyaltyRepository.findEarnTransactionsBetween(email, expiryThreshold, warningThreshold);
+      const expiringTransactions = await getLoyaltyRepository().findEarnTransactionsBetween(email, expiryThreshold, warningThreshold);
 
       if (expiringTransactions.length === 0) {
         return { pointsExpiring: 0, expiryDate: null };

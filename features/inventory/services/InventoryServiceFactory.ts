@@ -8,6 +8,8 @@ import { WixInventoryService } from './platforms/WixInventoryService';
 import { PrestaShopInventoryService } from './platforms/PrestaShopInventoryService';
 import { CommercefullInventoryService } from './platforms/CommercefullInventoryService';
 import { OfflineInventoryService } from './platforms/OfflineInventoryService';
+import { instoreApiInventoryService } from './platforms/InstoreApiInventoryService';
+import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
 import { CompositeInventoryService } from './platforms/CompositeInventoryService';
 import { PlatformInventoryConfig, PlatformInventoryServiceInterface } from './platforms/PlatformInventoryServiceInterface';
 import { RetryingInventoryService } from './RetryingInventoryService';
@@ -53,6 +55,11 @@ export class InventoryServiceFactory {
    * @returns An appropriate inventory service instance
    */
   public getService(platform?: ECommercePlatform | ECommercePlatform[]): InventoryServiceInterface {
+    // Multi-register client mode: the Store API owns shared stock counts.
+    if (instoreApiConfig.isClient && (!platform || platform === ECommercePlatform.OFFLINE)) {
+      return instoreApiInventoryService;
+    }
+
     // Check if we should use the mock service
     if (!platform) {
       return this.offlineDefaultService;

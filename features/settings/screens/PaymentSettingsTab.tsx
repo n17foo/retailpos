@@ -14,6 +14,7 @@ import { StripeSettingsForm } from '../components/StripeSettingsForm';
 import { SquareSettingsForm } from '../components/SquareSettingsForm';
 import { AdyenSettingsForm } from '../components/AdyenSettingsForm';
 import { TapPaymentsSettingsForm } from '../components/TapPaymentsSettingsForm';
+import { InstoreApiSettingsForm } from '../components/InstoreApiSettingsForm';
 
 type ProviderSettingKey<T extends keyof PaymentSettings> = keyof PaymentSettings[T];
 
@@ -59,7 +60,7 @@ const PaymentSettingsTab = () => {
 
   const handleSave = useCallback(async () => {
     // Validate required fields per provider
-    const { provider, stripe_nfc, stripe, square, adyen, tap_payments } = paymentSettings;
+    const { provider, stripe_nfc, stripe, square, adyen, tap_payments, instore_api } = paymentSettings;
 
     if (provider === PaymentProvider.STRIPE_NFC && !stripe_nfc.apiKey) {
       Alert.alert(t('common.error'), t('settings.payment.stripeNfcKeyRequired', { defaultValue: 'API Key is required for Stripe NFC' }));
@@ -90,6 +91,15 @@ const PaymentSettingsTab = () => {
       Alert.alert(
         t('common.error'),
         t('settings.payment.tapPaymentsKeysRequired', { defaultValue: 'API Key and Merchant ID are required for Tap Payments' })
+      );
+      return;
+    }
+    if (provider === PaymentProvider.INSTORE_API && (!instore_api.provider || !instore_api.terminalId)) {
+      Alert.alert(
+        t('common.error'),
+        t('settings.payment.instoreApiFieldsRequired', {
+          defaultValue: 'Provider and Terminal ID are required for Instore PED payments',
+        })
       );
       return;
     }
@@ -177,6 +187,11 @@ const PaymentSettingsTab = () => {
         onSettingChange={(field, value) =>
           handleProviderSettingChange('tap_payments', field as keyof PaymentSettings['tap_payments'], value)
         }
+      />
+      <InstoreApiSettingsForm
+        paymentSettings={paymentSettings}
+        isLoading={isLoading}
+        onSettingChange={(field, value) => handleProviderSettingChange('instore_api', field as keyof PaymentSettings['instore_api'], value)}
       />
 
       <View style={styles.optionRow}>

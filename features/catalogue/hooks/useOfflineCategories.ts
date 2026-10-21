@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Category } from '../services/category/CategoryServiceInterface';
 import { offlineCategoryService } from '../services/category/platforms/OfflineCategoryService';
+import { instoreApiCategoryService } from '../services/category/platforms/InstoreApiCategoryService';
+import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
 import { useLogger } from '../../../shared/hooks/useLogger';
 
 interface UseOfflineCategoriesReturn {
@@ -15,6 +17,12 @@ interface UseOfflineCategoriesReturn {
   setCategories: (categories: Category[]) => Promise<void>;
 }
 
+/**
+ * Local-catalogue category service: Store API in multi-register client mode,
+ * per-device KV otherwise. Resolved at call time.
+ */
+const getLocalCategoryService = () => (instoreApiConfig.isClient ? instoreApiCategoryService : offlineCategoryService);
+
 export const useOfflineCategories = (): UseOfflineCategoriesReturn => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +33,7 @@ export const useOfflineCategories = (): UseOfflineCategoriesReturn => {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await offlineCategoryService.getCategories();
+      const result = await getLocalCategoryService().getCategories();
       setCategories(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load categories');
@@ -40,7 +48,7 @@ export const useOfflineCategories = (): UseOfflineCategoriesReturn => {
       setIsLoading(true);
       setError(null);
       try {
-        const newCategory = await offlineCategoryService.addCategory(categoryData);
+        const newCategory = await getLocalCategoryService().addCategory(categoryData);
         await loadCategories();
         return newCategory;
       } catch (err) {
@@ -59,7 +67,7 @@ export const useOfflineCategories = (): UseOfflineCategoriesReturn => {
       setIsLoading(true);
       setError(null);
       try {
-        const updated = await offlineCategoryService.updateCategory(id, data);
+        const updated = await getLocalCategoryService().updateCategory(id, data);
         await loadCategories();
         return updated;
       } catch (err) {
@@ -78,7 +86,7 @@ export const useOfflineCategories = (): UseOfflineCategoriesReturn => {
       setIsLoading(true);
       setError(null);
       try {
-        await offlineCategoryService.deleteCategory(id);
+        await getLocalCategoryService().deleteCategory(id);
         await loadCategories();
         return true;
       } catch (err) {
@@ -94,7 +102,7 @@ export const useOfflineCategories = (): UseOfflineCategoriesReturn => {
   const clearAllCategories = useCallback(async (): Promise<void> => {
     setIsLoading(true);
     try {
-      await offlineCategoryService.clearLocalCategories();
+      await getLocalCategoryService().clearLocalCategories();
       setCategories([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to clear categories');
@@ -107,7 +115,7 @@ export const useOfflineCategories = (): UseOfflineCategoriesReturn => {
     async (newCategories: Category[]): Promise<void> => {
       setIsLoading(true);
       try {
-        await offlineCategoryService.setCategories(newCategories);
+        await getLocalCategoryService().setCategories(newCategories);
         await loadCategories();
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to set categories');

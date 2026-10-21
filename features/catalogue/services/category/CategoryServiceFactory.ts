@@ -6,6 +6,8 @@ import { BigCommerceCategoryService } from './platforms/BigCommerceCategoryServi
 import { CompositeCategoryService } from './platforms/CompositeCategoryService';
 import { PlatformCategoryConfig, PlatformCategoryServiceInterface } from './platforms/PlatformCategoryServiceInterface';
 import { OfflineCategoryService, offlineCategoryService } from './platforms/OfflineCategoryService';
+import { instoreApiCategoryService } from './platforms/InstoreApiCategoryService';
+import { instoreApiConfig } from '../../../multi-register/services/InstoreApiConfig';
 import { PrestaShopCategoryService } from './platforms/PrestaShopCategoryService';
 import { MagentoCategoryService } from './platforms/MagentoCategoryService';
 import { SyliusCategoryService } from './platforms/SyliusCategoryService';
@@ -52,6 +54,11 @@ export class CategoryServiceFactory {
    * @returns An appropriate category service instance
    */
   public getService(platform?: ECommercePlatform | ECommercePlatform[]): CategoryServiceInterface {
+    // Multi-register client mode: the Store API owns the local catalogue.
+    if (instoreApiConfig.isClient && (!platform || platform === ECommercePlatform.OFFLINE)) {
+      return instoreApiCategoryService;
+    }
+
     // Check if we should use the mock service
     if (!platform) {
       return this.offlineDefaultService;

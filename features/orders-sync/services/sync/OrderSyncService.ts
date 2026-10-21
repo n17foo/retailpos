@@ -11,6 +11,7 @@ import { MAX_SYNC_RETRIES } from '../../../platform-clients/services/config/POSC
 import { ECommercePlatform, isOnlinePlatform } from '../../../../shared/utils/platforms';
 import { toPlatformProductId, toPlatformVariantId } from '../../../../shared/utils/platformIds';
 import { kdsServiceFactory } from '../../../hardware/services/kds/KdsServiceFactory';
+import { instoreApiConfig } from '../../../multi-register/services/InstoreApiConfig';
 
 /**
  * Handles syncing paid orders to e-commerce platforms.
@@ -210,6 +211,12 @@ export class OrderSyncService implements OrderSyncServiceInterface {
   }
 
   private dispatchKdsTicket(order: { id: string; items: BasketItem[] }): void {
+    // Multi-register: the Store API owns KDS routing — it creates tickets
+    // when the order reaches paid and pushes them to KDS devices via the
+    // outbox. Dispatching here too would double-fire the kitchen.
+    if (instoreApiConfig.isClient) {
+      return;
+    }
     kdsServiceFactory
       .getService()
       .sendOrder({

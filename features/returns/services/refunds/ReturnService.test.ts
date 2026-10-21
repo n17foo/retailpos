@@ -28,12 +28,20 @@ jest.mock('../../../../shared/services/notifications/NotificationService', () =>
   notificationService: { notify: jest.fn() },
 }));
 
-// Block expo-sqlite from loading — ReturnRepository is injected via setReturnRepository()
+// Block expo-sqlite from loading — repositories are resolved via the mode-aware factories
 jest.mock('../../../../shared/utils/db', () => ({}));
-jest.mock('../../repositories/ReturnRepository', () => ({
-  returnRepository: {},
-  getReturnRepository: jest.fn(),
-}));
+jest.mock('../../repositories/ReturnRepository', () => {
+  const repo = {
+    create: jest.fn(),
+    findById: jest.fn(),
+    findByOrderId: jest.fn().mockResolvedValue([]),
+    findAll: jest.fn().mockResolvedValue([]),
+    findByDateRange: jest.fn().mockResolvedValue([]),
+    updateStatus: jest.fn().mockResolvedValue(undefined),
+    delete: jest.fn().mockResolvedValue(undefined),
+  };
+  return { returnRepository: repo, getReturnRepository: () => repo };
+});
 jest.mock('../../../orders-sync/repositories/OrderRepository', () => {
   const repo = { findById: jest.fn() };
   return { orderRepository: repo, getOrderRepository: () => repo };
@@ -69,18 +77,10 @@ jest.mock('./platforms/OfflineRefundService', () => ({
 }));
 
 import { ReturnService, ProcessReturnInput } from './RefundService';
-import { ReturnRepository } from '../../repositories/ReturnRepository';
+import { returnRepository } from '../../repositories/ReturnRepository';
 import { orderRepository } from '../../../orders-sync/repositories/OrderRepository';
 
-const mockReturnRepo: jest.Mocked<ReturnRepository> = {
-  create: jest.fn().mockResolvedValue('return-id-1'),
-  findById: jest.fn(),
-  findByOrderId: jest.fn().mockResolvedValue([]),
-  findAll: jest.fn().mockResolvedValue([]),
-  findByDateRange: jest.fn().mockResolvedValue([]),
-  updateStatus: jest.fn().mockResolvedValue(undefined),
-  delete: jest.fn().mockResolvedValue(undefined),
-};
+const mockReturnRepo = returnRepository as jest.Mocked<typeof returnRepository>;
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -114,7 +114,6 @@ function getService(): ReturnService {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (ReturnService as any).instance = undefined;
   const service = ReturnService.getInstance();
-  service.setReturnRepository(mockReturnRepo);
   return service;
 }
 

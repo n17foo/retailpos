@@ -1,5 +1,7 @@
 import { DiscountServiceInterface } from './DiscountServiceInterface';
 import { LocalDiscountService } from './LocalDiscountService';
+import { InstoreApiDiscountService } from './InstoreApiDiscountService';
+import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
 import { ShopifyDiscountService } from './platforms/ShopifyDiscountService';
 import { ECommercePlatform } from '../../../shared/utils/platforms';
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
@@ -14,10 +16,12 @@ export class DiscountServiceFactory {
   // Cache for platform-specific services
   private serviceInstances: Record<string, DiscountServiceInterface> = {};
   private localService: LocalDiscountService;
+  private instoreApiService: InstoreApiDiscountService;
 
   private constructor() {
     // Initialize local service as default
     this.localService = new LocalDiscountService();
+    this.instoreApiService = new InstoreApiDiscountService();
     this.localService.initialize().catch(err => {
       this.logger.error({ message: 'Failed to initialize local discount service' }, err instanceof Error ? err : new Error(String(err)));
     });
@@ -36,9 +40,9 @@ export class DiscountServiceFactory {
    * @returns An appropriate discount service instance
    */
   public getService(platform?: ECommercePlatform): DiscountServiceInterface {
-    // If no platform specified or offline, use local service
+    // If no platform specified or offline, use the shared local-mode service
     if (!platform || platform === ECommercePlatform.OFFLINE) {
-      return this.localService;
+      return this.getLocalService();
     }
 
     // Return cached instance if available
@@ -74,7 +78,7 @@ export class DiscountServiceFactory {
         this.logger.info({
           message: `Platform ${platform} uses local discount service (no platform API available)`,
         });
-        return this.localService;
+        return this.getLocalService();
     }
   }
 
@@ -93,10 +97,10 @@ export class DiscountServiceFactory {
   }
 
   /**
-   * Get the local discount service (for admin/manager discount management)
-   * @returns The local discount service
+   * Get the local-mode discount service — the Store API ledger in
+   * multi-register client mode, per-device SQLite otherwise.
    */
-  public getLocalService(): LocalDiscountService {
-    return this.localService;
+  public getLocalService(): DiscountServiceInterface {
+    return instoreApiConfig.isClient ? this.instoreApiService : this.localService;
   }
 }

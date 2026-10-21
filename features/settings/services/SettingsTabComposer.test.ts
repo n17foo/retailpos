@@ -3,7 +3,7 @@ jest.mock('../../../shared/services/logger/LoggerFactory', () => ({
     getInstance: () => ({ createLogger: () => ({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }) }),
   },
 }));
-jest.mock('../../authentication/repositories/UserRepository', () => ({ userRepository: {} }));
+jest.mock('../../authentication/repositories/UserRepository', () => ({ userRepository: {}, getUserRepository: () => ({}) }));
 jest.mock('../../authentication/repositories/PermissionRepository', () => ({ permissionRepository: {} }));
 
 import { composeSettingsTabs } from './SettingsTabComposer';

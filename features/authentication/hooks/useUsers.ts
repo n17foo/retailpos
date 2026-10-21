@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { userRepository, User, UserRole, CreateUserInput } from '../repositories/UserRepository';
+import { getUserRepository, User, UserRole, CreateUserInput } from '../repositories/UserRepository';
 import { useLogger } from '../../../shared/hooks/useLogger';
 import { validatePinFormat } from '../utils/userPin.utils';
 import { useAuthContext } from '../contexts/AuthProvider';
@@ -39,7 +39,7 @@ export const useUsers = (): UseUsersReturn => {
     async (action: UserManagementAction): Promise<void> => {
       if (actor?.id) {
         if (await permissionService.can(actor.id, action)) return;
-      } else if (action === 'user:create' && !(await userRepository.hasAdminUser())) {
+      } else if (action === 'user:create' && !(await getUserRepository().hasAdminUser())) {
         return;
       }
       throw new Error('You do not have permission to manage users');
@@ -51,7 +51,7 @@ export const useUsers = (): UseUsersReturn => {
     setIsLoading(true);
     setError(null);
     try {
-      const allUsers = await userRepository.findAll();
+      const allUsers = await getUserRepository().findAll();
       setUsers(allUsers);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load users');
@@ -72,12 +72,12 @@ export const useUsers = (): UseUsersReturn => {
         }
 
         // Check PIN uniqueness
-        const isUnique = await userRepository.isPinUnique(input.pin);
+        const isUnique = await getUserRepository().isPinUnique(input.pin);
         if (!isUnique) {
           throw new Error('PIN is already in use by another user');
         }
 
-        const id = await userRepository.create(input);
+        const id = await getUserRepository().create(input);
         await loadUsers(); // Refresh the list
         return id;
       } catch (err) {
@@ -97,7 +97,7 @@ export const useUsers = (): UseUsersReturn => {
       setError(null);
       try {
         await authorize('user:edit');
-        await userRepository.update(id, data);
+        await getUserRepository().update(id, data);
         permissionService.invalidateCache(id);
         await loadUsers();
       } catch (err) {
@@ -124,12 +124,12 @@ export const useUsers = (): UseUsersReturn => {
         }
 
         // Check uniqueness
-        const isUnique = await userRepository.isPinUnique(newPin, id);
+        const isUnique = await getUserRepository().isPinUnique(newPin, id);
         if (!isUnique) {
           throw new Error('PIN is already in use by another user');
         }
 
-        await userRepository.updatePin(id, newPin);
+        await getUserRepository().updatePin(id, newPin);
         await loadUsers();
         return true;
       } catch (err) {
@@ -148,7 +148,7 @@ export const useUsers = (): UseUsersReturn => {
       setError(null);
       try {
         await authorize('user:delete');
-        await userRepository.delete(id);
+        await getUserRepository().delete(id);
         permissionService.invalidateCache(id);
         await loadUsers();
       } catch (err) {
@@ -167,7 +167,7 @@ export const useUsers = (): UseUsersReturn => {
       setError(null);
       try {
         await authorize('user:edit');
-        await userRepository.deactivate(id);
+        await getUserRepository().deactivate(id);
         permissionService.invalidateCache(id);
         await loadUsers();
       } catch (err) {
@@ -186,7 +186,7 @@ export const useUsers = (): UseUsersReturn => {
       setError(null);
       try {
         await authorize('user:edit');
-        await userRepository.activate(id);
+        await getUserRepository().activate(id);
         permissionService.invalidateCache(id);
         await loadUsers();
       } catch (err) {
@@ -202,7 +202,7 @@ export const useUsers = (): UseUsersReturn => {
   const validatePin = useCallback(
     async (pin: string): Promise<User | null> => {
       try {
-        return await userRepository.findByPin(pin);
+        return await getUserRepository().findByPin(pin);
       } catch (err) {
         logger.error({ message: 'Error validating PIN' }, err instanceof Error ? err : new Error(String(err)));
         return null;
@@ -214,7 +214,7 @@ export const useUsers = (): UseUsersReturn => {
   const isPinUnique = useCallback(
     async (pin: string, excludeUserId?: string): Promise<boolean> => {
       try {
-        return await userRepository.isPinUnique(pin, excludeUserId);
+        return await getUserRepository().isPinUnique(pin, excludeUserId);
       } catch (err) {
         logger.error({ message: 'Error checking PIN uniqueness' }, err instanceof Error ? err : new Error(String(err)));
         return false;
@@ -225,7 +225,7 @@ export const useUsers = (): UseUsersReturn => {
 
   const hasAdminUser = useCallback(async (): Promise<boolean> => {
     try {
-      return await userRepository.hasAdminUser();
+      return await getUserRepository().hasAdminUser();
     } catch (err) {
       logger.error({ message: 'Error checking for admin user' }, err instanceof Error ? err : new Error(String(err)));
       return false;

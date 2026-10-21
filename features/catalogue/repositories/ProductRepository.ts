@@ -15,6 +15,8 @@ export interface Product {
   stock: number;
   created_at: number;
   updated_at: number;
+  /** Full POS product document (variants/images/options) — opaque to the server */
+  data_json?: string | null;
 }
 
 export class ProductRepository {

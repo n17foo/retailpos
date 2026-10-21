@@ -13,7 +13,7 @@
  */
 
 import type { UserRole } from '../../repositories/UserRepository';
-import { userRepository } from '../../repositories/UserRepository';
+import { getUserRepository } from '../../repositories/UserRepository';
 import { permissionRepository } from '../../repositories/PermissionRepository';
 import { ACTION_MAP, ROLE_RANK } from '../../../../shared/utils/actionRegistry';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
@@ -95,7 +95,7 @@ export class PermissionService {
 
   private async resolve(userId: string, action: string): Promise<boolean> {
     // 1. Load user role
-    const user = await userRepository.findById(userId);
+    const user = await getUserRepository().findById(userId);
     // Deactivated staff retain no privileges, including admins.
     if (!user || !user.is_active) return false;
 

@@ -23,6 +23,7 @@
  */
 
 import { instoreApiConfig } from '../InstoreApiConfig';
+import { SIGNATURE_HEADERS, signRequest } from '../requestSigning';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
 import type {
   PaymentIntent,
@@ -186,14 +187,17 @@ export class PaymentIntentClient {
 
   // ── Private HTTP helpers ────────────────────────────────────────────────────
 
-  private get headers(): Record<string, string> {
-    const h: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'X-Register-Id': instoreApiConfig.current.registerId,
-    };
+  // HMAC-signed headers — the shared secret is never transmitted.
+  // `pathWithQuery` must match exactly what the server receives.
+  private buildHeaders(method: string, pathWithQuery: string, rawBody: string): Record<string, string> {
+    const h: Record<string, string> = { 'Content-Type': 'application/json' };
     const secret = instoreApiConfig.current.sharedSecret;
     if (secret) {
-      h['x-shared-secret'] = secret;
+      const { timestamp, nonce, signature } = signRequest(secret, method, pathWithQuery, rawBody);
+      h[SIGNATURE_HEADERS.register] = instoreApiConfig.current.registerId;
+      h[SIGNATURE_HEADERS.timestamp] = timestamp;
+      h[SIGNATURE_HEADERS.nonce] = nonce;
+      h[SIGNATURE_HEADERS.signature] = signature;
     }
     return h;
   }
@@ -203,15 +207,15 @@ export class PaymentIntentClient {
   }
 
   private async get<T>(path: string, queryParams?: Record<string, string>): Promise<T> {
-    let url = `${this.baseUrl}${path}`;
+    let pathWithQuery = path;
     if (queryParams) {
       const qs = new URLSearchParams(queryParams).toString();
-      url += `?${qs}`;
+      pathWithQuery += `?${qs}`;
     }
 
-    const response = await fetch(url, {
+    const response = await fetch(`${this.baseUrl}${pathWithQuery}`, {
       method: 'GET',
-      headers: this.headers,
+      headers: this.buildHeaders('GET', pathWithQuery, ''),
     });
 
     if (!response.ok) {
@@ -224,10 +228,11 @@ export class PaymentIntentClient {
   }
 
   private async post<T>(path: string, body: unknown): Promise<T> {
+    const rawBody = JSON.stringify(body);
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: 'POST',
-      headers: this.headers,
-      body: JSON.stringify(body),
+      headers: this.buildHeaders('POST', path, rawBody),
+      body: rawBody,
     });
 
     if (!response.ok) {

@@ -10,6 +10,8 @@
 
 import { db } from '../../../shared/utils/db';
 import { generateUUID } from '../../../shared/utils/uuid';
+import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
+import { instoreApiStoreCreditRepository, StoreCreditLedger } from './InstoreApiStoreCreditRepository';
 
 export type StoreCreditEntryType = 'issue' | 'redeem' | 'expire' | 'reversal';
 
@@ -65,3 +67,12 @@ export class StoreCreditRepository {
 }
 
 export const storeCreditRepository = new StoreCreditRepository();
+
+/**
+ * Returns the authoritative store-credit ledger for the current register
+ * mode: Store API in client mode, local SQLite otherwise. Resolved at call
+ * time — instoreApiConfig finishes loading async.
+ */
+export const getStoreCreditRepository = (): StoreCreditLedger => {
+  return instoreApiConfig.isClient ? instoreApiStoreCreditRepository : storeCreditRepository;
+};

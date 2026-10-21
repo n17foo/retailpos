@@ -3,12 +3,15 @@ import { PaymentRequest, PaymentResponse } from '../services/PaymentServiceInter
 import { PaymentProvider } from '../services/PaymentServiceFactory';
 import paymentService from '../services/PaymentService';
 import { isElectron, isMobile } from '../../../shared/utils/electron';
+import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
 
-/** The two payment modes the checkout UI needs to know about. */
+/** The payment modes the checkout UI needs to know about. */
 export type PaymentMode =
   /** A tap-to-pay SDK provider is active and the device supports it. */
   | 'tap_to_pay'
-  /** No SDK provider available on this device — cash only. */
+  /** Store-api PED terminal (LAN payment device) in multi-register mode. */
+  | 'instore_ped'
+  /** No card payment available on this device — cash only. */
   | 'cash_only';
 
 /** Tap-to-pay providers that have a React Native SDK. */
@@ -51,6 +54,11 @@ export const usePayment = () => {
    * - Anything else: `cash_only`.
    */
   const getPaymentMode = useCallback((): PaymentMode => {
+    // Store-api PED works on any platform — the terminal lives on the LAN and
+    // the server drives it, so no local SDK is needed.
+    if (paymentService.getCurrentProvider() === PaymentProvider.INSTORE_API) {
+      return instoreApiConfig.isClient ? 'instore_ped' : 'cash_only';
+    }
     // Desktop has no tap-to-pay SDK support.
     if (isElectron()) return 'cash_only';
     // Web (non-Electron) also has no SDK support.

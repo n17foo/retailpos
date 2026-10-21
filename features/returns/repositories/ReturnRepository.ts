@@ -18,6 +18,8 @@ export interface ReturnRow {
   processed_at: number | null;
   created_at: number;
   updated_at: number;
+  /** Links a return line to the exchange order that replaced it */
+  exchange_order_id?: string | null;
 }
 
 export interface CreateReturnInput {
@@ -45,6 +47,8 @@ export interface ReturnRepository {
   findByDateRange(from: number, to: number): Promise<ReturnRow[]>;
   updateStatus(id: string, status: string, processedBy?: string): Promise<void>;
   delete(id: string): Promise<void>;
+  /** Link a return line to the exchange order that replaced it (ExchangeService uses when present) */
+  linkToExchange?(returnId: string, exchangeOrderId: string): Promise<void>;
 }
 
 /** Singleton offline instance for direct use in standalone/server mode */

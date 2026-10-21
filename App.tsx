@@ -31,6 +31,9 @@ import { NotificationProvider, useNotifications } from './shared/contexts/Notifi
 import Toast from './shared/components/Toast';
 import { ManagerApprovalModal } from './features/authentication/components/ManagerApprovalModal';
 import { StripeTerminalBridgeProvider } from './features/payments/contexts/StripeTerminalBridge';
+import { PaymentSettingsStorage } from './features/platform-clients/services/config/PaymentSettingsStorage';
+import paymentService from './features/payments/services/PaymentService';
+import type { PaymentSettings } from './features/payments/hooks/usePaymentSettings';
 
 const AppContent = () => {
   const { changeLanguage } = useTranslate();
@@ -137,6 +140,13 @@ const AppContent = () => {
             );
           });
         }
+
+        // Restore the saved payment provider (incl. store-api PED config).
+        PaymentSettingsStorage.load<PaymentSettings>()
+          .then(saved => (saved ? paymentService.applySettings(saved) : undefined))
+          .catch(err => {
+            loggerRef.current.error({ message: 'Failed to restore payment settings' }, err instanceof Error ? err : new Error(String(err)));
+          });
       })
       .catch(err => {
         loggerRef.current.error({ message: 'Failed to load local API config' }, err instanceof Error ? err : new Error(String(err)));

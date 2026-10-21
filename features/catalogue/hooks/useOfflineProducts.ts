@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Product } from '../services/product/ProductServiceInterface';
 import { offlineProductService } from '../services/product/platforms/OfflineProductService';
+import { instoreApiProductService } from '../services/product/platforms/InstoreApiProductService';
+import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
 import { useLogger } from '../../../shared/hooks/useLogger';
 
 interface UseOfflineProductsReturn {
@@ -15,6 +17,12 @@ interface UseOfflineProductsReturn {
   clearAllProducts: () => Promise<void>;
 }
 
+/**
+ * Local-catalogue product service: Store API in multi-register client mode,
+ * per-device KV otherwise. Resolved at call time so mode load order doesn't matter.
+ */
+const getLocalProductService = () => (instoreApiConfig.isClient ? instoreApiProductService : offlineProductService);
+
 export const useOfflineProducts = (): UseOfflineProductsReturn => {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +33,7 @@ export const useOfflineProducts = (): UseOfflineProductsReturn => {
     setIsLoading(true);
     setError(null);
     try {
-      const result = await offlineProductService.getProducts({ limit: 1000 });
+      const result = await getLocalProductService().getProducts({ limit: 1000 });
       setProducts(result.products);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load products');
@@ -40,7 +48,7 @@ export const useOfflineProducts = (): UseOfflineProductsReturn => {
       setIsLoading(true);
       setError(null);
       try {
-        const newProduct = await offlineProductService.createProduct(productData as Product);
+        const newProduct = await getLocalProductService().createProduct(productData as Product);
         await loadProducts();
         return newProduct;
       } catch (err) {
@@ -59,7 +67,7 @@ export const useOfflineProducts = (): UseOfflineProductsReturn => {
       setIsLoading(true);
       setError(null);
       try {
-        const updated = await offlineProductService.updateProduct(id, data);
+        const updated = await getLocalProductService().updateProduct(id, data);
         await loadProducts();
         return updated;
       } catch (err) {
@@ -78,7 +86,7 @@ export const useOfflineProducts = (): UseOfflineProductsReturn => {
       setIsLoading(true);
       setError(null);
       try {
-        await offlineProductService.deleteProduct(id);
+        await getLocalProductService().deleteProduct(id);
         await loadProducts();
         return true;
       } catch (err) {
@@ -94,7 +102,7 @@ export const useOfflineProducts = (): UseOfflineProductsReturn => {
   const getProductById = useCallback(
     async (id: string): Promise<Product | null> => {
       try {
-        return await offlineProductService.getProductById(id);
+        return await getLocalProductService().getProductById(id);
       } catch (err) {
         logger.error({ message: 'Error getting product' }, err instanceof Error ? err : new Error(String(err)));
         return null;
@@ -106,7 +114,7 @@ export const useOfflineProducts = (): UseOfflineProductsReturn => {
   const clearAllProducts = useCallback(async (): Promise<void> => {
     setIsLoading(true);
     try {
-      await offlineProductService.clearLocalProducts();
+      await getLocalProductService().clearLocalProducts();
       setProducts([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to clear products');

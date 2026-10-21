@@ -12,7 +12,7 @@ export { AuthConfigService, authConfig } from './services/auth/AuthConfigService
 export type { AuthMethodType, AuthResult, AuthMethodProvider } from './services/auth/AuthMethodInterface';
 export { PermissionService, permissionService } from './services/permissions/PermissionService';
 export { ManagerApprovalService, managerApprovalService } from './services/permissions/ManagerApprovalService';
-export { UserRepository, userRepository } from './repositories/UserRepository';
+export { UserRepository, userRepository, getUserRepository } from './repositories/UserRepository';
 export type { User, UserRole } from './repositories/UserRepository';
 export { PermissionRepository, permissionRepository } from './repositories/PermissionRepository';
 export { validatePinFormat } from './utils/userPin.utils';

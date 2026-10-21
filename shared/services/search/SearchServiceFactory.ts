@@ -8,6 +8,8 @@ import { WixSearchService } from './platforms/WixSearchService';
 import { SyliusSearchService } from './platforms/SyliusSearchService';
 import { MagentoSearchService } from './platforms/MagentoSearchService';
 import { OfflineSearchService } from './platforms/OfflineSearchService';
+import { instoreApiSearchService } from './platforms/InstoreApiSearchService';
+import { instoreApiConfig } from '../../../features/multi-register/services/InstoreApiConfig';
 import { CommercefullSearchService } from './platforms/CommercefullSearchService';
 
 /**
@@ -105,9 +107,12 @@ export class SearchServiceFactory {
       platformServices.push(new CommercefullSearchService(commercefullConfig));
     }
 
-    // Create Offline service if config is provided
+    // Create Offline service if config is provided — in multi-register client
+    // mode the Store API catalogue is searched instead of a per-device copy.
     if (platformConfigs.offline) {
-      platformServices.push(new OfflineSearchService() as unknown as PlatformSearchServiceInterface);
+      platformServices.push(
+        (instoreApiConfig.isClient ? instoreApiSearchService : new OfflineSearchService()) as unknown as PlatformSearchServiceInterface
+      );
     }
 
     // Create a new composite service with configured platforms

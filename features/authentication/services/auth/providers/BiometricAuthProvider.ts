@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { userRepository } from '../../../repositories/UserRepository';
+import { getUserRepository } from '../../../repositories/UserRepository';
 import { keyValueRepository } from '../../../../../shared/repositories/KeyValueRepository';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
 
@@ -79,7 +79,7 @@ export class BiometricAuthProvider implements AuthMethodProvider {
         return { success: false, error: 'No user is enrolled for biometric login. Please set up in Settings.' };
       }
 
-      const user = await userRepository.findById(userId);
+      const user = await getUserRepository().findById(userId);
       if (!user || !user.is_active) {
         return { success: false, error: 'Enrolled user not found or inactive.' };
       }

@@ -177,11 +177,8 @@ export class ExchangeService {
         try {
           const repo = getReturnRepository();
           for (const returnId of returnResult.returnIds) {
-            // linkToExchange is available on OfflineReturnRepository
-            await (repo as unknown as { linkToExchange?: (id: string, orderId: string) => Promise<void> }).linkToExchange?.(
-              returnId,
-              newOrderId
-            );
+            // Optional — implemented by both Offline and InstoreApi repositories
+            await repo.linkToExchange?.(returnId, newOrderId);
           }
         } catch (linkError) {
           this.logger.warn({

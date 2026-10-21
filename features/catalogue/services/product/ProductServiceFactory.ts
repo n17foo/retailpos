@@ -9,6 +9,8 @@ import { PrestaShopProductService } from './platforms/PrestaShopProductService';
 import { CommercefullProductService } from './platforms/CommercefullProductService';
 import { CompositeProductService } from './platforms/CompositeProductService';
 import { OfflineProductService } from './platforms/OfflineProductService';
+import { instoreApiProductService } from './platforms/InstoreApiProductService';
+import { instoreApiConfig } from '../../../multi-register/services/InstoreApiConfig';
 import { PlatformProductConfig, PlatformProductServiceInterface } from './platforms/PlatformProductServiceInterface';
 import { ECommercePlatform } from '../../../../shared/utils/platforms';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
@@ -50,6 +52,13 @@ export class ProductServiceFactory {
    * @returns A product service for the specified platform
    */
   public getService(platform?: ECommercePlatform, config?: PlatformProductConfig): ProductServiceInterface {
+    // Multi-register client mode: the Store API owns the local catalogue.
+    // Only the OFFLINE/absent platform routes here — a real e-commerce
+    // platform stays authoritative (all registers read the same platform).
+    if (instoreApiConfig.isClient && (!platform || platform === ECommercePlatform.OFFLINE)) {
+      return instoreApiProductService;
+    }
+
     // Determine if we should use the mock service
     if (!platform) {
       return this.offlineDefaultService;

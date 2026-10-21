@@ -143,7 +143,7 @@ export const SplitTenderStep: React.FC<SplitTenderStepProps> = ({
               <View style={styles.splitAddSection}>
                 <Text style={styles.sectionTitle}>Add Payment</Text>
                 <View style={styles.splitMethodRow}>
-                  {(['cash', ...(paymentMode === 'tap_to_pay' ? ['terminal'] : [])] as PaymentMethod[]).map(m => (
+                  {(['cash', ...(paymentMode !== 'cash_only' ? ['terminal'] : [])] as PaymentMethod[]).map(m => (
                     <Pressable
                       key={m}
                       style={state => [

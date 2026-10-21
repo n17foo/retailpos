@@ -29,7 +29,10 @@ import { setupProgressService } from '../services/SetupProgressService';
 import { platformCapabilityService } from '../../platform-clients/services/platform/PlatformCapabilityService';
 import { posConfig } from '../../platform-clients/services/config/POSConfigService';
 import { offlineCategoryService } from '../../catalogue/services/category/platforms/OfflineCategoryService';
+import { instoreApiCategoryService } from '../../catalogue/services/category/platforms/InstoreApiCategoryService';
 import { offlineProductService } from '../../catalogue/services/product/platforms/OfflineProductService';
+import { instoreApiProductService } from '../../catalogue/services/product/platforms/InstoreApiProductService';
+import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
 import { getCurrencySymbol } from '../../../shared/utils/currency';
 import { useLogger } from '../../../shared/hooks/useLogger';
 
@@ -93,6 +96,9 @@ const getDeferredFeatures = (_platform: string): string[] => {
 
   return deferred;
 };
+
+const getLocalCategoryService = () => (instoreApiConfig.isClient ? instoreApiCategoryService : offlineCategoryService);
+const getLocalProductService = () => (instoreApiConfig.isClient ? instoreApiProductService : offlineProductService);
 
 const OnboardingScreen: React.FC = () => {
   const { t } = useTranslate();
@@ -171,9 +177,9 @@ const OnboardingScreen: React.FC = () => {
     // name via productType (see utils/categoryFilter.ts).
     for (const category of config.categories) {
       try {
-        await offlineCategoryService.addCategory({ name: category.name });
+        await getLocalCategoryService().addCategory({ name: category.name });
         for (const product of category.products) {
-          await offlineProductService.createProduct({
+          await getLocalProductService().createProduct({
             id: '',
             title: product.name,
             productType: category.name,

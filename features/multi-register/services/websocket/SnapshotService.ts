@@ -60,7 +60,13 @@ export class SnapshotService {
           `${snapshot.categories?.length ?? 0} categories`
       );
 
-      // Emit events so the UI and services react to the full data refresh
+      // The catalogue and order stores are server-authoritative in client
+      // mode — "applying" a snapshot means telling every consumer its view is
+      // stale so it refetches. Emit on the event types the existing hooks and
+      // services already subscribe to, then a summary marker for anything else.
+      syncEventBus.emit('order:updated', { snapshotApplied: true, count: snapshot.orders?.length ?? 0 });
+      syncEventBus.emit('product:updated', { snapshotApplied: true, count: snapshot.products?.length ?? 0 });
+      syncEventBus.emit('inventory:updated', { snapshotApplied: true });
       syncEventBus.emit('config:updated', {
         entity: 'snapshot',
         action: 'applied',

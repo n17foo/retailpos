@@ -14,6 +14,18 @@ export interface InstoreApiHealthResponse {
   registerName?: string;
 }
 
+/** Server user record — /api/users responses (pin hash never returned) */
+export interface InstoreApiUser {
+  id: string;
+  name: string;
+  email: string | null;
+  role: string;
+  platform_user_id: string | null;
+  is_active: boolean;
+  created_at: number;
+  updated_at: number;
+}
+
 export interface InstoreApiSyncEventsResponse<TEvent> {
   events: TEvent[];
 }
@@ -160,8 +172,11 @@ export class InstoreApiClient {
 
   // ── Products ──────────────────────────────────────────────────────
 
-  async getProducts(): Promise<Product[]> {
-    const result = await this.get<{ products: Product[] }>('/api/products');
+  async getProducts(filters?: { barcode?: string; search?: string }): Promise<Product[]> {
+    const params: Record<string, string> = {};
+    if (filters?.barcode) params.barcode = filters.barcode;
+    if (filters?.search) params.search = filters.search;
+    const result = await this.get<{ products: Product[] }>('/api/products', Object.keys(params).length ? params : undefined);
     return result.products;
   }
 
@@ -183,8 +198,14 @@ export class InstoreApiClient {
 
   // ── Returns ───────────────────────────────────────────────────────
 
-  async getReturns(status?: string): Promise<ReturnRow[]> {
-    const result = await this.get<{ returns: ReturnRow[] }>('/api/returns', status ? { status } : undefined);
+  async getReturns(status?: string, range?: { from: number; to: number }): Promise<ReturnRow[]> {
+    const params: Record<string, string> = {};
+    if (status) params.status = status;
+    if (range) {
+      params.from = String(range.from);
+      params.to = String(range.to);
+    }
+    const result = await this.get<{ returns: ReturnRow[] }>('/api/returns', Object.keys(params).length ? params : undefined);
     return result.returns;
   }
 
@@ -215,6 +236,100 @@ export class InstoreApiClient {
   }
 
   // ── Orders (write) ────────────────────────────────────────────────
+
+  // ── Ledgers (loyalty / store credit / discounts) ────────────────
+
+  async getLoyaltyAccount(email: string): Promise<unknown | null> {
+    const result = await this.get<{ account: unknown | null }>('/api/loyalty/accounts', { email });
+    return result.account;
+  }
+
+  async setLoyaltyTier(email: string, tier: string | null): Promise<unknown> {
+    const result = await this.post<{ account: unknown }>('/api/loyalty/accounts', { customer_email: email, tier });
+    return result.account;
+  }
+
+  async appendLoyaltyTransaction(input: {
+    customer_email: string;
+    type: string;
+    points: number;
+    order_id?: string | null;
+    reason?: string | null;
+    created_by?: string | null;
+  }): Promise<{ transaction: unknown; account: unknown }> {
+    return this.post('/api/loyalty/transactions', input);
+  }
+
+  async getLoyaltyTransactions(
+    email: string,
+    options?: { limit?: number; type?: string; before?: number; after?: number }
+  ): Promise<unknown[]> {
+    const params: Record<string, string> = { email };
+    if (options?.limit) params.limit = String(options.limit);
+    if (options?.type) params.type = options.type;
+    if (options?.before) params.before = String(options.before);
+    if (options?.after) params.after = String(options.after);
+    const result = await this.get<{ transactions: unknown[] }>('/api/loyalty/transactions', params);
+    return result.transactions;
+  }
+
+  async getLoyaltyTransaction(id: string): Promise<unknown | null> {
+    const result = await this.get<{ transaction: unknown | null }>('/api/loyalty/transactions', { id });
+    return result.transaction;
+  }
+
+  /** Server-side loyalty expiry — runs once store-wide regardless of caller. */
+  async expireLoyaltyPoints(beforeMs: number, reason: string): Promise<{ customers_processed: number; points_expired: number }> {
+    return this.post('/api/loyalty/expire', { before_ms: beforeMs, reason });
+  }
+
+  async getStoreCredit(email: string, limit?: number): Promise<{ balance_cents: number; entries: unknown[] }> {
+    const params: Record<string, string> = { email };
+    if (limit) params.limit = String(limit);
+    return this.get('/api/store-credit', params);
+  }
+
+  async getStoreCreditEntry(id: string): Promise<unknown | null> {
+    const result = await this.get<{ entry: unknown | null }>('/api/store-credit', { id });
+    return result.entry;
+  }
+
+  async appendStoreCreditEntry(input: {
+    customer_email: string;
+    type: string;
+    amount_cents: number;
+    order_id?: string | null;
+    reason?: string | null;
+    created_by?: string | null;
+  }): Promise<unknown> {
+    const result = await this.post<{ entry: unknown }>('/api/store-credit', input);
+    return result.entry;
+  }
+
+  async getDiscounts(): Promise<unknown[]> {
+    const result = await this.get<{ discounts: unknown[] }>('/api/discounts');
+    return result.discounts;
+  }
+
+  async getDiscountByCode(code: string): Promise<unknown | null> {
+    const result = await this.get<{ discount: unknown | null }>('/api/discounts', { code });
+    return result.discount;
+  }
+
+  async upsertDiscount(data: Record<string, unknown>): Promise<unknown> {
+    const result = await this.post<{ discount: unknown }>('/api/discounts', data);
+    return result.discount;
+  }
+
+  async deleteDiscount(code: string): Promise<void> {
+    await this.delete(`/api/discounts?code=${encodeURIComponent(code)}`);
+  }
+
+  /** Atomic usage-limit check + increment — 409 when exhausted. */
+  async redeemDiscount(code: string): Promise<unknown> {
+    const result = await this.post<{ discount: unknown }>('/api/discounts/redeem', { code });
+    return result.discount;
+  }
 
   async createOrder(order: CreateOrderInput, items: CreateOrderItemInput[]): Promise<OrderRow> {
     const result = await this.post<{ order: OrderRow }>('/api/orders', { order, items });
@@ -256,7 +371,7 @@ export class InstoreApiClient {
 
   // ── Products (write) ──────────────────────────────────────────────
 
-  async createProduct(data: Omit<Product, 'id'>): Promise<Product> {
+  async createProduct(data: Omit<Product, 'id' | 'created_at' | 'updated_at'>): Promise<Product> {
     const result = await this.post<{ product: Product }>('/api/products', data);
     return result.product;
   }
@@ -271,6 +386,19 @@ export class InstoreApiClient {
   }
 
   // ── Returns (write) ───────────────────────────────────────────────
+
+  async getReturn(id: string): Promise<ReturnRow | null> {
+    try {
+      const result = await this.get<{ return: ReturnRow }>(`/api/returns/${id}`);
+      return result.return;
+    } catch {
+      return null;
+    }
+  }
+
+  async linkReturnToExchange(returnId: string, exchangeOrderId: string): Promise<void> {
+    await this.put(`/api/returns/${returnId}`, { exchangeOrderId });
+  }
 
   async createReturn(input: CreateReturnInput, processedBy?: string): Promise<string> {
     const result = await this.post<{ returnId: string }>('/api/returns', { input, processedBy });
@@ -296,9 +424,46 @@ export class InstoreApiClient {
 
   // ── Users ─────────────────────────────────────────────────────────
 
-  async getUsers(): Promise<Array<{ id: string; name: string; role: string; is_active: boolean }>> {
-    const result = await this.get<{ users: Array<{ id: string; name: string; role: string; is_active: boolean }> }>('/api/users');
+  async getUsers(): Promise<InstoreApiUser[]> {
+    const result = await this.get<{ users: InstoreApiUser[] }>('/api/users');
     return result.users;
+  }
+
+  async getUser(userId: string): Promise<InstoreApiUser | null> {
+    try {
+      const result = await this.get<{ user: InstoreApiUser }>(`/api/users/${userId}`);
+      return result.user;
+    } catch {
+      return null;
+    }
+  }
+
+  async createUser(data: {
+    name: string;
+    email?: string | null;
+    pin: string;
+    role: string;
+    platform_user_id?: string | null;
+  }): Promise<InstoreApiUser> {
+    const result = await this.post<{ user: InstoreApiUser }>('/api/users', data);
+    return result.user;
+  }
+
+  async updateUser(
+    userId: string,
+    data: Partial<{ name: string; email: string | null; pin: string; role: string; platform_user_id: string | null; is_active: boolean }>
+  ): Promise<InstoreApiUser> {
+    const result = await this.put<{ user: InstoreApiUser }>(`/api/users/${userId}`, data);
+    return result.user;
+  }
+
+  async deleteUser(userId: string): Promise<void> {
+    await this.delete(`/api/users/${userId}`);
+  }
+
+  async isPinUnique(pin: string, excludeUserId?: string): Promise<boolean> {
+    const result = await this.post<{ unique: boolean }>('/api/users/check-pin', { pin, excludeUserId });
+    return result.unique;
   }
 
   async verifyPin(pin: string): Promise<{ id: string; name: string; role: string } | null> {

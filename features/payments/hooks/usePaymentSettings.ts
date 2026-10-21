@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect } from 'react';
 import { keyValueRepository } from '../../../shared/repositories/KeyValueRepository';
 import { PaymentProvider } from '../services/PaymentServiceFactory';
-import { usePayment } from './usePayment';
 import { useLogger } from '../../../shared/hooks/useLogger';
 import { PaymentSettingsStorage } from '../../platform-clients/services/config/PaymentSettingsStorage';
+import type { InstoreApiPaymentConfig } from '../../multi-register/services/payment/InstoreApiPaymentService';
+import paymentService from '../services/PaymentService';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,6 +47,9 @@ export interface TapPaymentsSettings {
   merchantId: string;
 }
 
+/** Store-api PED settings — mirrors InstoreApiPaymentConfig. */
+export type InstoreApiSettings = InstoreApiPaymentConfig;
+
 export interface PaymentSettings {
   provider: PaymentProvider;
   syncInventory: boolean;
@@ -54,6 +58,7 @@ export interface PaymentSettings {
   square: SquareSettings;
   adyen: AdyenSettings;
   tap_payments: TapPaymentsSettings;
+  instore_api: InstoreApiSettings;
 }
 
 // ---------------------------------------------------------------------------
@@ -95,6 +100,13 @@ const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
     publishableKey: '',
     merchantId: '',
   },
+  instore_api: {
+    provider: '',
+    terminalId: '',
+    pedDeviceId: '',
+    currency: '',
+    useWebSocket: true,
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -102,7 +114,6 @@ const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
 // ---------------------------------------------------------------------------
 
 export const usePaymentSettings = () => {
-  const { setPaymentProvider } = usePayment();
   const logger = useLogger('usePaymentSettings');
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(DEFAULT_PAYMENT_SETTINGS);
   const [isLoading, setIsLoading] = useState(true);
@@ -141,7 +152,8 @@ export const usePaymentSettings = () => {
         await PaymentSettingsStorage.save(settings);
         await PaymentSettingsStorage.saveStripeNfcApiKey(settings.stripe_nfc.apiKey);
         setPaymentSettings(settings);
-        await setPaymentProvider(settings.provider);
+        // Applies the provider AND (for INSTORE_API) configures the PED service.
+        await paymentService.applySettings(settings);
         setSaveStatus('saved');
         logger.info({ message: 'Payment settings saved', provider: settings.provider });
         return true;
@@ -155,7 +167,7 @@ export const usePaymentSettings = () => {
         setIsLoading(false);
       }
     },
-    [setPaymentProvider, logger]
+    [logger]
   );
 
   // Partial update helper — merges provider-specific sub-objects
@@ -168,6 +180,7 @@ export const usePaymentSettings = () => {
       square: { ...prev.square, ...(updates.square ?? {}) },
       adyen: { ...prev.adyen, ...(updates.adyen ?? {}) },
       tap_payments: { ...prev.tap_payments, ...(updates.tap_payments ?? {}) },
+      instore_api: { ...prev.instore_api, ...(updates.instore_api ?? {}) },
     }));
     setSaveStatus('unsaved');
   }, []);
@@ -200,6 +213,16 @@ export const usePaymentSettings = () => {
             return true;
           }
 
+          case PaymentProvider.INSTORE_API: {
+            // Configure with the in-progress form values and probe the
+            // store-api payment endpoints.
+            await paymentService.applySettings(paymentSettings);
+            const service = paymentService; // applySettings already switched the provider
+            const ok = await service.connectToTerminal(paymentSettings.instore_api.terminalId);
+            if (!ok) throw new Error('Store API PED connection failed');
+            return true;
+          }
+
           case PaymentProvider.STRIPE:
           case PaymentProvider.SQUARE:
           case PaymentProvider.ADYEN:
@@ -219,7 +242,7 @@ export const usePaymentSettings = () => {
         setIsLoading(false);
       }
     },
-    [paymentSettings.stripe_nfc, logger]
+    [paymentSettings, logger]
   );
 
   useEffect(() => {

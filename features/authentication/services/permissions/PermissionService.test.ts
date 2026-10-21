@@ -3,7 +3,10 @@ jest.mock('../../../../shared/services/logger/LoggerFactory', () => ({
     getInstance: () => ({ createLogger: () => ({ debug: jest.fn(), info: jest.fn(), warn: jest.fn(), error: jest.fn() }) }),
   },
 }));
-jest.mock('../../repositories/UserRepository', () => ({ userRepository: { findById: jest.fn() } }));
+jest.mock('../../repositories/UserRepository', () => {
+  const repo = { findById: jest.fn() };
+  return { userRepository: repo, getUserRepository: () => repo };
+});
 jest.mock('../../repositories/PermissionRepository', () => ({ permissionRepository: { findOverridesForUser: jest.fn() } }));
 
 import { permissionService } from './PermissionService';

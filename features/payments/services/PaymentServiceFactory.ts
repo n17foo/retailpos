@@ -114,7 +114,7 @@ export class PaymentServiceFactory {
    * Used for PED providers routed through the store-api.
    */
   private instoreApiService: InstoreApiPaymentService | null = null;
-  private getInstoreApiPaymentService(): PaymentServiceInterface {
+  public getInstoreApiPaymentService(): InstoreApiPaymentService {
     if (!this.instoreApiService) {
       this.instoreApiService = new InstoreApiPaymentService();
     }

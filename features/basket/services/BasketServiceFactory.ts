@@ -94,13 +94,6 @@ export class BasketServiceFactory {
       loggerFactory.createLogger('OrderSyncService')
     );
 
-    // Inject the right return repository into RefundService
-    import('../../returns/repositories/ReturnRepository').then(({ getReturnRepository }) => {
-      import('../../returns/services/refunds/RefundService').then(({ returnService }) => {
-        returnService.setReturnRepository(getReturnRepository());
-      });
-    });
-
     return { basketService, checkoutService, orderSyncService };
   }
 }

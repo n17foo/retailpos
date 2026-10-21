@@ -16,13 +16,14 @@ jest.mock('../../../../shared/services/logger/LoggerFactory', () => ({
 // jest.fn()s are created inside the factories — jest.mock factories run when
 // the mocked module is first required (during the import phase, before the
 // file's consts initialise), so out-of-scope references resolve to undefined.
-jest.mock('../../repositories/ReturnRepository', () => ({
-  returnRepository: {
+jest.mock('../../repositories/ReturnRepository', () => {
+  const repo = {
     create: jest.fn(),
     updateStatus: jest.fn(),
     findByOrderId: jest.fn(),
-  },
-}));
+  };
+  return { returnRepository: repo, getReturnRepository: () => repo };
+});
 
 jest.mock('../../../orders-sync/repositories/OrderRepository', () => {
   const repo = { findById: jest.fn() };

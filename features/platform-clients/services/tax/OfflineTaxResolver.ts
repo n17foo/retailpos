@@ -1,5 +1,7 @@
 import { taxProfileService } from './TaxProfileService';
 import { posConfig } from '../config/POSConfigService';
+import { instoreApiConfig } from '../../../multi-register/services/InstoreApiConfig';
+import { instoreApiClient } from '../clients/instoreapi/InstoreApiClient';
 
 /**
  * Tax rate for the OFFLINE catalogue only.
@@ -11,13 +13,25 @@ import { posConfig } from '../config/POSConfigService';
  * rate configured in POS settings. Returns undefined when nothing is configured: no tax is invented.
  */
 export const resolveOfflineTaxRate = async (taxProfileId?: string): Promise<number | undefined> => {
-  if (taxProfileId) {
-    const profile = await taxProfileService.getProfileById(taxProfileId);
-    if (profile) return profile.rate;
-  }
+  if (instoreApiConfig.isClient) {
+    // Multi-register: tax profiles are shared on the Store API so every
+    // register charges the same rate.
+    const profiles = await instoreApiClient.getTaxProfiles();
+    if (taxProfileId) {
+      const profile = profiles.find(p => p.id === taxProfileId && p.is_active);
+      if (profile) return profile.rate;
+    }
+    const defaultProfile = profiles.find(p => p.is_default && p.is_active);
+    if (defaultProfile) return defaultProfile.rate;
+  } else {
+    if (taxProfileId) {
+      const profile = await taxProfileService.getProfileById(taxProfileId);
+      if (profile) return profile.rate;
+    }
 
-  const defaultProfile = await taxProfileService.getDefaultProfile();
-  if (defaultProfile) return defaultProfile.rate;
+    const defaultProfile = await taxProfileService.getDefaultProfile();
+    if (defaultProfile) return defaultProfile.rate;
+  }
 
   const storeRate = posConfig.values.taxRate;
   return typeof storeRate === 'number' && Number.isFinite(storeRate) && storeRate >= 0 ? storeRate : undefined;

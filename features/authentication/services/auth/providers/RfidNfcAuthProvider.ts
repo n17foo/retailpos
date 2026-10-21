@@ -1,4 +1,4 @@
-import { userRepository } from '../../../repositories/UserRepository';
+import { getUserRepository } from '../../../repositories/UserRepository';
 import { keyValueRepository } from '../../../../../shared/repositories/KeyValueRepository';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
 import { hashCredential, verifyCredential, isHashedCredential } from '../../../../../shared/utils/crypto';
@@ -46,7 +46,7 @@ export class RfidNfcAuthProvider implements AuthMethodProvider {
       const badgeId = credential.trim().toUpperCase();
 
       // Look up all active users and check their stored badge IDs
-      const users = await userRepository.findActive();
+      const users = await getUserRepository().findActive();
 
       for (const user of users) {
         const storedBadgeId = await keyValueRepository.getObject<string>(RFID_KEY_PREFIX + user.id);

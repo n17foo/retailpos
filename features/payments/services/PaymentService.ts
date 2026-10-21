@@ -1,5 +1,7 @@
 import { PaymentServiceInterface, PaymentRequest, PaymentResponse } from './PaymentServiceInterface';
 import { PaymentProvider, PaymentServiceFactory } from './PaymentServiceFactory';
+import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
+import type { InstoreApiPaymentConfig } from '../../multi-register/services/payment/InstoreApiPaymentService';
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
 
 /**
@@ -42,6 +44,36 @@ class PaymentService implements PaymentServiceInterface {
 
   getCurrentProvider(): PaymentProvider {
     return this.serviceFactory.getCurrentProvider();
+  }
+
+  /**
+   * Activate the persisted payment settings: switch provider and, for
+   * INSTORE_API, configure + connect the store-api PED service. The PED lives
+   * on the LAN, so INSTORE_API only applies in multi-register client mode.
+   */
+  async applySettings(settings: { provider?: PaymentProvider; instore_api?: InstoreApiPaymentConfig }): Promise<void> {
+    if (!settings.provider) return;
+    if (settings.provider !== this.getCurrentProvider()) {
+      this.setPaymentProvider(settings.provider);
+    }
+    if (settings.provider === PaymentProvider.INSTORE_API && instoreApiConfig.isClient) {
+      const service = this.serviceFactory.getInstoreApiPaymentService();
+      const config = settings.instore_api;
+      if (config?.provider && config?.terminalId) {
+        service.configure({
+          ...config,
+          // Payment outbox messages are addressed to the WS device_id — the
+          // register's own id — so pedDeviceId defaults to registerId.
+          pedDeviceId: config.pedDeviceId || instoreApiConfig.current.registerId,
+        });
+        service.connectToTerminal(config.terminalId).catch(error => {
+          this.logger.error(
+            { message: 'Failed to connect store-api PED terminal' },
+            error instanceof Error ? error : new Error(String(error))
+          );
+        });
+      }
+    }
   }
 
   // ---------------------------------------------------------------------------

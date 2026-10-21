@@ -9,6 +9,8 @@
 
 import { db } from '../../../shared/utils/db';
 import { generateUUID } from '../../../shared/utils/uuid';
+import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
+import { instoreApiLoyaltyRepository } from './InstoreApiLoyaltyRepository';
 
 export type LoyaltyTransactionType = 'earn' | 'redeem' | 'adjustment' | 'reversal' | 'expire';
 
@@ -31,6 +33,35 @@ export interface LoyaltyTransactionRow {
   reason: string | null;
   created_by: string | null;
   created_at: number;
+}
+
+/** Structural contract shared by local and Store API loyalty ledgers. */
+export interface LoyaltyLedger {
+  getAccount(email: string): Promise<LoyaltyAccountRow | null>;
+  getOrCreateAccount(email: string): Promise<LoyaltyAccountRow>;
+  updateBalance(email: string, delta: number): Promise<void>;
+  updateTier(email: string, tier: string): Promise<void>;
+  applyTransaction(
+    email: string,
+    type: LoyaltyTransactionType,
+    points: number,
+    orderId?: string | null,
+    reason?: string | null,
+    createdBy?: string | null
+  ): Promise<string>;
+  appendTransaction(
+    email: string,
+    type: LoyaltyTransactionType,
+    points: number,
+    orderId?: string | null,
+    reason?: string | null,
+    createdBy?: string | null
+  ): Promise<string>;
+  findTransactionsByEmail(email: string, limit?: number): Promise<LoyaltyTransactionRow[]>;
+  findTransactionById(id: string): Promise<LoyaltyTransactionRow | null>;
+  findCustomersWithExpiredTransactions(expiryThreshold: number): Promise<string[]>;
+  findExpiredEarnTransactions(email: string, expiryThreshold: number): Promise<LoyaltyTransactionRow[]>;
+  findEarnTransactionsBetween(email: string, expiryThreshold: number, warningThreshold: number): Promise<LoyaltyTransactionRow[]>;
 }
 
 export class LoyaltyRepository {
@@ -78,6 +109,23 @@ export class LoyaltyRepository {
   }
 
   // ── Transactions ──────────────────────────────────────────────────────
+
+  /**
+   * Append a transaction AND apply its balance delta atomically. In client
+   * mode this is one server call — splitting it would race across registers.
+   */
+  async applyTransaction(
+    email: string,
+    type: LoyaltyTransactionType,
+    points: number,
+    orderId?: string | null,
+    reason?: string | null,
+    createdBy?: string | null
+  ): Promise<string> {
+    const id = await this.appendTransaction(email, type, points, orderId, reason, createdBy);
+    await this.updateBalance(email, points);
+    return id;
+  }
 
   async appendTransaction(
     email: string,
@@ -158,3 +206,12 @@ export class LoyaltyRepository {
 }
 
 export const loyaltyRepository = new LoyaltyRepository();
+
+/**
+ * Returns the authoritative loyalty repository for the current register mode:
+ * the Store API in multi-register client mode, local SQLite otherwise.
+ * Resolved at call time — instoreApiConfig finishes loading async.
+ */
+export const getLoyaltyRepository = (): LoyaltyLedger => {
+  return instoreApiConfig.isClient ? instoreApiLoyaltyRepository : loyaltyRepository;
+};

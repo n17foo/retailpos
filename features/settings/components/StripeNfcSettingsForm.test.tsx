@@ -25,6 +25,7 @@ const makeSettings = (provider: PaymentProvider): PaymentSettings => ({
   square: { applicationId: '', locationId: '', accessToken: '' },
   adyen: { apiKey: '', clientKey: '', environment: 'test', merchantAccount: '' },
   tap_payments: { apiKey: '', publishableKey: '', merchantId: '' },
+  instore_api: { provider: '', terminalId: '', pedDeviceId: '', currency: '', useWebSocket: true },
 });
 
 const baseProps = {
