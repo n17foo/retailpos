@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Alert } from 'react-native';
 import { LocalOrder } from '../../basket/services/BasketServiceInterface';
-import { orderRepository } from '../repositories/OrderRepository';
+import { getOrderRepository } from '../repositories/OrderRepository';
 import { useAuthContext } from '../../authentication/contexts/AuthProvider';
 import { useLogger } from '../../../shared/hooks/useLogger';
 import { getDayStart, getDayEnd, filterAndSortOrders, canNavigateNext, canNavigatePrev } from '../utils/orderHistory.utils';
@@ -46,7 +46,7 @@ export function useOrderHistory(): UseOrderHistoryReturn {
       const fromTs = getDayStart(dayOffset);
       const toTs = getDayEnd(dayOffset);
       const cashierFilter = isCashier ? user?.id : undefined;
-      const rows = await orderRepository.findByDateRange(fromTs, toTs, cashierFilter);
+      const rows = await getOrderRepository().findByDateRange(fromTs, toTs, cashierFilter);
       const allOrders = await getLocalOrders();
       const rowIds = new Set(rows.map(r => r.id));
       const filtered = filterAndSortOrders(allOrders, rowIds);
@@ -107,7 +107,7 @@ export function useOrderHistory(): UseOrderHistoryReturn {
           style: 'destructive',
           onPress: async () => {
             try {
-              await orderRepository.delete(orderId);
+              await getOrderRepository().delete(orderId);
               await loadOrders();
               Alert.alert('Deleted', 'Order removed successfully');
             } catch (error) {

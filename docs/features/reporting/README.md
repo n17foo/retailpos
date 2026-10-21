@@ -2,19 +2,22 @@
 
 ## Purpose
 
-Sales analytics over locally-stored orders: summary totals, hourly/daily
-breakdowns, cashier performance, payment-method breakdown, and CSV export —
-all computed from the SQLite `orders`/`order_items` tables, so reports work
-fully offline. (Shift open/close + Z-report lives in the orders-sync feature;
+Sales analytics over the shared order store: summary totals, hourly/daily
+breakdowns, cashier performance, payment-method breakdown, per-register
+breakdown, and CSV export. Standalone/offline registers compute locally from
+the SQLite `orders` table; client registers call the Store API, which
+aggregates server-side so reports are **store-wide across all registers**
+(ADR-018). (Shift open/close + Z-report lives in the orders-sync feature;
 this is the analytics surface.)
 
 ## Scope
 
 ### Included
 
-- `ReportingService` — five report types over a `from/to` timestamp range:
-  `getSalesSummary`, `getSalesByHour`, `getSalesByDay`,
-  `getCashierPerformance`, `getPaymentBreakdown`, plus `exportOrdersCsv`.
+- `ReportingService` — report types over a `from/to` timestamp range:
+  `getFullReport` (single fetch: summary, hour/day buckets, cashier,
+  payment, register breakdowns), the individual `get*` methods, and
+  `exportOrdersCsv`.
 - `ReportingScreen` — period selector, charts/tables, CSV export via
   `Share.share`.
 - `useReporting` — hook wrapper.
@@ -34,9 +37,15 @@ this is the analytics surface.)
 
 ```
 ReportingScreen → pick range → useReporting
-   → ReportingService.get*(from, to) → SQL over orders/order_items
+   → ReportingService.getFullReport(from, to)
+     → standalone: one findByDateRange on local SQLite, aggregates in-app
+     → client:     GET /api/reports/sales?from&to&tzOffset on the Store API
+                  (server aggregates over all registers; tzOffset keeps
+                  hour/day buckets on the register's clock)
    → only 'paid'+'synced' orders count toward sales
-   → CSV button → exportOrdersCsv → Share.share({message: csv})
+   → CSV button → exportOrdersCsv
+     → standalone: local toCsv; client: GET /api/reports/orders.csv
+   → Share.share({message: csv})
 ```
 
 ## Implementation Map
@@ -53,17 +62,23 @@ ReportingScreen → pick range → useReporting
 
 - Sales metrics count only `paid`/`synced` orders.
 - `netSales = totalSales − totalTax`; `averageOrderValue = totalSales / count`.
-- Hourly buckets are always 24, labelled `HH:00`.
+- Hourly buckets are always 24, labelled `HH:00`; day buckets use the
+  register's local timezone (client passes `tzOffset` to the server).
 - Cashier performance groups by `cashier_id` (`'unknown'` when null), sorted
-  desc by sales.
+  desc by sales. Register breakdown groups by `register_id` the same way.
+- Payment breakdown is split-tender aware — `payments_json` lines count
+  toward their own method; single-tender orders use `payment_method`.
+- All monetary aggregation goes through `shared/utils/money.ts` (ADR-006).
 - CSV cells are formula-injection escaped (X-R3).
+- Client-mode reports are **store-wide**; `registerId` can scope the server
+  query when a per-register view is needed.
 
 ## State Ownership
 
-| State                 | Owner           | Persistence   | Reset condition |
-| --------------------- | --------------- | ------------- | --------------- |
-| Report inputs (range) | Screen local    | None          | Unmount         |
-| Report data           | Derived from DB | SQLite orders | n/a             |
+| State                 | Owner                   | Persistence                 | Reset condition |
+| --------------------- | ----------------------- | --------------------------- | --------------- |
+| Report inputs (range) | Screen local            | None                        | Unmount         |
+| Report data           | Derived from order repo | SQLite / Store API (client) | n/a             |
 
 ## Dependencies
 

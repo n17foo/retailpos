@@ -16,12 +16,13 @@ jest.mock('../../../shared/hooks/useLogger', () => ({
   useLogger: () => mockLogger,
 }));
 
-jest.mock('../repositories/OrderRepository', () => ({
-  orderRepository: {
+jest.mock('../repositories/OrderRepository', () => {
+  const repo = {
     findByDateRange: jest.fn(),
     delete: jest.fn(),
-  },
-}));
+  };
+  return { orderRepository: repo, getOrderRepository: () => repo };
+});
 
 jest.mock('../../authentication/contexts/AuthProvider', () => ({
   useAuthContext: jest.fn(),

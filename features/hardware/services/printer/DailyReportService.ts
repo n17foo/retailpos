@@ -1,4 +1,6 @@
 import { keyValueRepository } from '../../../../shared/repositories/KeyValueRepository';
+import { instoreApiConfig } from '../../../multi-register/services/InstoreApiConfig';
+import { instoreApiClient, InstoreApiShift } from '../../../platform-clients/services/clients/instoreapi/InstoreApiClient';
 import { EcommerceSettingsStorage } from '../../../platform-clients/services/config/EcommerceSettingsStorage';
 import { LocalOrder } from '../../../basket/services/BasketServiceInterface';
 import { receiptConfigService } from './ReceiptConfigService';
@@ -16,6 +18,8 @@ export interface ShiftData {
   openingCash: number;
   closingCash: number | null;
   status: 'open' | 'closed';
+  /** Register that owns the shift — set in multi-register deployments */
+  registerId?: string;
 }
 
 export interface DailyReportData {
@@ -55,6 +59,14 @@ export class DailyReportService {
 
   async initialize(): Promise<void> {
     try {
+      if (instoreApiConfig.isClient) {
+        // Shifts are shared on the Store API — pick up this register's open
+        // shift even if it was opened before this app restarted.
+        const remote = await instoreApiClient.getCurrentShift(instoreApiConfig.current.registerId);
+        this.currentShift = remote ? this.mapShift(remote) : null;
+        return;
+      }
+
       const savedShift = await keyValueRepository.getObject<ShiftData>(CURRENT_SHIFT_KEY);
       if (savedShift && savedShift.status === 'open') {
         this.currentShift = {
@@ -68,6 +80,20 @@ export class DailyReportService {
     }
   }
 
+  private mapShift(s: InstoreApiShift): ShiftData {
+    return {
+      id: s.id,
+      startTime: new Date(s.startTime),
+      endTime: s.endTime ? new Date(s.endTime) : null,
+      cashierName: s.cashierName,
+      cashierId: s.cashierId,
+      openingCash: s.openingCash,
+      closingCash: s.closingCash,
+      status: s.status === 'open' ? 'open' : 'closed',
+      registerId: s.registerId,
+    };
+  }
+
   getCurrentShift(): ShiftData | null {
     return this.currentShift;
   }
@@ -75,6 +101,21 @@ export class DailyReportService {
   async openShift(cashierName: string, cashierId: string, openingCash: number): Promise<ShiftData> {
     if (this.currentShift && this.currentShift.status === 'open') {
       throw new Error('A shift is already open. Please close it first.');
+    }
+
+    if (instoreApiConfig.isClient) {
+      // Server enforces one open shift per register and stamps register_id.
+      const remote = await instoreApiClient.openShift(cashierId, cashierName, openingCash);
+      const shift = this.mapShift(remote);
+      this.currentShift = shift;
+
+      await auditLogService.log('shift:opened', {
+        userId: cashierId,
+        userName: cashierName,
+        details: `Shift opened with starting cash ${openingCash.toFixed(2)}`,
+        metadata: { shiftId: shift.id, openingCash },
+      });
+      return shift;
     }
 
     const shift: ShiftData = {
@@ -86,6 +127,7 @@ export class DailyReportService {
       openingCash,
       closingCash: null,
       status: 'open',
+      registerId: instoreApiConfig.current.registerId || undefined,
     };
 
     this.currentShift = shift;
@@ -108,6 +150,25 @@ export class DailyReportService {
   async closeShift(closingCash: number): Promise<ShiftData> {
     if (!this.currentShift || this.currentShift.status !== 'open') {
       throw new Error('No open shift to close.');
+    }
+
+    if (instoreApiConfig.isClient) {
+      // The server owns shift history — close it there, then release local state.
+      const remote = await instoreApiClient.closeShift(this.currentShift.id, closingCash);
+      const closedShift = this.mapShift(remote);
+
+      await auditLogService.log('shift:closed', {
+        userId: closedShift.cashierId,
+        userName: closedShift.cashierName,
+        details: `Shift closed with ending cash ${closingCash.toFixed(2)}`,
+        metadata: {
+          shiftId: closedShift.id,
+          openingCash: closedShift.openingCash,
+          closingCash,
+        },
+      });
+      this.currentShift = null;
+      return closedShift;
     }
 
     this.currentShift.endTime = new Date();
@@ -151,13 +212,20 @@ export class DailyReportService {
       const shiftStart = new Date(shiftData.startTime).getTime();
       const shiftEnd = shiftData.endTime ? new Date(shiftData.endTime).getTime() : Date.now();
       const inTimeRange = orderTime >= shiftStart && orderTime <= shiftEnd;
-
-      // If the order has a cashierId, match it against the shift's cashierId
-      if (order.cashierId && shiftData.cashierId) {
-        return inTimeRange && order.cashierId === shiftData.cashierId;
+      if (!inTimeRange) {
+        return false;
       }
 
-      return inTimeRange;
+      // Register-scoped shifts (multi-register) reconcile one till — match the
+      // order's register when both sides carry registerId. Orders without a
+      // registerId fall back to cashier matching.
+      if (shiftData.registerId && order.registerId) {
+        return order.registerId === shiftData.registerId;
+      }
+      if (order.cashierId && shiftData.cashierId) {
+        return order.cashierId === shiftData.cashierId;
+      }
+      return true;
     });
 
     // Calculate summary using safe money math
@@ -420,6 +488,14 @@ export class DailyReportService {
 
   async getShiftHistory(limit: number = 30): Promise<ShiftData[]> {
     try {
+      if (instoreApiConfig.isClient) {
+        const remote = await instoreApiClient.getShifts(instoreApiConfig.current.registerId);
+        return remote
+          .map(s => this.mapShift(s))
+          .sort((a, b) => b.startTime.getTime() - a.startTime.getTime())
+          .slice(0, limit);
+      }
+
       const history = (await keyValueRepository.getObject<ShiftData[]>(SHIFT_HISTORY_KEY)) || [];
       return history
         .map(s => ({

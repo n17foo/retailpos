@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { orderRepository } from '../repositories/OrderRepository';
-import { orderItemRepository } from '../repositories/OrderItemRepository';
+import { getOrderRepository } from '../repositories/OrderRepository';
+import { getOrderItemRepository } from '../repositories/OrderItemRepository';
 import { rowToOrder, OrderWithItems } from '../utils/orderRow.utils';
 import { syncEventBus } from '../../multi-register/services/sync/SyncEventBus';
 import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
@@ -15,11 +15,13 @@ export const useOrders = () => {
   const fetchOrders = useCallback(async () => {
     try {
       setIsLoading(true);
-      const rows = await orderRepository.findAll();
+      const orderRepo = getOrderRepository();
+      const orderItemRepo = getOrderItemRepository();
+      const rows = await orderRepo.findAll();
       const result: OrderWithItems[] = [];
 
       for (const row of rows) {
-        const items = await orderItemRepository.findByOrderId(row.id);
+        const items = await orderItemRepo.findByOrderId(row.id);
         result.push(rowToOrder(row, items));
       }
 
@@ -65,7 +67,7 @@ export const useOrders = () => {
   const deleteOrder = async (id: string) => {
     try {
       // CASCADE delete removes associated order_items automatically
-      await orderRepository.delete(id);
+      await getOrderRepository().delete(id);
       await fetchOrders();
     } catch (e) {
       setError(e as Error);

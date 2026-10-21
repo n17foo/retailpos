@@ -4,18 +4,20 @@ import { useOrders } from './useOrders';
 import { orderRepository } from '../repositories/OrderRepository';
 import { orderItemRepository } from '../repositories/OrderItemRepository';
 
-jest.mock('../repositories/OrderRepository', () => ({
-  orderRepository: {
+jest.mock('../repositories/OrderRepository', () => {
+  const repo = {
     findAll: jest.fn(),
     delete: jest.fn(),
-  },
-}));
+  };
+  return { orderRepository: repo, getOrderRepository: () => repo };
+});
 
-jest.mock('../repositories/OrderItemRepository', () => ({
-  orderItemRepository: {
+jest.mock('../repositories/OrderItemRepository', () => {
+  const repo = {
     findByOrderId: jest.fn(),
-  },
-}));
+  };
+  return { orderItemRepository: repo, getOrderItemRepository: () => repo };
+});
 
 jest.mock('../../multi-register/services/InstoreApiConfig', () => ({
   instoreApiConfig: { isClient: false },

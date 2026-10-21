@@ -29,6 +29,22 @@ jest.mock('../../../../shared/repositories/KeyValueRepository', () => ({
   },
 }));
 
+jest.mock('../../../multi-register/services/InstoreApiConfig', () => ({
+  instoreApiConfig: {
+    isClient: false,
+    current: { registerId: 'test-register' },
+  },
+}));
+
+jest.mock('../../../platform-clients/services/clients/instoreapi/InstoreApiClient', () => ({
+  instoreApiClient: {
+    getCurrentShift: jest.fn(),
+    getShifts: jest.fn(),
+    openShift: jest.fn(),
+    closeShift: jest.fn(),
+  },
+}));
+
 // Minimal receipt config — deterministic output for formatting tests
 jest.mock('./ReceiptConfigService', () => ({
   receiptConfigService: {

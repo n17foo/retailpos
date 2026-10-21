@@ -1,5 +1,12 @@
 import { useState, useCallback } from 'react';
-import { reportingService, SalesSummary, SalesByPeriod, CashierPerformance, PaymentBreakdown } from '../services/ReportingService';
+import {
+  reportingService,
+  SalesSummary,
+  SalesByPeriod,
+  CashierPerformance,
+  PaymentBreakdown,
+  RegisterPerformance,
+} from '../services/ReportingService';
 
 interface UseReportingResult {
   summary: SalesSummary | null;
@@ -7,6 +14,7 @@ interface UseReportingResult {
   salesByDay: SalesByPeriod[];
   cashierPerformance: CashierPerformance[];
   paymentBreakdown: PaymentBreakdown[];
+  salesByRegister: RegisterPerformance[];
   isLoading: boolean;
   error: string | null;
   /** Load all report data for a date range */
@@ -23,23 +31,22 @@ export function useReporting(): UseReportingResult {
   const [salesByDay, setSalesByDay] = useState<SalesByPeriod[]>([]);
   const [cashierPerformance, setCashierPerformance] = useState<CashierPerformance[]>([]);
   const [paymentBreakdown, setPaymentBreakdown] = useState<PaymentBreakdown[]>([]);
+  const [salesByRegister, setSalesByRegister] = useState<RegisterPerformance[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const loadReport = useCallback(async (from: number, to: number) => {
+  const applyReport = useCallback(async (from: number, to: number) => {
     setIsLoading(true);
     setError(null);
     try {
-      const [summaryData, byDay, cashiers, payments] = await Promise.all([
-        reportingService.getSalesSummary(from, to),
-        reportingService.getSalesByDay(from, to),
-        reportingService.getCashierPerformance(from, to),
-        reportingService.getPaymentBreakdown(from, to),
-      ]);
-      setSummary(summaryData);
-      setSalesByDay(byDay);
-      setCashierPerformance(cashiers);
-      setPaymentBreakdown(payments);
+      // One fetch: server-aggregated in client mode, one local query in standalone
+      const report = await reportingService.getFullReport(from, to);
+      setSummary(report.summary);
+      setSalesByHour(report.salesByHour);
+      setSalesByDay(report.salesByDay);
+      setCashierPerformance(report.cashierPerformance);
+      setPaymentBreakdown(report.paymentBreakdown);
+      setSalesByRegister(report.salesByRegister);
     } catch {
       setError('Failed to load report data.');
     } finally {
@@ -47,26 +54,9 @@ export function useReporting(): UseReportingResult {
     }
   }, []);
 
-  const loadHourlyReport = useCallback(async (dayStart: number, dayEnd: number) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const [summaryData, byHour, cashiers, payments] = await Promise.all([
-        reportingService.getSalesSummary(dayStart, dayEnd),
-        reportingService.getSalesByHour(dayStart, dayEnd),
-        reportingService.getCashierPerformance(dayStart, dayEnd),
-        reportingService.getPaymentBreakdown(dayStart, dayEnd),
-      ]);
-      setSummary(summaryData);
-      setSalesByHour(byHour);
-      setCashierPerformance(cashiers);
-      setPaymentBreakdown(payments);
-    } catch {
-      setError('Failed to load report data.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+  const loadReport = useCallback((from: number, to: number) => applyReport(from, to), [applyReport]);
+
+  const loadHourlyReport = useCallback((dayStart: number, dayEnd: number) => applyReport(dayStart, dayEnd), [applyReport]);
 
   const exportCsv = useCallback(async (from: number, to: number): Promise<string> => {
     return reportingService.exportOrdersCsv(from, to);
@@ -78,6 +68,7 @@ export function useReporting(): UseReportingResult {
     salesByDay,
     cashierPerformance,
     paymentBreakdown,
+    salesByRegister,
     isLoading,
     error,
     loadReport,

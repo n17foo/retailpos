@@ -25,12 +25,18 @@ jest.mock('../../../shared/utils/db', () => ({}));
 jest.mock('../../multi-register/services/InstoreApiConfig', () => ({
   instoreApiConfig: { isClient: false },
 }));
-jest.mock('../../orders-sync/repositories/OrderRepository', () => ({
-  orderRepository: { findByDateRange: jest.fn() },
+jest.mock('../../platform-clients/services/clients/instoreapi/InstoreApiClient', () => ({
+  instoreApiClient: { getSalesReport: jest.fn(), getOrdersCsv: jest.fn() },
 }));
+jest.mock('../../orders-sync/repositories/OrderRepository', () => {
+  const repo = { findByDateRange: jest.fn() };
+  return { orderRepository: repo, getOrderRepository: () => repo };
+});
 
 import { ReportingService } from './ReportingService';
 import { orderRepository } from '../../orders-sync/repositories/OrderRepository';
+import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
+import { instoreApiClient } from '../../platform-clients/services/clients/instoreapi/InstoreApiClient';
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -353,5 +359,49 @@ describe('ReportingService.exportOrdersCsv', () => {
     const lines = csv.trim().split('\n');
 
     expect(lines).toHaveLength(1);
+  });
+});
+
+// ── Client mode (multi-register) ────────────────────────────────────────────
+
+describe('ReportingService in client mode', () => {
+  const config = instoreApiConfig as { isClient: boolean };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    config.isClient = true;
+  });
+  afterEach(() => {
+    config.isClient = false;
+  });
+
+  it('getFullReport delegates to the server-aggregated endpoint', async () => {
+    const serverReport = {
+      summary: { totalOrders: 5, totalSales: 99, totalTax: 9, totalDiscount: 0, netSales: 90, averageOrderValue: 19.8 },
+      salesByHour: [],
+      salesByDay: [{ label: '2026-10-21', orderCount: 5, totalSales: 99 }],
+      cashierPerformance: [],
+      paymentBreakdown: [],
+      salesByRegister: [{ registerId: 'pos-1', orderCount: 5, totalSales: 99 }],
+    };
+    (instoreApiClient.getSalesReport as jest.Mock).mockResolvedValue(serverReport);
+
+    const report = await getService().getFullReport(1000, 2000);
+
+    expect(instoreApiClient.getSalesReport).toHaveBeenCalledWith(1000, 2000);
+    // Must NOT hit the local SQLite repository — a client's orders table is empty
+    expect(orderRepository.findByDateRange).not.toHaveBeenCalled();
+    expect(report.summary.totalOrders).toBe(5);
+    expect(report.salesByRegister).toHaveLength(1);
+  });
+
+  it('exportOrdersCsv uses the server-generated CSV', async () => {
+    (instoreApiClient.getOrdersCsv as jest.Mock).mockResolvedValue('Order ID,Total\no1,10.80');
+
+    const csv = await getService().exportOrdersCsv(1000, 2000);
+
+    expect(instoreApiClient.getOrdersCsv).toHaveBeenCalledWith(1000, 2000);
+    expect(orderRepository.findByDateRange).not.toHaveBeenCalled();
+    expect(csv).toContain('o1');
   });
 });

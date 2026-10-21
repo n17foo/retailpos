@@ -27,12 +27,7 @@ export class InstoreApiOrderRepository implements OrderRepository {
   }
 
   async findByDateRange(fromTimestamp: number, toTimestamp: number, cashierId?: string): Promise<OrderRow[]> {
-    // Server doesn't have a date-range endpoint yet — fall back to getOrders and filter client-side
-    const rows = await instoreApiClient.getOrders();
-    return rows.filter(r => {
-      const inRange = r.created_at >= fromTimestamp && r.created_at < toTimestamp;
-      return cashierId ? inRange && r.cashier_id === cashierId : inRange;
-    });
+    return instoreApiClient.getOrdersInRange(fromTimestamp, toTimestamp, cashierId ? { cashierId } : undefined);
   }
 
   async updateStatus(orderId: string, status: string): Promise<void> {
@@ -44,8 +39,7 @@ export class InstoreApiOrderRepository implements OrderRepository {
   }
 
   async updatePaymentLines(orderId: string, paymentMethod: string, transactionId: string | null, paymentsJson: string): Promise<void> {
-    void paymentsJson;
-    await instoreApiClient.updateOrderPayment(orderId, paymentMethod, transactionId ?? undefined);
+    await instoreApiClient.updateOrderPayment(orderId, paymentMethod, transactionId ?? undefined, paymentsJson);
   }
 
   async updateSyncSuccess(orderId: string, platformOrderId: string): Promise<void> {

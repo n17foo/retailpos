@@ -18,6 +18,42 @@ export interface InstoreApiSyncEventsResponse<TEvent> {
   events: TEvent[];
 }
 
+/** Response shape of GET /api/reports/sales — server-side aggregation matching ReportingService semantics */
+export interface InstoreApiSalesReport {
+  summary: {
+    totalOrders: number;
+    totalSales: number;
+    totalTax: number;
+    totalDiscount: number;
+    netSales: number;
+    averageOrderValue: number;
+  };
+  salesByHour: Array<{ label: string; orderCount: number; totalSales: number }>;
+  salesByDay: Array<{ label: string; orderCount: number; totalSales: number }>;
+  cashierPerformance: Array<{
+    cashierId: string;
+    cashierName: string;
+    orderCount: number;
+    totalSales: number;
+    averageOrderValue: number;
+  }>;
+  paymentBreakdown: Array<{ method: string; count: number; total: number; percentage: number }>;
+  salesByRegister: Array<{ registerId: string; orderCount: number; totalSales: number }>;
+}
+
+/** Server shift record — /api/shifts responses */
+export interface InstoreApiShift {
+  id: string;
+  startTime: number;
+  endTime: number | null;
+  cashierName: string;
+  cashierId: string;
+  openingCash: number;
+  closingCash: number | null;
+  status: string;
+  registerId?: string;
+}
+
 /**
  * HTTP client for connecting to a Local API Server on the LAN.
  * Used by registers in "client" mode to read/write shared data
@@ -83,6 +119,23 @@ export class InstoreApiClient {
     return result.orders;
   }
 
+  /**
+   * Server-side date-range query — orders created at [from, to) unix ms.
+   * Avoids fetching the full orders table for report/history screens.
+   */
+  async getOrdersInRange(
+    from: number,
+    to: number,
+    options?: { status?: string; cashierId?: string; registerId?: string }
+  ): Promise<OrderRow[]> {
+    const params: Record<string, string> = { from: String(from), to: String(to) };
+    if (options?.status) params.status = options.status;
+    if (options?.cashierId) params.cashierId = options.cashierId;
+    if (options?.registerId) params.registerId = options.registerId;
+    const result = await this.get<{ orders: OrderRow[] }>('/api/orders', params);
+    return result.orders;
+  }
+
   async getOrder(orderId: string): Promise<{ order: OrderRow; items: OrderItemRow[] } | null> {
     try {
       return await this.get<{ order: OrderRow; items: OrderItemRow[] }>(`/api/orders/${orderId}`);
@@ -94,6 +147,15 @@ export class InstoreApiClient {
   async getUnsyncedOrders(): Promise<OrderRow[]> {
     const result = await this.get<{ orders: OrderRow[] }>('/api/orders/unsynced');
     return result.orders;
+  }
+
+  /** Batch fetch line items for a set of orders (order lists, item counts) */
+  async getOrderItems(orderIds: string[]): Promise<OrderItemRow[]> {
+    if (orderIds.length === 0) {
+      return [];
+    }
+    const result = await this.get<{ items: OrderItemRow[] }>('/api/order-items', { orderIds: orderIds.join(',') });
+    return result.items;
   }
 
   // ── Products ──────────────────────────────────────────────────────
@@ -164,8 +226,8 @@ export class InstoreApiClient {
     return result.order;
   }
 
-  async updateOrderPayment(orderId: string, paymentMethod: string, transactionId?: string): Promise<OrderRow> {
-    const result = await this.put<{ order: OrderRow }>(`/api/orders/${orderId}/payment`, { paymentMethod, transactionId });
+  async updateOrderPayment(orderId: string, paymentMethod: string, transactionId?: string, paymentsJson?: string): Promise<OrderRow> {
+    const result = await this.put<{ order: OrderRow }>(`/api/orders/${orderId}/payment`, { paymentMethod, transactionId, paymentsJson });
     return result.order;
   }
 
@@ -226,25 +288,64 @@ export class InstoreApiClient {
     }
   }
 
-  // ── Shifts ────────────────────────────────────────────────────────
+  // ── Reports ───────────────────────────────────────────────────────
 
-  async getShifts(): Promise<unknown[]> {
-    const result = await this.get<{ shifts: unknown[] }>('/api/shifts');
+  /**
+   * Store-wide (or register-scoped) sales analytics computed on the server.
+   * tzOffset is minutes east of UTC (-new Date().getTimezoneOffset()) so
+   * hour/day buckets follow this register's clock.
+   */
+  async getSalesReport(from: number, to: number, registerId?: string): Promise<InstoreApiSalesReport> {
+    const params: Record<string, string> = {
+      from: String(from),
+      to: String(to),
+      tzOffset: String(-new Date().getTimezoneOffset()),
+    };
+    if (registerId) params.registerId = registerId;
+    const result = await this.get<{ report: InstoreApiSalesReport }>('/api/reports/sales', params);
+    return result.report;
+  }
+
+  /** Server-generated orders CSV for a date range (same columns as local export) */
+  async getOrdersCsv(from: number, to: number, registerId?: string): Promise<string> {
+    const params: Record<string, string> = { from: String(from), to: String(to) };
+    if (registerId) params.registerId = registerId;
+    return this.getText('/api/reports/orders.csv', params);
+  }
+
+  // ── Shifts ────────────────────────────────────────────────────────
+  //
+  // Shifts are register-scoped on the server: at most one open shift per
+  // register, so a Z-report always reconciles a single till.
+
+  /** Shift history — pass registerId to scope to this register. */
+  async getShifts(registerId?: string): Promise<InstoreApiShift[]> {
+    const result = await this.get<{ shifts: InstoreApiShift[] }>('/api/shifts', registerId ? { registerId } : undefined);
     return result.shifts;
   }
 
-  async openShift(cashierId: string, openingFloat?: number): Promise<unknown> {
-    const result = await this.post<{ shift: unknown }>('/api/shifts', {
-      cashier_id: cashierId,
-      opening_float: openingFloat ?? 0,
+  /** The register's currently open shift, or null when none is open. */
+  async getCurrentShift(registerId: string): Promise<InstoreApiShift | null> {
+    try {
+      const result = await this.get<{ shift: InstoreApiShift }>('/api/shifts/current', { registerId });
+      return result.shift;
+    } catch {
+      return null; // 404 = no open shift
+    }
+  }
+
+  async openShift(cashierId: string, cashierName: string, openingCash?: number): Promise<InstoreApiShift> {
+    const result = await this.post<{ shift: InstoreApiShift }>('/api/shifts', {
+      cashierId,
+      cashierName,
+      openingCash: openingCash ?? 0,
     });
     return result.shift;
   }
 
-  async closeShift(shiftId: string, closingFloat?: number, notes?: string): Promise<unknown> {
-    const result = await this.put<{ shift: unknown }>(`/api/shifts/${shiftId}`, {
-      closing_float: closingFloat ?? 0,
-      notes: notes ?? '',
+  async closeShift(shiftId: string, closingCash?: number): Promise<InstoreApiShift> {
+    const result = await this.put<{ shift: InstoreApiShift }>(`/api/shifts/${shiftId}`, {
+      closingCash: closingCash ?? 0,
     });
     return result.shift;
   }
@@ -290,6 +391,27 @@ export class InstoreApiClient {
     }
 
     return response.json();
+  }
+
+  /** Signed GET that returns the raw body (CSV downloads) */
+  private async getText(path: string, queryParams?: Record<string, string>): Promise<string> {
+    let pathWithQuery = path;
+    if (queryParams) {
+      const qs = new URLSearchParams(queryParams).toString();
+      pathWithQuery += `?${qs}`;
+    }
+
+    const response = await fetch(`${this.baseUrl}${pathWithQuery}`, {
+      method: 'GET',
+      headers: this.buildSignedHeaders('GET', pathWithQuery, ''),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new Error(errorBody.error || `GET ${path} failed: ${response.status}`);
+    }
+
+    return response.text();
   }
 
   private async getFromBaseUrl<T>(baseUrl: string, path: string, queryParams?: Record<string, string>, timeoutMs?: number): Promise<T> {

@@ -14,8 +14,8 @@ import {
   UpsertLocalCustomerInput,
   UpdateLocalCustomerInput,
 } from '../../repositories/LocalCustomerRepository';
-import { orderRepository } from '../../../orders-sync/repositories/OrderRepository';
-import { orderItemRepository } from '../../../orders-sync/repositories/OrderItemRepository';
+import { getOrderRepository } from '../../../orders-sync/repositories/OrderRepository';
+import { getOrderItemRepository } from '../../../orders-sync/repositories/OrderItemRepository';
 import { auditLogService } from '../../../../shared/services/audit/AuditLogService';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
 
@@ -76,7 +76,7 @@ export class LocalCustomerService {
    */
   async getOrderHistory(email: string, limit = 20): Promise<CustomerOrderSummary[]> {
     try {
-      const orders = await orderRepository.findAll();
+      const orders = await getOrderRepository().findAll();
       const customerOrders = orders
         .filter(o => o.customer_email?.toLowerCase() === email.toLowerCase())
         .sort((a, b) => b.created_at - a.created_at)
@@ -84,7 +84,7 @@ export class LocalCustomerService {
 
       const summaries: CustomerOrderSummary[] = [];
       for (const order of customerOrders) {
-        const itemRows = await orderItemRepository.findByOrderId(order.id);
+        const itemRows = await getOrderItemRepository().findByOrderId(order.id);
         summaries.push({
           orderId: order.id,
           total: order.total,

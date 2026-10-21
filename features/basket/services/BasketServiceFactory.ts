@@ -6,7 +6,7 @@ import { OrderSyncService } from '../../orders-sync/services/sync/OrderSyncServi
 import { OrderSyncServiceInterface } from '../../orders-sync/services/sync/OrderSyncServiceInterface';
 import { BasketRepository } from '../repositories/BasketRepository';
 import { OrderRepository, getOrderRepository } from '../../orders-sync/repositories/OrderRepository';
-import { OrderItemRepository } from '../../orders-sync/repositories/OrderItemRepository';
+import { OrderItemRepository, getOrderItemRepository } from '../../orders-sync/repositories/OrderItemRepository';
 import { OrderServiceFactory } from '../../orders-sync/services/order/OrderServiceFactory';
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
 
@@ -78,7 +78,7 @@ export class BasketServiceFactory {
     // Repositories — factory selects the right implementation for the current mode
     const basketRepo = new BasketRepository();
     const orderRepo: OrderRepository = getOrderRepository();
-    const orderItemRepo = new OrderItemRepository();
+    const orderItemRepo: OrderItemRepository = getOrderItemRepository();
 
     // Shared dependencies
     const loggerFactory = LoggerFactory.getInstance();

@@ -1,6 +1,6 @@
 import { ReturnRepository, returnRepository, ReturnRow, CreateReturnInput } from '../../repositories/ReturnRepository';
-import { orderRepository } from '../../../orders-sync/repositories/OrderRepository';
-import { OrderItemRepository } from '../../../orders-sync/repositories/OrderItemRepository';
+import { getOrderRepository } from '../../../orders-sync/repositories/OrderRepository';
+import { OrderItemRepository, getOrderItemRepository } from '../../../orders-sync/repositories/OrderItemRepository';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
 import { auditLogService } from '../../../../shared/services/audit/AuditLogService';
 import { ECommercePlatform } from '../../../../shared/utils/platforms';
@@ -132,7 +132,7 @@ export interface RefundRecord {
 export class ReturnService {
   private static instance: ReturnService;
   private logger = LoggerFactory.getInstance().createLogger('ReturnService');
-  private orderItemRepo = new OrderItemRepository();
+  private orderItemRepo: OrderItemRepository = getOrderItemRepository();
   private returnRepo: ReturnRepository = returnRepository;
   private platformRefundServices: Map<ECommercePlatform, PlatformRefundServiceInterface> = new Map();
   private offlineRefundService: OfflineRefundService | null = null;
@@ -160,7 +160,7 @@ export class ReturnService {
       // the server re-validates under the same lock inside its POST route.
       const settled = await withKeyedLock(`return:${input.orderId}`, async () => {
         // Validate the order exists and is paid/synced
-        const order = await orderRepository.findById(input.orderId);
+        const order = await getOrderRepository().findById(input.orderId);
         if (!order) {
           return { error: 'Order not found' };
         }

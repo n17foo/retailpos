@@ -34,14 +34,18 @@ jest.mock('../../repositories/ReturnRepository', () => ({
   returnRepository: {},
   getReturnRepository: jest.fn(),
 }));
-jest.mock('../../../orders-sync/repositories/OrderRepository', () => ({
-  orderRepository: { findById: jest.fn() },
-}));
-jest.mock('../../../orders-sync/repositories/OrderItemRepository', () => ({
-  OrderItemRepository: jest.fn().mockImplementation(() => ({
-    findByOrderId: jest.fn().mockResolvedValue([]),
-  })),
-}));
+jest.mock('../../../orders-sync/repositories/OrderRepository', () => {
+  const repo = { findById: jest.fn() };
+  return { orderRepository: repo, getOrderRepository: () => repo };
+});
+jest.mock('../../../orders-sync/repositories/OrderItemRepository', () => {
+  const repo = { findByOrderId: jest.fn().mockResolvedValue([]) };
+  return {
+    OrderItemRepository: jest.fn().mockImplementation(() => repo),
+    orderItemRepository: repo,
+    getOrderItemRepository: () => repo,
+  };
+});
 jest.mock('../../../multi-register/services/InstoreApiConfig', () => ({
   instoreApiConfig: { isClient: false },
 }));

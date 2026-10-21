@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { orderRepository, OrderRow } from '../repositories/OrderRepository';
+import { getOrderRepository, OrderRow } from '../repositories/OrderRepository';
 import { getServiceContainer } from '../../basket/services/BasketServiceFactory';
 import { db } from '../../../shared/utils/db';
+import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
+import { instoreApiClient } from '../../platform-clients/services/clients/instoreapi/InstoreApiClient';
 
 export interface SyncQueueOrder {
   id: string;
@@ -39,10 +41,20 @@ interface UseSyncQueueResult {
 }
 
 /**
- * Get item counts for multiple orders in a single query
+ * Get item counts for multiple orders in a single query.
+ * Client registers fetch from the Store API (local order_items is empty).
  */
 async function getItemCounts(orderIds: string[]): Promise<Map<string, number>> {
   if (orderIds.length === 0) return new Map();
+
+  if (instoreApiConfig.isClient) {
+    const items = await instoreApiClient.getOrderItems(orderIds);
+    const counts = new Map<string, number>();
+    for (const item of items) {
+      counts.set(item.order_id, (counts.get(item.order_id) ?? 0) + item.quantity);
+    }
+    return counts;
+  }
 
   const placeholders = orderIds.map(() => '?').join(',');
   const query = `
@@ -84,9 +96,10 @@ export function useSyncQueue(): UseSyncQueueResult {
     setIsLoading(true);
     setLoadError(null);
     try {
-      const rows = await orderRepository.findUnsynced();
+      const orderRepo = getOrderRepository();
+      const rows = await orderRepo.findUnsynced();
       // Also include failed orders that haven't been cancelled
-      const failedRows = await orderRepository.findAll('paid');
+      const failedRows = await orderRepo.findAll('paid');
       const allRelevant = [...rows];
 
       // Add failed-sync orders that aren't already in the unsynced list

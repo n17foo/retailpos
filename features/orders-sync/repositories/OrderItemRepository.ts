@@ -1,5 +1,7 @@
 import { db } from '../../../shared/utils/db';
 import { generateUUID } from '../../../shared/utils/uuid';
+import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
+import { InstoreApiOrderItemRepository } from './InstoreApiOrderItemRepository';
 
 /** DB row shape for the order_items table */
 export interface OrderItemRow {
@@ -90,3 +92,15 @@ export class OrderItemRepository {
 }
 
 export const orderItemRepository = new OrderItemRepository();
+
+/**
+ * Factory — returns the right order-items source for the current mode.
+ * Standalone → local SQLite. Client register → Store API (items live on the
+ * server; a client's local order_items table stays empty).
+ */
+export function getOrderItemRepository(): OrderItemRepository {
+  if (instoreApiConfig.isClient) {
+    return new InstoreApiOrderItemRepository();
+  }
+  return orderItemRepository;
+}

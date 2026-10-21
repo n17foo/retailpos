@@ -4,11 +4,20 @@ import { useSyncQueue } from './useSyncQueue';
 import { orderRepository } from '../repositories/OrderRepository';
 import { db } from '../../../shared/utils/db';
 
-jest.mock('../repositories/OrderRepository', () => ({
-  orderRepository: {
+jest.mock('../repositories/OrderRepository', () => {
+  const repo = {
     findUnsynced: jest.fn(),
     findAll: jest.fn(),
-  },
+  };
+  return { orderRepository: repo, getOrderRepository: () => repo };
+});
+
+jest.mock('../../multi-register/services/InstoreApiConfig', () => ({
+  instoreApiConfig: { isClient: false },
+}));
+
+jest.mock('../../platform-clients/services/clients/instoreapi/InstoreApiClient', () => ({
+  instoreApiClient: { getOrderItems: jest.fn().mockResolvedValue([]) },
 }));
 
 jest.mock('../../../shared/utils/db', () => ({
