@@ -95,6 +95,7 @@ function createMockOrderRepo(): jest.Mocked<OrderRepository> {
     updateStatus: jest.fn(),
     updatePayment: jest.fn(),
     updatePaymentLines: jest.fn(),
+    claimSync: jest.fn().mockResolvedValue(true),
     updateSyncSuccess: jest.fn(),
     updateSyncError: jest.fn(),
     delete: jest.fn(),

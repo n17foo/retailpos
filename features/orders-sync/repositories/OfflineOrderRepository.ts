@@ -109,6 +109,11 @@ export class OfflineOrderRepository implements OrderRepository {
     );
   }
 
+  async claimSync(_orderId: string): Promise<boolean> {
+    // Single process owns the local DB — nothing else can race the push.
+    return true;
+  }
+
   async updateSyncSuccess(orderId: string, platformOrderId: string): Promise<void> {
     const now = Date.now();
     await db.runAsync(`UPDATE orders SET platform_order_id = ?, sync_status = ?, synced_at = ?, updated_at = ? WHERE id = ?`, [

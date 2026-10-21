@@ -73,6 +73,19 @@ ReportingScreen → pick range → useReporting
 - Client-mode reports are **store-wide**; `registerId` can scope the server
   query when a per-register view is needed.
 
+## Data Ownership (per deployment mode)
+
+| Setup                        | Where orders live                 | Report source                                    | Online-platform sync                                                          |
+| ---------------------------- | --------------------------------- | ------------------------------------------------ | ----------------------------------------------------------------------------- |
+| Single POS, offline platform | Local SQLite                      | Local SQLite                                     | n/a — orders self-mark `synced`                                               |
+| Single POS, online platform  | Local SQLite                      | Local SQLite                                     | `OrderSyncService` pushes, `updateSync*` updates local rows                   |
+| Multi-POS (client registers) | Store API server (`orders` table) | Store API `/api/reports/*`                       | Register pushes to platform, then `PUT /api/orders/{id}/sync` records outcome |
+| Multi-POS + online platform  | Store API server                  | Store API `/api/reports/*` — still authoritative | Same — platform is an external target, not a data source for reports          |
+
+Reports never read from the online platform. Web orders placed directly on
+the platform are not counted (POS-sales reports only), except Commercefull
+`order.created` webhooks which the sync layer writes into the order store.
+
 ## State Ownership
 
 | State                 | Owner                   | Persistence                 | Reset condition |

@@ -59,6 +59,14 @@ export class OrderSyncService implements OrderSyncServiceInterface {
       return { success: true, orderId, platformOrderId: localOrder.platformOrderId };
     }
 
+    // Multi-register: atomically claim the order on the Store API so another
+    // register's background sync can't push a duplicate to the platform.
+    // Offline this is a no-op that always succeeds.
+    if (!(await this.orderRepo.claimSync(orderId))) {
+      this.logger.info(`Order ${orderId} claimed by another register — skipping`);
+      return { success: true, orderId };
+    }
+
     // Offline orders have no platform to sync to — mark as synced immediately (spec requirement: sync.md §5.8)
     if (!localOrder.platform || !isOnlinePlatform(localOrder.platform)) {
       this.logger.info(`Offline order ${orderId} - marking as synced (fast-path)`);

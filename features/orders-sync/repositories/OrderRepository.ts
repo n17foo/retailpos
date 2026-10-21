@@ -67,6 +67,12 @@ export interface OrderRepository {
   updateStatus(orderId: string, status: string): Promise<void>;
   updatePayment(orderId: string, paymentMethod: string, transactionId: string | null): Promise<void>;
   updatePaymentLines(orderId: string, paymentMethod: string, transactionId: string | null, paymentsJson: string): Promise<void>;
+  /**
+   * Claim exclusive rights to push this order to the online platform.
+   * In client mode this is an atomic server-side claim (409 → false);
+   * offline it always succeeds — one process, no contention.
+   */
+  claimSync(orderId: string): Promise<boolean>;
   updateSyncSuccess(orderId: string, platformOrderId: string): Promise<void>;
   updateSyncError(orderId: string, syncStatus: string, errorMessage: string): Promise<void>;
   delete(orderId: string): Promise<void>;

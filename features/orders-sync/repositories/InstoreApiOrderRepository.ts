@@ -42,17 +42,18 @@ export class InstoreApiOrderRepository implements OrderRepository {
     await instoreApiClient.updateOrderPayment(orderId, paymentMethod, transactionId ?? undefined, paymentsJson);
   }
 
+  async claimSync(orderId: string): Promise<boolean> {
+    return instoreApiClient.claimOrderSync(orderId);
+  }
+
   async updateSyncSuccess(orderId: string, platformOrderId: string): Promise<void> {
-    // Sync success is managed by the server — no-op on client
-    void orderId;
-    void platformOrderId;
+    // The client pushed the order to the platform itself — record the outcome
+    // on the server so its row stays authoritative.
+    await instoreApiClient.updateOrderSync(orderId, 'synced', platformOrderId);
   }
 
   async updateSyncError(orderId: string, syncStatus: string, errorMessage: string): Promise<void> {
-    // Sync errors are managed by the server — no-op on client
-    void orderId;
-    void syncStatus;
-    void errorMessage;
+    await instoreApiClient.updateOrderSync(orderId, syncStatus, undefined, errorMessage);
   }
 
   async delete(orderId: string): Promise<void> {

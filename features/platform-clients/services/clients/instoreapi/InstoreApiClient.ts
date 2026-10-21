@@ -231,6 +231,29 @@ export class InstoreApiClient {
     return result.order;
   }
 
+  async updateOrderSync(orderId: string, syncStatus: string, platformOrderId?: string, syncError?: string): Promise<OrderRow> {
+    const result = await this.put<{ order: OrderRow }>(`/api/orders/${orderId}/sync`, { syncStatus, platformOrderId, syncError });
+    return result.order;
+  }
+
+  /**
+   * Atomically claim an order for platform sync so no other register pushes
+   * a duplicate. Returns false on 409 (already synced or claimed).
+   */
+  async claimOrderSync(orderId: string): Promise<boolean> {
+    const path = `/api/orders/${orderId}/sync/claim`;
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      method: 'PUT',
+      headers: this.buildSignedHeaders('PUT', path, ''),
+    });
+    if (response.status === 409) return false;
+    if (!response.ok) {
+      const errorBody = await response.json().catch(() => ({}));
+      throw new Error(errorBody.error || `PUT ${path} failed: ${response.status}`);
+    }
+    return true;
+  }
+
   // ── Products (write) ──────────────────────────────────────────────
 
   async createProduct(data: Omit<Product, 'id'>): Promise<Product> {
