@@ -184,6 +184,34 @@ export class UserRepository implements UserRepositoryInterface {
     ]);
     return (result?.count || 0) > 0;
   }
+
+  /**
+   * Read-through cache for client mode: upsert a server-fetched user row
+   * WITHOUT touching the pin column — the local pin (when present) is the
+   * credential this register has previously verified, used for offline login.
+   * New cache rows get an empty pin that can never verify.
+   */
+  async cacheServerUser(user: User): Promise<void> {
+    const now = Date.now();
+    await db.runAsync(
+      `INSERT INTO users (id, name, email, pin, role, platform_user_id, is_active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name, email = excluded.email, role = excluded.role,
+         platform_user_id = excluded.platform_user_id, is_active = excluded.is_active,
+         updated_at = excluded.updated_at`,
+      [user.id, user.name, user.email ?? null, '', user.role, user.platform_user_id ?? null, user.is_active ? 1 : 0, user.created_at, now]
+    );
+  }
+
+  /**
+   * Record that `pin` verified successfully for `userId` on this register.
+   * Called after a successful server-side verify-pin so the same credential
+   * keeps working if the LAN goes down.
+   */
+  async cacheVerifiedPin(userId: string, pin: string): Promise<void> {
+    await db.runAsync('UPDATE users SET pin = ?, updated_at = ? WHERE id = ?', [hashPin(pin), Date.now(), userId]);
+  }
 }
 
 /** Public contract for user persistence — implemented by UserRepository

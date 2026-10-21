@@ -4,6 +4,7 @@ import { PaymentProvider } from '../services/PaymentServiceFactory';
 import paymentService from '../services/PaymentService';
 import { isElectron, isMobile } from '../../../shared/utils/electron';
 import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
+import { useStoreApiHealth } from '../../multi-register/hooks/useStoreApiHealth';
 
 /** The payment modes the checkout UI needs to know about. */
 export type PaymentMode =
@@ -28,6 +29,9 @@ const TAP_TO_PAY_PROVIDERS = new Set<PaymentProvider>([
  * Provides a stable interface to the payment service singleton
  */
 export const usePayment = () => {
+  // Re-renders consumers when LAN health flips — PED tender hides while degraded.
+  const { isDegraded } = useStoreApiHealth();
+
   const connectToTerminal = useCallback((deviceId: string): Promise<boolean> => paymentService.connectToTerminal(deviceId), []);
 
   const processPayment = useCallback((request: PaymentRequest): Promise<PaymentResponse> => paymentService.processPayment(request), []);
@@ -55,9 +59,10 @@ export const usePayment = () => {
    */
   const getPaymentMode = useCallback((): PaymentMode => {
     // Store-api PED works on any platform — the terminal lives on the LAN and
-    // the server drives it, so no local SDK is needed.
+    // the server drives it, so no local SDK is needed. During a LAN outage the
+    // server is unreachable → card tender is unavailable, cash only.
     if (paymentService.getCurrentProvider() === PaymentProvider.INSTORE_API) {
-      return instoreApiConfig.isClient ? 'instore_ped' : 'cash_only';
+      return instoreApiConfig.isClient && !isDegraded ? 'instore_ped' : 'cash_only';
     }
     // Desktop has no tap-to-pay SDK support.
     if (isElectron()) return 'cash_only';
@@ -66,7 +71,7 @@ export const usePayment = () => {
     // Mobile/tablet: check whether the active provider is a tap-to-pay SDK.
     const provider = paymentService.getCurrentProvider();
     return TAP_TO_PAY_PROVIDERS.has(provider) ? 'tap_to_pay' : 'cash_only';
-  }, []);
+  }, [isDegraded]);
 
   return useMemo(
     () => ({

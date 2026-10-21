@@ -50,6 +50,14 @@ export interface CreateOrderInput {
   platformOrderId?: string | null;
   status?: string;
   paymentsJson?: string | null;
+  /**
+   * Original sale timestamp (unix ms) — only set when replaying a locally
+   * queued order after a LAN outage; the server attributes the sale to when
+   * it actually happened. New live orders leave it unset (server stamps now).
+   */
+  createdAt?: number;
+  /** Same offline-replay case — when the sale was paid locally. */
+  paidAt?: number | null;
 }
 
 /**

@@ -25,6 +25,9 @@ import { authConfig } from './features/authentication/services/auth/AuthConfigSe
 import { instoreApiConfig } from './features/multi-register/services/InstoreApiConfig';
 import { syncPoller } from './features/multi-register/services/sync/SyncPoller';
 import { storeApiConnectionManager } from './features/multi-register/services/websocket/StoreApiConnectionManager';
+import { storeApiHealthService } from './features/multi-register/services/StoreApiHealthService';
+import { pendingOrderStore } from './features/multi-register/services/offline/PendingOrderStore';
+import { StoreApiOfflineBanner } from './features/multi-register/components/StoreApiOfflineBanner';
 import RootNavigator from './app/navigation/RootNavigator';
 import ErrorBoundary from './shared/components/ErrorBoundary';
 import { NotificationProvider, useNotifications } from './shared/contexts/NotificationProvider';
@@ -126,6 +129,10 @@ const AppContent = () => {
       .then(async () => {
         if (instoreApiConfig.isClient) {
           syncPoller.start();
+          // LAN health monitor + pending-order flush — lets the register keep
+          // selling (queued locally) through a network outage.
+          storeApiHealthService.start();
+          pendingOrderStore.start();
           loggerRef.current.info({ message: 'SyncPoller started — client mode active' });
         }
 
@@ -168,6 +175,8 @@ const AppContent = () => {
       loyaltyExpiryJob.stop();
       queueManager.dispose();
       syncPoller.stop();
+      storeApiHealthService.stop();
+      pendingOrderStore.stop();
       storeApiConnectionManager.stop().catch(() => {}); // Don't throw on cleanup
     };
   }, []);
@@ -198,6 +207,7 @@ const AppContent = () => {
           </OnboardingProvider>
           <AppToast />
           <ManagerApprovalModal />
+          <StoreApiOfflineBanner />
         </NotificationProvider>
       </ErrorBoundary>
     </SafeAreaView>

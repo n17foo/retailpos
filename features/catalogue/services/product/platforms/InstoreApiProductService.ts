@@ -1,4 +1,6 @@
 import { instoreApiClient } from '../../../../platform-clients/services/clients/instoreapi/InstoreApiClient';
+import { serverDataCache } from '../../../../multi-register/services/offline/ServerDataCache';
+import { isStoreApiUnavailable } from '../../../../multi-register/services/offline/isStoreApiUnavailable';
 import { Product as ServerProduct } from '../../../repositories/ProductRepository';
 import { Product, ProductQueryOptions, ProductResult, SyncResult } from '../ProductServiceInterface';
 import { PlatformProductServiceInterface, PlatformConfigRequirements, PlatformProductConfig } from './PlatformProductServiceInterface';
@@ -37,10 +39,30 @@ export class InstoreApiProductService implements PlatformProductServiceInterface
   }
 
   async getProducts(options: ProductQueryOptions): Promise<ProductResult> {
-    let products = (await instoreApiClient.getProducts(options.search ? { search: options.search } : undefined)).map(row =>
-      this.toPosProduct(row)
-    );
+    let rows: ServerProduct[];
+    try {
+      rows = await instoreApiClient.getProducts(options.search ? { search: options.search } : undefined);
+      // Warm the offline cache with every successful fetch — the register can
+      // keep selling its last-known catalogue during a LAN outage.
+      await serverDataCache.mergeProducts(rows);
+    } catch (error) {
+      if (!isStoreApiUnavailable(error)) throw error;
+      const cached = await serverDataCache.getProducts<ServerProduct>();
+      if (!cached) throw error;
+      rows = cached;
+    }
+    let products = rows.map(row => this.toPosProduct(row));
 
+    if (options.search) {
+      // Cached reads repeat the server-side filter client-side (offline rows
+      // skip the server's search narrowing).
+      const q = options.search.toLowerCase();
+      products = products.filter(
+        p =>
+          p.title.toLowerCase().includes(q) ||
+          p.variants.some(v => v.sku?.toLowerCase().includes(q) || v.barcode?.toLowerCase().includes(q))
+      );
+    }
     if (options.category) {
       products = products.filter(p => p.productType === options.category || p.tags?.includes(options.category || ''));
     }
@@ -66,8 +88,19 @@ export class InstoreApiProductService implements PlatformProductServiceInterface
   }
 
   async getProductById(productId: string): Promise<Product | null> {
-    const row = await instoreApiClient.getProduct(productId);
-    return row ? this.toPosProduct(row) : null;
+    try {
+      const row = await instoreApiClient.getProduct(productId);
+      if (row) {
+        await serverDataCache.mergeProducts([row]);
+        return this.toPosProduct(row);
+      }
+      return null;
+    } catch (error) {
+      if (!isStoreApiUnavailable(error)) throw error;
+      const cached = await serverDataCache.getProducts<ServerProduct>();
+      const row = cached?.find(p => p.id === productId);
+      return row ? this.toPosProduct(row) : null;
+    }
   }
 
   async createProduct(product: Product): Promise<Product> {
@@ -88,6 +121,7 @@ export class InstoreApiProductService implements PlatformProductServiceInterface
   async deleteProduct(productId: string): Promise<boolean> {
     try {
       await instoreApiClient.deleteProduct(productId);
+      await serverDataCache.removeProduct(productId);
       return true;
     } catch {
       return false;

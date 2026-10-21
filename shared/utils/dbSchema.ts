@@ -7,7 +7,7 @@ const logger = LoggerFactory.getInstance().createLogger('dbSchema');
  * Current database schema version.
  * Bump this number and add a migration block whenever the schema changes.
  */
-export const LATEST_DB_VERSION = 11;
+export const LATEST_DB_VERSION = 12;
 
 /**
  * Initialise (or migrate) the database schema.
@@ -730,6 +730,23 @@ async function migrateDatabase(db: SQLiteDatabase, fromVersion: number, toVersio
       }
 
       logger.info('v11 sale_mode columns added.');
+    }
+
+    // ── v12 – LAN-outage pending ops queue (client registers only) ────
+    if (fromVersion < 12) {
+      logger.info('Applying v12: creating pending_ops queue…');
+
+      await db.runAsync(`
+        CREATE TABLE IF NOT EXISTS pending_ops (
+          id         TEXT PRIMARY KEY,
+          kind       TEXT NOT NULL,
+          payload    TEXT NOT NULL,
+          created_at INTEGER NOT NULL
+        );
+      `);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_pending_ops_created ON pending_ops(created_at);`);
+
+      logger.info('v12 pending_ops created.');
     }
 
     // Stamp the version

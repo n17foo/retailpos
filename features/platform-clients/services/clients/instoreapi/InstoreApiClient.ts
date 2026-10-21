@@ -1,4 +1,5 @@
 import { instoreApiConfig } from '../../../../multi-register/services/InstoreApiConfig';
+import { storeApiHealthService } from '../../../../multi-register/services/StoreApiHealthService';
 import { LoggerFactory } from '../../../../../shared/services/logger/LoggerFactory';
 import { SIGNATURE_HEADERS, signRequest } from '../../../../multi-register/services/requestSigning';
 import { OrderRow, CreateOrderInput } from '../../../../orders-sync/repositories/OrderRepository';
@@ -357,10 +358,17 @@ export class InstoreApiClient {
    */
   async claimOrderSync(orderId: string): Promise<boolean> {
     const path = `/api/orders/${orderId}/sync/claim`;
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: 'PUT',
-      headers: this.buildSignedHeaders('PUT', path, ''),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, {
+        method: 'PUT',
+        headers: this.buildSignedHeaders('PUT', path, ''),
+      });
+      this.reportSuccess();
+    } catch (error) {
+      this.reportFailure(error);
+      throw error;
+    }
     if (response.status === 409) return false;
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
@@ -561,6 +569,15 @@ export class InstoreApiClient {
     return h;
   }
 
+  /** Report request outcomes to the LAN health monitor (drives degraded mode). */
+  private reportSuccess(): void {
+    storeApiHealthService.noteRequestSuccess();
+  }
+
+  private reportFailure(error: unknown): void {
+    storeApiHealthService.noteRequestFailure(error);
+  }
+
   private async get<T>(path: string, queryParams?: Record<string, string>): Promise<T> {
     let pathWithQuery = path;
     if (queryParams) {
@@ -568,10 +585,17 @@ export class InstoreApiClient {
       pathWithQuery += `?${qs}`;
     }
 
-    const response = await fetch(`${this.baseUrl}${pathWithQuery}`, {
-      method: 'GET',
-      headers: this.buildSignedHeaders('GET', pathWithQuery, ''),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${pathWithQuery}`, {
+        method: 'GET',
+        headers: this.buildSignedHeaders('GET', pathWithQuery, ''),
+      });
+      this.reportSuccess();
+    } catch (error) {
+      this.reportFailure(error);
+      throw error;
+    }
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
@@ -589,10 +613,17 @@ export class InstoreApiClient {
       pathWithQuery += `?${qs}`;
     }
 
-    const response = await fetch(`${this.baseUrl}${pathWithQuery}`, {
-      method: 'GET',
-      headers: this.buildSignedHeaders('GET', pathWithQuery, ''),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${pathWithQuery}`, {
+        method: 'GET',
+        headers: this.buildSignedHeaders('GET', pathWithQuery, ''),
+      });
+      this.reportSuccess();
+    } catch (error) {
+      this.reportFailure(error);
+      throw error;
+    }
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
@@ -634,11 +665,18 @@ export class InstoreApiClient {
 
   private async post<T>(path: string, body: unknown): Promise<T> {
     const rawBody = JSON.stringify(body);
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: 'POST',
-      headers: this.buildSignedHeaders('POST', path, rawBody),
-      body: rawBody,
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, {
+        method: 'POST',
+        headers: this.buildSignedHeaders('POST', path, rawBody),
+        body: rawBody,
+      });
+      this.reportSuccess();
+    } catch (error) {
+      this.reportFailure(error);
+      throw error;
+    }
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
@@ -650,11 +688,18 @@ export class InstoreApiClient {
 
   private async put<T>(path: string, body: unknown): Promise<T> {
     const rawBody = JSON.stringify(body);
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: 'PUT',
-      headers: this.buildSignedHeaders('PUT', path, rawBody),
-      body: rawBody,
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, {
+        method: 'PUT',
+        headers: this.buildSignedHeaders('PUT', path, rawBody),
+        body: rawBody,
+      });
+      this.reportSuccess();
+    } catch (error) {
+      this.reportFailure(error);
+      throw error;
+    }
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));
@@ -665,10 +710,17 @@ export class InstoreApiClient {
   }
 
   private async delete(path: string): Promise<void> {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: 'DELETE',
-      headers: this.buildSignedHeaders('DELETE', path, ''),
-    });
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, {
+        method: 'DELETE',
+        headers: this.buildSignedHeaders('DELETE', path, ''),
+      });
+      this.reportSuccess();
+    } catch (error) {
+      this.reportFailure(error);
+      throw error;
+    }
 
     if (!response.ok) {
       const errorBody = await response.json().catch(() => ({}));

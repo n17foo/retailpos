@@ -1,4 +1,6 @@
 import { instoreApiClient } from '../../../../platform-clients/services/clients/instoreapi/InstoreApiClient';
+import { serverDataCache } from '../../../../multi-register/services/offline/ServerDataCache';
+import { isStoreApiUnavailable } from '../../../../multi-register/services/offline/isStoreApiUnavailable';
 import { Category, CategoryServiceInterface } from '../CategoryServiceInterface';
 import { LoggerFactory } from '../../../../../shared/services/logger/LoggerFactory';
 
@@ -19,7 +21,16 @@ export class InstoreApiCategoryService implements CategoryServiceInterface {
   }
 
   async getCategories(): Promise<Category[]> {
-    return instoreApiClient.getCategories();
+    try {
+      const categories = await instoreApiClient.getCategories();
+      await serverDataCache.mergeCategories(categories);
+      return categories;
+    } catch (error) {
+      if (!isStoreApiUnavailable(error)) throw error;
+      const cached = await serverDataCache.getCategories<Category>();
+      if (!cached) throw error;
+      return cached;
+    }
   }
 
   async addCategory(category: Omit<Category, 'id'>): Promise<Category> {
@@ -35,6 +46,7 @@ export class InstoreApiCategoryService implements CategoryServiceInterface {
   async deleteCategory(categoryId: string): Promise<boolean> {
     try {
       await instoreApiClient.deleteCategory(categoryId);
+      await serverDataCache.removeCategory(categoryId);
       return true;
     } catch {
       return false;
