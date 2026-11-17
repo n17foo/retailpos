@@ -172,15 +172,15 @@ Feature docs updated alongside the controls:
 
 ## Residual risks (accepted)
 
-| Risk                             | Note                                                                                                                                                               |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| PIN uniqueness oracle            | Creating/updating a user reveals whether a PIN is already taken — inherent to PIN-only identification; limited to admins.                                          |
-| Global LAN PIN rate limit        | `/api/users/verify-pin` locks for every register after 10 failures/min — a secret holder can DoS PIN logins. Per-register limiting needs signed register identity. |
-| Mutable audit log                | KV JSON array capped ~2000 entries (ADR-012); not tamper-evident. `clear()` exists with no UI caller. Export CSV regularly.                                        |
-| Manager-approval lockout keying  | Keyed by requesting cashier; online PIN brute-force protection comes from `AuthAttemptLimiter`.                                                                    |
-| Plaintext LAN transport          | Signing protects integrity, not confidentiality → dedicated VLAN or WireGuard/Tailscale overlay required (`network-segmentation.md`).                              |
-| Dependency advisories            | 9 remain, all build-time except `decode-uri-component` (DoS only, via `@react-navigation` → `query-string`; fix is ESM-only).                                      |
-| Salted SHA-256 credential hashes | No KDF (carried over from round 2).                                                                                                                                |
-| Electron privileged IPC surface  | Peripheral/payment bridge is privileged — mitigated by fuses and port allowlists.                                                                                  |
-| Platform login disabled          | Carried over from round 2.                                                                                                                                         |
-| Webhook listener idempotency     | Carried over from round 2.                                                                                                                                         |
+| Risk                                 | Note                                                                                                                                                                                               |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PIN uniqueness oracle                | Creating/updating a user reveals whether a PIN is already taken — inherent to PIN-only identification; limited to admins.                                                                          |
+| Global LAN PIN rate limit            | `/api/users/verify-pin` locks for every register after 10 failures/min — a secret holder can DoS PIN logins. Per-register limiting needs signed register identity.                                 |
+| Mutable audit log                    | KV JSON array capped ~2000 entries (ADR-012); not tamper-evident. `clear()` exists with no UI caller. Export CSV regularly.                                                                        |
+| Manager-approval lockout keying      | Keyed by requesting cashier; online PIN brute-force protection comes from `AuthAttemptLimiter`.                                                                                                    |
+| Plaintext LAN transport              | Signing protects integrity, not confidentiality → dedicated VLAN or WireGuard/Tailscale overlay required (`network-segmentation.md`).                                                              |
+| Dependency advisories                | 9 remain, all build-time except `decode-uri-component` (DoS only, via `@react-navigation` → `query-string`; fix is ESM-only).                                                                      |
+| ~~Salted SHA-256 credential hashes~~ | Resolved — credentials are now `v2$` PBKDF2-HMAC-SHA256 (10k iterations); `v1$`/plaintext rows migrate on verify. Pure-TS KDF, no memory hardness — server-side bcrypt remains the stronger store. |
+| Electron privileged IPC surface      | Peripheral/payment bridge is privileged — mitigated by fuses and port allowlists.                                                                                                                  |
+| Platform login disabled              | Carried over from round 2.                                                                                                                                                                         |
+| Webhook listener idempotency         | Carried over from round 2.                                                                                                                                                                         |

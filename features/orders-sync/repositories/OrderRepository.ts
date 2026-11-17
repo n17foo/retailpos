@@ -31,6 +31,8 @@ export interface OrderRow {
   synced_at: number | null;
   payments_json: string | null;
   tax_estimated?: number | null;
+  /** Server-side receipt time — set by the Store API, absent on local rows. */
+  received_at?: number | null;
 }
 
 export interface CreateOrderInput {

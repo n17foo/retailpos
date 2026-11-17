@@ -208,13 +208,11 @@ export class StripeService implements PaymentServiceInterface {
    */
   public async getTransactionStatus(transactionId: string): Promise<PaymentResponse> {
     this.logger.info(`Getting transaction status for ${transactionId}`);
-    // This would require calling the Stripe API directly
-    // For now, return a not implemented response
-    return {
-      success: false,
-      errorMessage: 'Transaction status queries not implemented - use Stripe API directly',
-      timestamp: new Date(),
-    };
+    // Retrieving an intent needs the Stripe API (secret key, not on device)
+    // or the client secret, which we don't persist. Throw so interruption
+    // recovery takes the "cannot verify" path instead of reading a stubbed
+    // success:false as "the charge definitely failed" and re-attempting.
+    throw new Error('Transaction status queries not supported — verify in the Stripe dashboard');
   }
 
   /**

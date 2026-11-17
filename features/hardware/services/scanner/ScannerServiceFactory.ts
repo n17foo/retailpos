@@ -11,6 +11,7 @@ import { ElectronScannerService } from './ElectronScannerService';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
 import { isElectron } from '../../../../shared/utils/electron';
 import { USE_MOCK_SCANNER } from '@env';
+import { isMockFlagEnabled } from '../../../../shared/utils/mockFlags';
 
 /**
  * Enum for scanner types supported by the application
@@ -41,7 +42,7 @@ export class ScannerServiceFactory {
    * Initialize scanner services based on the USE_MOCK_SCANNER flag
    */
   private initializeServices(): void {
-    const useMock = USE_MOCK_SCANNER === 'true';
+    const useMock = isMockFlagEnabled(USE_MOCK_SCANNER);
     const runningInElectron = isElectron();
     this.logger.info(`Initializing scanner services (mock=${useMock}, electron=${runningInElectron})`);
 

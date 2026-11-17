@@ -41,13 +41,13 @@ export class InstoreApiInventoryService implements InventoryServiceInterface {
     let successful = 0;
     for (const update of updates) {
       try {
-        const row = await instoreApiClient.getProduct(update.productId);
-        if (!row) {
-          errors.push({ productId: update.productId, variantId: update.variantId, error: 'Product not found' });
-          continue;
+        if (update.adjustment) {
+          // Atomic on the server — concurrent registers can't lose each
+          // other's deltas via a read-modify-write race.
+          await instoreApiClient.adjustProductStock(update.productId, update.quantity);
+        } else {
+          await instoreApiClient.updateProduct(update.productId, { stock: Math.max(0, update.quantity) });
         }
-        const newStock = update.adjustment ? row.stock + update.quantity : update.quantity;
-        await instoreApiClient.updateProduct(update.productId, { stock: Math.max(0, newStock) });
         successful++;
       } catch (error) {
         errors.push({

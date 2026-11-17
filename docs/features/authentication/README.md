@@ -99,7 +99,8 @@ In-session:
 ## Dependencies
 
 - `shared/utils/crypto.ts` — `hashPin`/`verifyPin`/`timingSafeEqual` (PINs stored
-  `v1$salt$hash`; legacy plaintext rows transparently rehashed on login).
+  `v2$salt$iterations$pbkdf2hash`; legacy plaintext and `v1$` fast-hash rows
+  transparently rehashed on login).
 - `features/authentication/utils/userPin.utils.ts` — 6-digit format gate.
 - `shared/utils/actionRegistry.ts` — action keys + `ROLE_RANK`; `roleAccess.ts` for
   UI-level tab gating (navigation feature consumes it).

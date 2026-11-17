@@ -6,6 +6,7 @@ import { BrowserSecretsService } from './BrowserSecretsService';
 import { MemorySecretsService } from './mock/MemorySecretsService';
 import { isElectron } from '../../utils/electron';
 import { USE_MOCK_SECRETS } from '@env';
+import { isMockFlagEnabled } from '../../utils/mockFlags';
 import { LoggerFactory } from '../logger/LoggerFactory';
 
 /**
@@ -20,7 +21,7 @@ export class SecretsServiceFactory {
     const logger = LoggerFactory.getInstance().createLogger('SecretsServiceFactory');
     logger.debug('USE_MOCK_SECRETS', USE_MOCK_SECRETS);
     // Initialize the appropriate service based on the explicit mock flag and runtime.
-    if (USE_MOCK_SECRETS === 'true') {
+    if (isMockFlagEnabled(USE_MOCK_SECRETS)) {
       // Use mock service for Expo Go or testing
       this.currentService = MemorySecretsService.getInstance();
       logger.debug('Using MemorySecretsService (mock)');

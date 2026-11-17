@@ -187,6 +187,17 @@ export class InstoreApiPaymentService implements PaymentServiceInterface {
   }
 
   /**
+   * PaymentServiceInterface recovery hook — the stored transaction id is the
+   * payment-intent id. Unlike recoverPayment, transport errors propagate so
+   * the caller can distinguish "server unreachable — outcome unknown" from
+   * "processor confirmed the charge failed".
+   */
+  async getTransactionStatus(transactionId: string): Promise<PaymentResponse> {
+    const result = await paymentIntentClient.recoverOutcome(transactionId);
+    return this.mapIntentToResponse(result.payment_intent);
+  }
+
+  /**
    * Recover the outcome of a payment with unknown status.
    */
   async recoverPayment(paymentIntentId: string): Promise<PaymentResponse> {

@@ -389,6 +389,15 @@ export class InstoreApiClient {
     return result.product;
   }
 
+  /**
+   * Atomic signed stock delta — the only safe way for concurrent registers
+   * to change shared stock (a get-then-put read-modify-write loses updates).
+   */
+  async adjustProductStock(id: string, delta: number): Promise<Product> {
+    const result = await this.post<{ product: Product }>(`/api/products/${id}/stock-adjust`, { delta });
+    return result.product;
+  }
+
   async deleteProduct(id: string): Promise<void> {
     await this.delete(`/api/products/${id}`);
   }

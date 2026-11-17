@@ -2,7 +2,7 @@ import { db } from '../../../shared/utils/db';
 import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
 import { InstoreApiUserRepository } from './InstoreApiUserRepository';
 import { generateUUID } from '../../../shared/utils/uuid';
-import { hashPin, isHashedPin, verifyPin } from '../../../shared/utils/crypto';
+import { hashPin, isCurrentPinHash, verifyPin } from '../../../shared/utils/crypto';
 import { validatePinFormat } from '../utils/userPin.utils';
 import { buildUpdateAssignments } from '../../../shared/utils/sql';
 
@@ -95,8 +95,8 @@ export class UserRepository implements UserRepositoryInterface {
     const rows = await db.getAllAsync<UserRow>('SELECT * FROM users WHERE is_active = 1 ORDER BY name ASC');
     for (const row of rows) {
       if (verifyPin(pin, row.pin)) {
-        if (!isHashedPin(row.pin)) {
-          // Transparent migration: re-hash legacy plaintext PIN on successful match
+        if (!isCurrentPinHash(row.pin)) {
+          // Transparent migration: re-hash legacy plaintext/v1 PIN on successful match
           await this.updatePin(row.id, pin).catch(() => undefined);
         }
         return rowToUser(row);

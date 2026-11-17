@@ -77,8 +77,12 @@ beforeAll(async () => {
   await initializeSchema(realDb);
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   jest.clearAllMocks();
+  // Shared :memory: db — each test owns a clean queue.
+  await realDb.runAsync('DELETE FROM order_items');
+  await realDb.runAsync('DELETE FROM orders');
+  await realDb.runAsync('DELETE FROM pending_ops');
 });
 
 describe('queueOrder on real SQLite', () => {

@@ -1,6 +1,7 @@
 import { PaymentServiceInterface } from './PaymentServiceInterface';
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
 import { USE_MOCK_PAYMENT } from '@env';
+import { isMockFlagEnabled } from '../../../shared/utils/mockFlags';
 import Constants from 'expo-constants';
 import { MockPaymentService } from './mock/MockPaymentService';
 import { InstoreApiPaymentService } from '../../multi-register/services/payment/InstoreApiPaymentService';
@@ -32,7 +33,7 @@ function isExpoGo(): boolean {
 
 /** Returns true when mock mode is explicitly requested via the environment. */
 function isMockMode(): boolean {
-  return USE_MOCK_PAYMENT === 'true';
+  return isMockFlagEnabled(USE_MOCK_PAYMENT);
 }
 
 /**
