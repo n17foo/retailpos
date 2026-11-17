@@ -56,6 +56,8 @@ export interface LocalOrder {
   status: LocalOrderStatus;
   syncStatus: 'pending' | 'synced' | 'failed';
   syncError?: string;
+  /** Tax computed from last-known local rates — the platform could not be reached. */
+  taxEstimated?: boolean;
   registerId?: string;
   createdAt: Date;
   updatedAt: Date;

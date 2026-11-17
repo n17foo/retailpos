@@ -7,7 +7,7 @@ const logger = LoggerFactory.getInstance().createLogger('dbSchema');
  * Current database schema version.
  * Bump this number and add a migration block whenever the schema changes.
  */
-export const LATEST_DB_VERSION = 13;
+export const LATEST_DB_VERSION = 14;
 
 /**
  * Initialise (or migrate) the database schema.
@@ -818,6 +818,16 @@ async function migrateDatabase(db: SQLiteDatabase, fromVersion: number, toVersio
       }
 
       logger.info('v13 applied.');
+    }
+
+    // ── v14 – tax_estimated flag on orders ─────────────────────────────
+    if (fromVersion < 14) {
+      logger.info('Applying v14: adding tax_estimated to orders…');
+      const colExists = await db.getFirstAsync<{ cid: number }>(`SELECT cid FROM pragma_table_info('orders') WHERE name = 'tax_estimated'`);
+      if (!colExists) {
+        await db.runAsync(`ALTER TABLE orders ADD COLUMN tax_estimated INTEGER NOT NULL DEFAULT 0`);
+      }
+      logger.info('v14 applied.');
     }
 
     // Stamp the version

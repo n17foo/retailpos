@@ -80,8 +80,11 @@ export class PendingOrderStore {
 
   /** Write an order (with items) locally, marked for upload. */
   async queueOrder(input: CreateOrderInput, items: CreateOrderItemInput[]): Promise<void> {
-    await orderRepository.createWithItems(input, items);
-    await db.runAsync('UPDATE orders SET sync_status = ? WHERE id = ?', [PENDING_UPLOAD, input.id]);
+    await db.withTransactionAsync(async () => {
+      await orderRepository.create(input);
+      await orderItemRepository.createMany(items);
+      await db.runAsync('UPDATE orders SET sync_status = ? WHERE id = ?', [PENDING_UPLOAD, input.id]);
+    });
     this.logger.info({ message: `Order ${input.id} queued locally — LAN down` });
   }
 

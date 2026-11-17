@@ -30,6 +30,7 @@ export interface OrderRow {
   paid_at: number | null;
   synced_at: number | null;
   payments_json: string | null;
+  tax_estimated?: number | null;
 }
 
 export interface CreateOrderInput {
@@ -58,6 +59,11 @@ export interface CreateOrderInput {
   createdAt?: number;
   /** Same offline-replay case — when the sale was paid locally. */
   paidAt?: number | null;
+  /**
+   * Tax was computed from last-known local rates because the platform could
+   * not be reached — the synced platform record may differ from the charge.
+   */
+  taxEstimated?: boolean;
 }
 
 /**

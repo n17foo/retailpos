@@ -19,6 +19,7 @@ import { localCustomerService } from '../../customers/services/customer/LocalCus
 import { DiscountServiceFactory } from '../../discounts/services/DiscountServiceFactory';
 import { procurementService } from '../../procurement/services/ProcurementService';
 import { InventoryServiceFactory } from '../../inventory/services/InventoryServiceFactory';
+import { isRetryableTransportError } from '../../../shared/utils/apiErrors';
 
 /**
  * Handles checkout flow and order queries.
@@ -48,13 +49,17 @@ export class CheckoutService implements CheckoutServiceInterface {
     //   remote_cart   → ask the platform to calculate tax on a cart/quote/checkout and discard it
     //                   (WooCommerce, Magento, BigCommerce, Sylius, PrestaShop); the order is created after payment
     //   local_only    → offline catalogue only: basket totals with the merchant's local tax setup
-    // If an online platform cannot return the tax, checkout stops: charging without it would charge the customer wrongly.
+    // If the platform is unreachable the basket's own totals — computed from per-item rates
+    // cached from the catalogue — are used and the order is flagged tax_estimated so the
+    // discrepancy against the platform's calculation is auditable. A platform that actively
+    // REJECTS the basket (4xx) still stops checkout: its answer is authoritative.
     // See: docs/specs/platform/platform-tax.md and docs/specs/checkout/checkout.md §Checkout Capability Modes
     let subtotal = basket.subtotal;
     let tax = basket.tax;
     let total = basket.total;
     let platformOrderId: string | undefined;
     let status: LocalOrderStatus = 'pending';
+    let taxEstimated = false;
     let platformTaxRates: (number | undefined)[] = basket.items.map(() => undefined);
 
     const isOnline = !!platform && isOnlinePlatform(platform);
@@ -100,15 +105,24 @@ export class CheckoutService implements CheckoutServiceInterface {
           ({ subtotal, tax, total } = applyTaxQuote(basket.subtotal, basket.discountAmount ?? 0, quote));
         }
       } catch (err) {
-        this.logger.error(
-          { message: `Could not get tax from ${platform} (${basketMode}); checkout stopped` },
-          err instanceof Error ? err : new Error(String(err))
-        );
-        throw new Error(
-          `Could not get the tax calculation from ${PLATFORM_DISPLAY_NAMES[platform]}, so the sale cannot be completed. ` +
-            `Check the connection and try again. (${err instanceof Error ? err.message : String(err)})`,
-          { cause: err }
-        );
+        if (isRetryableTransportError(err)) {
+          // Platform unreachable or wedged — the sale must still complete (ADR-004).
+          this.logger.warn(
+            { message: `Could not reach ${platform} for tax (${basketMode}) — using last-known local rates` },
+            err instanceof Error ? err : new Error(String(err))
+          );
+          taxEstimated = true;
+        } else {
+          this.logger.error(
+            { message: `Could not get tax from ${platform} (${basketMode}); checkout stopped` },
+            err instanceof Error ? err : new Error(String(err))
+          );
+          throw new Error(
+            `Could not get the tax calculation from ${PLATFORM_DISPLAY_NAMES[platform]}, so the sale cannot be completed. ` +
+              `Check the connection and try again. (${err instanceof Error ? err.message : String(err)})`,
+            { cause: err }
+          );
+        }
       }
     }
 
@@ -131,6 +145,7 @@ export class CheckoutService implements CheckoutServiceInterface {
       registerId: basket.registerId,
       status,
       syncStatus: 'pending',
+      taxEstimated: taxEstimated || undefined,
       createdAt: new Date(now),
       updatedAt: new Date(now),
     };
@@ -152,6 +167,7 @@ export class CheckoutService implements CheckoutServiceInterface {
       registerId: basket.registerId ?? null,
       platformOrderId: platformOrderId ?? null,
       status,
+      taxEstimated,
     };
 
     const itemInputs = basket.items.map((item, i) => ({
@@ -413,6 +429,7 @@ export class CheckoutService implements CheckoutServiceInterface {
       registerId: row.register_id ?? undefined,
       status: row.status as LocalOrderStatus,
       syncStatus: row.sync_status as 'pending' | 'synced' | 'failed',
+      taxEstimated: row.tax_estimated === 1 ? true : undefined,
       syncError: row.sync_error ?? undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),

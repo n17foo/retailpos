@@ -2,6 +2,7 @@ import { InstoreApiOrderRepository } from './InstoreApiOrderRepository';
 import { instoreApiClient } from '../../platform-clients/services/clients/instoreapi/InstoreApiClient';
 import { pendingOrderStore } from '../../multi-register/services/offline/PendingOrderStore';
 import { isStoreApiUnavailable } from '../../multi-register/services/offline/isStoreApiUnavailable';
+import { ApiError, RequestTimeoutError } from '../../../shared/utils/apiErrors';
 import type { CreateOrderInput, OrderRow } from './OrderRepository';
 import type { CreateOrderItemInput } from './OrderItemRepository';
 
@@ -35,7 +36,8 @@ const client = instoreApiClient as jest.Mocked<typeof instoreApiClient>;
 const store = pendingOrderStore as jest.Mocked<typeof pendingOrderStore>;
 
 const LAN_DOWN = new TypeError('Network request failed');
-const HTTP_500 = new Error('POST /api/orders failed: 500');
+const HTTP_500 = new ApiError(500, 'POST /api/orders failed: 500');
+const HTTP_422 = new ApiError(422, 'POST /api/orders failed: 422');
 
 function makeInput(): CreateOrderInput {
   return {
@@ -90,10 +92,14 @@ function makeRow(id: string): OrderRow {
 }
 
 describe('isStoreApiUnavailable', () => {
-  it('flags fetch-level failures only', () => {
+  it('flags transport failures and 5xx, but not 4xx', () => {
     expect(isStoreApiUnavailable(new TypeError('Network request failed'))).toBe(true);
     expect(isStoreApiUnavailable(Object.assign(new Error('aborted'), { name: 'AbortError' }))).toBe(true);
-    expect(isStoreApiUnavailable(HTTP_500)).toBe(false);
+    expect(isStoreApiUnavailable(new RequestTimeoutError('timed out'))).toBe(true);
+    expect(isStoreApiUnavailable(HTTP_500)).toBe(true);
+    expect(isStoreApiUnavailable(new Error('POST /api/orders failed: 503'))).toBe(true);
+    expect(isStoreApiUnavailable(HTTP_422)).toBe(false);
+    expect(isStoreApiUnavailable(new ApiError(404, 'not found'))).toBe(false);
     expect(isStoreApiUnavailable(new Error('invalid PIN'))).toBe(false);
   });
 });
@@ -113,9 +119,15 @@ describe('InstoreApiOrderRepository — LAN degraded', () => {
     expect(store.queueOrder).toHaveBeenCalledWith(input, items);
   });
 
-  it('propagates real HTTP errors instead of queueing', async () => {
+  it('queues on 5xx — the server is alive but broken, replay is idempotent', async () => {
     client.createOrder.mockRejectedValue(HTTP_500);
-    await expect(repo.createWithItems(makeInput(), [])).rejects.toThrow('500');
+    await repo.createWithItems(makeInput(), []);
+    expect(store.queueOrder).toHaveBeenCalled();
+  });
+
+  it('propagates real 4xx errors instead of queueing', async () => {
+    client.createOrder.mockRejectedValue(HTTP_422);
+    await expect(repo.createWithItems(makeInput(), [])).rejects.toThrow('422');
     expect(store.queueOrder).not.toHaveBeenCalled();
   });
 

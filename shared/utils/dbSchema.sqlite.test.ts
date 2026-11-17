@@ -8,45 +8,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { initializeSchema, LATEST_DB_VERSION } from './dbSchema';
-
-type Row = Record<string, unknown>;
-
-class NodeSqliteAdapter {
-  constructor(private readonly db: DatabaseSync) {}
-
-  async runAsync(sql: string, params: unknown[] = []): Promise<{ changes: number; lastInsertRowId: number }> {
-    const result = this.db.prepare(sql).run(...(params as never[]));
-    return { changes: Number(result.changes), lastInsertRowId: Number(result.lastInsertRowid) };
-  }
-
-  async getFirstAsync<T = Row>(sql: string, params: unknown[] = []): Promise<T | null> {
-    const row = this.db.prepare(sql).get(...(params as never[]));
-    return (row as T) ?? null;
-  }
-
-  async getAllAsync<T = Row>(sql: string, params: unknown[] = []): Promise<T[]> {
-    return this.db.prepare(sql).all(...(params as never[])) as T[];
-  }
-
-  async execAsync(sql: string): Promise<void> {
-    this.db.exec(sql);
-  }
-
-  async withTransactionAsync(fn: (txn: this) => Promise<void>): Promise<void> {
-    this.db.exec('BEGIN');
-    try {
-      await fn(this);
-      this.db.exec('COMMIT');
-    } catch (error) {
-      this.db.exec('ROLLBACK');
-      throw error;
-    }
-  }
-}
-
-function openDb(): SQLiteDatabase {
-  return new NodeSqliteAdapter(new DatabaseSync(':memory:')) as unknown as SQLiteDatabase;
-}
+import { NodeSqliteAdapter, openDb } from '../../tests/helpers/nodeSqliteAdapter';
 
 describe('initializeSchema on real SQLite', () => {
   it('migrates a fresh database to the latest version', async () => {
@@ -102,5 +64,52 @@ describe('initializeSchema on real SQLite', () => {
     expect(op?.attempts).toBe(0);
     expect(op?.quarantined).toBe(0);
     real.close();
+  });
+});
+
+describe('database safety pragmas and atomic writes (bug 10)', () => {
+  it('WAL journal mode and FULL synchronous stick on a real file', async () => {
+    const fs = await import('node:fs');
+    const os = await import('node:os');
+    const path = await import('node:path');
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'posdb-')), 'test.db');
+    const real = new DatabaseSync(file);
+    const db = new NodeSqliteAdapter(real) as unknown as SQLiteDatabase;
+
+    await db.execAsync('PRAGMA journal_mode = WAL;');
+    await db.execAsync('PRAGMA synchronous = FULL;');
+
+    const { journal_mode } = (await db.getFirstAsync<{ journal_mode: string }>('PRAGMA journal_mode'))!;
+    const { synchronous } = (await db.getFirstAsync<{ synchronous: number }>('PRAGMA synchronous'))!;
+    expect(journal_mode.toLowerCase()).toBe('wal');
+    expect(synchronous).toBe(2); // FULL = 2
+    real.close();
+  });
+
+  it('quick_check reports ok on a healthy schema', async () => {
+    const db = openDb();
+    await initializeSchema(db);
+    const rows = await db.getAllAsync<{ quick_check: string }>('PRAGMA quick_check');
+    expect(rows.map(r => r.quick_check)).toEqual(['ok']);
+  });
+
+  it('a failed insert inside withTransactionAsync rolls back the whole sale', async () => {
+    const db = openDb();
+    await initializeSchema(db);
+    await expect(
+      db.withTransactionAsync(async () => {
+        await db.runAsync(
+          `INSERT INTO orders (id, subtotal, tax, total, status, created_at, updated_at) VALUES ('sale-1', 10, 1, 11, 'paid', 1, 1)`
+        );
+        // NOT NULL violation on name — the crash-mid-sale case.
+        await db.runAsync(
+          `INSERT INTO order_items (id, order_id, product_id, name, price, quantity) VALUES ('i1', 'sale-1', 'p1', NULL, 10, 1)`
+        );
+      })
+    ).rejects.toThrow(/NOT NULL/i);
+
+    // Order must not exist — no orphan order row without its items.
+    expect(await db.getFirstAsync('SELECT id FROM orders WHERE id = ?', ['sale-1'])).toBeNull();
+    expect(await db.getFirstAsync('SELECT id FROM order_items WHERE order_id = ?', ['sale-1'])).toBeNull();
   });
 });
