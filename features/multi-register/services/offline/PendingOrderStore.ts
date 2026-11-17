@@ -9,6 +9,8 @@ import { instoreApiConfig } from '../InstoreApiConfig';
 import { storeApiHealthService } from '../StoreApiHealthService';
 import { isStoreApiUnavailable } from './isStoreApiUnavailable';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
+import { MAX_SYNC_RETRIES } from '../../../platform-clients/services/config/POSConfigService';
+import { notificationService } from '../../../../shared/services/notifications/NotificationService';
 
 /** sync_status marker for orders written locally while the LAN is down. */
 export const PENDING_UPLOAD = 'pending_upload';
@@ -25,6 +27,9 @@ interface PendingOpRow {
   kind: PendingOpKind;
   payload: string;
   created_at: number;
+  attempts: number;
+  last_error: string | null;
+  quarantined: number;
 }
 
 /**
@@ -165,21 +170,43 @@ export class PendingOrderStore {
             { message: `Queued order ${row.id} rejected by server` },
             error instanceof Error ? error : new Error(String(error))
           );
+          // Surface the reason — the row stays pending_upload and retries
+          // next cycle (server-side create is idempotent on the order id).
+          await db.runAsync('UPDATE orders SET sync_error = ? WHERE id = ?', [(error as Error).message, row.id]).catch(() => undefined);
         }
       }
 
-      const ops = await db.getAllAsync<PendingOpRow>('SELECT * FROM pending_ops ORDER BY created_at ASC');
+      const ops = await db.getAllAsync<PendingOpRow>('SELECT * FROM pending_ops WHERE quarantined = 0 ORDER BY created_at ASC');
       for (const op of ops) {
         try {
           await this.replayOp(op);
           await db.runAsync('DELETE FROM pending_ops WHERE id = ?', [op.id]);
         } catch (error) {
           if (isStoreApiUnavailable(error)) return;
+          // Keep the op — a server error must not silently lose a payment
+          // or status update (audit bug 6). Retry with an attempt counter;
+          // quarantine after MAX_SYNC_RETRIES so a poisoned op can't wedge
+          // the queue.
+          const attempts = op.attempts + 1;
+          const quarantined = attempts >= MAX_SYNC_RETRIES() ? 1 : 0;
+          await db.runAsync('UPDATE pending_ops SET attempts = ?, last_error = ?, quarantined = ? WHERE id = ?', [
+            attempts,
+            (error as Error).message,
+            quarantined,
+            op.id,
+          ]);
           this.logger.error(
-            { message: `Pending op ${op.id} (${op.kind}) failed` },
+            { message: `Pending op ${op.id} (${op.kind}) failed (attempt ${attempts})` },
             error instanceof Error ? error : new Error(String(error))
           );
-          await db.runAsync('DELETE FROM pending_ops WHERE id = ?', [op.id]);
+          if (quarantined) {
+            this.logger.error({ message: `Pending op ${op.id} (${op.kind}) quarantined after ${attempts} attempts` });
+            notificationService.notify(
+              'Offline sync',
+              `A queued ${op.kind} update failed ${attempts} times and was quarantined — manual reconciliation needed`,
+              'error'
+            );
+          }
         }
       }
     } finally {

@@ -3,6 +3,7 @@ import { Order, TaxQuote } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { SyliusApiClient } from '../../../../platform-clients/services/clients/sylius/SyliusApiClient';
+import { noteHasReference } from '../orderReference';
 
 /**
  * Sylius-specific implementation of the order service
@@ -140,6 +141,22 @@ export class SyliusOrderService extends BaseOrderService {
   /**
    * Get an order by ID
    */
+  /**
+   * API Platform collection — scan recent orders' `notes` for the POS
+   * reference marker (audit bug 3).
+   */
+  async findOrderByReference(reference: string): Promise<Order | null> {
+    if (!this.isInitialized()) return null;
+    try {
+      const data = await this.apiClient.get<any>('orders?itemsPerPage=50&order[createdAt]=desc');
+      const items: any[] = data?.['hydra:member'] ?? data?.member ?? data?.items ?? [];
+      const hit = items.find(o => noteHasReference(o.notes, reference));
+      return hit ? this.getOrder(String(hit.id ?? hit['@id']?.split('/').pop())) : null;
+    } catch {
+      return null;
+    }
+  }
+
   async getOrder(orderId: string): Promise<Order | null> {
     if (!this.isInitialized()) {
       throw new Error('Sylius order service not initialized');

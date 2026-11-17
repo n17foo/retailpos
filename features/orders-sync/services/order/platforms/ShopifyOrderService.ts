@@ -3,6 +3,7 @@ import { Order } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { ShopifyApiClient } from '../../../../platform-clients/services/clients/shopify/ShopifyApiClient';
+import { noteHasReference } from '../orderReference';
 
 /**
  * Shopify-specific implementation of the order service
@@ -136,11 +137,32 @@ export class ShopifyOrderService extends BaseOrderService {
 
     try {
       const shopifyOrder = this.mapToShopifyOrder(order);
+      // Shopify-native dedupe: retrying with the same key returns the
+      // original order instead of creating a duplicate (audit bug 3).
+      if (order.reference) {
+        shopifyOrder.idempotency_key = order.reference;
+      }
       const data = await this.apiClient.post<{ order: any }>('orders.json', { order: shopifyOrder });
       return this.mapToOrder(data.order);
     } catch (error) {
       this.logger.error({ message: 'Error creating Shopify order:' }, error instanceof Error ? error : new Error(String(error)));
       throw error;
+    }
+  }
+
+  /**
+   * Scan recent orders for the POS reference marker embedded in `note`
+   * (see orderReference.ts). Combined with idempotency_key this makes
+   * create-retries safe.
+   */
+  async findOrderByReference(reference: string): Promise<Order | null> {
+    if (!this.isInitialized()) return null;
+    try {
+      const data = await this.apiClient.get<{ orders: any[] }>('orders.json?status=any&fields=id,note&limit=50&order=created_at+desc');
+      const hit = (data.orders ?? []).find(o => noteHasReference(o.note, reference));
+      return hit ? this.getOrder(String(hit.id)) : null;
+    } catch {
+      return null;
     }
   }
 

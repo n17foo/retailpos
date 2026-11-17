@@ -61,10 +61,10 @@ export class OfflineOrderRepository implements OrderRepository {
   }
 
   async findUnsynced(): Promise<OrderRow[]> {
-    return db.getAllAsync<OrderRow>(`SELECT * FROM orders WHERE status = ? AND sync_status != ? ORDER BY created_at ASC`, [
-      'paid',
-      'synced',
-    ]);
+    return db.getAllAsync<OrderRow>(
+      `SELECT * FROM orders WHERE status = ? AND sync_status NOT IN ('synced', 'quarantined') ORDER BY created_at ASC`,
+      ['paid']
+    );
   }
 
   async findByDateRange(fromTimestamp: number, toTimestamp: number, cashierId?: string): Promise<OrderRow[]> {

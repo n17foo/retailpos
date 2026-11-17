@@ -233,6 +233,10 @@ export class CheckoutService implements CheckoutServiceInterface {
   }
 
   async completePayment(orderId: string, paymentMethod: string, transactionId?: string, payments?: PaymentLine[]): Promise<CheckoutResult> {
+    // Phase 1 — durable payment record. This is the point of no return: the
+    // card may already be charged, so a failure here must leave the order
+    // in 'processing' (recoverable via interruption recovery), NEVER flip a
+    // possibly-paid order to 'failed' (audit bug 4).
     try {
       // Validate split tender total matches order total (spec §6.1)
       if (payments && payments.length > 0) {
@@ -248,10 +252,31 @@ export class CheckoutService implements CheckoutServiceInterface {
       } else {
         await this.orderRepo.updatePayment(orderId, paymentMethod, transactionId ?? null);
       }
+    } catch (error) {
+      this.logger.error({ message: `Payment record could not be persisted for order ${orderId} — charge state unknown` }, error as Error);
+      return {
+        success: false,
+        orderId,
+        error: 'The payment may have reached the processor but could not be recorded. Verify the charge before retrying.',
+      };
+    }
 
-      // If this order has a platform draft, mark it as paid on the platform.
-      // Only attempt completeOrder() for native_draft platforms — remote_cart and
-      // local_only platforms never create a platformOrderId at checkout time.
+    // Phase 2 — post-payment work. Everything below is non-fatal: the
+    // payment is durably recorded as 'paid', so failures are logged and
+    // reported as warnings, never a status flip (audit bug 4).
+    const warnings: string[] = [];
+    const nonFatal = (label: string) => (error: unknown) => {
+      warnings.push(label);
+      this.logger.warn(
+        { message: `${label} failed for order ${orderId} after payment was recorded` },
+        error instanceof Error ? error : new Error(String(error))
+      );
+    };
+
+    // If this order has a platform draft, mark it as paid on the platform.
+    // Only attempt completeOrder() for native_draft platforms — remote_cart and
+    // local_only platforms never create a platformOrderId at checkout time.
+    try {
       const orderRow = await this.orderRepo.findById(orderId);
       if (orderRow?.platform_order_id && orderRow.platform) {
         const platform = orderRow.platform as ECommercePlatform;
@@ -266,12 +291,13 @@ export class CheckoutService implements CheckoutServiceInterface {
               { message: `Failed to complete platform order ${orderRow.platform_order_id} on ${platform}` },
               err instanceof Error ? err : new Error(String(err))
             );
+            warnings.push('platform order completion');
           }
         }
       }
 
       // Only clear basket after the order is successfully recorded
-      await this.basketService.clearBasket();
+      await this.basketService.clearBasket().catch(nonFatal('basket clear'));
 
       // Post-payment hooks — non-blocking, must not affect checkout result
       // orderRow was already fetched above; reuse it
@@ -301,11 +327,21 @@ export class CheckoutService implements CheckoutServiceInterface {
         metadata: { orderId, paymentMethod, transactionId },
       });
 
-      return { success: true, orderId, openDrawer };
+      return {
+        success: true,
+        orderId,
+        openDrawer,
+        warning: warnings.length > 0 ? `Payment recorded; deferred step(s) failed: ${warnings.join(', ')}` : undefined,
+      };
     } catch (error) {
-      this.logger.error({ message: `Failed to complete payment for order ${orderId}` }, error as Error);
-      await this.orderRepo.updateStatus(orderId, 'failed');
-      return { success: false, orderId, error: (error as Error).message };
+      // Phase-2 catch — payment is already durably 'paid'; report success
+      // with a warning rather than flipping status (audit bug 4).
+      this.logger.error({ message: `Post-payment step failed for order ${orderId}` }, error as Error);
+      return {
+        success: true,
+        orderId,
+        warning: `Payment recorded; a post-payment step failed: ${(error as Error).message}`,
+      };
     }
   }
 

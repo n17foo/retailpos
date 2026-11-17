@@ -71,6 +71,8 @@ export interface CheckoutResult {
   orderId: string;
   platformOrderId?: string;
   error?: string;
+  /** Payment was recorded but a post-payment step failed — show to staff. */
+  warning?: string;
   /** Signals the UI to open the cash drawer (true when payment method is cash) */
   openDrawer?: boolean;
   payments?: PaymentLine[];

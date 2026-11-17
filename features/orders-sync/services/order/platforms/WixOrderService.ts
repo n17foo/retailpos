@@ -3,6 +3,7 @@ import { Order } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { WixApiClient } from '../../../../platform-clients/services/clients/wix/WixApiClient';
+import { noteHasReference } from '../orderReference';
 
 /**
  * Wix-specific implementation of the order service.
@@ -189,6 +190,22 @@ export class WixOrderService extends BaseOrderService {
   }
 
   // ── Mapping helpers ───────────────────────────────────────────────────────
+
+  /**
+   * Wix order search — scan recent orders' buyerNote for the POS
+   * reference marker (audit bug 3).
+   */
+  async findOrderByReference(reference: string): Promise<Order | null> {
+    if (!this.isInitialized()) return null;
+    try {
+      const data = await this.apiClient.post<any>('ecom/v1/orders/search', { search: { paging: { limit: 50 } } });
+      const orders: any[] = data?.orders ?? [];
+      const hit = orders.find(o => noteHasReference(o.buyerNote, reference));
+      return hit ? this.getOrder(String(hit.id)) : null;
+    } catch {
+      return null;
+    }
+  }
 
   private mapToWixOrder(order: Order): any {
     return {

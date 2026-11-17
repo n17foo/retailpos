@@ -169,14 +169,25 @@ describe('CheckoutService', () => {
       expect(basketService.clearBasket).toHaveBeenCalled();
     });
 
-    it('marks order as failed when payment errors', async () => {
+    it('leaves order in processing when the payment record cannot persist — never marks a possibly-charged order failed', async () => {
       orderRepo.updatePayment.mockRejectedValue(new Error('DB write failed'));
 
       const result = await service.completePayment('order-1', 'card');
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('DB write failed');
-      expect(orderRepo.updateStatus).toHaveBeenCalledWith('order-1', 'failed');
+      expect(result.error).toContain('could not be recorded');
+      expect(orderRepo.updateStatus).not.toHaveBeenCalled();
+    });
+
+    it('reports a post-payment failure as a warning while staying paid', async () => {
+      orderRepo.updatePayment.mockResolvedValue(undefined);
+      (basketService.clearBasket as jest.Mock).mockRejectedValue(new Error('basket write failed'));
+
+      const result = await service.completePayment('order-1', 'card', 'txn-1');
+
+      expect(result.success).toBe(true);
+      expect(result.warning).toContain('basket clear');
+      expect(orderRepo.updateStatus).not.toHaveBeenCalledWith('order-1', 'failed');
     });
   });
 

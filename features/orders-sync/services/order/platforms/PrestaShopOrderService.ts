@@ -3,6 +3,7 @@ import { Order, TaxQuote } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { PrestaShopApiClient } from '../../../../platform-clients/services/clients/prestashop/PrestaShopApiClient';
+import { noteHasReference } from '../orderReference';
 
 /**
  * PrestaShop-specific implementation of the order service
@@ -176,7 +177,25 @@ export class PrestaShopOrderService extends BaseOrderService {
       total_paid_real: order.paymentStatus === 'paid' ? order.total : 0,
       total_products: order.subtotal,
       total_products_wt: order.subtotal + (order.tax || 0),
+      // Carries the POS-ORDER:<id> marker so retries can find the order.
+      note: order.note,
     };
+  }
+
+  /**
+   * PrestaShop orders carry a `note` field — scan recent orders for the
+   * POS reference marker (audit bug 3).
+   */
+  async findOrderByReference(reference: string): Promise<Order | null> {
+    if (!this.isInitialized()) return null;
+    try {
+      const data = await this.apiClient.get<any>('orders?output_format=JSON&display=full&sort=id_DESC&limit=25');
+      const orders: any[] = Array.isArray(data) ? data : (data?.orders ?? []);
+      const hit = orders.find(o => typeof o === 'object' && o !== null && noteHasReference(o.note, reference));
+      return hit ? this.getOrder(String(hit.id)) : null;
+    } catch {
+      return null;
+    }
   }
 
   protected mapToOrder(psOrder: any): Order {

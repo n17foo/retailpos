@@ -3,6 +3,7 @@ import { Order, TaxQuote } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { BigCommerceApiClient } from '../../../../platform-clients/services/clients/bigcommerce/BigCommerceApiClient';
+import { noteHasReference } from '../orderReference';
 
 /**
  * BigCommerce-specific implementation of the order service
@@ -177,6 +178,21 @@ export class BigCommerceOrderService extends BaseOrderService {
   /**
    * Map our order format to BigCommerce's format
    */
+  /**
+   * BigCommerce V2 list — scan recent orders' customer_message for the
+   * POS reference marker (audit bug 3).
+   */
+  async findOrderByReference(reference: string): Promise<Order | null> {
+    if (!this.isInitialized()) return null;
+    try {
+      const data = await this.apiClient.get<any[]>('orders?limit=50&sort=date_created:desc');
+      const hit = (data ?? []).find(o => noteHasReference(o.customer_message, reference));
+      return hit ? this.getOrder(String(hit.id)) : null;
+    } catch {
+      return null;
+    }
+  }
+
   private mapToBigCommerceOrder(order: Order): any {
     // Map addresses
     const billing_address = order.billingAddress
