@@ -45,7 +45,9 @@ describe('SquareSettingsForm', () => {
     const tree = await renderUi(<SquareSettingsForm {...baseProps} onSettingChange={onSettingChange} />);
     expect(hasText(tree, 'settings.payment.squareSettings')).toBe(true);
     const inputs = tree.root.findAll(n => n.type === 'TextInput');
-    expect(inputs).toHaveLength(3);
+    // applicationId, locationId, accessToken, backendUrl (PAY-02 — the
+    // nonce charge endpoint is configurable).
+    expect(inputs).toHaveLength(4);
     inputs[2].props.onChangeText('tok-2');
     expect(onSettingChange).toHaveBeenCalledWith('accessToken', 'tok-2');
   });
