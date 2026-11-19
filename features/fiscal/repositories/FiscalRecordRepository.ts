@@ -101,6 +101,41 @@ export class FiscalRecordRepository {
     return db.getFirstAsync<FiscalRecordRow>('SELECT * FROM fiscal_records WHERE chain_id = ? ORDER BY seq DESC LIMIT 1', [chainId]);
   }
 
+  /** The z_report closing a shift — idempotent close checks (F12). */
+  async findZReport(shiftId: string): Promise<FiscalRecordRow | null> {
+    return db.getFirstAsync<FiscalRecordRow>(
+      `SELECT * FROM fiscal_records WHERE shift_id = ? AND type = 'z_report' ORDER BY seq DESC LIMIT 1`,
+      [shiftId]
+    );
+  }
+
+  /** Whether a shift is locked by a committed z_report (F12 period lock). */
+  async isShiftLocked(dbh: SQLiteDatabase, shiftId: string): Promise<boolean> {
+    const row = await dbh.getFirstAsync<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM fiscal_records WHERE type = 'z_report' AND shift_id = ?`,
+      [shiftId]
+    );
+    return (row?.n ?? 0) > 0;
+  }
+
+  /**
+   * Sequence bounds of the period being closed — every non-z_report record
+   * since the previous z_report (or the genesis). Snapshotted into the
+   * closing record so the period's contents are reconstructible (F12).
+   */
+  async getPeriodBounds(dbh: SQLiteDatabase, chainId: string): Promise<{ firstSeq: number; lastSeq: number } | null> {
+    const row = await dbh.getFirstAsync<{ firstSeq: number | null; lastSeq: number | null }>(
+      `SELECT MIN(seq) AS firstSeq, MAX(seq) AS lastSeq FROM fiscal_records
+       WHERE chain_id = ? AND type != 'z_report'
+         AND seq > COALESCE((SELECT MAX(seq) FROM fiscal_records WHERE chain_id = ? AND type = 'z_report'), 0)`,
+      [chainId, chainId]
+    );
+    if (!row || row.firstSeq == null || row.lastSeq == null) {
+      return null;
+    }
+    return { firstSeq: row.firstSeq, lastSeq: row.lastSeq };
+  }
+
   /** Whether any authority outbox row exists for a record — repair checks (F03). */
   async hasTransmissionForRecord(recordId: string): Promise<boolean> {
     const row = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM fiscal_transmissions WHERE record_id = ?', [recordId]);

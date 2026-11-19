@@ -1,4 +1,4 @@
-import { buildAltaXml, buildVerifactuQrUrl, computeHuella, verifactuFecha, VerifactuContext } from './verifactu';
+import { buildAltaXml, buildAnulacionXml, buildVerifactuQrUrl, computeHuella, verifactuFecha, VerifactuContext } from './verifactu';
 import type { FiscalRecord } from '../FiscalServiceInterface';
 
 const ctx: VerifactuContext = {
@@ -76,5 +76,19 @@ describe('verifactu builders', () => {
     expect(url).toContain(encodeURIComponent('B12345678'));
     expect(url).toContain('N17-A-000001');
     expect(url).toContain('121');
+  });
+
+  it('uses the production AEAT host when production is selected (F11)', () => {
+    const url = buildVerifactuQrUrl(ctx, record, content, true);
+    expect(url).toContain('www2.agenciatributaria.gob.es');
+    expect(url).not.toContain('prewww2');
+  });
+
+  it('serializes a void as an anulación referencing the original invoice (F08)', () => {
+    const { xml, huella } = buildAnulacionXml(ctx, record, { number: 'N17-A-000001', createdAt: record.createdAt });
+    expect(xml).toContain('RegistroFacturacionAnulacion');
+    expect(xml).toContain('<NumSerieFacturaAnulada>N17-A-000001</NumSerieFacturaAnulada>');
+    expect(xml).not.toContain('TipoFactura');
+    expect(huella).toMatch(/^[0-9A-F]{64}$/);
   });
 });

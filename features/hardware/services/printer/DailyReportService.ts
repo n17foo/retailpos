@@ -10,6 +10,7 @@ import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory'
 import { auditLogService } from '../../../../shared/services/audit/AuditLogService';
 import { posConfig } from '../../../platform-clients/services/config/POSConfigService';
 import { getFiscalService } from '../../../fiscal/services/FiscalServiceFactory';
+import { getOrderRepository } from '../../../orders-sync/repositories/OrderRepository';
 
 export interface ShiftData {
   id: string;
@@ -91,10 +92,16 @@ export class DailyReportService {
     if (!posConfig.values.fiscalEnabled || posConfig.values.fiscalShiftLock === false) {
       return;
     }
+    // F12 — the z_report freezes a complete closure snapshot: paid order
+    // count + gross for the shift window, not just shift identity.
+    const periodOrders = await getOrderRepository().findByDateRange(shift.startTime.getTime(), Date.now(), shift.cashierId);
+    const paid = periodOrders.filter(o => o.status === 'paid' || o.status === 'synced');
     const record = await getFiscalService().closeShift({
       shiftId: shift.id,
       cashierId: shift.cashierId,
       cashierName: shift.cashierName,
+      orderCount: paid.length,
+      grossTotal: sumMoney(paid.map(o => o.total)),
     });
     await auditLogService.log('fiscal:z_report', {
       userId: shift.cashierId,

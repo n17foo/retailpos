@@ -5,6 +5,7 @@ import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
 import { posConfig } from '../../platform-clients/services/config/POSConfigService';
 import { orderRepository } from '../../orders-sync/repositories/OrderRepository';
 import { getReturnRepository } from '../../returns/repositories/ReturnRepository';
+import { keyValueRepository } from '../../../shared/repositories/KeyValueRepository';
 import { fiscalRecordRepository, FiscalRecordRow } from '../repositories/FiscalRecordRepository';
 import { canonicalize } from './FiscalCanonicalizer';
 import { getFiscalAuthorityAdapter } from './authorities/getFiscalAuthorityAdapter';
@@ -21,6 +22,8 @@ import type {
 const GENESIS_HASH = 'GENESIS';
 /** Standalone deployments have exactly one chain. */
 const LOCAL_CHAIN_ID = 'local';
+/** Key-value key the standalone shift service stores the open shift under. */
+const CURRENT_SHIFT_KEY = 'current_shift';
 
 /**
  * Standalone/offline fiscal authority — chain + numbering live in the
@@ -63,9 +66,22 @@ export class OfflineFiscalService implements FiscalService {
       }
       throw new Error(`Order ${orderId} is stamped fiscalized but has no sale record — ledger integrity failure`);
     }
+    // F09 — a voided sale can never be re-finalized: the void is a
+    // permanent correction, not a state that converts back.
+    if (order.fiscal_status === 'voided') {
+      throw new Error(`Order ${orderId} was voided — it cannot be finalized again`);
+    }
     if (order.status !== 'paid' && order.status !== 'synced') {
       throw new Error(`Cannot fiscalize order ${orderId} in status '${order.status}' — payment must be recorded first`);
     }
+    // One original sale record per order — a drifted status must not
+    // allocate a second invoice for the same sale (F09).
+    if (await this.repo.findByOrderId(orderId)) {
+      throw new Error(`Order ${orderId} already has a sale record — refusing to allocate a second invoice`);
+    }
+
+    // Sales carry their shift so a closed period can be locked (F12).
+    const shiftId = await this.currentShiftId();
 
     const { record, outcome } = await this.allocateRecord(
       'sale',
@@ -78,6 +94,7 @@ export class OfflineFiscalService implements FiscalService {
           paymentMethod: order.payment_method,
         },
         registerId: order.register_id ?? null,
+        shiftId,
       },
       adapter
     );
@@ -156,6 +173,13 @@ export class OfflineFiscalService implements FiscalService {
 
   async closeShift(summary: ShiftFiscalSummary): Promise<FiscalRecord> {
     const adapter = getFiscalAuthorityAdapter(this.jurisdiction);
+    // Idempotent per shift — a retried close returns the same z_report
+    // rather than chaining a second one (F12).
+    const existing = await this.repo.findZReport(summary.shiftId);
+    if (existing) {
+      const record = this.mapRow(existing);
+      return this.applyAuthorityOutcome(record, await this.ensureAuthorityWork(record, adapter));
+    }
     const { record, outcome } = await this.allocateRecord('z_report', { shiftId: summary.shiftId, shift: summary }, adapter);
     return this.applyAuthorityOutcome(record, outcome);
   }
@@ -322,6 +346,11 @@ export class OfflineFiscalService implements FiscalService {
       const createdAt = Date.now();
       const number = this.invoiceNumber(seq);
 
+      // F12 — a z_report freezes the period it closes: the sequence bounds
+      // of every record since the previous close become part of the
+      // immutable document.
+      const period = type === 'z_report' ? await this.repo.getPeriodBounds(db, LOCAL_CHAIN_ID) : undefined;
+
       // Only legal content is hashed — control fields like markOrder
       // drive the order-row update but are not part of the document.
       const payloadJson = canonicalize({
@@ -337,6 +366,7 @@ export class OfflineFiscalService implements FiscalService {
         returnDetails: content.returnDetails,
         shiftId: content.shiftId,
         shift: content.shift,
+        period,
         registerId: content.registerId,
         reason: content.reason,
       });
@@ -375,6 +405,12 @@ export class OfflineFiscalService implements FiscalService {
       });
       await this.repo.upsertChainState(db, LOCAL_CHAIN_ID, seq, hash);
 
+      // F12 period lock — a shift closed by a z_report accepts no new
+      // sales records. Corrections (void/return) stay legal.
+      if (type === 'sale' && record.shiftId && (await this.repo.isShiftLocked(db, record.shiftId))) {
+        throw new Error(`Shift ${record.shiftId} is closed by a z_report — the period is locked`);
+      }
+
       // Only the original sale claims the order's fiscal identity.
       // Corrections link back through their own records — a return never
       // replaces the sale's invoice number/id (F02); a void updates the
@@ -411,6 +447,12 @@ export class OfflineFiscalService implements FiscalService {
    * if a committed record has no authority work, rebuild it now.
    * enqueueTransmission is idempotent, so a live re-run never duplicates (F03).
    */
+  /** The open shift's id, when standalone shift tracking has one (F12). */
+  private async currentShiftId(): Promise<string | null> {
+    const shift = await keyValueRepository.getObject<{ id: string; status: string }>(CURRENT_SHIFT_KEY);
+    return shift?.status === 'open' ? shift.id : null;
+  }
+
   private async ensureAuthorityWork(record: FiscalRecord, adapter: FiscalAuthorityAdapter): Promise<FiscalAuthorityOutcome | undefined> {
     if (await this.repo.hasTransmissionForRecord(record.id)) {
       return adapter.receiptOutcome?.(record);

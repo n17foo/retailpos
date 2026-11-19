@@ -21,6 +21,9 @@ import { useLogger } from '../../../shared/hooks/useLogger';
 import { PrinterServiceFactory } from '../../hardware/services/printer/PrinterServiceFactory';
 import { useOrderHistory } from '../hooks/useOrderHistory';
 import { useCheckoutContext } from '../../checkout/contexts/CheckoutProvider';
+import { posConfig } from '../../platform-clients/services/config/POSConfigService';
+import { getFiscalService } from '../../fiscal/services/FiscalServiceFactory';
+import { getFiscalAuthorityAdapter } from '../../fiscal/services/authorities/getFiscalAuthorityAdapter';
 
 interface OrderHistoryScreenProps extends MoreStackScreenProps<'OrderHistory'> {}
 
@@ -86,9 +89,22 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = () => {
       return;
     }
     try {
+      // Derive the fiscal receipt QR from the immutable record on every
+      // reprint — it is not stored on the order (F11).
+      let fiscalQr: string | undefined;
+      if (selectedOrder.fiscalNumber && posConfig.values.fiscalEnabled) {
+        const record = await getFiscalService()
+          .getRecord(selectedOrder.id)
+          .catch(() => null);
+        if (record) {
+          const adapter = getFiscalAuthorityAdapter(posConfig.values.fiscalJurisdiction ?? 'generic');
+          fiscalQr = adapter.receiptOutcome?.(record)?.receiptQrUrl;
+        }
+      }
       const receiptData = {
         orderId: selectedOrder.id.slice(-8),
         fiscalNumber: selectedOrder.fiscalNumber,
+        fiscalQr,
         items: selectedOrder.items.map(item => ({ name: item.name, quantity: item.quantity, price: item.price })),
         subtotal: selectedOrder.subtotal,
         tax: selectedOrder.tax,

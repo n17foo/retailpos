@@ -33,6 +33,7 @@ import { fiscalRecordRepository } from '../repositories/FiscalRecordRepository';
 import { orderRepository } from '../../orders-sync/repositories/OrderRepository';
 import { orderItemRepository } from '../../orders-sync/repositories/OrderItemRepository';
 import { returnRepository } from '../../returns/repositories/ReturnRepository';
+import { keyValueRepository } from '../../../shared/repositories/KeyValueRepository';
 import { CheckoutService } from '../../checkout/services/CheckoutService';
 import { posConfig } from '../../platform-clients/services/config/POSConfigService';
 import type { CreateOrderInput } from '../../orders-sync/repositories/OrderRepository';
@@ -363,5 +364,81 @@ describe('F08 — ES serialization dispatches on record type', () => {
     const pending = await fiscalRecordRepository.listPendingTransmissions(5);
     expect(pending).toHaveLength(1); // only the sale's alta
     expect(pending[0].record_id).not.toBe(z.id);
+  });
+});
+
+describe('F09 — a voided sale can never be re-finalized', () => {
+  it('rejects finalize after void and keeps the voided status', async () => {
+    await seedPaidOrder('o-v');
+    await offlineFiscalService.finalizeSale('o-v');
+    await offlineFiscalService.voidOrder('o-v', 'mistake');
+
+    await expect(offlineFiscalService.finalizeSale('o-v')).rejects.toThrow(/voided/);
+    const order = await orderRepository.findById('o-v');
+    expect(order?.fiscal_status).toBe('voided');
+    const rows = await realDb.getAllAsync<{ n: number }>(`SELECT COUNT(*) AS n FROM fiscal_records WHERE order_id = 'o-v'`);
+    expect(rows[0].n).toBe(2); // sale + void — no third record
+  });
+
+  it('rejects a second invoice when a sale record exists but the status drifted', async () => {
+    await seedPaidOrder('o-drift');
+    await offlineFiscalService.finalizeSale('o-drift');
+    await realDb.runAsync(`UPDATE orders SET fiscal_status = 'unfinalized' WHERE id = 'o-drift'`);
+
+    await expect(offlineFiscalService.finalizeSale('o-drift')).rejects.toThrow(/already has a sale record/);
+  });
+});
+
+describe('F11 — receipt QR environment and replay', () => {
+  it('idempotent re-finalize still returns the record-mode QR', async () => {
+    await posConfig.update('fiscalJurisdiction', 'es');
+    await posConfig.update('fiscalAuthorityMode', 'record');
+    await seedPaidOrder('o-qr');
+    const first = await offlineFiscalService.finalizeSale('o-qr');
+    const second = await offlineFiscalService.finalizeSale('o-qr');
+    expect(first.authorityQr).toContain('ValidarQR');
+    expect(second.authorityQr).toBe(first.authorityQr);
+  });
+});
+
+describe('F12 — z_report snapshot and period lock', () => {
+  it('the z_report payload carries the period bounds it closes', async () => {
+    await seedPaidOrder('o-p1');
+    await seedPaidOrder('o-p2');
+    await offlineFiscalService.finalizeSale('o-p1');
+    await offlineFiscalService.finalizeSale('o-p2');
+
+    const z = await offlineFiscalService.closeShift({ shiftId: 'sh-1', orderCount: 2, grossTotal: 240 });
+    const payload = JSON.parse(z.payloadJson) as {
+      period?: { firstSeq: number; lastSeq: number };
+      shift?: { orderCount?: number; grossTotal?: number };
+    };
+    expect(payload.period).toEqual({ firstSeq: 1, lastSeq: 2 });
+    expect(payload.shift?.orderCount).toBe(2);
+    expect(payload.shift?.grossTotal).toBe(240);
+  });
+
+  it('is idempotent per shift', async () => {
+    const first = await offlineFiscalService.closeShift({ shiftId: 'sh-idem', orderCount: 0, grossTotal: 0 });
+    const second = await offlineFiscalService.closeShift({ shiftId: 'sh-idem', orderCount: 99, grossTotal: 999 });
+    expect(second.id).toBe(first.id);
+    const rows = await realDb.getAllAsync<{ n: number }>(
+      `SELECT COUNT(*) AS n FROM fiscal_records WHERE type = 'z_report' AND shift_id = 'sh-idem'`
+    );
+    expect(rows[0].n).toBe(1);
+  });
+
+  it('locks a closed shift against new sales records', async () => {
+    await keyValueRepository.setObject('current_shift', { id: 'sh-lock', status: 'open' });
+    await seedPaidOrder('o-l1');
+    const sale = await offlineFiscalService.finalizeSale('o-l1');
+    expect(sale.shiftId).toBe('sh-lock');
+
+    await offlineFiscalService.closeShift({ shiftId: 'sh-lock', orderCount: 1, grossTotal: 120 });
+
+    // Shift still open in key-value — the same shift cannot take another sale.
+    await seedPaidOrder('o-l2');
+    await expect(offlineFiscalService.finalizeSale('o-l2')).rejects.toThrow(/locked/);
+    await keyValueRepository.removeItem('current_shift');
   });
 });

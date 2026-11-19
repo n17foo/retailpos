@@ -67,7 +67,9 @@ export class EsVerifactuAdapter implements FiscalAuthorityAdapter {
     if (!nif) {
       throw new Error('fiscalBusinessTaxId (NIF) is required for Veri*factu receipts');
     }
-    return { receiptQrUrl: buildVerifactuQrUrl({ nif }, record, this.content(record)) };
+    // Production receipts must validate against the real AEAT service,
+    // not preprod — the environment tracks the build type (F11).
+    return { receiptQrUrl: buildVerifactuQrUrl({ nif }, record, this.content(record), !__DEV__) };
   }
 
   private async context(record: FiscalRecord): Promise<VerifactuContext> {
