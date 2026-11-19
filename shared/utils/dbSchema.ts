@@ -7,7 +7,7 @@ const logger = LoggerFactory.getInstance().createLogger('dbSchema');
  * Current database schema version.
  * Bump this number and add a migration block whenever the schema changes.
  */
-export const LATEST_DB_VERSION = 14;
+export const LATEST_DB_VERSION = 15;
 
 /**
  * Initialise (or migrate) the database schema.
@@ -828,6 +828,76 @@ async function migrateDatabase(db: SQLiteDatabase, fromVersion: number, toVersio
         await db.runAsync(`ALTER TABLE orders ADD COLUMN tax_estimated INTEGER NOT NULL DEFAULT 0`);
       }
       logger.info('v14 applied.');
+    }
+
+    // ── v15 – fiscal chain: records, chain head, transmission outbox ──
+    if (fromVersion < 15) {
+      logger.info('Applying v15: creating fiscal tables and order fiscal columns…');
+
+      // The tamper-evident ledger — every finalized sale/return/void/z-report
+      // is one immutable chained record (docs/features/fiscal).
+      await db.runAsync(`
+        CREATE TABLE IF NOT EXISTS fiscal_records (
+          id           TEXT PRIMARY KEY NOT NULL,
+          chain_id     TEXT NOT NULL,
+          seq          INTEGER NOT NULL,
+          number       TEXT NOT NULL UNIQUE,
+          type         TEXT NOT NULL CHECK(type IN ('sale','return','void','z_report')),
+          order_id     TEXT,
+          return_id    TEXT,
+          shift_id     TEXT,
+          register_id  TEXT,
+          payload_json TEXT NOT NULL,
+          prev_hash    TEXT NOT NULL,
+          hash         TEXT NOT NULL,
+          created_at   INTEGER NOT NULL,
+          UNIQUE (chain_id, seq)
+        );
+      `);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_fiscal_records_order ON fiscal_records(order_id);`);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_fiscal_records_shift ON fiscal_records(shift_id);`);
+
+      // One row per chain — the allocation head, updated in the same
+      // transaction as the record insert so numbering is atomic.
+      await db.runAsync(`
+        CREATE TABLE IF NOT EXISTS fiscal_chain_state (
+          chain_id  TEXT PRIMARY KEY NOT NULL,
+          last_seq  INTEGER NOT NULL,
+          last_hash TEXT NOT NULL
+        );
+      `);
+
+      // Authority-submission outbox — jurisdiction adapters enqueue work
+      // here; a failed AEAT/TSE/AdE call never blocks the chain itself.
+      await db.runAsync(`
+        CREATE TABLE IF NOT EXISTS fiscal_transmissions (
+          id         TEXT PRIMARY KEY NOT NULL,
+          record_id  TEXT NOT NULL,
+          authority  TEXT NOT NULL,
+          status     TEXT NOT NULL CHECK(status IN ('pending','sent','failed','dead')),
+          response   TEXT,
+          attempts   INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          sent_at    INTEGER,
+          FOREIGN KEY (record_id) REFERENCES fiscal_records(id)
+        );
+      `);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_fiscal_tx_status ON fiscal_transmissions(status);`);
+
+      // Appended columns — order scans elsewhere are positional, so these
+      // must go last (same rule as the server-side ORDER_COLUMNS contract).
+      for (const [colName, ddl] of [
+        ['fiscal_record_id', `ALTER TABLE orders ADD COLUMN fiscal_record_id TEXT`],
+        ['fiscal_status', `ALTER TABLE orders ADD COLUMN fiscal_status TEXT`],
+        ['fiscal_number', `ALTER TABLE orders ADD COLUMN fiscal_number TEXT`],
+      ] as const) {
+        const col = await db.getFirstAsync<{ cid: number }>(`SELECT cid FROM pragma_table_info('orders') WHERE name = '${colName}'`);
+        if (!col) {
+          await db.runAsync(ddl);
+        }
+      }
+
+      logger.info('v15 applied.');
     }
 
     // Stamp the version

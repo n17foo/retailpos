@@ -233,8 +233,9 @@ export class UnifiedPrinterService extends AbstractPrinterService {
         await printer.addTextAlign(ALIGN_LEFT);
         await print(`${divider}\n`);
 
-        // Order info
-        await print(`Order #: ${data.orderId}\n`);
+        // Order info — the fiscal number is the legal document reference
+        // when the fiscal module produced one (docs/features/fiscal).
+        await print(`Order #: ${data.fiscalNumber ?? data.orderId}\n`);
         await print(`Date: ${data.date.toLocaleString()}\n`);
         await print(`Cashier: ${data.cashierName}\n`);
 

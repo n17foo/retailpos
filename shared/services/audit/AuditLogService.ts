@@ -63,7 +63,13 @@ export type AuditAction =
   | 'hardware:connected'
   | 'hardware:disconnected'
   | 'hardware:error'
-  | 'hardware:configured';
+  | 'hardware:configured'
+  | 'fiscal:finalized'
+  | 'fiscal:voided'
+  | 'fiscal:return'
+  | 'fiscal:z_report'
+  | 'fiscal:transmitted'
+  | 'fiscal:verification_failed';
 
 export interface AuditEntry {
   id: string;

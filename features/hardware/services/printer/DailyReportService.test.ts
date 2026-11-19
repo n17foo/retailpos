@@ -36,6 +36,12 @@ jest.mock('../../../multi-register/services/InstoreApiConfig', () => ({
   },
 }));
 
+jest.mock('../../../platform-clients/services/config/POSConfigService', () => ({
+  posConfig: {
+    values: { fiscalEnabled: false },
+  },
+}));
+
 jest.mock('../../../platform-clients/services/clients/instoreapi/InstoreApiClient', () => ({
   instoreApiClient: {
     getCurrentShift: jest.fn(),

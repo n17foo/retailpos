@@ -1,6 +1,7 @@
 // ── Config shape ────────────────────────────────────────────────────
 
 import { KeyValueRepository } from '../../../../shared/repositories/KeyValueRepository';
+import type { FiscalJurisdiction } from '../../../fiscal/services/FiscalServiceInterface';
 
 export interface POSConfig {
   taxRate: number;
@@ -27,6 +28,27 @@ export interface POSConfig {
   saleAutoNewSaleDelayMs?: number;
   /** Order total at or above which manager approval is required (absent = no gate) */
   checkoutHighValueThreshold?: number;
+  // ── Fiscal (docs/features/fiscal) ──
+  /** Master switch — the chain is only written when enabled (default: off). */
+  fiscalEnabled?: boolean;
+  /** 'generic' performs no authority actions. UK/IE/NL/BE record-only; ES/IT/DE/FR certified tier. */
+  fiscalJurisdiction?: FiscalJurisdiction;
+  /** 'store' = one chain per deployment (multi-register); 'register' = one per till. */
+  fiscalChainScope?: 'store' | 'register';
+  /** Invoice number prefix, e.g. 'N17' → N17-A-000123. */
+  fiscalInvoicePrefix?: string;
+  /** Invoice series letter/designator (default 'A'). */
+  fiscalSeries?: string;
+  /** true = refuse a paid finalization the fiscal authority can't record (fail-closed). */
+  fiscalStrictMode?: boolean;
+  /** Closing a shift chains a z_report record and locks the shift. */
+  fiscalShiftLock?: boolean;
+  /** Returns must reference a fiscalized original sale. */
+  fiscalRequireOriginalOnReturn?: boolean;
+  /** VAT/NIF/AΦM the records are issued under — printed on receipts, sent to authorities. */
+  fiscalBusinessTaxId?: string;
+  /** 'transmit' submits each record to the authority; 'record' keeps the chain local (ES record-only). */
+  fiscalAuthorityMode?: 'transmit' | 'record';
 }
 
 /** Security default applied until an admin configures autoLockMinutes. */
@@ -50,6 +72,16 @@ export const SETTINGS_KEYS: Record<keyof POSConfig, string> = {
   saleNoteChips: 'sale.noteChips',
   saleAutoNewSaleDelayMs: 'sale.autoNewSaleDelayMs',
   checkoutHighValueThreshold: 'checkout.highValueThreshold',
+  fiscalEnabled: 'fiscal.enabled',
+  fiscalJurisdiction: 'fiscal.jurisdiction',
+  fiscalChainScope: 'fiscal.chainScope',
+  fiscalInvoicePrefix: 'fiscal.invoicePrefix',
+  fiscalSeries: 'fiscal.series',
+  fiscalStrictMode: 'fiscal.strictMode',
+  fiscalShiftLock: 'fiscal.shiftLock',
+  fiscalRequireOriginalOnReturn: 'fiscal.requireOriginalOnReturn',
+  fiscalBusinessTaxId: 'fiscal.businessTaxId',
+  fiscalAuthorityMode: 'fiscal.authorityMode',
 };
 
 /**

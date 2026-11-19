@@ -33,6 +33,10 @@ export interface OrderRow {
   tax_estimated?: number | null;
   /** Server-side receipt time — set by the Store API, absent on local rows. */
   received_at?: number | null;
+  /** v15 fiscal columns — null until the order is finalized (docs/features/fiscal). */
+  fiscal_record_id?: string | null;
+  fiscal_status?: string | null;
+  fiscal_number?: string | null;
 }
 
 export interface CreateOrderInput {

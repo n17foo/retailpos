@@ -113,3 +113,44 @@ describe('database safety pragmas and atomic writes (bug 10)', () => {
     expect(await db.getFirstAsync('SELECT id FROM order_items WHERE order_id = ?', ['sale-1'])).toBeNull();
   });
 });
+
+describe('v15 — fiscal chain schema', () => {
+  it('creates the fiscal tables and order columns', async () => {
+    const db = openDb();
+    await initializeSchema(db);
+
+    for (const table of ['fiscal_records', 'fiscal_chain_state', 'fiscal_transmissions']) {
+      const row = await db.getFirstAsync<{ name: string }>(`SELECT name FROM sqlite_master WHERE type='table' AND name = ?`, [table]);
+      expect(row?.name).toBe(table);
+    }
+
+    const orderCols = (await db.getAllAsync<{ name: string }>(`SELECT name FROM pragma_table_info('orders')`)).map(c => c.name);
+    expect(orderCols.slice(-3)).toEqual(['fiscal_record_id', 'fiscal_status', 'fiscal_number']);
+  });
+
+  it('enforces UNIQUE(chain_id, seq) — duplicate sequence allocation fails', async () => {
+    const db = openDb();
+    await initializeSchema(db);
+    const insert = (seq: number, number: string) =>
+      db.runAsync(
+        `INSERT INTO fiscal_records (id, chain_id, seq, number, type, payload_json, prev_hash, hash, created_at)
+         VALUES (?, 'local', ?, ?, 'sale', '{}', 'h0', ?, 1)`,
+        [`rec-${seq}`, seq, number, `h${seq}`]
+      );
+
+    await insert(1, 'N17-A-000001');
+    await expect(insert(1, 'N17-A-000001b')).rejects.toThrow(/UNIQUE/i);
+  });
+
+  it('enforces the transmission status CHECK', async () => {
+    const db = openDb();
+    await initializeSchema(db);
+    await db.runAsync(
+      `INSERT INTO fiscal_records (id, chain_id, seq, number, type, payload_json, prev_hash, hash, created_at)
+       VALUES ('r1', 'local', 1, 'N17-A-000001', 'sale', '{}', 'h0', 'h1', 1)`
+    );
+    await expect(
+      db.runAsync(`INSERT INTO fiscal_transmissions (id, record_id, authority, status, created_at) VALUES ('t1', 'r1', 'tse', 'bogus', 1)`)
+    ).rejects.toThrow(/CHECK/i);
+  });
+});

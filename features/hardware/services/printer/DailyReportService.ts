@@ -8,6 +8,8 @@ import { addMoney, multiplyMoney, roundMoney, subtractMoney, sumMoney } from '..
 import { getCurrencySymbol } from '../../../../shared/utils/currency';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
 import { auditLogService } from '../../../../shared/services/audit/AuditLogService';
+import { posConfig } from '../../../platform-clients/services/config/POSConfigService';
+import { getFiscalService } from '../../../fiscal/services/FiscalServiceFactory';
 
 export interface ShiftData {
   id: string;
@@ -78,6 +80,28 @@ export class DailyReportService {
     } catch (error) {
       this.logger.error({ message: 'Failed to load current shift:' }, error instanceof Error ? error : new Error(String(error)));
     }
+  }
+
+  /**
+   * Chain a z_report record for a closed shift when the fiscal module is
+   * on and shift locking is enabled (docs/features/fiscal R8). Standalone
+   * allocates locally; client mode defers to the Store API.
+   */
+  private async chainZReport(shift: ShiftData, closingCash: number): Promise<void> {
+    if (!posConfig.values.fiscalEnabled || posConfig.values.fiscalShiftLock === false) {
+      return;
+    }
+    const record = await getFiscalService().closeShift({
+      shiftId: shift.id,
+      cashierId: shift.cashierId,
+      cashierName: shift.cashierName,
+    });
+    await auditLogService.log('fiscal:z_report', {
+      userId: shift.cashierId,
+      userName: shift.cashierName,
+      details: `Shift ${shift.id} closed with z_report ${record.number} (closing cash ${closingCash.toFixed(2)})`,
+      metadata: { shiftId: shift.id, fiscalRecordId: record.id, number: record.number, closingCash },
+    });
   }
 
   private mapShift(s: InstoreApiShift): ShiftData {
@@ -157,6 +181,15 @@ export class DailyReportService {
       const remote = await instoreApiClient.closeShift(this.currentShift.id, closingCash);
       const closedShift = this.mapShift(remote);
 
+      // Fiscal z_report — chained on the server. Failure is logged but the
+      // close stands: the record can be re-issued, the shift can't un-close.
+      await this.chainZReport(closedShift, closingCash).catch(err => {
+        this.logger.warn(
+          { message: `Fiscal z_report failed for shift ${closedShift.id} — reissue required` },
+          err instanceof Error ? err : new Error(String(err))
+        );
+      });
+
       await auditLogService.log('shift:closed', {
         userId: closedShift.cashierId,
         userName: closedShift.cashierName,
@@ -170,6 +203,10 @@ export class DailyReportService {
       this.currentShift = null;
       return closedShift;
     }
+
+    // Fiscal z_report before closing — a failure leaves the shift open and
+    // retryable rather than closed-without-a-record (fiscal strict default).
+    await this.chainZReport(this.currentShift, closingCash);
 
     this.currentShift.endTime = new Date();
     this.currentShift.closingCash = closingCash;
