@@ -7,6 +7,7 @@ import { generateUUID } from '../../../shared/utils/uuid';
 import { localCustomerService } from '../../customers/services/customer/LocalCustomerService';
 import { DiscountServiceFactory } from '../../discounts/services/DiscountServiceFactory';
 import { ECommercePlatform } from '../../../shared/utils/platforms';
+import { withKeyedLock } from '../../../shared/utils/keyedLock';
 
 /**
  * Basket service — cart CRUD only.
@@ -31,30 +32,37 @@ export class BasketService implements BasketServiceInterface {
   }
 
   async addItem(item: Omit<BasketItem, 'id'>): Promise<Basket> {
-    const basket = await this.getOrCreateBasket();
+    // The basket is persisted as one JSON document — the whole
+    // read-modify-write must be serialized or parallel mutations overwrite
+    // each other and silently drop items (BAS-01).
+    return this.mutateBasket(async () => {
+      const basket = await this.getOrCreateBasket();
 
-    const existingIndex = basket.items.findIndex(i => i.productId === item.productId && i.variantId === item.variantId);
+      const existingIndex = basket.items.findIndex(i => i.productId === item.productId && i.variantId === item.variantId);
 
-    if (existingIndex !== -1) {
-      basket.items[existingIndex].quantity += item.quantity;
-    } else {
-      basket.items.push({ ...item, id: generateUUID() });
-    }
+      if (existingIndex !== -1) {
+        basket.items[existingIndex].quantity += item.quantity;
+      } else {
+        basket.items.push({ ...item, id: generateUUID() });
+      }
 
-    return this.recalculateAndSave(basket);
+      return this.recalculateAndSave(basket);
+    });
   }
 
   async updateItemQuantity(itemId: string, quantity: number): Promise<Basket> {
-    const basket = await this.getOrCreateBasket();
+    return this.mutateBasket(async () => {
+      const basket = await this.getOrCreateBasket();
 
-    if (quantity <= 0) {
-      basket.items = basket.items.filter(i => i.id !== itemId);
-    } else {
-      const item = basket.items.find(i => i.id === itemId);
-      if (item) item.quantity = quantity;
-    }
+      if (quantity <= 0) {
+        basket.items = basket.items.filter(i => i.id !== itemId);
+      } else {
+        const item = basket.items.find(i => i.id === itemId);
+        if (item) item.quantity = quantity;
+      }
 
-    return this.recalculateAndSave(basket);
+      return this.recalculateAndSave(basket);
+    });
   }
 
   async removeItem(itemId: string): Promise<Basket> {
@@ -62,62 +70,71 @@ export class BasketService implements BasketServiceInterface {
   }
 
   async clearBasket(): Promise<void> {
-    if (!this.currentBasketId) return;
-    await this.basketRepo.clearBasket(this.currentBasketId);
-    this.currentBasketId = null;
+    await this.mutateBasket(async () => {
+      if (!this.currentBasketId) return;
+      await this.basketRepo.clearBasket(this.currentBasketId);
+      this.currentBasketId = null;
+    });
   }
 
   async applyDiscount(code: string, platform?: ECommercePlatform): Promise<Basket> {
-    const basket = await this.getOrCreateBasket();
+    return this.mutateBasket(async () => {
+      const basket = await this.getOrCreateBasket();
 
-    try {
-      // Get discount service for current platform
-      const discountService = DiscountServiceFactory.getInstance().getService(platform);
+      try {
+        // Get discount service for current platform
+        const discountService = DiscountServiceFactory.getInstance().getService(platform);
 
-      // Validate discount code and calculate discount amount.
-      // Discount services work in cents end to end; the basket stores
-      // major units, so convert at the boundary (DIS-01).
-      const validation = await discountService.validateDiscount(code, toCents(basket.subtotal));
+        // Validate discount code and calculate discount amount.
+        // Discount services work in cents end to end; the basket stores
+        // major units, so convert at the boundary (DIS-01).
+        const validation = await discountService.validateDiscount(code, toCents(basket.subtotal));
 
-      if (!validation.valid) {
-        this.logger.warn({ message: `Discount validation failed: ${code}`, error: validation.error });
-        throw new Error(validation.error || 'Invalid discount code');
+        if (!validation.valid) {
+          this.logger.warn({ message: `Discount validation failed: ${code}`, error: validation.error });
+          throw new Error(validation.error || 'Invalid discount code');
+        }
+
+        // Apply validated discount
+        basket.discountCode = code;
+        basket.discountAmount = toDollars(validation.discountAmount);
+        basket.updatedAt = new Date();
+
+        // Recalculate totals with discount applied
+        await this.recalculateAndSave(basket);
+
+        this.logger.info({
+          message: `Discount applied: ${code}`,
+          amount: validation.discountAmount,
+          type: validation.discountType,
+        });
+
+        return basket;
+      } catch (error) {
+        this.logger.error({ message: `Error applying discount: ${code}` }, error instanceof Error ? error : new Error(String(error)));
+        throw error;
       }
-
-      // Apply validated discount
-      basket.discountCode = code;
-      basket.discountAmount = toDollars(validation.discountAmount);
-      basket.updatedAt = new Date();
-
-      // Recalculate totals with discount applied
-      await this.recalculateAndSave(basket);
-
-      this.logger.info({
-        message: `Discount applied: ${code}`,
-        amount: validation.discountAmount,
-        type: validation.discountType,
-      });
-
-      return basket;
-    } catch (error) {
-      this.logger.error({ message: `Error applying discount: ${code}` }, error instanceof Error ? error : new Error(String(error)));
-      throw error;
-    }
+    });
   }
 
   async removeDiscount(): Promise<Basket> {
-    const basket = await this.getOrCreateBasket();
-    basket.discountCode = undefined;
-    basket.discountAmount = undefined;
-    return this.recalculateAndSave(basket);
+    return this.mutateBasket(async () => {
+      const basket = await this.getOrCreateBasket();
+      basket.discountCode = undefined;
+      basket.discountAmount = undefined;
+      return this.recalculateAndSave(basket);
+    });
   }
 
   async setCustomer(email?: string, name?: string): Promise<Basket> {
-    const basket = await this.getOrCreateBasket();
-    basket.customerEmail = email;
-    basket.customerName = name;
-    basket.updatedAt = new Date();
-    await this.updateBasketInDb(basket);
+    const basket = await this.mutateBasket(async () => {
+      const basket = await this.getOrCreateBasket();
+      basket.customerEmail = email;
+      basket.customerName = name;
+      basket.updatedAt = new Date();
+      await this.updateBasketInDb(basket);
+      return basket;
+    });
 
     // Upsert local customer profile (non-blocking)
     if (email) {
@@ -128,19 +145,23 @@ export class BasketService implements BasketServiceInterface {
   }
 
   async setNote(note: string): Promise<Basket> {
-    const basket = await this.getOrCreateBasket();
-    basket.note = note;
-    basket.updatedAt = new Date();
-    await this.updateBasketInDb(basket);
-    return basket;
+    return this.mutateBasket(async () => {
+      const basket = await this.getOrCreateBasket();
+      basket.note = note;
+      basket.updatedAt = new Date();
+      await this.updateBasketInDb(basket);
+      return basket;
+    });
   }
 
   async setSaleMode(mode: string | undefined): Promise<Basket> {
-    const basket = await this.getOrCreateBasket();
-    basket.saleMode = mode;
-    basket.updatedAt = new Date();
-    await this.updateBasketInDb(basket);
-    return basket;
+    return this.mutateBasket(async () => {
+      const basket = await this.getOrCreateBasket();
+      basket.saleMode = mode;
+      basket.updatedAt = new Date();
+      await this.updateBasketInDb(basket);
+      return basket;
+    });
   }
 
   /**
@@ -148,17 +169,28 @@ export class BasketService implements BasketServiceInterface {
    * Persisted inside the items JSON blob.
    */
   async updateItemProperties(itemId: string, properties: Record<string, string>): Promise<Basket> {
-    const basket = await this.getOrCreateBasket();
-    const item = basket.items.find(i => i.id === itemId);
-    if (item) {
-      item.properties = { ...item.properties, ...properties };
-      basket.updatedAt = new Date();
-      await this.updateBasketInDb(basket);
-    }
-    return basket;
+    return this.mutateBasket(async () => {
+      const basket = await this.getOrCreateBasket();
+      const item = basket.items.find(i => i.id === itemId);
+      if (item) {
+        item.properties = { ...item.properties, ...properties };
+        basket.updatedAt = new Date();
+        await this.updateBasketInDb(basket);
+      }
+      return basket;
+    });
   }
 
   // ── Private helpers ─────────────────────────────────────────────────
+
+  /**
+   * Serialize basket mutations — each one reads the whole JSON document,
+   * edits it, and writes it back, so they must run one at a time (BAS-01).
+   * Not reentrant: private helpers must never re-enter this lock.
+   */
+  private async mutateBasket<T>(fn: () => Promise<T>): Promise<T> {
+    return withKeyedLock('basket:active', fn);
+  }
 
   private async getOrCreateBasket(): Promise<Basket> {
     try {
