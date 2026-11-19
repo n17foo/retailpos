@@ -2,7 +2,7 @@ import { BasketServiceInterface } from './BasketServiceInterface';
 import { Basket, BasketItem } from './basket';
 import { BasketRepository, BasketRow } from '../repositories/BasketRepository';
 import { LoggerInterface } from '../../../shared/services/logger/LoggerInterface';
-import { multiplyMoney, sumMoney, roundMoney } from '../../../shared/utils/money';
+import { multiplyMoney, sumMoney, roundMoney, toCents, toDollars } from '../../../shared/utils/money';
 import { generateUUID } from '../../../shared/utils/uuid';
 import { localCustomerService } from '../../customers/services/customer/LocalCustomerService';
 import { DiscountServiceFactory } from '../../discounts/services/DiscountServiceFactory';
@@ -74,8 +74,10 @@ export class BasketService implements BasketServiceInterface {
       // Get discount service for current platform
       const discountService = DiscountServiceFactory.getInstance().getService(platform);
 
-      // Validate discount code and calculate discount amount
-      const validation = await discountService.validateDiscount(code, basket.subtotal);
+      // Validate discount code and calculate discount amount.
+      // Discount services work in cents end to end; the basket stores
+      // major units, so convert at the boundary (DIS-01).
+      const validation = await discountService.validateDiscount(code, toCents(basket.subtotal));
 
       if (!validation.valid) {
         this.logger.warn({ message: `Discount validation failed: ${code}`, error: validation.error });
@@ -84,7 +86,7 @@ export class BasketService implements BasketServiceInterface {
 
       // Apply validated discount
       basket.discountCode = code;
-      basket.discountAmount = validation.discountAmount;
+      basket.discountAmount = toDollars(validation.discountAmount);
       basket.updatedAt = new Date();
 
       // Recalculate totals with discount applied
