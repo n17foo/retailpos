@@ -2,6 +2,8 @@ import React, { ReactNode, createContext, useContext, useMemo, useCallback } fro
 import { ImageSourcePropType } from 'react-native';
 import { ECommercePlatform } from '../../../shared/utils/platforms';
 import { useBasketState } from './BasketStateProvider';
+import { useAuthContext } from '../../authentication/contexts/AuthProvider';
+import { permissionService } from '../../authentication/services/permissions/PermissionService';
 import { customerDisplayServiceFactory } from '../../hardware/services/display/CustomerDisplayServiceFactory';
 import { buildDisplayState } from '../../hardware/services/display/CustomerDisplayServiceInterface';
 import { useCurrency } from '../../platform-clients/hooks/useCurrency';
@@ -55,6 +57,7 @@ export const BasketActionsContext = createContext<BasketActionsContextType | nul
 
 export const BasketActionsProvider = ({ children }: Readonly<{ children: ReactNode }>) => {
   const state = useBasketState();
+  const { user } = useAuthContext();
   const currency = useCurrency();
 
   // Helper to convert ImageSourcePropType to string URL
@@ -288,6 +291,13 @@ export const BasketActionsProvider = ({ children }: Readonly<{ children: ReactNo
     async (code: string) => {
       if (!state._containerRef.current) return;
 
+      // discount:apply is a registered action key — a user denied the
+      // action must not get a discounted basket (AUTH-02).
+      if (!user?.id || !(await permissionService.can(user.id, 'discount:apply'))) {
+        state._setError('Permission denied: discount:apply');
+        return;
+      }
+
       try {
         const newBasket = await state._containerRef.current.basketService.applyDiscount(code);
         if (state._mountedRef.current) {
@@ -300,7 +310,7 @@ export const BasketActionsProvider = ({ children }: Readonly<{ children: ReactNo
         }
       }
     },
-    [state]
+    [state, user]
   );
 
   const removeDiscount = useCallback(async () => {

@@ -36,6 +36,10 @@ jest.mock('../../inventory/services/InventoryServiceFactory', () => ({
   },
 }));
 
+jest.mock('../../authentication/services/permissions/PermissionService', () => ({
+  permissionService: { can: jest.fn().mockResolvedValue(true) },
+}));
+
 import { db } from '../../../shared/utils/db';
 import { initializeSchema } from '../../../shared/utils/dbSchema';
 import { procurementRepository } from '../repositories/ProcurementRepository';
@@ -70,7 +74,7 @@ describe('PRO-01 — receiving validates the PO before writing', () => {
     const b = await createOrderedPo('p-b');
 
     // Receive against PO A using PO B's line id
-    const result = await procurementService.receivePO(a.poId, [{ itemId: b.itemId, receiveNow: 5 }], ECommercePlatform.OFFLINE);
+    const result = await procurementService.receivePO(a.poId, [{ itemId: b.itemId, receiveNow: 5 }], ECommercePlatform.OFFLINE, 'mgr-1');
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/does not belong/);
@@ -84,7 +88,7 @@ describe('PRO-01 — receiving validates the PO before writing', () => {
     const { poId, itemId } = await createOrderedPo();
     await procurementRepository.updatePOStatus(poId, 'cancelled');
 
-    const result = await procurementService.receivePO(poId, [{ itemId, receiveNow: 10 }], ECommercePlatform.OFFLINE);
+    const result = await procurementService.receivePO(poId, [{ itemId, receiveNow: 10 }], ECommercePlatform.OFFLINE, 'mgr-1');
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/cannot receive/);
@@ -102,7 +106,7 @@ describe('PRO-01 — receiving validates the PO before writing', () => {
     });
     const items = await procurementRepository.findPOItems(poId);
 
-    const result = await procurementService.receivePO(poId, [{ itemId: items[0].id, receiveNow: 10 }], ECommercePlatform.OFFLINE);
+    const result = await procurementService.receivePO(poId, [{ itemId: items[0].id, receiveNow: 10 }], ECommercePlatform.OFFLINE, 'mgr-1');
 
     expect(result.success).toBe(false);
     expect((await procurementRepository.findPOItems(poId))[0].received_qty).toBe(0);
@@ -112,7 +116,7 @@ describe('PRO-01 — receiving validates the PO before writing', () => {
     const { poId, itemId } = await createOrderedPo();
     await procurementRepository.incrementReceivedQty(itemId, 8); // 8 of 10 already received
 
-    const result = await procurementService.receivePO(poId, [{ itemId, receiveNow: 5 }], ECommercePlatform.OFFLINE);
+    const result = await procurementService.receivePO(poId, [{ itemId, receiveNow: 5 }], ECommercePlatform.OFFLINE, 'mgr-1');
 
     expect(result.success).toBe(false);
     expect(result.error).toMatch(/exceeds/);
@@ -123,7 +127,12 @@ describe('PRO-01 — receiving validates the PO before writing', () => {
   it('rejects non-finite quantities', async () => {
     const { poId, itemId } = await createOrderedPo();
 
-    const result = await procurementService.receivePO(poId, [{ itemId, receiveNow: Number.POSITIVE_INFINITY }], ECommercePlatform.OFFLINE);
+    const result = await procurementService.receivePO(
+      poId,
+      [{ itemId, receiveNow: Number.POSITIVE_INFINITY }],
+      ECommercePlatform.OFFLINE,
+      'mgr-1'
+    );
 
     expect(result.success).toBe(false);
     expect((await procurementRepository.findPOItems(poId))[0].received_qty).toBe(0);
@@ -132,12 +141,12 @@ describe('PRO-01 — receiving validates the PO before writing', () => {
   it('a retried receive after success fails closed instead of double-crediting', async () => {
     const { poId, itemId } = await createOrderedPo();
 
-    const first = await procurementService.receivePO(poId, [{ itemId, receiveNow: 10 }], ECommercePlatform.OFFLINE);
+    const first = await procurementService.receivePO(poId, [{ itemId, receiveNow: 10 }], ECommercePlatform.OFFLINE, 'mgr-1');
     expect(first.success).toBe(true);
     expect(first.newStatus).toBe('received');
 
     // Same receive retried — the full quantity is gone, so it is rejected
-    const retry = await procurementService.receivePO(poId, [{ itemId, receiveNow: 10 }], ECommercePlatform.OFFLINE);
+    const retry = await procurementService.receivePO(poId, [{ itemId, receiveNow: 10 }], ECommercePlatform.OFFLINE, 'mgr-1');
     expect(retry.success).toBe(false);
     expect((await procurementRepository.findPOItems(poId))[0].received_qty).toBe(10);
   });
@@ -145,7 +154,7 @@ describe('PRO-01 — receiving validates the PO before writing', () => {
   it('a valid partial receive increments exactly once and stays partially_received', async () => {
     const { poId, itemId } = await createOrderedPo();
 
-    const result = await procurementService.receivePO(poId, [{ itemId, receiveNow: 4 }], ECommercePlatform.OFFLINE);
+    const result = await procurementService.receivePO(poId, [{ itemId, receiveNow: 4 }], ECommercePlatform.OFFLINE, 'mgr-1');
 
     expect(result.success).toBe(true);
     expect(result.newStatus).toBe('partially_received');

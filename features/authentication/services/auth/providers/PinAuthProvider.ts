@@ -1,6 +1,5 @@
 import { getUserRepository } from '../../../repositories/UserRepository';
 import { instoreApiConfig } from '../../../../multi-register/services/InstoreApiConfig';
-import { instoreApiClient } from '../../../../platform-clients/services/clients/instoreapi/InstoreApiClient';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
 import { AuthAttemptLimiter } from '../AuthAttemptLimiter';
 import { validatePinFormat } from '../../../utils/userPin.utils';
@@ -84,19 +83,14 @@ export class PinAuthProvider implements AuthMethodProvider {
   }
 
   private async authenticateViaStoreApi(credential: string): Promise<AuthResult> {
-    const user = await instoreApiClient.verifyPin(credential);
+    // Route through the repository — in client mode that is
+    // InstoreApiUserRepository, which verifies against the server, caches the
+    // credential on this register, and falls back to that cache when the LAN
+    // is down (AUTH-01). Its toUser() also normalizes the server-supplied
+    // role instead of trusting the string.
+    const user = await getUserRepository().findByPin(credential);
     if (user) {
-      return {
-        success: true,
-        user: {
-          id: user.id,
-          name: user.name,
-          role: user.role as 'admin' | 'manager' | 'cashier',
-          is_active: true,
-          created_at: 0,
-          updated_at: 0,
-        },
-      };
+      return { success: true, user };
     }
 
     return { success: false, error: 'Invalid PIN. Please try again.' };

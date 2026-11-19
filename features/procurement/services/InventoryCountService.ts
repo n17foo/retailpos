@@ -13,6 +13,7 @@ import { auditLogService } from '../../../shared/services/audit/AuditLogService'
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
 import { ECommercePlatform } from '../../../shared/utils/platforms';
 import { getPlatformCapabilities } from '../../../shared/utils/platformCapabilities';
+import { permissionService } from '../../authentication/services/permissions/PermissionService';
 
 export interface CountItemInput {
   productId: string;
@@ -45,6 +46,11 @@ export class InventoryCountService {
   }
 
   async startCount(items: CountItemInput[], startedBy?: string, notes?: string): Promise<string> {
+    // inventory:count is a registered action key — a stock-take mutates
+    // stock levels and must be started by a permissioned actor (AUTH-02).
+    if (!startedBy || !(await permissionService.can(startedBy, 'inventory:count'))) {
+      throw new Error('Permission denied: inventory:count');
+    }
     const countId = await procurementRepository.createCount(startedBy ?? null, notes ?? null);
 
     for (const item of items) {
@@ -80,6 +86,10 @@ export class InventoryCountService {
 
   async finaliseCount(countId: string, platform: ECommercePlatform, finalisedBy?: string): Promise<FinaliseResult> {
     try {
+      // inventory:count — finalising commits stock corrections (AUTH-02).
+      if (!finalisedBy || !(await permissionService.can(finalisedBy, 'inventory:count'))) {
+        return { success: false, adjustedLines: 0, totalVariance: 0, error: 'Permission denied: inventory:count' };
+      }
       const items = await procurementRepository.findCountItems(countId);
       const variantLines = items.filter(i => i.counted_qty !== null);
 

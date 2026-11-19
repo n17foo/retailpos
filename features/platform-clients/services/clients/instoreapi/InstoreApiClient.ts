@@ -530,9 +530,14 @@ export class InstoreApiClient {
     try {
       const result = await this.post<{ user: { id: string; name: string; role: string } }>('/api/users/verify-pin', { pin });
       return result.user;
-    } catch {
-      // 401 = invalid PIN, not a network error
-      return null;
+    } catch (error) {
+      // Only an explicit rejection means "invalid PIN". Transport failures and
+      // 5xx must reach callers so they can fall back to the local credential
+      // cache during a LAN outage (AUTH-01).
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        return null;
+      }
+      throw error;
     }
   }
 

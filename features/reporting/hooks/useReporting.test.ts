@@ -10,6 +10,11 @@ jest.mock('../services/ReportingService', () => ({
   },
 }));
 
+const mockRequestApproval = jest.fn(async () => true);
+jest.mock('../../authentication/hooks/useManagerApproval', () => ({
+  useManagerApproval: () => ({ requestApproval: mockRequestApproval }),
+}));
+
 const mockReport = {
   summary: { totalSales: 100, totalOrders: 2, totalTax: 8, totalDiscount: 0, netSales: 92, averageOrderValue: 50 },
   salesByHour: [{ label: '09:00', totalSales: 50, orderCount: 1 }],
@@ -67,6 +72,14 @@ describe('useReporting', () => {
 
     const csv = await get().exportCsv(1000, 2000);
     expect(csv).toBe('id,total\n1,50');
+    expect(mockRequestApproval).toHaveBeenCalledWith('report:export');
+  });
+
+  it('refuses the CSV export when report:export approval is denied', async () => {
+    mockRequestApproval.mockResolvedValueOnce(false);
+    const { get } = mountHook();
+    await expect(get().exportCsv(1000, 2000)).rejects.toThrow('Permission denied: report:export');
+    expect(reportingService.exportOrdersCsv).not.toHaveBeenCalled();
   });
 
   it('sets error state when the report fails to load', async () => {

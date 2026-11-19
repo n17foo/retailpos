@@ -34,6 +34,13 @@ jest.mock('../../../shared/services/notifications/NotificationService', () => ({
   notificationService: { notify: jest.fn() },
 }));
 
+jest.mock('../../authentication/services/permissions/PermissionService', () => ({
+  permissionService: { can: jest.fn().mockResolvedValue(true) },
+}));
+
+import { permissionService } from '../../authentication/services/permissions/PermissionService';
+const mockCan = permissionService.can as jest.Mock;
+
 import { db } from '../../../shared/utils/db';
 import { initializeSchema } from '../../../shared/utils/dbSchema';
 import { keyValueRepository } from '../../../shared/repositories/KeyValueRepository';
@@ -52,13 +59,14 @@ describe('Ledger integrity (CUS-01/02/04/05)', () => {
     await realDb.runAsync('DELETE FROM loyalty_accounts');
     await realDb.runAsync('DELETE FROM key_value_store');
     jest.clearAllMocks();
+    mockCan.mockResolvedValue(true);
     // loyaltyService caches its config — reseed it each test
     await keyValueRepository.setObject('loyalty.config', { enabled: true, earnRate: 100, redeemRate: 1, expiryDays: 1 });
   });
 
   describe('CUS-01 — reversal idempotency', () => {
     it('reversing a store-credit redemption twice restores it only once', async () => {
-      await storeCreditService.issue(EMAIL, 1000, 'test issue');
+      await storeCreditService.issue(EMAIL, 1000, 'test issue', 'mgr-1');
       const { entryId } = await storeCreditService.redeem(EMAIL, 'ord-1', 200);
 
       await storeCreditService.reverseRedemption(entryId);
@@ -83,7 +91,7 @@ describe('Ledger integrity (CUS-01/02/04/05)', () => {
 
   describe('CUS-02 — concurrent redemptions cannot overspend', () => {
     it('two parallel 800¢ redemptions against a 1000¢ balance cannot overdraw', async () => {
-      await storeCreditService.issue(EMAIL, 1000, 'test issue');
+      await storeCreditService.issue(EMAIL, 1000, 'test issue', 'mgr-1');
 
       const results = await Promise.allSettled([
         storeCreditService.redeem(EMAIL, 'ord-a', 800),
@@ -225,6 +233,33 @@ describe('Ledger integrity (CUS-01/02/04/05)', () => {
       await loyaltyRepository.applyTransaction(EMAIL, 'adjustment', 25, 'order-1', 'manual');
       await loyaltyRepository.applyTransaction(EMAIL, 'adjustment', 25, 'order-1', 'manual');
       expect((await loyaltyService.getBalance(EMAIL)).points).toBe(250);
+    });
+  });
+
+  describe('AUTH-02 — permission keys enforced at the service boundary', () => {
+    it('store_credit:issue is denied for an unpermissioned or anonymous actor', async () => {
+      mockCan.mockResolvedValue(false);
+      await expect(storeCreditService.issue(EMAIL, 1000, 'x', 'cashier-9')).rejects.toThrow('store_credit:issue');
+      await expect(storeCreditService.issue(EMAIL, 1000, 'x')).rejects.toThrow('store_credit:issue');
+      expect(await storeCreditService.getBalanceCents(EMAIL)).toBe(0);
+    });
+
+    it('issue amounts must be positive safe integers — no floats, no Infinity', async () => {
+      await expect(storeCreditService.issue(EMAIL, Number.POSITIVE_INFINITY, 'x', 'mgr-1')).rejects.toThrow();
+      await expect(storeCreditService.issue(EMAIL, 10.5, 'x', 'mgr-1')).rejects.toThrow();
+      await expect(storeCreditService.issue(EMAIL, -100, 'x', 'mgr-1')).rejects.toThrow();
+      await expect(storeCreditService.issue(EMAIL, 100, 'x', 'mgr-1')).resolves.toBeTruthy();
+    });
+
+    it('loyalty:adjust is denied for an unpermissioned actor and requires integer points', async () => {
+      mockCan.mockResolvedValue(false);
+      await expect(loyaltyService.adjustPoints(EMAIL, 50, 'x', 'cashier-9')).rejects.toThrow('loyalty:adjust');
+
+      mockCan.mockResolvedValue(true);
+      await expect(loyaltyService.adjustPoints(EMAIL, 1.5, 'x', 'mgr-1')).rejects.toThrow();
+      await expect(loyaltyService.adjustPoints(EMAIL, 0, 'x', 'mgr-1')).rejects.toThrow();
+      await expect(loyaltyService.adjustPoints(EMAIL, 50, 'x', 'mgr-1')).resolves.toBeUndefined();
+      expect((await loyaltyService.getBalance(EMAIL)).points).toBe(50);
     });
   });
 });

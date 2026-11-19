@@ -7,6 +7,7 @@ import {
   PaymentBreakdown,
   RegisterPerformance,
 } from '../services/ReportingService';
+import { useManagerApproval } from '../../authentication/hooks/useManagerApproval';
 
 interface UseReportingResult {
   summary: SalesSummary | null;
@@ -34,6 +35,7 @@ export function useReporting(): UseReportingResult {
   const [salesByRegister, setSalesByRegister] = useState<RegisterPerformance[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { requestApproval } = useManagerApproval();
 
   const applyReport = useCallback(async (from: number, to: number) => {
     setIsLoading(true);
@@ -58,9 +60,18 @@ export function useReporting(): UseReportingResult {
 
   const loadHourlyReport = useCallback((dayStart: number, dayEnd: number) => applyReport(dayStart, dayEnd), [applyReport]);
 
-  const exportCsv = useCallback(async (from: number, to: number): Promise<string> => {
-    return reportingService.exportOrdersCsv(from, to);
-  }, []);
+  const exportCsv = useCallback(
+    async (from: number, to: number): Promise<string> => {
+      // report:export is a registered action key — exporting sales data must
+      // be permissioned or manager-approved (AUTH-02).
+      const approved = await requestApproval('report:export');
+      if (!approved) {
+        throw new Error('Permission denied: report:export');
+      }
+      return reportingService.exportOrdersCsv(from, to);
+    },
+    [requestApproval]
+  );
 
   return {
     summary,

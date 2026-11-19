@@ -24,6 +24,7 @@ import { notificationService } from '../../../../shared/services/notifications/N
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
 import { toCents, toDollars } from '../../../../shared/utils/money';
 import { withKeyedLock } from '../../../../shared/utils/keyedLock';
+import { permissionService } from '../../../authentication/services/permissions/PermissionService';
 
 export interface LoyaltyConfig {
   enabled: boolean;
@@ -226,6 +227,14 @@ export class LoyaltyService {
   // ── Manual Adjustment ─────────────────────────────────────────────────
 
   async adjustPoints(email: string, delta: number, reason: string, managerId?: string): Promise<void> {
+    // Bounded integer points — the UI parseFloat can yield non-integers or
+    // non-finite values (AUTH-02).
+    if (!Number.isSafeInteger(delta) || delta === 0) throw new Error('Adjustment must be a non-zero integer number of points');
+    // loyalty:adjust is a registered action key — adjustments must come from
+    // an identified, permissioned actor (AUTH-02).
+    if (!managerId || !(await permissionService.can(managerId, 'loyalty:adjust'))) {
+      throw new Error('Permission denied: loyalty:adjust');
+    }
     await getLoyaltyRepository().getOrCreateAccount(email);
     await getLoyaltyRepository().applyTransaction(email, 'adjustment', delta, null, reason, managerId);
 

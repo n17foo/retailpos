@@ -16,6 +16,7 @@ import { auditLogService } from '../../../../shared/services/audit/AuditLogServi
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
 import { toDollars } from '../../../../shared/utils/money';
 import { withKeyedLock } from '../../../../shared/utils/keyedLock';
+import { permissionService } from '../../../authentication/services/permissions/PermissionService';
 
 const CONFIG_KEY = 'storeCredit.enabled';
 
@@ -54,7 +55,13 @@ export class StoreCreditService {
   // ── Issue ─────────────────────────────────────────────────────────────
 
   async issue(email: string, amountCents: number, reason: string, issuedBy?: string): Promise<string> {
-    if (!Number.isFinite(amountCents) || amountCents <= 0) throw new Error('Issue amount must be a finite positive number');
+    // Bounded integer cents — parseFloat can produce 1e309 → Infinity (AUTH-02).
+    if (!Number.isSafeInteger(amountCents) || amountCents <= 0) throw new Error('Issue amount must be a positive integer number of cents');
+    // store_credit:issue is a registered action key — issuing money to a
+    // customer must be an identified, permissioned actor (AUTH-02).
+    if (!issuedBy || !(await permissionService.can(issuedBy, 'store_credit:issue'))) {
+      throw new Error('Permission denied: store_credit:issue');
+    }
 
     const entryId = await getStoreCreditRepository().appendEntry(email, 'issue', amountCents, null, reason, issuedBy);
 

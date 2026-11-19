@@ -18,6 +18,7 @@ import {
 } from '../repositories/ProcurementRepository';
 import { InventoryServiceFactory } from '../../inventory/services/InventoryServiceFactory';
 import { auditLogService } from '../../../shared/services/audit/AuditLogService';
+import { permissionService } from '../../authentication/services/permissions/PermissionService';
 import { notificationService } from '../../../shared/services/notifications/NotificationService';
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
 import { ECommercePlatform } from '../../../shared/utils/platforms';
@@ -58,6 +59,11 @@ export class ProcurementService {
   // ── Purchase Orders ───────────────────────────────────────────────────
 
   async createPO(input: CreatePOInput): Promise<string> {
+    // purchase_order:create is a registered action key — creating a PO
+    // commits stock expectations and must be a permissioned actor (AUTH-02).
+    if (!input.createdBy || !(await permissionService.can(input.createdBy, 'purchase_order:create'))) {
+      throw new Error('Permission denied: purchase_order:create');
+    }
     const id = await procurementRepository.createPO(input);
     await auditLogService.log('purchase_order:created', {
       userId: input.createdBy ?? undefined,
@@ -111,6 +117,11 @@ export class ProcurementService {
    */
   async receivePO(poId: string, lines: ReceiveLineInput[], platform: ECommercePlatform, receivedBy?: string): Promise<ReceiveResult> {
     try {
+      // purchase_order:receive is a registered action key — stock intake must
+      // be performed by an identified, permissioned actor (AUTH-02).
+      if (!receivedBy || !(await permissionService.can(receivedBy, 'purchase_order:receive'))) {
+        return { success: false, newStatus: 'partially_received', error: 'Permission denied: purchase_order:receive' };
+      }
       // Serialize per PO — concurrent receives must not double-credit.
       return await withKeyedLock(`po:${poId}`, async () => {
         const po = await procurementRepository.findPOById(poId);
