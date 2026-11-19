@@ -1,7 +1,7 @@
 import React, { memo, useCallback, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, typography, borderRadius } from '../../../shared/utils/theme';
 import { ProductCard } from './ProductCard';
 import VariantPicker from './VariantPicker';

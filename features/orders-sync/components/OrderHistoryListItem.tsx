@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors } from '../../../shared/utils/theme';
 import { LocalOrder } from '../../basket/services/BasketServiceInterface';
 import OrderCard from './OrderCard';

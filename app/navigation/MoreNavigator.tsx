@@ -2,7 +2,7 @@ import React, { lazy, Suspense, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import type { MoreStackParamList, MoreStackScreenProps } from './types';
 import { spacing, typography, borderRadius, elevation } from '../../shared/utils/theme';
 import type { UserRole } from '../../features/authentication/repositories/UserRepository';

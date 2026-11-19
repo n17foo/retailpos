@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, RefreshControl } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../../shared/utils/theme';
 import { formatMoney } from '../../../shared/utils/money';
 import { useSyncQueue, SyncQueueOrder } from '../hooks/useSyncQueue';

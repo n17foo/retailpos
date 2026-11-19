@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../../shared/utils/theme';
 import { formatMoney } from '../../../shared/utils/money';
 import { usePayment } from '../hooks/usePayment';

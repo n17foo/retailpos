@@ -1,7 +1,7 @@
 import React, { lazy, Suspense, useCallback } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import SaleScreen from '../../features/checkout/screens/SaleScreen';
 import { MoreNavigator } from './MoreNavigator';
 import type { MainTabParamList } from './types';

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../utils/theme';
 import { AppNotification, NotificationSeverity } from '../services/notifications/NotificationTypes';
 

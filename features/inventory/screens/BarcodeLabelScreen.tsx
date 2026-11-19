@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, typography } from '../../../shared/utils/theme';
 import { useCurrency } from '../../platform-clients/hooks/useCurrency';
 import { Button } from '../../../shared/components/Button';

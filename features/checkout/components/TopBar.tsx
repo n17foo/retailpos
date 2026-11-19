@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { lightColors, spacing, borderRadius, typography, interactionStyle } from '../../../shared/utils/theme';
 import { getSaleStateInfo, type UserFacingSaleState } from '../utils/orderStateMapper';

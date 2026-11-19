@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, borderRadius, typography } from '../../../shared/utils/theme';
 import type { ScanNotice } from '../hooks/useSaleScanner';
 

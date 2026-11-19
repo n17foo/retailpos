@@ -495,7 +495,11 @@ export const StripeTerminalBridgeProvider: React.FC<{ children: ReactNode }> = (
 
   // Wrap everything with the Stripe Terminal Provider
   return (
-    <StripeTerminalProvider logLevel="verbose" tokenProvider={fetchTokenProvider}>
+    <StripeTerminalProvider
+      logLevel="verbose"
+      tokenProvider={fetchTokenProvider}
+      localeConfig={{ type: 'cardLanguagePreferenceIfAvailable' }}
+    >
       <StripeTerminalBridgeContent />
     </StripeTerminalProvider>
   );

@@ -1,7 +1,7 @@
 import React, { memo, useCallback } from 'react';
 import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, borderRadius, typography, hitTarget, interactionStyle } from '../../../shared/utils/theme';
 import { formatMoney } from '../../../shared/utils/money';
 import { useCurrency } from '../../platform-clients/hooks/useCurrency';

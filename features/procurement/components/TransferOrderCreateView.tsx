@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors } from '../../../shared/utils/theme';
 import { Button } from '../../../shared/components/Button';
 import { vendorReturnStyles as styles } from './vendorReturnStyles';

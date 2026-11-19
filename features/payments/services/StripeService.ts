@@ -134,11 +134,14 @@ export class StripeService implements PaymentServiceInterface {
         simulated: false,
       });
 
-      // Map the readers to our format
-      this.discoveredReaders = readers.map(reader => ({
-        id: reader.serialNumber,
-        name: reader.label || reader.deviceType || reader.serialNumber,
-      }));
+      // Map the readers to our format — a reader without a serialNumber
+      // can never be connected, so it is excluded.
+      this.discoveredReaders = readers
+        .filter((reader): reader is typeof reader & { serialNumber: string } => typeof reader.serialNumber === 'string')
+        .map(reader => ({
+          id: reader.serialNumber,
+          name: reader.label || reader.deviceType || reader.serialNumber,
+        }));
 
       this.logger.info(`Discovered ${this.discoveredReaders.length} Stripe terminals`);
       return this.discoveredReaders;

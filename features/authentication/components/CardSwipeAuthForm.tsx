@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TextInput } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors } from '../../../shared/utils/theme';
 import { useTranslate } from '../../../shared/hooks/useTranslate';
 import { loginScreenStyles as styles } from './loginScreenStyles';

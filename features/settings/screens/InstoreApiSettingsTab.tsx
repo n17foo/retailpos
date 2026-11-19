@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../../shared/utils/theme';
 import { instoreApiConfig, InstoreApiMode } from '../../multi-register/services/InstoreApiConfig';
 import { instoreApiClient } from '../../platform-clients/services/clients/instoreapi/InstoreApiClient';

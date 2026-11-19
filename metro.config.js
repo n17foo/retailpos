@@ -51,6 +51,9 @@ const NATIVE_ONLY_MODULES = new Set([
   'card-react-native',
   'react-native-square-in-app-payments',
   '@stripe/stripe-terminal-react-native',
+  // Bluetooth scanner transport — Electron uses ElectronScannerService
+  // instead, so the BLE stack must never reach the web/Electron bundle.
+  'react-native-ble-plx',
 ]);
 
 const originalResolveRequest = config.resolver.resolveRequest;

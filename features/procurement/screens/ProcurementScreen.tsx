@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../../../shared/utils/theme';
 import type { MoreStackScreenProps } from '../../../app/navigation/types';

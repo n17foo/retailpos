@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, Alert, RefreshControl } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
 import { useAuthContext } from '../../authentication/contexts/AuthProvider';
 import { useDailyReport, DailyReportData } from '../hooks/useDailyReport';

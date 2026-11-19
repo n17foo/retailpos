@@ -12,7 +12,7 @@
 
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useRoute } from '@react-navigation/native';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../../../shared/utils/theme';
 import { Button } from '../../../shared/components/Button';

@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, borderRadius, typography, elevation } from '../../../shared/utils/theme';
 import { Button } from '../../../shared/components/Button';
 import { permissionRepository, PermissionSet } from '../../authentication/repositories/PermissionRepository';

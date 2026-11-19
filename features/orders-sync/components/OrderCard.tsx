@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../../shared/utils/theme';
 import { formatMoney } from '../../../shared/utils/money';
 import { LocalOrder } from '../../basket/services/BasketServiceInterface';

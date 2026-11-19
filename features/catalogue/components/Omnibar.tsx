@@ -1,6 +1,6 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { View, TextInput, Pressable, StyleSheet, ActivityIndicator, type TextInputInstance } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, borderRadius, typography, interactionStyle } from '../../../shared/utils/theme';
 
 export interface OmnibarHandle {

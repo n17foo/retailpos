@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../../shared/utils/theme';
 
 export type BlockerType = 'error' | 'warning' | 'info';

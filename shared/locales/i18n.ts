@@ -55,7 +55,6 @@ export const initI18n = async () => {
     react: {
       useSuspense: false, // Disable Suspense for React Native
     },
-    compatibilityJSON: 'v4' as const,
     parseMissingKeyHandler: (key: string) => {
       logger.warn(`Missing translation: ${key}`);
       return key;

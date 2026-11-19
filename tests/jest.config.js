@@ -32,6 +32,8 @@ module.exports = {
     '^@env$': '<rootDir>/__mocks__/@env.ts',
     '^uuid$': '<rootDir>/__mocks__/uuid.ts',
     '^@expo/vector-icons$': '<rootDir>/__mocks__/uiMocks.ts',
+    '^@expo/vector-icons/MaterialIcons$': '<rootDir>/__mocks__/vectorIconsMaterialIcons.ts',
+    '^@expo/vector-icons/Ionicons$': '<rootDir>/__mocks__/vectorIconsIonicons.ts',
     '^@shopify/flash-list$': '<rootDir>/__mocks__/uiMocks.ts',
     '^@react-navigation/native$': '<rootDir>/__mocks__/uiMocks.ts',
     '^@react-navigation/native-stack$': '<rootDir>/__mocks__/uiMocks.ts',

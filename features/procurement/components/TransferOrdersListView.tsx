@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors } from '../../../shared/utils/theme';
 import { TransferOrderRow } from '../repositories/ProcurementRepository';
 import { vendorReturnStyles as styles } from './vendorReturnStyles';

@@ -9,7 +9,7 @@
 
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../../../shared/contexts/ThemeProvider';
 import { THEME_ORDER, THEME_PRESETS, ThemeId } from '../../../shared/utils/themes';
 import { spacing, borderRadius, typography, elevation } from '../../../shared/utils/theme';

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, Pressable, StyleSheet, Modal, FlatList } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, typography, borderRadius, elevation, interactionStyle } from '../../../shared/utils/theme';
 import { formatMoney } from '../../../shared/utils/money';
 import { UnifiedProductVariant, UnifiedProductOption } from '../services/product/types';

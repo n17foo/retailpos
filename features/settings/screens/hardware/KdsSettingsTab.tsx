@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Switch, ActivityIndicator, Alert, ScrollView } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../../../shared/utils/theme';
 import { kdsServiceFactory, KdsSettings, KdsType } from '../../../hardware/services/kds/KdsServiceFactory';
 import { KDS_VENDOR_PRESETS, KdsVendorType } from '../../../hardware/services/kds/KdsVendorPresets';

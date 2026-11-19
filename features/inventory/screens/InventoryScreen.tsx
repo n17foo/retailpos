@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl, Alert } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, spacing, typography, borderRadius } from '../../../shared/utils/theme';
 import { Input } from '../../../shared/components/Input';
 import { useInventory } from '../hooks/useInventory';

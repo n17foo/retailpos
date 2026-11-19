@@ -1,6 +1,6 @@
 import React, { memo } from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { lightColors, spacing, borderRadius, typography, hitTarget, interactionStyle } from '../../../shared/utils/theme';
 import { formatMoney } from '../../../shared/utils/money';

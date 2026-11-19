@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, interactionStyle } from '../../../shared/utils/theme';
 import { formatMoney } from '../../../shared/utils/money';
 import { basketPanelStyles as styles } from './basketPanelStyles';

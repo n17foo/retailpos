@@ -14,7 +14,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { View, Text, FlatList, ActivityIndicator, TextInput } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors, hitTarget } from '../../../shared/utils/theme';
 import { BasketBlockers } from './BasketBlockers';
 import { ECommercePlatform, isOnlinePlatform } from '../../../shared/utils/platforms';

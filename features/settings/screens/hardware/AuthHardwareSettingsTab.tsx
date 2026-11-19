@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, Switch, ActivityIndicator, FlatList } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useTheme } from '../../../../shared/contexts/ThemeProvider';
 import { Card } from '../../../../shared/components/Card';
 import { Button } from '../../../../shared/components/Button';

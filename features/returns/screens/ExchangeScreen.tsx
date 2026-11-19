@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useNavigation, useRoute, RouteProp, useIsFocused } from '@react-navigation/native';
 import { lightColors, spacing, typography, borderRadius } from '../../../shared/utils/theme';
 import { formatMoney, toCents, toDollars } from '../../../shared/utils/money';

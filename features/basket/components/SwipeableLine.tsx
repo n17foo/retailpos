@@ -1,6 +1,6 @@
 import React, { useRef, useMemo } from 'react';
 import { View, Animated, PanResponder } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors } from '../../../shared/utils/theme';
 import { basketPanelStyles as styles } from './basketPanelStyles';
 

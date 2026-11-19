@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { useStoreApiHealth } from '../hooks/useStoreApiHealth';
 import { instoreApiConfig } from '../services/InstoreApiConfig';
 import { useTranslate } from '../../../shared/hooks/useTranslate';

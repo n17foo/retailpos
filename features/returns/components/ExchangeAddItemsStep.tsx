@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { lightColors } from '../../../shared/utils/theme';
 import { formatMoney } from '../../../shared/utils/money';
 import { Button } from '../../../shared/components/Button';

@@ -16,7 +16,8 @@ import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
 
 // Define types based on Stripe Terminal SDK (incomplete type definitions)
 export interface Reader {
-  serialNumber: string;
+  // The SDK's Reader.Type allows serialNumber to be absent pre-discovery.
+  serialNumber?: string;
   deviceType?: string;
   status?: string;
   label?: string;
