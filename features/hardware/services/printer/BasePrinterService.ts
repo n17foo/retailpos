@@ -192,8 +192,9 @@ export abstract class AbstractPrinterService implements BasePrinterService {
     // Return to left alignment for details
     commands.push(...CMD.ALIGN_LEFT);
 
-    // Order info
-    commands.push(...stringToBytes(`Order #: ${data.orderId}`));
+    // Order info — the fiscal number is the legal document reference
+    // when the fiscal module produced one (docs/features/fiscal).
+    commands.push(...stringToBytes(`Order #: ${data.fiscalNumber ?? data.orderId}`));
     commands.push(...CMD.NEWLINE);
     commands.push(...stringToBytes(`Date: ${data.date.toLocaleString()}`));
     commands.push(...CMD.NEWLINE);
@@ -280,6 +281,14 @@ export abstract class AbstractPrinterService implements BasePrinterService {
       commands.push(...CMD.ALIGN_CENTER);
       commands.push(...stringToBytes(`Payment Method: ${data.paymentMethod}`));
       commands.push(...CMD.NEWLINE, ...CMD.NEWLINE);
+    }
+
+    // Fiscal QR — legally required on e.g. ES record-mode receipts
+    // (ValidarQR). Uses the printer model's QR command when the
+    // command set provides one.
+    if (data.fiscalQr && CMD.QR_CODE) {
+      commands.push(...CMD.ALIGN_CENTER);
+      commands.push(...CMD.QR_CODE(data.fiscalQr));
     }
 
     // Footer — from ReceiptConfigService (center aligned)
