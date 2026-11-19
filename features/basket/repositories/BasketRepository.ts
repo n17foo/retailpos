@@ -80,9 +80,13 @@ export class BasketRepository {
 
   async clearBasket(basketId: string): Promise<void> {
     const now = Date.now();
+    // A completed sale ends the basket's lifecycle — every customer/sale-
+    // scoped field resets so the next sale can't inherit identity, notes,
+    // discounts or sale mode from a stranger's basket (BAS-02).
     await db.runAsync(
       `UPDATE baskets SET items = ?, subtotal = ?, tax = ?, total = ?,
-       discount_amount = NULL, discount_code = NULL, sale_mode = NULL, updated_at = ?
+       discount_amount = NULL, discount_code = NULL, sale_mode = NULL,
+       customer_email = NULL, customer_name = NULL, note = NULL, updated_at = ?
        WHERE id = ?`,
       ['[]', 0, 0, 0, now, basketId]
     );
