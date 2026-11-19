@@ -68,7 +68,6 @@ function getDbPromise(): Promise<SQLite.SQLiteDatabase> {
     dbPromise = SQLite.openDatabaseAsync(DATABASE_NAME)
       .then(async database => {
         logger.info(`Database ${DATABASE_NAME} opened successfully`);
-        dbInstance = database;
         if (process.env.NODE_ENV !== 'test') {
           await applySafetyPragmas(database);
           await runIntegrityCheck(database);
@@ -82,6 +81,10 @@ function getDbPromise(): Promise<SQLite.SQLiteDatabase> {
           }
           await maybeBackupDatabase(database);
         }
+        // Publish only after pragmas, integrity check, and migrations have all
+        // completed — before this point every proxy call must route through the
+        // init promise, not a half-ready handle (SYS-01).
+        dbInstance = database;
         return database;
       })
       .catch(err => {
