@@ -3,6 +3,26 @@ import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory'
 import { keyValueRepository } from '../../../../shared/repositories/KeyValueRepository';
 
 const INVENTORY_STORAGE_KEY = 'offline_local_inventory';
+const KEY_SEPARATOR = '::';
+
+interface InventoryEntry {
+  quantity: number;
+  sku?: string;
+  updatedAt: Date;
+}
+
+/**
+ * Composite storage identity (INV-01): variants of the same product are
+ * distinct stock lines — `productId::variantId`. Product-level entries keep
+ * the plain `productId` key so legacy rows stay readable as product totals.
+ */
+const inventoryKey = (productId: string, variantId?: string): string =>
+  variantId ? `${productId}${KEY_SEPARATOR}${variantId}` : productId;
+
+const parseInventoryKey = (key: string): { productId: string; variantId?: string } => {
+  const sep = key.indexOf(KEY_SEPARATOR);
+  return sep === -1 ? { productId: key } : { productId: key.slice(0, sep), variantId: key.slice(sep + KEY_SEPARATOR.length) };
+};
 
 /**
  * Offline inventory service for local-first POS operation
@@ -11,7 +31,7 @@ const INVENTORY_STORAGE_KEY = 'offline_local_inventory';
  */
 export class OfflineInventoryService implements InventoryServiceInterface {
   private initialized: boolean = false;
-  private inventory: Map<string, { quantity: number; sku?: string; updatedAt: Date }> = new Map();
+  private inventory: Map<string, InventoryEntry> = new Map();
   private logger = LoggerFactory.getInstance().createLogger('OfflineInventoryService');
 
   /**
@@ -63,14 +83,20 @@ export class OfflineInventoryService implements InventoryServiceInterface {
       await this.initialize();
     }
 
-    const items = productIds.map(productId => {
-      const item = this.inventory.get(productId);
-      return {
+    const items = productIds.flatMap(productId => {
+      // Emit every stock line for the product — product-level entry and each
+      // variant entry — so a variant lookup can't collapse into one row.
+      const entries = Array.from(this.inventory.entries()).filter(([key]) => parseInventoryKey(key).productId === productId);
+      if (entries.length === 0) {
+        return [{ productId, quantity: 0 }];
+      }
+      return entries.map(([key, item]) => ({
         productId,
-        quantity: item?.quantity || 0,
-        sku: item?.sku || undefined,
-        updatedAt: item?.updatedAt,
-      };
+        variantId: parseInventoryKey(key).variantId,
+        quantity: item.quantity,
+        sku: item.sku || undefined,
+        updatedAt: item.updatedAt,
+      }));
     });
 
     return { items };
@@ -94,7 +120,8 @@ export class OfflineInventoryService implements InventoryServiceInterface {
 
     updates.forEach(update => {
       try {
-        const currentItem = this.inventory.get(update.productId) || { quantity: 0 };
+        const key = inventoryKey(update.productId, update.variantId);
+        const currentItem: Pick<InventoryEntry, 'quantity' | 'sku'> = this.inventory.get(key) || { quantity: 0 };
 
         let newQuantity: number;
         if (update.adjustment) {
@@ -105,14 +132,14 @@ export class OfflineInventoryService implements InventoryServiceInterface {
 
         newQuantity = Math.max(0, newQuantity);
 
-        this.inventory.set(update.productId, {
+        this.inventory.set(key, {
           quantity: newQuantity,
-          sku: update.variantId || (currentItem as { sku?: string }).sku,
+          sku: currentItem.sku,
           updatedAt: now,
         });
 
         result.successful++;
-        this.logger.info(`Updated inventory for ${update.productId}: ${newQuantity}`);
+        this.logger.info(`Updated inventory for ${key}: ${newQuantity}`);
       } catch (error) {
         result.failed++;
         result.errors.push({
@@ -135,8 +162,8 @@ export class OfflineInventoryService implements InventoryServiceInterface {
       await this.initialize();
     }
 
-    const items = Array.from(this.inventory.entries()).map(([productId, data]) => ({
-      productId,
+    const items = Array.from(this.inventory.entries()).map(([key, data]) => ({
+      ...parseInventoryKey(key),
       quantity: data.quantity,
       sku: data.sku,
       updatedAt: data.updatedAt,
@@ -155,8 +182,8 @@ export class OfflineInventoryService implements InventoryServiceInterface {
 
     const items = Array.from(this.inventory.entries())
       .filter(([, data]) => data.quantity <= threshold)
-      .map(([productId, data]) => ({
-        productId,
+      .map(([key, data]) => ({
+        ...parseInventoryKey(key),
         quantity: data.quantity,
         sku: data.sku,
         updatedAt: data.updatedAt,
