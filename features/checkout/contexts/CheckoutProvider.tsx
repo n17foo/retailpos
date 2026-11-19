@@ -20,6 +20,8 @@ interface CheckoutContextValue {
   markPaymentProcessing: (orderId: string) => Promise<void>;
   /** Return a 'processing' order to 'draft' so a failed payment can be retried */
   revertToDraft: (orderId: string) => Promise<void>;
+  /** Persist payment-attempt evidence (transaction id / tender lines) while processing (CHK-01) */
+  recordPaymentAttempt: (orderId: string, patch: { transactionId?: string | null; paymentLines?: PaymentLine[] }) => Promise<void>;
   completePayment: (
     orderId: string,
     paymentMethod: string,
@@ -117,6 +119,14 @@ export const CheckoutProvider: React.FC<CheckoutProviderProps> = ({ children }) 
     setCurrentOrder(order);
   }, []);
 
+  const recordPaymentAttempt = useCallback(
+    async (orderId: string, patch: { transactionId?: string | null; paymentLines?: PaymentLine[] }) => {
+      const { checkoutService } = await getServiceContainer();
+      await checkoutService.recordPaymentAttempt(orderId, patch);
+    },
+    []
+  );
+
   const cancelOrder = useCallback(async (orderId: string) => {
     const { checkoutService } = await getServiceContainer();
     await checkoutService.cancelOrder(orderId);
@@ -201,6 +211,7 @@ export const CheckoutProvider: React.FC<CheckoutProviderProps> = ({ children }) 
     startCheckout,
     markPaymentProcessing,
     revertToDraft,
+    recordPaymentAttempt,
     completePayment,
     cancelOrder,
     cancelDraftOrder,

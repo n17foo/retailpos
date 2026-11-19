@@ -323,6 +323,20 @@ export class CheckoutService implements CheckoutServiceInterface {
   }
 
   /**
+   * Persist evidence of a payment attempt before/regardless of the outcome —
+   * the processor's transaction/intent id and/or tender lines charged so far.
+   * Never flips status: this runs while the order is still 'processing', and a
+   * crash afterwards must leave recoverable evidence (CHK-01).
+   */
+  async recordPaymentAttempt(orderId: string, patch: { transactionId?: string | null; paymentLines?: PaymentLine[] }): Promise<void> {
+    if (!this.orderRepo.updatePaymentAttempt) return; // client mode — attempts live on the server
+    await this.orderRepo.updatePaymentAttempt(orderId, {
+      transactionId: patch.transactionId,
+      paymentsJson: patch.paymentLines !== undefined ? JSON.stringify(patch.paymentLines) : undefined,
+    });
+  }
+
+  /**
    * Return a 'processing' order to 'draft' after a failed payment attempt so the
    * cashier can retry or pick another tender method without losing the order.
    */

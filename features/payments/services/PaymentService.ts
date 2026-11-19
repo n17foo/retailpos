@@ -133,6 +133,13 @@ class PaymentService implements PaymentServiceInterface {
     }
     throw new Error('refundTransaction not supported by the current payment provider');
   }
+
+  async getOpenPaymentForOrder(orderId: string): Promise<PaymentResponse | null> {
+    if (this.activeService.getOpenPaymentForOrder) {
+      return this.activeService.getOpenPaymentForOrder(orderId);
+    }
+    throw new Error('getOpenPaymentForOrder not supported by the current payment provider');
+  }
 }
 
 // Export a singleton instance consumed by usePayment and other callers.

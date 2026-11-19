@@ -9,6 +9,12 @@ export interface CheckoutServiceInterface {
   markPaymentProcessing(orderId: string): Promise<LocalOrder>;
   /** Return a 'processing' order to 'draft' so a failed payment can be retried */
   revertToDraft(orderId: string): Promise<LocalOrder>;
+  /**
+   * Persist payment-attempt evidence (transaction id and/or tender lines)
+   * while the order is still 'processing' — survives a crash so recovery can
+   * verify rather than assume no charge (CHK-01).
+   */
+  recordPaymentAttempt(orderId: string, patch: { transactionId?: string | null; paymentLines?: PaymentLine[] }): Promise<void>;
   completePayment(
     orderId: string,
     paymentMethod: string,

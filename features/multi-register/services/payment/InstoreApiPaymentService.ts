@@ -94,6 +94,9 @@ export class InstoreApiPaymentService implements PaymentServiceInterface {
       };
     }
 
+    // The intent id is durable evidence that a charge may exist — keep it
+    // outside the try so a transport failure still hands it back (CHK-01).
+    let paymentIntentId: string | undefined;
     try {
       // Initiate the payment via the store-api orchestrator
       const result = await paymentIntentClient.initiatePayment({
@@ -107,7 +110,8 @@ export class InstoreApiPaymentService implements PaymentServiceInterface {
         surcharge_minor: 0,
       });
 
-      const paymentIntentId = result.payment_intent.payment_intent_id;
+      paymentIntentId = result.payment_intent.payment_intent_id;
+      request.onPaymentAttempt?.(paymentIntentId);
       this.logger.info(`Payment intent created: ${paymentIntentId}`);
 
       // Wait for terminal state via polling (WS delivery is handled separately
@@ -118,8 +122,13 @@ export class InstoreApiPaymentService implements PaymentServiceInterface {
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Payment processing failed';
       this.logger.error(msg);
+      // A timeout/transport failure after the intent was created is NOT a
+      // confirmed decline — the charge outcome is genuinely unknown and the
+      // caller must not retry blindly (CHK-01).
       return {
         success: false,
+        outcome: 'unknown',
+        transactionId: paymentIntentId,
         errorMessage: msg,
         errorCode: 'payment_error',
         timestamp: new Date(),
@@ -195,6 +204,21 @@ export class InstoreApiPaymentService implements PaymentServiceInterface {
   async getTransactionStatus(transactionId: string): Promise<PaymentResponse> {
     const result = await paymentIntentClient.recoverOutcome(transactionId);
     return this.mapIntentToResponse(result.payment_intent);
+  }
+
+  /**
+   * Look up the riskiest payment intent recorded for an order — used when an
+   * interrupted sale has no persisted transaction id. Returns null only when
+   * the server confirms no possibly-live charge exists, i.e. every recorded
+   * intent ended without approval (CHK-01).
+   */
+  async getOpenPaymentForOrder(orderId: string): Promise<PaymentResponse | null> {
+    const intents = await paymentIntentClient.getIntentsForOrder(orderId);
+    // Approved beats pending beats declined — surface the riskiest attempt.
+    const approved = intents.find(i => i.state === 'approved');
+    const live = intents.find(i => !isTerminalState(i.state));
+    const candidate = approved ?? live;
+    return candidate ? this.mapIntentToResponse(candidate) : null;
   }
 
   /**
@@ -290,9 +314,14 @@ export class InstoreApiPaymentService implements PaymentServiceInterface {
    */
   private mapIntentToResponse(intent: PaymentIntent): PaymentResponse {
     const success = intent.state === 'approved';
+    // Model the outcome explicitly (CHK-01): terminal non-approved states are
+    // confirmed declines; anything still in flight is genuinely unknown —
+    // the charge may already exist at the provider.
+    const outcome = success ? 'approved' : isTerminalState(intent.state) ? 'declined' : 'unknown';
 
     return {
       success,
+      outcome,
       transactionId: intent.payment_intent_id,
       receiptNumber: intent.approval_code ?? undefined,
       timestamp: new Date(intent.updated_at),

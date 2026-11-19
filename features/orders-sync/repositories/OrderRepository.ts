@@ -85,6 +85,13 @@ export interface OrderRepository {
   findUnsynced(): Promise<OrderRow[]>;
   findByDateRange(fromTimestamp: number, toTimestamp: number, cashierId?: string): Promise<OrderRow[]>;
   updateStatus(orderId: string, status: string): Promise<void>;
+  /**
+   * Persist evidence of a payment attempt WITHOUT changing status —
+   * the processor's transaction/intent id and/or the tender lines recorded
+   * so far. Ensures a crash between processor acceptance and completion can
+   * never leave a possibly-paid order looking uncharged (CHK-01).
+   */
+  updatePaymentAttempt?(orderId: string, patch: { transactionId?: string | null; paymentsJson?: string | null }): Promise<void>;
   updatePayment(orderId: string, paymentMethod: string, transactionId: string | null): Promise<void>;
   updatePaymentLines(orderId: string, paymentMethod: string, transactionId: string | null, paymentsJson: string): Promise<void>;
   /**

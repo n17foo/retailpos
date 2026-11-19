@@ -37,6 +37,7 @@ import type {
   ReceiptResponse,
   ReprintRequest,
 } from './PaymentIntentTypes';
+import { isActiveState } from './PaymentIntentTypes';
 
 export class PaymentIntentClient {
   private static instance: PaymentIntentClient;
@@ -81,12 +82,22 @@ export class PaymentIntentClient {
   }
 
   /**
-   * List all open (non-terminal) payment intents for an order.
+   * List all payment intents recorded for an order, in any state. Used by
+   * interruption recovery — a crashed sale may have reached the processor
+   * before its intent id was persisted locally (CHK-01).
+   */
+  async getIntentsForOrder(orderId: string): Promise<PaymentIntent[]> {
+    const result = await this.get<{ payment_intents: PaymentIntent[] }>(`/api/payment-intents/order/${orderId}`);
+    return result.payment_intents ?? [];
+  }
+
+  /**
+   * List open (non-terminal) payment intents for an order.
    * Useful for checking if there's already an active payment before initiating.
    */
   async getOpenIntentsForOrder(orderId: string): Promise<PaymentIntent[]> {
-    const result = await this.get<{ payment_intents: PaymentIntent[] }>(`/api/payment-intents/order/${orderId}`);
-    return result.payment_intents ?? [];
+    const intents = await this.getIntentsForOrder(orderId);
+    return intents.filter(i => isActiveState(i.state));
   }
 
   // ── Cancel ──────────────────────────────────────────────────────────────────

@@ -48,8 +48,16 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
   const logger = useLogger('useCheckout');
   const currency = useCurrency();
   const { basketItems, total: basketTotal, subtotal: basketSubtotal, tax: basketTax, itemCount, basket } = useBasketState();
-  const { currentOrder, startCheckout, markPaymentProcessing, revertToDraft, completePayment, cancelOrder, cancelDraftOrder } =
-    useCheckoutContext();
+  const {
+    currentOrder,
+    startCheckout,
+    markPaymentProcessing,
+    revertToDraft,
+    recordPaymentAttempt,
+    completePayment,
+    cancelOrder,
+    cancelDraftOrder,
+  } = useCheckoutContext();
 
   // Once checkout has started, the order holds the authoritative amounts (including the tax the platform calculated).
   // Everything charged, tendered or displayed must use them, never the basket's pre-checkout figures.
@@ -87,6 +95,13 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
       // Reopening an open order (modal was closed mid-checkout, or an
       // interrupted draft was resumed) reuses it — never create a second draft.
       if (currentOrder && (currentOrder.status === 'draft' || currentOrder.status === 'pending')) {
+        // Rehydrate tender lines persisted before the interruption — card
+        // lines carry their transaction ids, so resuming cannot re-charge
+        // them (CHK-01).
+        if (currentOrder.payments && currentOrder.payments.length > 0) {
+          setPaymentLines(currentOrder.payments);
+          setSplitMode(true);
+        }
         return;
       }
       try {
@@ -129,14 +144,23 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
         try {
           const response = await processPayment({
             amount: line.amount,
-            reference: `ORDER-${Date.now()}-SPLIT`,
+            reference: `ORDER-${currentOrder.id}-SPLIT-${paymentLines.length + 1}`,
             currency: currency.code,
             orderId: currentOrder.id,
             itemCount,
           });
 
           if (!response.success) {
-            setError(response.errorMessage || 'Card payment failed');
+            // An unknown outcome means the charge may already exist — persist
+            // the attempt id so recovery can verify before any retry (CHK-01).
+            if (response.outcome === 'unknown' && response.transactionId) {
+              await recordPaymentAttempt(currentOrder.id, { transactionId: response.transactionId }).catch(() => {});
+            }
+            setError(
+              response.outcome === 'unknown'
+                ? 'Card payment outcome unknown — verify the charge before adding this tender again'
+                : response.errorMessage || 'Card payment failed'
+            );
             return;
           }
 
@@ -149,7 +173,11 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
             cardBrand: response.cardBrand,
             last4: response.last4,
           };
-          setPaymentLines(prev => [...prev, full]);
+          const next = [...paymentLines, full];
+          setPaymentLines(next);
+          // Persist the charged line immediately — hook state alone would
+          // lose the charge evidence on crash (CHK-01).
+          await recordPaymentAttempt(currentOrder.id, { paymentLines: next }).catch(() => {});
         } catch (err) {
           setError((err as Error).message);
         } finally {
@@ -208,7 +236,7 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
         setPaymentLines(prev => [...prev, full]);
       }
     },
-    [currentOrder, processPayment, itemCount, basket?.customerEmail, currency.code]
+    [currentOrder, processPayment, itemCount, basket?.customerEmail, currency.code, paymentLines, recordPaymentAttempt]
   );
 
   const confirmSplitCashPayment = useCallback(
@@ -279,9 +307,13 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
         }
       }
 
-      setPaymentLines(prev => prev.filter(p => p.id !== lineId));
+      const next = paymentLines.filter(p => p.id !== lineId);
+      setPaymentLines(next);
+      if (currentOrder) {
+        recordPaymentAttempt(currentOrder.id, { paymentLines: next }).catch(() => {});
+      }
     },
-    [paymentLines, basket?.customerEmail, logger]
+    [paymentLines, basket?.customerEmail, logger, currentOrder, recordPaymentAttempt]
   );
 
   const remainingDue = useMemo(() => {
@@ -413,15 +445,33 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
         if (selection.method === 'card' || selection.method === 'terminal') {
           const response = await processPayment({
             amount: total,
-            reference: `ORDER-${Date.now()}`,
+            // Stable per-order reference — a retry reuses the same attempt
+            // key so provider-side dedupe can recognise it (CHK-01).
+            reference: `ORDER-${currentOrder.id}`,
             currency: currency.code,
             orderId: currentOrder.id,
             itemCount,
+            onPaymentAttempt: id => {
+              recordPaymentAttempt(currentOrder.id, { transactionId: id }).catch(() => {});
+            },
           });
 
           if (!response.success) {
-            // Payment failed — keep the order alive and return it to 'draft' so
-            // the cashier can retry or pick another tender method (spec §4.7)
+            // Persist whatever attempt id came back — it is the only link to
+            // a possibly-live charge at the processor (CHK-01).
+            if (response.transactionId) {
+              await recordPaymentAttempt(currentOrder.id, { transactionId: response.transactionId }).catch(() => {});
+            }
+
+            if (response.outcome === 'unknown') {
+              // The charge may already exist — keep the order 'processing'
+              // for interruption recovery; retrying could double-charge.
+              setError(response.errorMessage || 'Payment outcome is unknown — the charge may have succeeded. Verify it before retrying.');
+              return;
+            }
+
+            // Confirmed decline — keep the order alive and return it to
+            // 'draft' so the cashier can retry or pick another tender (spec §4.7)
             await revertToDraft(currentOrder.id);
             setInitialTender(null);
             setError(response.errorMessage || 'Payment failed — try again or choose another method');
@@ -480,17 +530,27 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
           setCheckoutVisible(false);
           onSuccess?.(result.orderId);
         } else {
-          // Order stays retryable — a 'processing' order must go back to 'draft'
-          if (currentOrder.status === 'processing') {
+          // The durable record failed. For card tenders the charge may already
+          // exist — keep 'processing' for recovery rather than making it
+          // retryable (CHK-01). Non-card tenders can safely return to draft.
+          if (currentOrder.status === 'processing' && selection.method !== 'card' && selection.method !== 'terminal') {
             await revertToDraft(currentOrder.id).catch(() => {});
           }
           setError(result.error || 'Payment failed — try again or choose another method');
         }
       } catch (err) {
-        if (currentOrder.status === 'processing') {
+        // A thrown error mid-payment is an unknown outcome — the processor may
+        // have been reached. For card tenders keep the order 'processing' for
+        // recovery; cash-style tenders carry no external charge, so they can
+        // safely return to draft (CHK-01).
+        if (currentOrder.status === 'processing' && selection.method !== 'card' && selection.method !== 'terminal') {
           await revertToDraft(currentOrder.id).catch(() => {});
         }
-        setError((err as Error).message);
+        setError(
+          selection.method === 'card' || selection.method === 'terminal'
+            ? 'Payment outcome is unknown — the charge may have succeeded. Verify it before retrying.'
+            : (err as Error).message
+        );
       } finally {
         setIsProcessing(false);
       }
@@ -501,6 +561,7 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
       processPayment,
       completePayment,
       revertToDraft,
+      recordPaymentAttempt,
       total,
       tax,
       itemCount,

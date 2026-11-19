@@ -96,6 +96,16 @@ export class OfflineOrderRepository implements OrderRepository {
     await db.runAsync('UPDATE orders SET status = ?, updated_at = ? WHERE id = ?', [status, now, orderId]);
   }
 
+  async updatePaymentAttempt(orderId: string, patch: { transactionId?: string | null; paymentsJson?: string | null }): Promise<void> {
+    const now = Date.now();
+    if (patch.transactionId !== undefined) {
+      await db.runAsync(`UPDATE orders SET payment_transaction_id = ?, updated_at = ? WHERE id = ?`, [patch.transactionId, now, orderId]);
+    }
+    if (patch.paymentsJson !== undefined) {
+      await db.runAsync(`UPDATE orders SET payments_json = ?, updated_at = ? WHERE id = ?`, [patch.paymentsJson, now, orderId]);
+    }
+  }
+
   async updatePayment(orderId: string, paymentMethod: string, transactionId: string | null): Promise<void> {
     const now = Date.now();
     await db.runAsync(
