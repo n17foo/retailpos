@@ -39,8 +39,11 @@ export interface VerifactuRecordContent {
   tipoFactura?: string; // F1 default
 }
 
-const esc = (s: string): string =>
+/** XML-escape text interpolated into fiscal documents/envelopes. */
+export const escapeXml = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+
+const esc = escapeXml;
 
 const amount = (n: number): string => n.toFixed(2);
 
@@ -108,6 +111,46 @@ export function buildAltaXml(ctx: VerifactuContext, record: FiscalRecord, conten
     `<TipoHuella>01</TipoHuella>` +
     `<Huella>${huella}</Huella>` +
     `</RegistroFacturacionAlta>`;
+
+  return { xml, huella };
+}
+
+/**
+ * Cancellation (anulación) record for a void — NOT an alta. It references
+ * the original sale's invoice identity (`IDFacturaAnulada`) and uses the
+ * anulación huella field names, per the spec's RegistroFacturacionAnulacion
+ * schema (F08 — a void must never be submitted as an F1/AN invoice).
+ */
+export function buildAnulacionXml(
+  ctx: VerifactuContext,
+  record: FiscalRecord,
+  sale: { number: string; createdAt: number }
+): VerifactuAltaPayload {
+  const fechaHora = verifactuFechaHora(record.createdAt);
+  const saleFecha = verifactuFecha(sale.createdAt);
+  const huellaFields = [
+    `IDEmisorFacturaAnulada=${ctx.nif}`,
+    `NumSerieFacturaAnulada=${sale.number}`,
+    `FechaExpedicionFacturaAnulada=${saleFecha}`,
+    `Huella=${ctx.prevHuella}`,
+    `FechaHoraHusoGenRegistro=${fechaHora}`,
+  ];
+  const huella = sha256Hex(huellaFields.join('&')).toUpperCase();
+
+  const encadenamiento = ctx.prevNumSerie
+    ? `<Encadenamiento><RegistroAnterior><IDEmisorFactura>${esc(ctx.nif)}</IDEmisorFactura><NumSerieFactura>${esc(ctx.prevNumSerie)}</NumSerieFactura><FechaExpedicionFactura>${esc(ctx.prevFecha ?? '')}</FechaExpedicionFactura><Huella>${esc(ctx.prevHuella)}</Huella></RegistroAnterior></Encadenamiento>`
+    : `<Encadenamiento><PrimerRegistro>S</PrimerRegistro></Encadenamiento>`;
+
+  const xml =
+    `<RegistroFacturacionAnulacion xmlns="https://www2.agenciatributaria.gob.es/static_files/common/internet/dep/aplicaciones/es/aeat/tike/cont/ws/SuministroInformacion.xsd">` +
+    `<IDVersion>1.0</IDVersion>` +
+    `<IDFactura><IDEmisorFacturaAnulada>${esc(ctx.nif)}</IDEmisorFacturaAnulada><NumSerieFacturaAnulada>${esc(sale.number)}</NumSerieFacturaAnulada><FechaExpedicionFacturaAnulada>${esc(saleFecha)}</FechaExpedicionFacturaAnulada></IDFactura>` +
+    encadenamiento +
+    `<SistemaInformatico><NombreRazon>${esc(ctx.issuerName)}</NombreRazon><NIF>${esc(ctx.nif)}</NIF><NombreSistemaInformatico>RetailPOS</NombreSistemaInformatico><IdSistemaInformatico>RP1</IdSistemaInformatico><Version>1.0</Version><NumeroInstalacion>1</NumeroInstalacion><TipoUsoPosibleSoloVerifactu>S</TipoUsoPosibleSoloVerifactu><TipoUsoPosibleMultiOT>N</TipoUsoPosibleMultiOT><IndicadorMultiplesOT>N</IndicadorMultiplesOT></SistemaInformatico>` +
+    `<FechaHoraHusoGenRegistro>${fechaHora}</FechaHoraHusoGenRegistro>` +
+    `<TipoHuella>01</TipoHuella>` +
+    `<Huella>${huella}</Huella>` +
+    `</RegistroFacturacionAnulacion>`;
 
   return { xml, huella };
 }

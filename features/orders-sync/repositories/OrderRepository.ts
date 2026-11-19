@@ -95,6 +95,12 @@ export interface OrderRepository {
   updatePayment(orderId: string, paymentMethod: string, transactionId: string | null): Promise<void>;
   updatePaymentLines(orderId: string, paymentMethod: string, transactionId: string | null, paymentsJson: string): Promise<void>;
   /**
+   * Stamp a paid order as fiscally 'unfinalized' after a failed
+   * finalization — the durable, retryable state the reconciler scans for
+   * (fiscal F04). Optional: in client mode the server owns fiscal state.
+   */
+  markFiscalUnfinalized?(orderId: string): Promise<void>;
+  /**
    * Claim exclusive rights to push this order to the online platform.
    * In client mode this is an atomic server-side claim (409 → false);
    * offline it always succeeds — one process, no contention.

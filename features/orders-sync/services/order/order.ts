@@ -84,6 +84,12 @@ export interface CheckoutResult {
   /** Legal invoice number allocated during this checkout, when the fiscal module is on. */
   fiscalNumber?: string;
   fiscalQr?: string;
+  /**
+   * The payment IS durably recorded even though this result failed —
+   * e.g. strict-mode fiscal rejection. Callers must NOT treat the order
+   * as unpaid/retryable (fiscal F04, CHK-01).
+   */
+  paymentRecorded?: boolean;
   payments?: PaymentLine[];
 }
 

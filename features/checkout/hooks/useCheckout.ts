@@ -383,7 +383,9 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
         setCheckoutVisible(false);
         onSuccess?.(result.orderId);
       } else {
-        if (currentOrder.status === 'processing') {
+        // paymentRecorded — the charge is durably 'paid' (e.g. strict-fiscal
+        // rejection); reverting to draft would make a paid sale retryable.
+        if (!result.paymentRecorded && currentOrder.status === 'processing') {
           await revertToDraft(currentOrder.id).catch(() => {});
         }
         setError(result.error ?? 'Payment failed — try again or choose another method');
@@ -532,8 +534,14 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
         } else {
           // The durable record failed. For card tenders the charge may already
           // exist — keep 'processing' for recovery rather than making it
-          // retryable (CHK-01). Non-card tenders can safely return to draft.
-          if (currentOrder.status === 'processing' && selection.method !== 'card' && selection.method !== 'terminal') {
+          // retryable (CHK-01). Non-card tenders can safely return to draft,
+          // unless the payment itself was already recorded (F04 strict fiscal).
+          if (
+            !result.paymentRecorded &&
+            currentOrder.status === 'processing' &&
+            selection.method !== 'card' &&
+            selection.method !== 'terminal'
+          ) {
             await revertToDraft(currentOrder.id).catch(() => {});
           }
           setError(result.error || 'Payment failed — try again or choose another method');

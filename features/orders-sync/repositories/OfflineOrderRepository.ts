@@ -122,6 +122,19 @@ export class OfflineOrderRepository implements OrderRepository {
     );
   }
 
+  /**
+   * Durable retry marker for a failed fiscal finalization — never clears
+   * an existing 'fiscalized'/'voided' status (fiscal F04).
+   */
+  async markFiscalUnfinalized(orderId: string): Promise<void> {
+    const now = Date.now();
+    await db.runAsync(
+      `UPDATE orders SET fiscal_status = 'unfinalized', updated_at = ?
+       WHERE id = ? AND (fiscal_status IS NULL OR fiscal_status = 'unfinalized')`,
+      [now, orderId]
+    );
+  }
+
   async claimSync(_orderId: string): Promise<boolean> {
     // Single process owns the local DB — nothing else can race the push.
     return true;

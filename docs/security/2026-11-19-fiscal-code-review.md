@@ -351,5 +351,9 @@ an explicitly configured, validated transport path before enabling standalone
 production submission.
 
 Fiscal specifications in `docs/features/fiscal/` still identify themselves as
-draft/pre-implementation and contain target guarantees not enforced here.
-Treat them as requirements, not proof of current behavior or certification.
+draft/pre-implementation and describe target guarantees that were unenforced
+when this report was written. Treat them as requirements, not proof of
+current behavior or certification — the unenforced guarantees are catalogued
+as findings F01–F12 above; their fixes are applied and regression-tested in
+this repository, but certified deployments still require validating those
+fixes against the actual authority integrations.

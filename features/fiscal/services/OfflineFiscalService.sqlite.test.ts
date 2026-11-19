@@ -18,6 +18,7 @@ import { db } from '../../../shared/utils/db';
 import { initializeSchema } from '../../../shared/utils/dbSchema';
 import { offlineFiscalService } from './OfflineFiscalService';
 import { orderRepository } from '../../orders-sync/repositories/OrderRepository';
+import { returnRepository } from '../../returns/repositories/ReturnRepository';
 import { posConfig } from '../../platform-clients/services/config/POSConfigService';
 import type { CreateOrderInput } from '../../orders-sync/repositories/OrderRepository';
 
@@ -47,7 +48,7 @@ async function seedPaidOrder(id: string): Promise<void> {
 
 beforeEach(async () => {
   await initializeSchema(realDb);
-  for (const table of ['fiscal_records', 'fiscal_chain_state', 'fiscal_transmissions', 'orders', 'order_items']) {
+  for (const table of ['fiscal_records', 'fiscal_chain_state', 'fiscal_transmissions', 'returns', 'orders', 'order_items']) {
     await realDb.runAsync(`DELETE FROM ${table}`);
   }
   await posConfig.update('fiscalEnabled', true);
@@ -132,9 +133,18 @@ describe('OfflineFiscalService on real SQLite', () => {
   it('registers a return as a chained record linked to the original', async () => {
     await seedPaidOrder('o1');
     await offlineFiscalService.finalizeSale('o1');
-    const ret = await offlineFiscalService.registerReturn('ret-1', 'o1');
+    // F07 — the record now binds to a real return row, so seed one first.
+    await returnRepository.create({
+      orderId: 'o1',
+      productId: 'prod-1',
+      productName: 'Widget',
+      quantity: 1,
+      refundAmount: 40,
+    });
+    const returnId = (await returnRepository.findByOrderId('o1'))[0].id;
+    const ret = await offlineFiscalService.registerReturn(returnId, 'o1');
     expect(ret.type).toBe('return');
-    expect(ret.returnId).toBe('ret-1');
+    expect(ret.returnId).toBe(returnId);
     expect(ret.orderId).toBe('o1');
   });
 

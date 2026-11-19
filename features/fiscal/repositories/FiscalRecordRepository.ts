@@ -89,6 +89,24 @@ export class FiscalRecordRepository {
     ]);
   }
 
+  /** The fiscal record produced for a return — idempotent registration checks (F07). */
+  async findByReturnId(returnId: string): Promise<FiscalRecordRow | null> {
+    return db.getFirstAsync<FiscalRecordRow>(`SELECT * FROM fiscal_records WHERE return_id = ? AND type = 'return' ORDER BY seq DESC`, [
+      returnId,
+    ]);
+  }
+
+  /** Newest record on a chain — verifyChain reconciles it against fiscal_chain_state (F01). */
+  async getTailRecord(chainId: string): Promise<FiscalRecordRow | null> {
+    return db.getFirstAsync<FiscalRecordRow>('SELECT * FROM fiscal_records WHERE chain_id = ? ORDER BY seq DESC LIMIT 1', [chainId]);
+  }
+
+  /** Whether any authority outbox row exists for a record — repair checks (F03). */
+  async hasTransmissionForRecord(recordId: string): Promise<boolean> {
+    const row = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM fiscal_transmissions WHERE record_id = ?', [recordId]);
+    return (row?.n ?? 0) > 0;
+  }
+
   async listByChain(chainId: string, fromSeq?: number): Promise<FiscalRecordRow[]> {
     if (fromSeq !== undefined) {
       return db.getAllAsync<FiscalRecordRow>('SELECT * FROM fiscal_records WHERE chain_id = ? AND seq >= ? ORDER BY seq ASC', [
@@ -99,11 +117,17 @@ export class FiscalRecordRepository {
     return db.getAllAsync<FiscalRecordRow>('SELECT * FROM fiscal_records WHERE chain_id = ? ORDER BY seq ASC', [chainId]);
   }
 
-  /** Enqueue an authority submission for a record (jurisdiction adapters). */
+  /**
+   * Enqueue an authority submission for a record (jurisdiction adapters).
+   * Idempotent per (record, authority): retrying/repairing finalization of an
+   * already-enqueued record is a no-op rather than a duplicate submission (F03).
+   */
   async enqueueTransmission(id: string, recordId: string, authority: string, request?: string): Promise<void> {
     await db.runAsync(
-      `INSERT INTO fiscal_transmissions (id, record_id, authority, status, request, created_at) VALUES (?, ?, ?, 'pending', ?, ?)`,
-      [id, recordId, authority, request ?? null, Date.now()]
+      `INSERT INTO fiscal_transmissions (id, record_id, authority, status, request, created_at)
+       SELECT ?, ?, ?, 'pending', ?, ?
+       WHERE NOT EXISTS (SELECT 1 FROM fiscal_transmissions WHERE record_id = ? AND authority = ?)`,
+      [id, recordId, authority, request ?? null, Date.now(), recordId, authority]
     );
   }
 

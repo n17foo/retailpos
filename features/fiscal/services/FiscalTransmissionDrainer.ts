@@ -7,6 +7,7 @@ import { getFiscalAuthorityCredentials } from './authorityCredentials';
 import { FiscalAuthorityTransport, FiscalDeferralError } from './transports/FiscalAuthorityTransport';
 import { AeatVerifactuTransport } from './transports/AeatVerifactuTransport';
 import { FiskalyTseTransport } from './transports/FiskalyTseTransport';
+import { offlineFiscalService } from './OfflineFiscalService';
 
 const DEFAULT_INTERVAL_MS = 60_000;
 
@@ -53,6 +54,13 @@ export class FiscalTransmissionDrainer {
     this.draining = true;
     try {
       const maxAttempts = posConfig.values.maxSyncRetries ?? 5;
+
+      // F04 recovery — retry finalization for orders left paid but
+      // unfiscalized (failed strict-mode checkouts, crashes after payment).
+      await offlineFiscalService.reconcileUnfinalizedOrders().catch(err => {
+        this.logger.warn({ message: 'Unfinalized-order reconciliation failed' }, err instanceof Error ? err : new Error(String(err)));
+      });
+
       const rows = await fiscalRecordRepository.listPendingTransmissions(maxAttempts);
       for (const row of rows) {
         await this.submitRow(row, maxAttempts).catch(err => {

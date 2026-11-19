@@ -22,6 +22,7 @@ import { procurementService } from '../../procurement/services/ProcurementServic
 import { InventoryServiceFactory } from '../../inventory/services/InventoryServiceFactory';
 import { isRetryableTransportError } from '../../../shared/utils/apiErrors';
 import { getFiscalService } from '../../fiscal/services/FiscalServiceFactory';
+import { getFiscalAuthorityAdapter } from '../../fiscal/services/authorities/getFiscalAuthorityAdapter';
 
 /**
  * Handles checkout flow and order queries.
@@ -313,6 +314,11 @@ export class CheckoutService implements CheckoutServiceInterface {
   }
 
   async markPaymentProcessing(orderId: string): Promise<LocalOrder> {
+    // Strict-fiscal preflight (F04): an unsupported jurisdiction must fail
+    // BEFORE tender is attempted — never after a charge already exists.
+    if (posConfig.values.fiscalEnabled && posConfig.values.fiscalStrictMode) {
+      getFiscalAuthorityAdapter(posConfig.values.fiscalJurisdiction ?? 'generic');
+    }
     await this.orderRepo.updateStatus(orderId, 'processing');
 
     const order = await this.getLocalOrder(orderId);
@@ -341,7 +347,12 @@ export class CheckoutService implements CheckoutServiceInterface {
    * cashier can retry or pick another tender method without losing the order.
    */
   async revertToDraft(orderId: string): Promise<LocalOrder> {
-    await this.orderRepo.updateStatus(orderId, 'draft');
+    // Only a genuinely 'processing' order may go back to draft — a row
+    // already 'paid' must NEVER become retryable again (CHK-01, F04).
+    const row = await this.orderRepo.findById(orderId);
+    if (row?.status === 'processing') {
+      await this.orderRepo.updateStatus(orderId, 'draft');
+    }
     const order = await this.getLocalOrder(orderId);
     if (!order) {
       throw new Error(`Order ${orderId} not found`);
@@ -428,21 +439,31 @@ export class CheckoutService implements CheckoutServiceInterface {
       }
 
       // Fiscal finalization — part of the durable post-payment phase. On
-      // failure the order stays 'unfinalized' and retryable: strict mode
-      // means we never pretend the record exists, never that we roll the
-      // charge back (docs/features/fiscal R2/R5).
+      // failure the order is stamped 'unfinalized' so the reconciler can
+      // retry it. Strict mode additionally refuses to report the sale as
+      // complete — the payment stays recorded, never rolled back (F04).
       if (posConfig.values.fiscalEnabled) {
-        await getFiscalService()
-          .finalizeSale(orderId)
-          .then(record => {
-            fiscalNumber = record.number;
-            fiscalQr = record.authorityQr;
-            auditLogService.log('fiscal:finalized', {
-              details: `Order ${orderId} fiscalized as ${record.number}`,
-              metadata: { orderId, fiscalRecordId: record.id, number: record.number, seq: record.seq },
-            });
-          })
-          .catch(nonFatal('fiscal finalization'));
+        try {
+          const record = await getFiscalService().finalizeSale(orderId);
+          fiscalNumber = record.number;
+          fiscalQr = record.authorityQr;
+          auditLogService.log('fiscal:finalized', {
+            details: `Order ${orderId} fiscalized as ${record.number}`,
+            metadata: { orderId, fiscalRecordId: record.id, number: record.number, seq: record.seq },
+          });
+        } catch (error) {
+          await this.orderRepo.markFiscalUnfinalized?.(orderId).catch(() => {});
+          if (posConfig.values.fiscalStrictMode) {
+            return {
+              success: false,
+              paymentRecorded: true,
+              orderId,
+              error:
+                'Payment was recorded but fiscalization failed — strict fiscal mode does not allow completing this sale. The order stays paid and finalization will be retried automatically.',
+            };
+          }
+          nonFatal('fiscal finalization')(error);
+        }
       }
 
       // Only clear basket after the order is successfully recorded.

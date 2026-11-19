@@ -4,9 +4,11 @@ import { generateUUID } from '../../../shared/utils/uuid';
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
 import { posConfig } from '../../platform-clients/services/config/POSConfigService';
 import { orderRepository } from '../../orders-sync/repositories/OrderRepository';
+import { getReturnRepository } from '../../returns/repositories/ReturnRepository';
 import { fiscalRecordRepository, FiscalRecordRow } from '../repositories/FiscalRecordRepository';
 import { canonicalize } from './FiscalCanonicalizer';
 import { getFiscalAuthorityAdapter } from './authorities/getFiscalAuthorityAdapter';
+import type { FiscalAuthorityAdapter, FiscalAuthorityOutcome } from './authorities/FiscalAuthorityAdapter';
 import type {
   ChainVerification,
   FiscalJurisdiction,
@@ -51,27 +53,35 @@ export class OfflineFiscalService implements FiscalService {
       throw new Error(`Cannot fiscalize unknown order ${orderId}`);
     }
     if (order.fiscal_status === 'fiscalized') {
-      // Idempotent — recovery re-running finalize returns the existing record.
+      // Idempotent — recovery re-running finalize returns the existing
+      // record, but first repairs any authority work an older version or
+      // a crash left missing (F03).
       const existing = await this.repo.findByOrderId(orderId);
       if (existing) {
-        return this.mapRow(existing);
+        const record = this.mapRow(existing);
+        return this.applyAuthorityOutcome(record, await this.ensureAuthorityWork(record, adapter));
       }
+      throw new Error(`Order ${orderId} is stamped fiscalized but has no sale record — ledger integrity failure`);
     }
     if (order.status !== 'paid' && order.status !== 'synced') {
       throw new Error(`Cannot fiscalize order ${orderId} in status '${order.status}' — payment must be recorded first`);
     }
 
-    const record = await this.allocateRecord('sale', {
-      orderId,
-      order: {
-        total: order.total,
-        tax: order.tax,
-        subtotal: order.subtotal,
-        paymentMethod: order.payment_method,
+    const { record, outcome } = await this.allocateRecord(
+      'sale',
+      {
+        orderId,
+        order: {
+          total: order.total,
+          tax: order.tax,
+          subtotal: order.subtotal,
+          paymentMethod: order.payment_method,
+        },
+        registerId: order.register_id ?? null,
       },
-      registerId: order.register_id ?? null,
-    });
-    return this.notifyAuthority(record, adapter);
+      adapter
+    );
+    return this.applyAuthorityOutcome(record, outcome);
   }
 
   async voidOrder(orderId: string, reason: string): Promise<FiscalRecord> {
@@ -83,14 +93,18 @@ export class OfflineFiscalService implements FiscalService {
     if (order.fiscal_status !== 'fiscalized') {
       throw new Error(`Order ${orderId} is not fiscalized — nothing to void (drafts are deleted, not voided)`);
     }
-    const record = await this.allocateRecord('void', {
-      orderId,
-      order: { total: order.total, tax: order.tax, subtotal: order.subtotal },
-      reason,
-      registerId: order.register_id ?? null,
-      markOrder: 'voided',
-    });
-    return this.notifyAuthority(record, adapter);
+    const { record, outcome } = await this.allocateRecord(
+      'void',
+      {
+        orderId,
+        order: { total: order.total, tax: order.tax, subtotal: order.subtotal },
+        reason,
+        registerId: order.register_id ?? null,
+        markOrder: 'voided',
+      },
+      adapter
+    );
+    return this.applyAuthorityOutcome(record, outcome);
   }
 
   async registerReturn(returnId: string, orderId: string): Promise<FiscalRecord> {
@@ -102,14 +116,79 @@ export class OfflineFiscalService implements FiscalService {
     if (posConfig.values.fiscalRequireOriginalOnReturn !== false && order.fiscal_status !== 'fiscalized') {
       throw new Error(`Return ${returnId} references order ${orderId} which has no fiscal record`);
     }
-    const record = await this.allocateRecord('return', { orderId, returnId });
-    return this.notifyAuthority(record, adapter);
+
+    // Idempotent per return ID — a retried registration returns the same
+    // record and repairs any missing authority work (F07/F03).
+    const existing = await this.repo.findByReturnId(returnId);
+    if (existing) {
+      const record = this.mapRow(existing);
+      return this.applyAuthorityOutcome(record, await this.ensureAuthorityWork(record, adapter));
+    }
+
+    // The immutable payload must carry the ACTUAL refunded amounts (F07):
+    // load the persisted return row and verify it belongs to this order —
+    // an arbitrary return ID can never be fiscalized.
+    const returnRow = await getReturnRepository().findById(returnId);
+    if (!returnRow) {
+      throw new Error(`Cannot register return ${returnId} — no such return exists`);
+    }
+    if (returnRow.order_id !== orderId) {
+      throw new Error(`Return ${returnId} belongs to order ${returnRow.order_id}, not ${orderId}`);
+    }
+
+    const { record, outcome } = await this.allocateRecord(
+      'return',
+      {
+        orderId,
+        returnId,
+        order: { total: returnRow.refund_amount, tax: 0, subtotal: returnRow.refund_amount },
+        returnDetails: {
+          refundAmount: returnRow.refund_amount,
+          quantity: returnRow.quantity,
+          productId: returnRow.product_id,
+          productName: returnRow.product_name,
+        },
+      },
+      adapter
+    );
+    return this.applyAuthorityOutcome(record, outcome);
   }
 
   async closeShift(summary: ShiftFiscalSummary): Promise<FiscalRecord> {
     const adapter = getFiscalAuthorityAdapter(this.jurisdiction);
-    const record = await this.allocateRecord('z_report', { shiftId: summary.shiftId, shift: summary });
-    return this.notifyAuthority(record, adapter);
+    const { record, outcome } = await this.allocateRecord('z_report', { shiftId: summary.shiftId, shift: summary }, adapter);
+    return this.applyAuthorityOutcome(record, outcome);
+  }
+
+  /**
+   * Durable recovery for paid-but-unfiscalized orders (F04): a checkout
+   * whose fiscalization failed leaves the order 'paid'/'unfinalized'; this
+   * scan retries finalization so no confirmed sale can stay without a
+   * fiscal record. Called by the transmission drainer (standalone only —
+   * in client mode the Store API reconciles its own chain).
+   */
+  async reconcileUnfinalizedOrders(): Promise<number> {
+    if (!posConfig.values.fiscalEnabled) {
+      return 0;
+    }
+    const rows = await db.getAllAsync<{ id: string }>(
+      `SELECT id FROM orders
+       WHERE status IN ('paid', 'synced') AND (fiscal_status IS NULL OR fiscal_status = 'unfinalized')
+       ORDER BY created_at ASC`
+    );
+    let finalized = 0;
+    for (const row of rows) {
+      try {
+        await this.finalizeSale(row.id);
+        finalized++;
+      } catch (err) {
+        this.logger.warn(
+          { message: `Fiscal reconciliation could not finalize order ${row.id}` },
+          err instanceof Error ? err : new Error(String(err))
+        );
+      }
+    }
+    return finalized;
   }
 
   async getRecord(orderId: string): Promise<FiscalRecord | null> {
@@ -119,8 +198,19 @@ export class OfflineFiscalService implements FiscalService {
 
   async verifyChain(fromSeq?: number): Promise<ChainVerification> {
     const rows = await this.repo.listByChain(LOCAL_CHAIN_ID, fromSeq);
+    const state = await this.repo.getChainState(db, LOCAL_CHAIN_ID);
+    const tail = await this.repo.getTailRecord(LOCAL_CHAIN_ID);
+
+    // Empty-ledger/head consistency: a recorded chain head with no
+    // surviving records means the ledger was wiped (F01).
     if (rows.length === 0) {
+      if (state && state.last_seq > 0) {
+        return { ok: false, checked: 0, firstDivergenceSeq: 1, reason: 'fiscal_chain_state records a head but the ledger is empty' };
+      }
       return { ok: true, checked: 0 };
+    }
+    if (!state) {
+      return { ok: false, checked: 0, firstDivergenceSeq: rows[0].seq, reason: 'fiscal_chain_state head is missing' };
     }
 
     // Seed prev_hash from the record before the window, or GENESIS for seq 1.
@@ -135,32 +225,95 @@ export class OfflineFiscalService implements FiscalService {
     }
 
     let checked = 0;
+    let expectedSeq = rows[0].seq;
     for (const row of rows) {
+      if (row.seq !== expectedSeq) {
+        return {
+          ok: false,
+          checked,
+          firstDivergenceSeq: row.seq,
+          reason: `non-contiguous sequence — expected seq ${expectedSeq}, found ${row.seq}`,
+        };
+      }
       if (row.prev_hash !== prevHash) {
         return { ok: false, checked, firstDivergenceSeq: row.seq, reason: 'prev_hash does not match predecessor' };
       }
       if (sha256Hex(prevHash + row.payload_json) !== row.hash) {
         return { ok: false, checked, firstDivergenceSeq: row.seq, reason: 'record hash mismatch — payload may have been altered' };
       }
+      const fieldError = this.verifyPayloadFields(row);
+      if (fieldError) {
+        return { ok: false, checked, firstDivergenceSeq: row.seq, reason: fieldError };
+      }
       prevHash = row.hash;
+      expectedSeq++;
       checked++;
     }
+
+    // Tail/head reconciliation — the newest surviving record must equal
+    // the recorded head. A tail deletion leaves state.last_seq ahead of
+    // the ledger; a head rewrite leaves the hashes mismatched (F01).
+    if (!tail || state.last_seq !== tail.seq || state.last_hash !== tail.hash) {
+      return {
+        ok: false,
+        checked,
+        firstDivergenceSeq: tail ? Math.min(tail.seq, state.last_seq) : state.last_seq,
+        reason: 'fiscal_chain_state head does not match the verified chain tail',
+      };
+    }
+
     return { ok: true, checked };
   }
 
   /**
+   * The hashed payload is the source of truth: every field duplicated
+   * into relational columns (which mapRow() and queries actually use)
+   * must match it, or someone tampered with the ledger metadata (F01).
+   */
+  private verifyPayloadFields(row: FiscalRecordRow): string | null {
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(row.payload_json) as Record<string, unknown>;
+    } catch {
+      return 'payload_json is not valid JSON';
+    }
+    const checks: Array<[unknown, unknown, string]> = [
+      [payload.id, row.id, 'id'],
+      [payload.chainId, row.chain_id, 'chainId'],
+      [payload.seq, row.seq, 'seq'],
+      [payload.number, row.number, 'number'],
+      [payload.type, row.type, 'type'],
+      [payload.orderId ?? null, row.order_id, 'orderId'],
+      [payload.returnId ?? null, row.return_id, 'returnId'],
+      [payload.shiftId ?? null, row.shift_id, 'shiftId'],
+      [payload.registerId ?? null, row.register_id, 'registerId'],
+      [payload.createdAt, row.created_at, 'createdAt'],
+    ];
+    for (const [payloadValue, columnValue, field] of checks) {
+      if (payloadValue !== columnValue) {
+        return `payload field '${field}' does not match the ledger column — metadata tampered`;
+      }
+    }
+    return null;
+  }
+
+  /**
    * Atomic allocation: chain-head read + record insert + head update +
-   * order fiscal columns in ONE transaction. A failure rolls all of it
-   * back — no consumed numbers, no half-fiscalized orders (R2/R5).
+   * order fiscal columns + the authority-outbox intent in ONE transaction.
+   * A failure rolls all of it back — no consumed numbers, no
+   * half-fiscalized orders, and no committed record without its authority
+   * work (R2/R5, F03).
    */
   private async allocateRecord(
     type: FiscalRecordType,
-    content: Record<string, unknown> & { orderId?: string; registerId?: string | null; markOrder?: 'voided' }
-  ): Promise<FiscalRecord> {
+    content: Record<string, unknown> & { orderId?: string; registerId?: string | null; markOrder?: 'voided' },
+    adapter: FiscalAuthorityAdapter
+  ): Promise<{ record: FiscalRecord; outcome: FiscalAuthorityOutcome | undefined }> {
     const recordId = generateUUID();
     // Inside withTransactionAsync calls through the `db` proxy run in the
     // transaction — same convention as OfflineOrderRepository.
     const committed: FiscalRecord[] = [];
+    let outcome: FiscalAuthorityOutcome | undefined;
 
     await db.withTransactionAsync(async () => {
       const head = await this.repo.getChainState(db, LOCAL_CHAIN_ID);
@@ -181,6 +334,7 @@ export class OfflineFiscalService implements FiscalService {
         orderId: content.orderId,
         order: content.order,
         returnId: content.returnId,
+        returnDetails: content.returnDetails,
         shiftId: content.shiftId,
         shift: content.shift,
         registerId: content.registerId,
@@ -221,15 +375,25 @@ export class OfflineFiscalService implements FiscalService {
       });
       await this.repo.upsertChainState(db, LOCAL_CHAIN_ID, seq, hash);
 
-      if (content.orderId) {
-        const status = content.markOrder ?? 'fiscalized';
+      // Only the original sale claims the order's fiscal identity.
+      // Corrections link back through their own records — a return never
+      // replaces the sale's invoice number/id (F02); a void updates the
+      // status only, keeping the original fiscal_record_id/fiscal_number.
+      if (content.orderId && type === 'sale') {
         await db.runAsync('UPDATE orders SET fiscal_status = ?, fiscal_record_id = ?, fiscal_number = ? WHERE id = ?', [
-          status,
+          'fiscalized',
           recordId,
           number,
           content.orderId,
         ]);
+      } else if (content.orderId && content.markOrder === 'voided') {
+        await db.runAsync(`UPDATE orders SET fiscal_status = 'voided' WHERE id = ?`, [content.orderId]);
       }
+
+      // Authority work commits atomically with the ledger record — an
+      // adapter failure aborts the whole allocation so nothing fiscalized
+      // can exist without its retryable outbox intent (F03).
+      outcome = await adapter.onRecord(record);
 
       committed.push(record);
     });
@@ -239,19 +403,22 @@ export class OfflineFiscalService implements FiscalService {
       throw new Error('Fiscal allocation transaction produced no record');
     }
     this.logger.info(`Fiscal record ${record.number} (${type}) chained for order ${content.orderId ?? '—'}`);
-    return record;
+    return { record, outcome };
   }
 
-  private async notifyAuthority(record: FiscalRecord, adapter: ReturnType<typeof getFiscalAuthorityAdapter>): Promise<FiscalRecord> {
-    // Adapter failure must not touch the committed chain record — the
-    // authority outbox picks it up on retry.
-    const outcome = await adapter.onRecord(record).catch((error: unknown) => {
-      this.logger.warn(
-        { message: `Authority adapter failed for record ${record.number}` },
-        error instanceof Error ? error : new Error(String(error))
-      );
-      return undefined;
-    });
+  /**
+   * Repair path for records committed before the outbox intent was atomic:
+   * if a committed record has no authority work, rebuild it now.
+   * enqueueTransmission is idempotent, so a live re-run never duplicates (F03).
+   */
+  private async ensureAuthorityWork(record: FiscalRecord, adapter: FiscalAuthorityAdapter): Promise<FiscalAuthorityOutcome | undefined> {
+    if (await this.repo.hasTransmissionForRecord(record.id)) {
+      return adapter.receiptOutcome?.(record);
+    }
+    return adapter.onRecord(record);
+  }
+
+  private applyAuthorityOutcome(record: FiscalRecord, outcome: FiscalAuthorityOutcome | undefined): FiscalRecord {
     if (outcome?.receiptQrUrl) {
       record.authorityQr = outcome.receiptQrUrl;
     }

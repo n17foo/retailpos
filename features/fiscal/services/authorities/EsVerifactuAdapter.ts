@@ -3,7 +3,7 @@ import { generateUUID } from '../../../../shared/utils/uuid';
 import { posConfig } from '../../../platform-clients/services/config/POSConfigService';
 import type { FiscalAuthorityAdapter, FiscalAuthorityOutcome } from './FiscalAuthorityAdapter';
 import type { FiscalJurisdiction, FiscalRecord } from '../FiscalServiceInterface';
-import { buildAltaXml, buildVerifactuQrUrl, VerifactuContext, VerifactuRecordContent } from './verifactu';
+import { buildAltaXml, buildAnulacionXml, buildVerifactuQrUrl, VerifactuContext, VerifactuRecordContent } from './verifactu';
 
 /**
  * Spain — Veri*factu (RRSIF). Two legal modes selected by
@@ -24,9 +24,34 @@ export class EsVerifactuAdapter implements FiscalAuthorityAdapter {
       return this.receiptOutcome(record); // record-only mode — QR on the receipt is the obligation
     }
     const ctx = await this.context(record);
-    const content = this.content(record);
-    const alta = buildAltaXml(ctx, record, content);
-    await this.repo.enqueueTransmission(generateUUID(), record.id, 'aeat', JSON.stringify(alta));
+    switch (record.type) {
+      case 'sale':
+      case 'return': {
+        const alta = buildAltaXml(ctx, record, this.content(record));
+        await this.repo.enqueueTransmission(generateUUID(), record.id, 'aeat', JSON.stringify({ ...alta, op: 'alta' }));
+        return undefined;
+      }
+      case 'void':
+        return this.enqueueAnulacion(ctx, record);
+      case 'z_report':
+        // Internal closure event — not an invoice. Submitting it as an F1
+        // alta would report phantom zero-total sales to AEAT (F08).
+        return undefined;
+    }
+  }
+
+  /**
+   * A void is a RegistroFacturacionAnulacion referencing the ORIGINAL sale
+   * invoice — never an alta with TipoFactura=AN (F08).
+   */
+  private async enqueueAnulacion(ctx: VerifactuContext, record: FiscalRecord): Promise<undefined> {
+    const sale = record.orderId ? await this.repo.findByOrderId(record.orderId) : null;
+    if (!sale) {
+      throw new Error(`Cannot submit anulación for record ${record.number} — the original sale record is missing`);
+    }
+    const saleCreatedAt = this.contentFromPayload(sale.payload_json).createdAt ?? sale.created_at;
+    const anulacion = buildAnulacionXml(ctx, record, { number: sale.number, createdAt: saleCreatedAt });
+    await this.repo.enqueueTransmission(generateUUID(), record.id, 'aeat', JSON.stringify({ ...anulacion, op: 'anulacion' }));
     return undefined;
   }
 
