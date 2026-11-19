@@ -127,6 +127,10 @@ export class LoyaltyRepository {
    * mode this is one server call — locally the insert and the guarded
    * balance update commit or roll back together (CUS-04), and the update
    * is conditioned on not overdrawing the account (CUS-02).
+   *
+   * 'earn' transactions are idempotent per (customer, order): a retried
+   * checkout/reconciliation replay returns the existing award's id
+   * instead of awarding the same sale twice (CUS-03).
    */
   async applyTransaction(
     email: string,
@@ -139,7 +143,18 @@ export class LoyaltyRepository {
   ): Promise<string> {
     const id = generateUUID();
     const now = Date.now();
+    let committedId = id;
     await db.withTransactionAsync(async () => {
+      if (type === 'earn' && orderId) {
+        const existing = await db.getFirstAsync<{ id: string }>(
+          `SELECT id FROM loyalty_transactions WHERE customer_email = ? AND order_id = ? AND type = 'earn'`,
+          [email.toLowerCase(), orderId]
+        );
+        if (existing) {
+          committedId = existing.id;
+          return;
+        }
+      }
       await db.runAsync(
         `INSERT INTO loyalty_transactions
            (id, customer_email, type, points, order_id, reason, created_by, created_at, reverses_id)
@@ -158,7 +173,7 @@ export class LoyaltyRepository {
         throw new Error('Insufficient loyalty points balance');
       }
     });
-    return id;
+    return committedId;
   }
 
   async appendTransaction(

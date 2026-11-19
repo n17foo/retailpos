@@ -200,4 +200,31 @@ describe('Ledger integrity (CUS-01/02/04/05)', () => {
       void redeemId;
     });
   });
+
+  describe('CUS-03 — earn idempotency per order', () => {
+    it('replaying earnPoints for the same order awards points only once', async () => {
+      // earnRate 100 cents/pt → a 100.00 order earns 100 points.
+      await loyaltyService.earnPoints(EMAIL, 'order-1', 100);
+      await loyaltyService.earnPoints(EMAIL, 'order-1', 100);
+
+      expect((await loyaltyService.getBalance(EMAIL)).points).toBe(100);
+
+      const rows = await realDb.getAllAsync<{ id: string }>(
+        `SELECT id FROM loyalty_transactions WHERE customer_email = ? AND order_id = ? AND type = 'earn'`,
+        [EMAIL, 'order-1']
+      );
+      expect(rows).toHaveLength(1);
+    });
+
+    it('different orders still earn independently, and non-earn entries do not collide', async () => {
+      await loyaltyService.earnPoints(EMAIL, 'order-1', 100);
+      await loyaltyService.earnPoints(EMAIL, 'order-2', 100);
+      expect((await loyaltyService.getBalance(EMAIL)).points).toBe(200);
+
+      // Manual adjustments referencing an order must not be deduplicated.
+      await loyaltyRepository.applyTransaction(EMAIL, 'adjustment', 25, 'order-1', 'manual');
+      await loyaltyRepository.applyTransaction(EMAIL, 'adjustment', 25, 'order-1', 'manual');
+      expect((await loyaltyService.getBalance(EMAIL)).points).toBe(250);
+    });
+  });
 });
