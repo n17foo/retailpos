@@ -6,11 +6,13 @@
 
 ## Documents
 
-| Document                                                   | Covers                                                                                                                                                                                   |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [network-segmentation.md](network-segmentation.md)         | Dedicated POS network / VLAN design, firewall rule matrix, peripheral segmentation, remote access. **Start here.**                                                                       |
-| [instore-server-hardening.md](instore-server-hardening.md) | Checklist for operating the in-store server — a separate service on a dedicated always-on host (ADR-018); all registers are client-only: secrets, clock, upgrades, monitoring, failover. |
-| [security-controls.md](security-controls.md)               | Implemented code-level controls (signed LAN requests, authz, auto-lock, CSV/SQL injection, redaction, Electron fuses) + residual risks.                                                  |
+| Document                                                               | Covers                                                                                                                                                                                   |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [network-segmentation.md](network-segmentation.md)                     | Dedicated POS network / VLAN design, firewall rule matrix, peripheral segmentation, remote access. **Start here.**                                                                       |
+| [instore-server-hardening.md](instore-server-hardening.md)             | Checklist for operating the in-store server — a separate service on a dedicated always-on host (ADR-018); all registers are client-only: secrets, clock, upgrades, monitoring, failover. |
+| [security-controls.md](security-controls.md)                           | Implemented code-level controls (signed LAN requests, authz, auto-lock, CSV/SQL injection, redaction, Electron fuses) + residual risks.                                                  |
+| [2026-11-19-fiscal-code-review.md](2026-11-19-fiscal-code-review.md)   | Fiscal-module bug/security findings, reproduction steps, recommended fixes, and review limitations at revision `909c2ee`.                                                                |
+| [2026-11-19-project-code-review.md](2026-11-19-project-code-review.md) | Project-wide feature-by-feature review: findings, implementation coverage, validation evidence, and remaining checks.                                                                    |
 
 ## Threat model (short version)
 
