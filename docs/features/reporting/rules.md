@@ -44,14 +44,19 @@ prefixed unless a plain number; RFC 4180 quoting.
 
 🟢 **E4.1** — product named `=cmd…` exports as text, not a formula.
 
-## R5 — Export shares via OS sheet; failure is an alert
+## R5 — Export requires `report:export` approval, then shares via OS sheet
 
-**Rule.** CSV → `Share.share({message: csv})`; share failure →
-`'Export Failed'` alert.
+**Rule.** `useReporting` requests `report:export` permission (manager
+approval flow when the current role lacks it) before generating the CSV.
+CSV → `Share.share({message: csv})`; share failure → `'Export Failed'`
+alert.
 
-**Evidence.** `features/reporting/screens/ReportingScreen.tsx:61-64`.
+**Evidence.** `features/reporting/hooks/useReporting.ts` (`requestApproval`),
+`features/reporting/screens/ReportingScreen.tsx:61-64`.
 
 🔴 **E5.1** — large ranges build the whole CSV in memory — no streaming (PG1).
+🟢 **E5.2** — cashier without `report:export` → approval prompt; denial →
+no CSV generated.
 
 ## R6 — Reporting is read-only and role-gated
 

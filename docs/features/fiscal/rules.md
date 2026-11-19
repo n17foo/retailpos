@@ -1,9 +1,10 @@
-# Fiscal — Rules (DRAFT, pre-implementation)
+# Fiscal — Rules
 
 > Companion to `README.md`. Status markers use the repo convention:
 > 🟢 enforced today · 🟠 partial · 🔴 gap — the implementation must
-> close. Since the module doesn't exist yet, rules describe the target
-> contract; markers show where current code stands.
+> close. The standalone module exists (`features/fiscal/`, schema v15+);
+> markers reflect the standalone path, and client-mode/Store-API items
+> stay marked until the server side ships.
 
 ## R1 — Exactly one fiscal authority per chain
 
@@ -36,9 +37,11 @@ record without a paid order.
 🟢 **E2.1** — crash between payment and fiscalize → recovery sees
 `fiscal_status='unfinalized'` + `paid` → retries `finalizeSale`, never
 re-charges (payment-recovery path from bug 5 is unchanged).
-🔴 **E2.2** — fiscalize failing must **not** mark the order `failed`
-after a successful charge — same anti-pattern as bug 4. The record
-retries; the charge is never reversed silently.
+🟢 **E2.2** — fiscalize failing does **not** mark the order `failed`
+after a successful charge: `completePayment` returns `success:false` +
+`paymentRecorded:true`, stamps `fiscal_status='unfinalized'`, and the
+queue drainer runs `reconcileUnfinalizedOrders()` to retry. The charge
+is never reversed silently.
 
 ## R3 — Fiscalized records are append-only; nothing deletes or edits them
 
@@ -91,9 +94,10 @@ reusing them.
 🟠 **E5.2** — crash _inside_ the finalize tx → rolled back, number not
 consumed (atomicity covers it). A crash between allocate-commit and
 order-update is impossible by construction (same tx).
-🔴 **E5.3** — receipt reprint shows `fiscal_number` — never
-`order.id.slice(-8)` once fiscalized (receipt code in
-`features/hardware/services/printer/` must branch on `fiscal_number`).
+🟢 **E5.3** — receipt reprint shows `fiscal_number` — never
+`order.id.slice(-8)` once fiscalized. The shared ESC/POS buffer prints
+`data.fiscalNumber ?? data.orderId` on every printer path, including
+Electron, plus the fiscal QR when supplied (`fiscalQr`).
 
 ## R6 — Multi-register: the server chains; registers display
 
@@ -139,8 +143,11 @@ reject edits; corrections go through `return`/`void` records on top.
 
 🟢 **E8.1** — Z-report reprint = re-read the chained record → identical
 output guaranteed (the record is immutable).
-🔴 **E8.2** — today nothing locks a shift; a cashier could edit
-yesterday's data post-close. Gap to close.
+🟢 **E8.2** — `closeShift` snapshots the period totals into the
+immutable `z_report` payload, marks the shift closed, and
+`allocateRecord` rejects new fiscal records stamped to a closed period
+or a different shift's window. `closeShift` is idempotent — a repeat
+call returns the existing z-record.
 
 ## R9 — Audit log: operational vs fiscal
 

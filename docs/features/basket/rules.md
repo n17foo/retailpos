@@ -12,7 +12,9 @@
 **Rule**
 Items, note, customer, `saleMode` live in the `baskets` row (items as JSON,
 `items_json` plus domain columns). Every service call writes — nothing is
-session-only.
+session-only. Mutations are serialised per basket under a keyed lock so
+parallel changes can't be lost; `clear` preserves the attached customer and
+basket note (only lines/totals reset).
 
 **Evidence** — `features/basket/services/BasketService.ts`,
 `features/basket/repositories/BasketRepository.ts`, `shared/utils/dbSchema.ts` (v11 `sale_mode`).
@@ -67,6 +69,10 @@ blockers gate — shown via `BasketBlockers` and the `needs-attention` state.
 `features/checkout/utils/orderStateMapper.ts`.
 
 🔴 **E5.1** — discount without customer → blocker → checkout disabled.
+🟢 **E5.3** — applying a discount requires the `discount:apply` permission
+(evaluated in `BasketActionsProvider`); the service contract is cents —
+`BasketService.applyDiscount` converts the basket's major-unit totals at
+the boundary (see discounts R3).
 🟠 **E5.2** — info-level blocker → chip still `building`, tender allowed.
 
 ## R6 — Loyalty/store-credit act as basket adjustments (legacy plumbing)

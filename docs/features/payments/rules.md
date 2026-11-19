@@ -4,21 +4,23 @@
 
 **Rule.** `PaymentService` is a singleton facade over one
 `PaymentServiceInterface`. `PaymentServiceFactory` resolves the implementation:
-`MockPaymentService` under Expo Go/`USE_MOCK_PAYMENT`, otherwise the real SDK
-service for `currentProvider` (default `STRIPE_NFC`). `setPaymentProvider`
+`MockPaymentService` under Expo Go/`USE_MOCK_PAYMENT` **in a development
+runtime only** — a production build that cannot load the real SDK fails
+closed (initialisation error, never a simulated charge). `setPaymentProvider`
 rejects unsupported values.
 
 **Evidence.** `features/payments/services/{PaymentService,PaymentServiceFactory}.ts`,
-`features/payments/services/mock/MockPaymentService.ts`.
+`features/payments/services/mock/MockPaymentService.ts`,
+`shared/utils/mockFlags.ts` (`isDevelopmentRuntime`).
 
 🟢 **E1.1 — Resolution**
 Given provider `STRIPE` configured, when a payment runs, `StripeService` gets
 the call; other provider SDKs are not even bundled (Square/Adyen/Tap are
 lazy `require()`).
 
-🟠 **E1.2 — Mock everywhere**
-`USE_MOCK_PAYMENT=true` or Expo Go → `MockPaymentService` for _all_ providers —
-the config screen still shows the real provider.
+🟠 **E1.2 — Mock in development only**
+`USE_MOCK_PAYMENT=true` or Expo Go → `MockPaymentService` — but only when
+`isDevelopmentRuntime()` is true; the flag is inert in production builds.
 
 🔴 **E1.3 — Bad provider value**
 `setPaymentProvider('bogus')` throws `Unsupported payment provider`.
@@ -137,9 +139,21 @@ A split line's transaction can be voided individually by transactionId.
   forever by re-entering the screen.
 - **PG3** — Provider switch mid-session: `setPaymentProvider` doesn't visibly
   disconnect an existing terminal session on the old provider.
-- **PG4** — Optional `getTransactionStatus` means an ambiguous result (SDK
-  timed out after charging) has no standard reconciliation path for providers
-  that don't implement it.
+- **PG4** — partially resolved — `PaymentResponse.outcome` now distinguishes
+  `declined|failed|unknown`; checkout never reverts an unknown-outcome order
+  to draft and records a payment-attempt id for reconciliation (see checkout
+  doc). Providers without `getTransactionStatus` still can't actively
+  reconcile an ambiguous charge.
+- ~~**PG7**~~ **RESOLVED** — Square reported nonce collection as a completed
+  payment. `SquareService` now charges through a configurable `backendUrl`;
+  nonce-without-charge is a failure, not a success.
+- ~~**PG8**~~ **RESOLVED** — Stripe's secret key could leave the device and
+  direct-API mode was silently reachable in production. Stripe calls go
+  through the backend-only module (secret never on the POS); the direct-API
+  fallback is development-build only.
+- ~~**PG9**~~ **RESOLVED** — Adyen/Tap called SDK surfaces that don't exist
+  and Adyen sent major units. Both fail closed when the terminal surface is
+  absent; Adyen amounts go through `toCents` minor units.
 - ~~**PG5**~~ **RESOLVED** — `StripeTerminalBridgeProvider` was commented out in
   `App.tsx` because the file imported `@stripe/stripe-terminal-react-native`
   at module top level — the import crashed Expo Go at load. Split into a safe

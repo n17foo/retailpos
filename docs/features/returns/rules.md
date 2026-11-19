@@ -46,8 +46,11 @@ restore inventory. Rows transition pending → approved/rejected → completed.
 🟢 **E3.1 — Local + push**
 Validate → rows → adapter refund → `platformRefundId` stored → completed.
 
-🟠 **E3.2 — Platform refund fails** — return rows exist; check whether status
-stays pre-completed or the whole call errors (verify PG1).
+🟠 **E3.2 — Platform refund fails** — return rows persist with
+`refund_status='failed'` (or `'pending'` on a timeout/unknown outcome) and
+`refund_id` as the durable intent; the call reports `success:false` with the
+returns still recorded. `retryFailedRefund()` resumes the monetary leg — it
+is idempotent per refund id.
 
 📴 **E3.3 — Offline** — `OfflineRefundService` records the refund locally; no
 upstream call.
@@ -57,8 +60,12 @@ upstream call.
 **Rule.** `ExchangeService.createSession(originalOrderId, returnItems)` →
 `returnCredit`; `newItems` → `newItemsTotal`; `netDue = new − credit`
 (negative ⇒ store owes customer); `payments[]` reduce `remainingDue`.
-Confirm writes returns (linked to the exchange) + creates the new order via
-`CheckoutService` + audits `exchange:completed`.
+Confirm requires the `exchange:process` permission evaluated against the
+approving user's id (manager approval flows supply the approver's PIN), then
+writes returns (linked to the exchange) + creates the new order from the
+session's items via `CheckoutService` + audits `exchange:completed`. A
+negative remaining due settles as a refund of the return credit — never as
+a marked-paid order with no tender.
 
 **Evidence.** `features/returns/services/exchange/ExchangeService.ts` (`calcTotals`, confirm).
 
@@ -68,8 +75,9 @@ returns recorded.
 🟢 **E4.2 — Customer owes** — new items cost more → collect payments until
 `remainingDue ≤ 0` → confirm.
 
-🟠 **E4.3 — Store owes** — netDue negative → the flow must issue a refund/
-credit (verify how negative remaining is settled — PG2/Q1).
+🟢 **E4.3 — Store owes** — netDue negative → the confirm path routes the
+return credit through `RefundService.processRefund` (per-line caps apply);
+the new order is never marked paid without real tender.
 
 � **E4.4 — Partial confirm failure** — new-order creation/payment fails after
 returns written → the created return records are deleted as compensation
@@ -100,9 +108,9 @@ service supports standalone payment refunds (e.g. `refundTransaction`).
 
 ## ❓ Open Questions
 
-- **Q1** — Negative `netDue` settlement: cash back / store credit / platform
-  refund — which path does the exchange flow take when the store owes the
-  customer?
+- ~~**Q1**~~ Resolved — negative `netDue` settles through
+  `RefundService.processRefund` as a refund of the return credit (E4.3);
+  the exchange cannot produce a paid order with no tender.
 - **Q2** — `pending` returns: who approves (manager approval flow via
   `PermissionService`/`ManagerApprovalService`)? Screens don't obviously show
   an approval step.
@@ -111,10 +119,13 @@ service supports standalone payment refunds (e.g. `refundTransaction`).
 
 ## ⚠️ Potential Gaps
 
-- **PG1** — Platform-refund failure after local rows are written: unclear
-  whether the whole `processReturn` rolls back or leaves `pending` rows with
-  a half-done refund.
-- **PG2** — Negative `netDue` (store owes) settlement path unverified.
+- ~~**PG1**~~ **RESOLVED** — the refund leg is durable: `returns.refund_status`
+  - `returns.refund_id` (schema v17) record the intent before the provider
+    call; a failure leaves a retryable `pending`/`failed` state that
+    `retryFailedRefund()` resumes, and `processReturn` reports
+    `success:false` until the refund is done.
+- ~~**PG2**~~ **RESOLVED** — negative `netDue` (store owes) settles via
+  `RefundService.processRefund` (E4.3, Q1).
 - **PG3 — resolved** — Exchange confirm runs a compensating saga (E4.4): on
   new-order/payment failure the created return rows are deleted; link failure
   is non-fatal. Residual: a mid-confirm crash can still orphan rows — no
@@ -122,17 +133,20 @@ service supports standalone payment refunds (e.g. `refundTransaction`).
 - **PG4 — resolved** — `pending` returns now reserve quantity (E2.3) and
   validate-then-write is serialised per order (E2.4), closing the
   double-return race.
-- **PG5** — Refund amount per line is caller-supplied (`refundAmount` in the
-  request) — validation caps the total but per-line pricing fidelity (did the
-  line actually sell for that?) isn't obviously enforced.
+- ~~**PG5**~~ **RESOLVED** — refund amounts are bound to what each line was
+  actually paid: `returnValidation` computes a per-line refundable cap from
+  `price` + `tax_rate` with the order-level discount allocated across lines,
+  minus prior refunds. `processRefund` re-validates against the cap and
+  routes every refund type (including payment-terminal refunds) through the
+  provider's real refund call.
 
 ## Test Coverage Mapping
 
-| Example          | Coverage                                                     |
-| ---------------- | ------------------------------------------------------------ |
-| R1/R2 validation | `features/returns/services/refunds/returnValidation.test.ts` |
-| R3 return flow   | `RefundService.integration.test.ts`, `ReturnService.test.ts` |
-| R4 exchange      | Not found for ExchangeService                                |
+| Example          | Coverage                                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------------------- |
+| R1/R2 validation | `features/returns/services/refunds/returnValidation.test.ts` (incl. per-line cap + discount allocation) |
+| R3 return flow   | `RefundService.integration.test.ts` (incl. durable-refund retry), `ReturnService.test.ts`               |
+| R4 exchange      | `features/returns/services/exchange/ExchangeService.test.ts` (permission, tender settlement)            |
 
 ## Feature Context Summary
 
@@ -155,10 +169,10 @@ that net out credit vs new items and produce a new order.
 platform refund → completed.
 
 **Critical unhappy paths**: unpaid order rejected; over-quantity/over-amount
-rejected; platform refund failure leaves partial state (PG1); exchange
-partial-confirm compensated by saga (E4.4).
+rejected; platform refund failure leaves a durable retryable refund intent
+(E3.2); exchange partial-confirm compensated by saga (E4.4).
 
 **Offline**: `OfflineRefundService` records locally; platform push skipped.
 
-**Gaps**: per-line price fidelity unverified; a mid-confirm crash can still
-orphan exchange writes; a stuck `pending` row blocks its line until cleaned up.
+**Gaps**: a mid-confirm crash can still orphan exchange writes; a stuck
+`pending` row blocks its line until cleaned up.

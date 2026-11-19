@@ -46,14 +46,22 @@ actions until the draft exists.
 
 **Evidence** — `features/checkout/hooks/useCheckout.ts`, `CheckoutService.startCheckout`.
 
-## R5 — Failed payment reverts to draft and stays retryable
+## R5 — Payment outcome decides the recovery path
 
 **Rule**
-`markPaymentProcessing` → failure → `revertToDraft(orderId)` so the order
-returns to draft and checkout stays open; cancel goes `cancelOrder`
-(unpaid)/`cancelDraftOrder`.
+`markPaymentProcessing` → a definite decline/failure → `revertToDraft(orderId)`
+so the order returns to draft and checkout stays open. An **unknown** outcome
+(timeout, SDK error after the charge may have landed) never reverts to draft —
+`completePayment` returns `success:false` + `paymentRecorded:true`, a
+payment-attempt id is persisted on the order, and the interruption-recovery
+path must not treat missing local evidence as proof of no charge. Cancel
+goes `cancelOrder` (unpaid)/`cancelDraftOrder`; `revertToDraft` refuses any
+row whose payment was already recorded.
 
-**Evidence** — `features/checkout/hooks/useCheckout.ts`, `CheckoutService.revertToDraft`.
+**Evidence** — `features/checkout/hooks/useCheckout.ts`,
+`features/checkout/hooks/useInterruptionRecovery.ts`,
+`CheckoutService.{revertToDraft,recordPaymentAttempt}`,
+`PaymentIntentClient` (order-level intent lookup).
 
 ## R6 — High-value checkout can demand manager approval
 

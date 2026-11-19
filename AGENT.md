@@ -70,6 +70,7 @@ Each `features/<domain>/` may contain `components/`, `contexts/`, `hooks/`, `rep
 | `checkout/`         | CheckoutService, tax quote, sale/checkout providers + screens                                                                              |
 | `customers/`        | Customer lookup (9 platforms), loyalty, store credit                                                                                       |
 | `discounts/`        | Coupon / discount validation (9 platforms + local)                                                                                         |
+| `fiscal/`           | Tamper-evident fiscal chain — sequential records, hash chain, authority adapters (Veri*factu/TSE), Z-reports, strict-mode checkout gating  |
 | `hardware/`         | Receipt printers, cash drawer, scanner drivers, KDS, customer display                                                                      |
 | `inventory/`        | Inventory read/write (9 platforms), barcode labels                                                                                         |
 | `multi-register/`   | In-store LAN API client — config, HMAC-signed transport, discovery, WebSocket + sync, PED orchestration (the server is a separate project) |

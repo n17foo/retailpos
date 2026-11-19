@@ -138,26 +138,48 @@ Defined in `shared/utils/platforms.ts` → `ECommercePlatform` enum. Each platfo
 
 ## Database Schema
 
-SQLite managed by `shared/utils/db.ts` (opens `retailPOS.db`) with migrations in `shared/utils/dbSchema.ts`. Current schema version: **v11** (`LATEST_DB_VERSION`).
+SQLite managed by `shared/utils/db.ts` (opens `retailPOS.db` — the proxy is
+not published until pragmas, integrity check, migrations and backup init
+complete) with migrations in `shared/utils/dbSchema.ts`. Current schema
+version: **v17** (`LATEST_DB_VERSION`).
 
-| Table                   | Purpose                                                                    |
-| ----------------------- | -------------------------------------------------------------------------- |
-| `users`                 | Cashiers / admins — id, name, role, pin, is_active                         |
-| `orders`                | Order headers — status, sync_status, platformOrderId, payments_json        |
-| `order_items`           | Order line items — product snapshot, qty, price, tax_rate                  |
-| `baskets`               | Active basket state — items (JSON), totals, customer_id                    |
-| `key_value_store`       | All KV config: `pos.*`, auth config, scan settings, audit log, cached data |
-| `tax_profiles`          | Named tax rates — Standard 20%, Reduced 5%, Zero 0%                        |
-| `product_variants`      | Local offline product variants — SKU, barcode, options                     |
-| `returns`               | Return records — items, reason, refund linkage                             |
-| `customers_cache`       | Cached platform customer lookup results                                    |
-| `vendors`               | Procurement — supplier / vendor records                                    |
-| `purchase_orders`       | Procurement — PO headers                                                   |
-| `purchase_order_items`  | Procurement — PO line items                                                |
-| `inventory_counts`      | Stock-take sessions                                                        |
-| `inventory_count_items` | Counted quantities per product / variant                                   |
-| `transfer_orders`       | Stock transfer headers                                                     |
-| `transfer_order_items`  | Stock transfer line items                                                  |
+| Table                      | Purpose                                                                    |
+| -------------------------- | -------------------------------------------------------------------------- |
+| `users`                    | Cashiers / admins — id, name, role, pin, is_active                         |
+| `orders`                   | Order headers — status, sync_status, platformOrderId, payments_json        |
+| `order_items`              | Order line items — product snapshot, qty, price, tax_rate                  |
+| `baskets`                  | Active basket state — items (JSON), totals, customer_id                    |
+| `key_value_store`          | All KV config: `pos.*`, auth config, scan settings, audit log, cached data |
+| `tax_profiles`             | Named tax rates — Standard 20%, Reduced 5%, Zero 0%                        |
+| `product_variants`         | Local offline product variants — SKU, barcode, options                     |
+| `products`                 | Local offline product catalogue                                            |
+| `categories`               | Local offline catalogue categories                                         |
+| `returns`                  | Return records — items, reason, `refund_status`/`refund_id` lifecycle      |
+| `customers_cache`          | Cached platform customer lookup results                                    |
+| `local_customers`          | Locally-created customers (offline mode)                                   |
+| `loyalty_accounts`         | Loyalty point balances per customer                                        |
+| `loyalty_transactions`     | Loyalty ledger — earn/redeem/adjustment/expiry, `reverses_id`              |
+| `store_credit_ledger`      | Store-credit cents ledger — issue/redeem/expire, `reverses_id`             |
+| `fiscal_records`           | Tamper-evident fiscal chain — seq, number, canonical payload, hash links   |
+| `fiscal_chain_state`       | Chain head (last seq/hash) per chain                                       |
+| `fiscal_transmissions`     | Authority-submission outbox per fiscal record                              |
+| `pending_ops`              | Durable op queue for LAN-outage order/operation replay                     |
+| `vendors`                  | Procurement — supplier / vendor records                                    |
+| `purchase_orders`          | Procurement — PO headers                                                   |
+| `purchase_order_items`     | Procurement — PO line items                                                |
+| `inventory_counts`         | Stock-take sessions                                                        |
+| `inventory_count_items`    | Counted quantities per product / variant                                   |
+| `transfer_orders`          | Stock transfer headers                                                     |
+| `transfer_order_items`     | Stock transfer line items                                                  |
+| `permission_sets`          | Named permission bundles assignable to users                               |
+| `user_permission_sets`     | User ↔ permission-set assignments                                          |
+| `permission_overrides`     | Per-user grant/deny overrides on action keys                               |
+| `approval_log`             | Manager-approval audit trail                                               |
+| `product_inventory_config` | Per product/variant reorder point + suggested qty + default vendor         |
+| `vendor_returns`           | Procurement — vendor-return headers                                        |
+| `vendor_return_items`      | Procurement — vendor-return line items                                     |
+| `settings`                 | Typed settings rows (alongside `key_value_store`)                          |
+| `webhook_deliveries`       | Inbound webhook claim/dedup records                                        |
 
 `SettingsRepository` is a typed JSON facade over `key_value_store` — no separate settings table.
 
@@ -196,7 +218,7 @@ If the WebSocket is unavailable, the POS falls back to polling `GET /api/sync/ev
 
 ### Authentication in Client Mode
 
-In client mode, PIN verification is delegated to the in-store server (`POST /api/users/verify-pin`) so that user management is centralised. In standalone mode, PINs are verified against local SQLite.
+In client mode, PIN verification is delegated to the in-store server (`POST /api/users/verify-pin`) so that user management is centralised. Successful verifications cache the server user and verified PIN locally — when the store API is unreachable (network/timeout/5xx, never a real 4xx), previously-seen credentials authenticate against that local cache so registers keep working during a LAN outage. In standalone mode, PINs are verified against local SQLite.
 
 ---
 
@@ -270,9 +292,10 @@ yarn test / lint / lint:fix / format    # quality gates
 
 - **Credentials** — stored via `SecretsService` (`react-native-keychain` in production; Electron `safeStorage` on desktop; in-memory mock in dev)
 - **Environment** — `.env` is gitignored; never commit secrets
-- **Auth** — pluggable multi-method; PIN is always the fallback (ADR-008). PINs are stored salted+hashed; credential-bearing settings tabs are admin-only; inactivity auto-lock defaults to 5 min
+- **Auth** — pluggable multi-method; PIN is always the fallback (ADR-008). PINs are stored salted+hashed (PBKDF2); credential-bearing settings tabs are admin-only; inactivity auto-lock defaults to 5 min. Registered permission action keys each have a real enforcement site or an explicit reservation, verified by `shared/utils/actionRegistry.enforcement.test.ts`
 - **LAN API** — every multi-register request is HMAC-signed (no secret on the wire); replayed nonces and stale timestamps rejected. Transport is plaintext HTTP — a dedicated POS VLAN (or WireGuard/Tailscale overlay) is a **deployment requirement**
-- **Payments** — delegated to PCI-compliant SDKs (Stripe, Square, Adyen, Tap Payments); non-SDK providers go through the Instore API
+- **Payments** — delegated to PCI-compliant SDKs (Stripe, Square, Adyen, Tap Payments); non-SDK providers go through the Instore API. Provider services fail closed when the required SDK surface is missing — mock payment paths exist in development builds only. Stripe's secret key never lives on the device (backend-only module); Square charges go through a configured backend URL
+- **Platform TLS** — remote store URLs are forced to `https:`; plaintext `http:` is accepted only for loopback/private-LAN development targets (`BaseApiClient.normalizeUrl`), and the Electron production CSP `connect-src` is restricted accordingly
 - **Deployment** — network segmentation, in-store server hardening and the full controls inventory: `docs/security/`
 
 ---

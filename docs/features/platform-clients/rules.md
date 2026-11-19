@@ -75,6 +75,19 @@ write through `ServiceConfigBridge`.
 
 **Evidence.** `features/platform-clients/services/config/{POSConfigService,ServiceConfigBridge}.ts`.
 
+## PC-R7 — Remote platform endpoints are TLS-only
+
+**Rule.** `BaseApiClient.normalizeUrl` upgrades an explicit `http://` store
+URL to `https://` so Basic-Auth credentials and bearer tokens can never
+cross the network in plaintext. The only `http://` targets kept are
+loopback and private-LAN hosts (`localhost`, `127.x`, `::1`, `10.x`,
+`172.16–31.x`, `192.168.x`, `*.local`) for local development and in-store
+LAN services. The Electron production CSP `connect-src` mirrors this:
+`https:`/`wss:` plus loopback/mDNS exceptions only.
+
+**Evidence.** `features/platform-clients/services/clients/BaseApiClient.ts`
+(`normalizeUrl`, `isLocalDevUrl`), `electron/main.js` CSP.
+
 ## ❓ Open Questions
 
 - **Q1** — Confirm intended: staff logout never invalidates device tokens —
@@ -120,6 +133,7 @@ resolution chain; `posConfig.values` runtime config.
 - PC-R4 Token lifetime per platform provider.
 - PC-R5 Offline tax: product profile → default → store.
 - PC-R6 `posConfig.values` is the config surface.
+- PC-R7 Remote endpoints TLS-only; http:// kept only for LAN/loopback.
 
 **Critical unhappy paths**: exchange failure propagates to all waiters;
 legacy secret shadowing; missing provider → unauthenticated calls.

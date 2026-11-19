@@ -226,7 +226,8 @@ locally and flush on recovery, catalogue/auth serve from cache, ledger
 redemption fails closed (R8).
 
 **Offline**: LAN-only by design; no internet needed. Server down ⇒ clients
-keep selling cash orders via the local pending queue; shared/server
+keep selling cash orders via the local pending queue; PIN auth falls back
+to locally cached verified credentials (see auth R5/E5.2); shared/server
 operations (ledgers, PED, KDS) are unavailable until recovery.
 
 **Gaps**: multi-server split-brain; manual secret

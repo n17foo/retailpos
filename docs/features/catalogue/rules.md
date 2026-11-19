@@ -61,7 +61,10 @@ boundary.
 `shared/utils/platformIds.ts`, `features/catalogue/components/VariantPicker.tsx`.
 
 🟢 **E4.1** — "Tee — Red / L" adds with Red/L price+SKU.
-🔴 **E4.2** — out-of-stock variant → greyed, not addable.
+🔴 **E4.2** — out-of-stock variant → greyed, not addable. Only a **tracked**
+quantity of 0 is out-of-stock: `trackInventory` off (or stock unknown) is
+sellable whenever `isAvailable` — an untracked product is never treated as
+out of stock.
 🟠 **E4.3** — product with variants but no selection → picker forced; scan of
 the product SKU resolves to the default variant.
 

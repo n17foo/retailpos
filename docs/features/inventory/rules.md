@@ -63,12 +63,13 @@ falls out of the low-stock view entirely (PG2).
 
 **Rule.** `OFFLINE` platform → `OfflineInventoryService` reads/writes the
 local product/inventory tables — identical interface. `CompositeInventoryService`
-can aggregate.
+can aggregate. Offline rows are keyed by the **product+variant composite** —
+distinct variants of one product never merge into each other.
 
 **Evidence.** `features/inventory/services/platforms/{Offline,Composite}InventoryService.ts`.
 
 📴 **E5.1 — Offline platform adjustments** — persist locally; never leave the
-device.
+device. Two variants of the same product keep independent quantities.
 
 🟠 **E5.2 — Online platform, no connectivity** — adapter calls fail → per-item
 errors in `InventoryUpdateResult`; the failed updates are persisted to
@@ -100,10 +101,11 @@ suggested qty — purchase-order creation itself is procurement's job.
 **Rule.** `InventoryServiceFactory` wraps every non-offline service in
 `RetryingInventoryService`. On `updateInventory` failure (throw or per-item
 errors), the failed updates are written to `PendingInventoryStore`
-(KV `inventory:pendingUpdates`). After any successful `getInventory` —
-proof of connectivity — queued updates replay oldest-first in the background;
-entries that fail again stay queued. Absolute writes coalesce per item
-(latest wins); deltas append.
+(KV `inventory:pendingUpdates`). Writes are serialised per product under a
+keyed lock so concurrent adds can't lose entries. After any successful
+`getInventory` — proof of connectivity — queued updates replay oldest-first
+in the background; entries that fail again stay queued. Absolute writes
+coalesce per item (latest wins); deltas append.
 
 **Evidence.** `features/inventory/services/RetryingInventoryService.ts`,
 `features/inventory/services/PendingInventoryStore.ts`,

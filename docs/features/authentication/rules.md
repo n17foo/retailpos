@@ -69,19 +69,28 @@ row is re-hashed (fire-and-forget `updatePin().catch()`).
 🟠 **E4.3 — O(n·verify)** — every login checks every active user; fine for a
 POS (tens of users), noticeable at thousands.
 
-## R5 — Client-mode PIN verify goes to the in-store server
+## R5 — Client-mode PIN verifies centrally, then falls back to its cache
 
 **Rule**
-When `instoreApiConfig.isClient`, `PinAuthProvider` calls
-`instoreApiClient.verifyPin` instead of the local users table — user
-management is centralised on the in-store server.
+When `instoreApiConfig.isClient`, `PinAuthProvider` delegates to
+`getUserRepository().findByPin()` — `InstoreApiUserRepository` calls
+`instoreApiClient.verifyPin`, caches the server user + the verified PIN
+hash locally on success, and on a **store-API-unavailable** error (network
+failure, timeout, abort, or HTTP ≥500 — never a real 4xx) falls back to the
+local users table so previously-seen credentials still authenticate during
+a LAN outage. `verifyPin` returns `null` only on explicit invalid-PIN
+responses; transport failures propagate for classification by
+`isStoreApiUnavailable`.
 
-**Evidence** — `features/authentication/services/auth/providers/PinAuthProvider.ts:39-47,85-99`.
+**Evidence** — `features/authentication/services/auth/providers/PinAuthProvider.ts`,
+`features/authentication/repositories/InstoreApiUserRepository.ts`,
+`features/multi-register/services/offline/isStoreApiUnavailable.ts`.
 
-🟢 **E5.1** — client register, server reachable → PIN verified centrally.
-🔴 **E5.2 — LAN down on a client register** → `verifyPin` fails →
-`Authentication failed` — **cashiers cannot log in even for offline sales**.
-No local fallback. Potential gap PG1.
+🟢 **E5.1** — client register, server reachable → PIN verified centrally +
+cached.
+🟢 **E5.2 — LAN down on a client register** → unavailable error → local
+`findByPin` against the cached verified PIN → cashier logs in for offline
+sales. A wrong PIN still fails (4xx propagates, never cached).
 
 ## R6 — Session is memory-only; lock = logout
 
@@ -134,6 +143,15 @@ to a manager → still denied; warn-logged.
 🟠 **E8.4 — Cache staleness** — role demotion/deactivation can take up to 60s
 to take effect (TTL documented as intentional; `invalidateCache` exists but
 only helps same-process callers).
+🟢 **E8.5 — Registry coverage is test-enforced** — every action key in the
+central registry must have a real enforcement call site or be explicitly
+reserved; `shared/utils/actionRegistry.enforcement.test.ts` scans the repo
+and fails on a missing key. Enforcement lives at service boundaries
+(`StoreCreditService.issue`, `LoyaltyService.adjustPoints`,
+`ProcurementService.{createPO,receivePO}`, `InventoryCountService`,
+`ExchangeService`) or context hooks (`useReporting` export,
+`BasketActionsProvider` discount), always evaluated against an identified
+actor — never an anonymous check.
 
 ## R9 — Manager approval is an in-context PIN challenge
 
@@ -175,16 +193,17 @@ the register (shared limiter; observed).
 - **Q2** — `AuthConfigService.setAuthMode` exists but **no caller** sets it —
   `authMode` is always `'offline'`. Should onboarding call it? (Spec says
   "set during onboarding"; `OnboardingScreen` never does.)
-- **Q3** — Client-mode login failure when the in-store server is offline —
-  intended hard dependency or should there be an emergency local PIN?
+- ~~**Q3**~~ Resolved — client-mode login has a local fallback: verified
+  credentials are cached and authenticate offline when the store API is
+  unavailable (R5, E5.2).
 - **Q4** — `findByPin` returns the _first_ matching user by `name ASC` — two
   users sharing a PIN is prevented by `isPinUnique` at creation, but a legacy
   DB could contain duplicates; first match wins silently.
 
 ## ⚠️ Potential Coverage Gaps
 
-- **PG1** — Client-register login requires the LAN server; no offline
-  fallback → register unusable during network loss.
+- ~~**PG1**~~ **RESOLVED** — client-register login falls back to locally
+  cached verified credentials when the LAN server is unreachable (R5).
 - **PG2** — Permission cache (60s) means server-side role changes lag; a
   deactivated user keeps their permissions until TTL.
 - **PG3** — `ManagerApprovalService` lockout is keyed to requesting user but
@@ -210,13 +229,13 @@ the register (shared limiter; observed).
 
 ## Test Coverage Mapping
 
-| Example                  | Coverage                             |
-| ------------------------ | ------------------------------------ |
-| R3 limiter               | `AuthAttemptLimiter.test.ts`         |
-| R2/R1 provider dispatch  | `AuthService.test.ts`                |
-| R1/R2 config persistence | `AuthConfigService.test.ts`          |
-| R8 resolution            | `PermissionService.test.ts`          |
-| R7 lock timer            | `useInactivityLock.test.ts`          |
-| R4/R5 PIN providers      | Not found (indirect via AuthService) |
-| R9 approval flow         | Not found                            |
-| R6 session               | Not found                            |
+| Example                  | Coverage                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------ |
+| R3 limiter               | `AuthAttemptLimiter.test.ts`                                                         |
+| R2/R1 provider dispatch  | `AuthService.test.ts`                                                                |
+| R1/R2 config persistence | `AuthConfigService.test.ts`                                                          |
+| R8 resolution            | `PermissionService.test.ts`                                                          |
+| R7 lock timer            | `useInactivityLock.test.ts`                                                          |
+| R4/R5 PIN providers      | `InstoreApiUserRepository.pin.test.ts` (server verify + cache + LAN-outage fallback) |
+| R9 approval flow         | Not found                                                                            |
+| R6 session               | Not found                                                                            |

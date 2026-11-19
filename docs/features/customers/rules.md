@@ -49,9 +49,14 @@ until resolved.
 ## R4 — Store credit is an append-only cents ledger with clamped redemption
 
 **Rule.** `StoreCreditService.redeem(email, requestedCents)` redeems
-`min(requested, balance)` — never overdraws. `redeemedCents <= 0` → throw
-`'Insufficient store credit balance'`. Every entry appends
-(`issue|redeem|expire`) and audits.
+`min(requested, balance)` — never overdraws; the balance check and debit
+happen atomically in one guarded transaction (a concurrent redeem can't
+overspend). `redeemedCents <= 0` → throw `'Insufficient store credit
+balance'`. Every entry appends (`issue|redeem|expire`) and audits.
+`issue` requires the `store_credit:issue` permission evaluated against an
+identified actor, plus a bounded positive integer amount. Reversals carry
+`reverses_id` — a retried reversal of the same entry is a no-op, never a
+second credit.
 
 **Evidence.** `features/customers/services/customer/StoreCreditService.ts:73-88`.
 
@@ -69,7 +74,13 @@ the shortfall rather than assume full coverage.
 ## R5 — Loyalty points are a separate ledger adjusted with a reason
 
 **Rule.** Loyalty delta + reason required for manual adjustments on the
-profile screen; earn/redeem flows run through `LoyaltyService`.
+profile screen; earn/redeem flows run through `LoyaltyService`. Manual
+adjustments require `loyalty:adjust` against an identified actor and a
+bounded safe-integer delta. Earning is idempotent per order — a retried
+`earn` for the same order can't double-award. Ledger writes and balance
+updates commit atomically; redemptions serialize per account; reversals
+are idempotent via `reverses_id`; expiry consumes per-lot `expired_points`
+so a repeat pass finds nothing left.
 
 **Evidence.** `features/customers/screens/CustomerProfileScreen.tsx:47-90`,
 `features/customers/services/loyalty/LoyaltyService.ts`.
@@ -116,8 +127,10 @@ won't see them (by design; POS-local CRM).
   the shortfall, the cashier can think full credit was applied.
 - **PG2** — `parseInt` NaN on loyalty delta input — validation unknown.
 - **PG3** — Aggregate profile: partial leg failure rendering unverified.
-- **PG4** — Ledger correctness depends on append-only discipline — a missed
-  entry or direct table edit corrupts balances; no reconciliation exists.
+- **PG4** — partially resolved — ledger entries and balance updates now
+  commit atomically with idempotent reversals/earns (R4/R5), so the common
+  corruption paths are closed; a direct table edit still has no
+  reconciliation.
 - **PG5** — Platform search results have no local cache: offline on an online
   platform → no customer lookup at all (capability `isAvailable` still true —
   calls just fail).
@@ -129,11 +142,11 @@ won't see them (by design; POS-local CRM).
 
 ## Test Coverage Mapping
 
-| Example             | Coverage                                                                  |
-| ------------------- | ------------------------------------------------------------------------- |
-| R1 factory/adapters | `customerServiceFactory.test.ts`, per-platform `*CustomerService.test.ts` |
-| R2 search           | Not found                                                                 |
-| R4 redeem clamp     | Not found (StoreCreditService has no dedicated test seen)                 |
+| Example             | Coverage                                                                   |
+| ------------------- | -------------------------------------------------------------------------- |
+| R1 factory/adapters | `customerServiceFactory.test.ts`, per-platform `*CustomerService.test.ts`  |
+| R2 search           | Not found                                                                  |
+| R4/R5 ledger        | `LedgerIntegrity.test.ts` (atomic redeem, idempotent reversal/earn, perms) |
 
 ## Feature Context Summary
 

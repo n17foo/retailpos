@@ -1,6 +1,12 @@
-# Fiscal — Spec (DRAFT, pre-implementation)
+# Fiscal — Spec
 
-> Status: **specification only** — no `features/fiscal/` code exists yet.
+> Status: **standalone implementation exists** — `features/fiscal/` (schema
+> v15+) implements the local chain, authority-adapter outbox, strict-mode
+> checkout gating, void/return record types, Z-report snapshots and
+> closed-period locking described here. The Store-API (client-mode) side of
+> the spec remains unimplemented — `pkg/store/fiscal.go` routes are
+> target-state. Where a rule marks 🟠/🔴, read it against the standalone
+> path unless the marker says otherwise.
 > Open product decisions are collected at the bottom; defaults marked
 > **[proposed]** are the recommended path unless the decision changes.
 

@@ -20,8 +20,13 @@ design per spec, but a real divergence — PG1).
 ## R2 — PO lifecycle is one-way; cancel only before receiving
 
 **Rule.** `draft → ordered → partially_received → received`; `cancelled` only
-from `draft|ordered`. `receivePO` increments `received_qty` per line; status
-becomes `received` only when every line's `received_qty ≥ ordered_qty`.
+from `draft|ordered`. `createPO` requires `purchase_order:create` and
+`receivePO` requires `purchase_order:receive`, each evaluated against the
+identified actor (`input.createdBy` / `receivedBy`). `receivePO` rejects
+cancelled/completed POs and lines that don't belong to the PO, and
+increments `received_qty` per line up to `ordered_qty` (over-receive
+rejected); status becomes `received` only when every line's
+`received_qty ≥ ordered_qty`.
 
 **Evidence.** `ProcurementService.{createPO,submitPO,cancelPO,receivePO}`,
 `POStatus` type.
@@ -33,8 +38,9 @@ notification.
 🔴 **E2.2 — Cancel a partially-received PO** — rejected; the PO can only
 complete.
 
-🟠 **E2.3 — Over-receive a line** — `incrementReceivedQty` doesn't appear to
-cap at `ordered_qty` (verify — PG2).
+🟢 **E2.3 — Over-receive a line** — `receivePO` rejects quantities that would
+push `received_qty` past `ordered_qty` (PG2 resolved); the whole receive is
+atomic — a rejected line aborts all increments.
 
 ## R3 — Receiving is local-first; failed pushes queue for replay
 
@@ -112,7 +118,8 @@ a bookkeeping record (Q2).
 
 - **PG1** — Capability-gated push means a `not_recommended` platform drifts
   from POS stock permanently — no reconciliation.
-- **PG2** — `incrementReceivedQty` may allow over-receiving a line.
+- ~~**PG2**~~ **RESOLVED** — `receivePO` validates PO state, line membership,
+  and caps `received_qty` at `ordered_qty` atomically (E2.3).
 - **PG3 — resolved** — Failed pushes persist to the pending-inventory queue
   and replay (E3.1); `platformSyncPending` surfaces the pending state in
   `ReceiveResult`/`FinaliseResult` and audit metadata. Deltas are
@@ -125,11 +132,11 @@ a bookkeeping record (Q2).
 
 ## Test Coverage Mapping
 
-| Example         | Coverage  |
-| --------------- | --------- |
-| R2/R3 PO flow   | Not found |
-| R4 variance     | Not found |
-| repository CRUD | Not found |
+| Example         | Coverage                                                    |
+| --------------- | ----------------------------------------------------------- |
+| R2/R3 PO flow   | `ProcurementService.test.ts` (validation, atomicity, perms) |
+| R4 variance     | Not found                                                   |
+| repository CRUD | Not found                                                   |
 
 ## Feature Context Summary
 

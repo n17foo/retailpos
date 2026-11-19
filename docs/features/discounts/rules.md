@@ -32,6 +32,11 @@ a validated-then-abandoned checkout still consumed a use (PG1).
 **Rule.** `BasketService.applyDiscount(code)` sets
 `basket.discountCode`/`discountAmount` on the whole basket; the order +
 sync payload carries it as `discounts: [{code, amount, type:'fixed_amount'}]`.
+The service contract (R1) is **cents**, while basket totals are major units —
+`applyDiscount` converts at the boundary: subtotal goes in as cents, the
+validated amount comes back out as major units. Applying a discount also
+requires the `discount:apply` permission (enforced in
+`BasketActionsProvider`).
 
 **Evidence.** `features/basket/services/BasketService.ts:70`,
 `OrderSyncService.basketItemsToLineItems`/`platformOrder.discounts`.

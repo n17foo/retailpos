@@ -69,6 +69,18 @@ When contributing to RetailPOS, please follow these security best practices:
 - Implement proper session management
 - Follow data minimization principles
 
+## Security Reviews & Deployment Controls
+
+- **Controls inventory** — network segmentation, in-store server hardening
+  and deployment requirements: `docs/security/`
+- **Code reviews** — dated review reports live alongside the controls docs
+  (`docs/security/YYYY-MM-DD-*-code-review.md`). The 2026-11-19 reviews
+  (fiscal, project, round 2) have all findings remediated and annotated
+  with the fixing commit; each report keeps its own verification notes.
+- **Enforcement coverage** — every registered permission action key has a
+  real enforcement call site or an explicit reservation, verified by an
+  automated repository-scan test (`shared/utils/actionRegistry.enforcement.test.ts`).
+
 ## Security Updates
 
 Security updates will be released as patch versions. Critical security fixes may result in immediate releases outside of regular release cycles.

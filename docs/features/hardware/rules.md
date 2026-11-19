@@ -33,6 +33,12 @@ PrinterServiceFactory,MobilePrinterDiscovery}.ts`,
 🟢 **E2.1 — Network printer**
 `192.168.1.50:9100` validates → `connect` → `printReceipt` emits ESC/POS.
 
+🟢 **E2.5 — Fiscal identity on every path**
+The shared `formatReceiptBuffer` (used by both `UnifiedPrinterService` and
+`ElectronPrinterService`) prints `data.fiscalNumber ?? data.orderId` and
+emits QR command bytes when `data.fiscalQr` is supplied — Electron receipts
+carry the same fiscal identity as native ones.
+
 🔴 **E2.2 — Bad config**
 BT + malformed MAC → `'Invalid MAC address format'`; validation blocks connect.
 

@@ -12,8 +12,10 @@
 **Rule**
 `shared/utils/db.ts` opens `retailPOS.db` **at module import** and exports a `Proxy`
 that forwards method calls to the real `SQLiteDatabase` once ready; calls made
-before readiness return promises chained on `dbPromise`. Outside test env the
-open chain also runs `initializeSchema` (migrations).
+before readiness return promises chained on `dbPromise`. The raw `dbInstance`
+is **not** published until safety pragmas, the integrity check,
+`initializeSchema` (migrations) and backup init have all completed — a call
+issued mid-migration resolves only after the schema is ready.
 
 **Evidence** — `shared/utils/db.ts` (`dbInstance`, `dbPromise`, Proxy `get`).
 
@@ -23,8 +25,9 @@ queues on `dbPromise` and executes after open+schema, transparently.
 📱 **E1.2 — Restart** — the DB file persists across termination; migrations are
 idempotent via `PRAGMA user_version`.
 
-🔴 **E1.3 — Open failure is permanent** — `dbPromise` rejects once; every later
-call through the Proxy re-throws the same rejection. No retry/recreate. PG2.
+🟢 **E1.3 — Open failure retries** — a failed init clears the cached
+`dbPromise`/`dbInstance`, so the next call through the Proxy starts a fresh
+init attempt instead of re-throwing a stale rejection forever.
 
 🟠 **E1.4 — Test env skips schema** — `NODE_ENV === 'test'` skips
 `initializeSchema`, so unit tests never exercise migrations (usually mocked
@@ -33,17 +36,19 @@ anyway). Parent-map Q2.
 ## DB-R2 — Schema evolves by forward-only, transactional migrations
 
 **Rule**
-`LATEST_DB_VERSION` (currently **11**) gates `migrateDatabase`, which applies
-each `v1…v11` block inside **one** `withTransactionAsync` and then stamps
-`user_version`. v1 creates the full base schema; v2–v11 incrementally
+`LATEST_DB_VERSION` (currently **17**) gates `migrateDatabase`, which applies
+each `v1…v17` block inside **one** `withTransactionAsync` and then stamps
+`user_version`. v1 creates the full base schema; v2–v17 incrementally
 merge/add (e.g. v8 `register_id`, v9 order-item snapshots, v10 webhook
-delivery, v11 `sale_mode`).
+delivery, v11 `sale_mode`, v12 `pending_ops`, v13 widened `sync_status`
+CHECK, v14 `orders.tax_estimated`, v15 fiscal tables, v16 ledger
+`reverses_id` + loyalty earn-lot expiry, v17 `returns.refund_status`/`refund_id`).
 
-**Evidence** — `shared/utils/dbSchema.ts` (739 lines; `initializeSchema`,
-`migrateDatabase`, `LATEST_DB_VERSION = 11`).
+**Evidence** — `shared/utils/dbSchema.ts` (`initializeSchema`,
+`migrateDatabase`, `LATEST_DB_VERSION = 17`).
 
-🟢 **E2.1 — Fresh install** — `user_version = 0` → all 11 blocks run inside one
-transaction → `user_version = 11`.
+🟢 **E2.1 — Fresh install** — `user_version = 0` → all 17 blocks run inside one
+transaction → `user_version = 17`.
 
 🟠 **E2.2 — Migration failure** — a throw mid-migration rolls back the whole
 transaction; `initializeSchema` rethrows → the startup bootstrap fails loudly
@@ -76,11 +81,13 @@ impossible, but callers must tolerate the throw.
   (Contradiction C1).
 - **DB-Q2** — Should `dbPromise` failures mark the app state so repositories
   can surface "database unavailable" instead of hanging on a rejected promise?
+  (Init failure now retries on next access — E1.3 — but callers still can't
+  render a distinct unavailable state.)
 
 ## Coverage
 
-| Example               | Coverage                            |
-| --------------------- | ----------------------------------- |
-| DB-R2 migration logic | Not found (indirect via repo tests) |
-| DB-R3 allowlist       | Not found                           |
-| DB-R1 proxy/failure   | Not found                           |
+| Example               | Coverage                                       |
+| --------------------- | ---------------------------------------------- |
+| DB-R2 migration logic | Not found (indirect via repo tests)            |
+| DB-R3 allowlist       | Not found                                      |
+| DB-R1 proxy/failure   | `shared/utils/db.test.ts` (mid-migration wait) |

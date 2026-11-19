@@ -33,8 +33,10 @@ the pass → request replays.
 📱 **E2.2 — Restart** — the store persists via the SQLite adapter — queue
 survives termination; `isProcessing` is _not_ persisted (starts false).
 
-🟠 **E2.3 — Double-processing** — poll + connectivity trigger can overlap;
-processQueue is re-entrant-guarded by `isProcessing` (verify — PG2).
+🟢 **E2.3 — Double-processing** — poll + connectivity triggers can overlap,
+but `processQueue` is single-flight: a second call while a drain is active
+returns the in-flight promise, and the drain iterates the live queue so
+items enqueued mid-drain are still sent (PG2 resolved).
 
 ## I-R3 — Secrets resolve to the safest available backend
 
@@ -133,7 +135,9 @@ code pending removal, not behaviour to rely on:
 
 - **PG1** — Audit persistence lag: `ensureLoaded`/`persist` async — a crash
   between log() and persist loses entries.
-- **PG2** — Queue re-entrancy on overlapping triggers.
+- ~~**PG2**~~ **RESOLVED** — `processQueue` is single-flight (E2.3);
+  overlapping triggers share one drain instead of duplicating sends.
+  Covered by `shared/hooks/useSyncStore.test.ts`.
 - **PG3** — Backend mis-detection → memory secrets (silent persistence loss).
 - **PG4** — At-least-once queue delivery — a platform request that succeeded
   but whose response was lost will replay (idempotency is the request's
@@ -145,7 +149,7 @@ code pending removal, not behaviour to rely on:
 | Example      | Coverage                                         |
 | ------------ | ------------------------------------------------ |
 | I-R1 audit   | `shared/services/audit/AuditLogService.test.ts`  |
-| I-R2 queue   | Not found                                        |
+| I-R2 queue   | `shared/hooks/useSyncStore.test.ts`              |
 | I-R3 secrets | mock backend used in tests; per-backend untested |
 
 ## Feature Context Summary
