@@ -2,7 +2,7 @@
 
 Date: 2026-11-19  
 Revision: `909c2ee` (`main`)  
-Status: open findings; documentation only, no application fixes
+Status: all P1 findings fixed — commits `3ad321f`, `b913539`, `632ed86`, `4f54bbb`, `157e7fb`, `b055ee0`, `9343a50`, `4f90d42`; P2 findings remain open
 
 ## Findings And Priorities
 
@@ -92,6 +92,8 @@ evidence of server-side authorization.
 
 ### BAS-01 - P1 - Parallel basket changes overwrite each other
 
+Status: **fixed** in `157e7fb`
+
 Evidence: `features/basket/services/BasketService.ts:33-57,161-178,224-248`;
 `features/basket/repositories/BasketRepository.ts:42-79`.
 
@@ -140,6 +142,8 @@ from tracked zero stock. Test services and mixed-availability variants.
 
 ### CHK-01 - P1 - Unknown payment outcomes can become safely retryable drafts
 
+Status: **fixed** in `b055ee0`
+
 Validation: static trace, not a live double-charge experiment.  
 Evidence: `features/checkout/hooks/useCheckout.ts:103-114,125-153,382-503`;
 `features/checkout/services/CheckoutService.ts:236-286`;
@@ -166,6 +170,8 @@ be treated as proof the processor did not charge.
 
 ### CUS-01 - P1 - Repeated reversal creates extra spendable customer credit
 
+Status: **fixed** in `4f54bbb`
+
 Evidence: `features/customers/services/customer/StoreCreditService.ts:107-120`;
 `features/customers/services/loyalty/LoyaltyService.ts:189-201`.
 
@@ -182,6 +188,8 @@ transaction reference with a unique reversal constraint and atomically enforce
 one reversal per redemption, including on the separate server.
 
 ### CUS-02 - P1 - Concurrent standalone redemptions overspend store credit
+
+Status: **fixed** in `4f54bbb`
 
 Evidence: `features/customers/services/customer/StoreCreditService.ts:76-93`;
 `features/customers/repositories/StoreCreditRepository.ts:30-54`.
@@ -212,6 +220,8 @@ return value. Use explicit corrective transactions for adjustments.
 
 ### CUS-04 - P1 - Loyalty ledger and balance updates are not atomic
 
+Status: **fixed** in `4f54bbb`
+
 Evidence: `features/customers/repositories/LoyaltyRepository.ts:88-98,117-146`.
 
 Despite its atomicity comment, `applyTransaction()` commits the ledger insert
@@ -227,6 +237,8 @@ back both. Add uniqueness/idempotency and reconcile cached balances against
 the ledger. Verify actual Expo transaction isolation as well as the test adapter.
 
 ### CUS-05 - P1 - Repeated loyalty expiry consumes newly earned points
+
+Status: **fixed** in `4f54bbb`
 
 Evidence: `features/customers/services/loyalty/LoyaltyService.ts:240-289`;
 `features/customers/repositories/LoyaltyRepository.ts:180-188`.
@@ -294,6 +306,8 @@ existing rows explicitly rather than inferring a SKU is a variant ID.
 
 ### INV-02 - P1 - Concurrent pending-inventory writes silently lose updates
 
+Status: **fixed** in `9343a50`
+
 Evidence: `features/inventory/services/PendingInventoryStore.ts:16-30,42-71`.
 
 The queue is one JSON value updated with unlocked read-modify-write operations.
@@ -339,6 +353,8 @@ search provides end-to-end idempotency.
 
 ### PAY-01 - P1 - Missing SDKs silently activate simulated payments in production
 
+Status: **fixed** in `3ad321f`
+
 Evidence: `features/payments/services/PaymentServiceFactory.ts:87-94,130-138`;
 `features/payments/services/mock/MockPaymentService.ts:66-99`.
 
@@ -355,6 +371,8 @@ through explicit development/demo mode with unmistakable UI and isolated data.
 Test both production flags and actual missing-native-module failures.
 
 ### PAY-02 - P1 - Square reports nonce collection as successful payment
+
+Status: **fixed** in `3ad321f`
 
 Evidence: `features/payments/services/SquareService.ts:99-136`.
 
@@ -385,6 +403,8 @@ transport uses them safely.
 
 ### PRO-01 - P1 - Receiving does not validate PO ownership or lifecycle
 
+Status: **fixed** in `4f90d42`
+
 Evidence: `features/procurement/services/ProcurementService.ts:107-153`;
 `features/procurement/repositories/ProcurementRepository.ts:282-292`.
 
@@ -412,6 +432,8 @@ net sales should subtract returns/refunds, then compare the server output.
 ## Returns And Exchanges
 
 ### RET-01 - P1 - Exchange checkout does not use the exchange's replacement items
+
+Status: **fixed** in `632ed86`
 
 Validation: static trace.  
 Evidence: `features/returns/screens/ExchangeScreen.tsx:117-136`;

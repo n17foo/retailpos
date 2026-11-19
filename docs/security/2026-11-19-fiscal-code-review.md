@@ -2,7 +2,7 @@
 
 Date: 2026-11-19  
 Reviewed revision: `909c2ee` (`main`)  
-Status: findings documented; application code not modified
+Status: F01–F08 (all P1) fixed in `f699375` with real-SQLite regression coverage; F09–F12 (P2) remain open
 
 ## Scope And Method
 
@@ -25,6 +25,8 @@ input-handling defect. Severity is not a CVSS rating. All findings remain open.
 ## Findings
 
 ### F01 - P1 - Ledger verification accepts metadata tampering and tail deletion
+
+Status: **fixed** in `f699375`
 
 Category: security / financial integrity  
 Evidence: `features/fiscal/services/OfflineFiscalService.ts:120-148,261-275`
@@ -56,6 +58,8 @@ rewrites; an unkeyed local chain alone cannot prevent those.
 
 ### F02 - P1 - A return overwrites the original sale's invoice identity
 
+Status: **fixed** in `f699375`
+
 Category: financial correctness  
 Evidence: `features/fiscal/services/OfflineFiscalService.ts:96-106,224-231`
 
@@ -76,6 +80,8 @@ through their own return/void records; a void may update the order's fiscal
 status without replacing the original invoice identity.
 
 ### F03 - P1 - Authority work can be lost permanently after ledger commit
+
+Status: **fixed** in `f699375`
 
 Category: durability / fiscal processing  
 Evidence: `features/fiscal/services/OfflineFiscalService.ts:53-58,64-74,245-258`;
@@ -100,6 +106,8 @@ payload construction and outbox insertion inside the allocation transaction.
 Make repair/idempotent finalization detect missing work without duplicating it.
 
 ### F04 - P1 - Strict checkout is not enforced and failed fiscalization has no recovery queue
+
+Status: **fixed** in `f699375`
 
 Category: checkout / durability  
 Evidence: `features/checkout/services/CheckoutService.ts:259-286,325-344,375-391`;
@@ -133,6 +141,8 @@ to pay again merely because fiscal work failed.
 
 ### F05 - P1 - The TSE transport never completes the signing transaction
 
+Status: **fixed** in `f699375`
+
 Category: fiscal processing  
 Evidence: `features/fiscal/services/transports/FiskalyTseTransport.ts:24-51`;
 `features/fiscal/services/authorities/DeTseAdapter.ts:18-20`;
@@ -159,6 +169,8 @@ the configured strict/fallback policy at tender close.
 
 ### F06 - P1 - AEAT business rejections are marked successfully sent
 
+Status: **fixed** in `f699375`
+
 Category: fiscal processing / data loss  
 Evidence: `features/fiscal/services/transports/AeatVerifactuTransport.ts:50-61`;
 `features/fiscal/services/FiscalTransmissionDrainer.ts:76-82`
@@ -180,6 +192,8 @@ mark sent only on confirmed acceptance. Persist actionable rejection details
 and distinguish accepted duplicates, retryable failures, and permanent errors.
 
 ### F07 - P1 - Return records omit the actual refunded amounts
+
+Status: **fixed** in `f699375`
 
 Category: financial correctness  
 Evidence: `features/fiscal/services/OfflineFiscalService.ts:96-106`;
@@ -204,6 +218,8 @@ with the original fiscal sale, snapshot the actual refund/tax breakdown and
 original fiscal reference, and make registration idempotent per return ID.
 
 ### F08 - P1 - ES voids and shift closures are serialized as sales-invoice records
+
+Status: **fixed** in `f699375`
 
 Category: fiscal processing  
 Evidence: `features/fiscal/services/authorities/EsVerifactuAdapter.ts:22-29,80-87`;

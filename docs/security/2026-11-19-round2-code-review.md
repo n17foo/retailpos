@@ -2,7 +2,7 @@
 
 Date: 2026-11-19  
 Revision: `909c2ee` (`main`)  
-Status: open findings; documentation only, no application fixes
+Status: all P1 findings fixed — PAY-03 in `3ad321f`, RET-02/03/04 in `632ed86`, DIS-01 in `b913539`; P2 findings and notes remain open
 
 ## Summary
 
@@ -75,6 +75,8 @@ was established there.
 ## Payments
 
 ### PAY-03 - P1 - Stripe secret key sent to a placeholder third-party host by default
+
+Status: **fixed** in `3ad321f`
 
 Validation: static trace.  
 Evidence: `features/payments/contexts/StripeTerminalBridgeImpl.tsx:32-53,320-330,487-494,521-528`;
@@ -158,6 +160,8 @@ Recommendation:
 
 ### RET-02 - P1 - Zero-tender exchange marks the unrelated live basket paid, no approval
 
+Status: **fixed** in `632ed86`
+
 Validation: reproduced on real SQLite (`ExchangeService` + real
 `BasketService`/`CheckoutService`/`ReturnService`).  
 Evidence: `features/returns/components/ExchangeAddItemsStep.tsx:79-86`;
@@ -209,6 +213,8 @@ Recommendation:
 
 ### RET-03 - P1 - Refund amounts are not bound to the returned line; discounts not allocated
 
+Status: **fixed** in `632ed86`
+
 Validation: reproduced against `validateReturnRequest` (pure function).  
 Evidence: `features/returns/services/refunds/returnValidation.ts:48,73-78`;
 `features/returns/screens/RefundScreen.tsx:202,224`.
@@ -247,6 +253,8 @@ Recommendation:
 - Keep the cumulative cap as a second check.
 
 ### RET-04 - P1 - Free-form refunds bypass validation; terminal refunds never reach the processor
+
+Status: **fixed** in `632ed86`
 
 Validation: reproduced on real SQLite (`ReturnService` with the real
 `OfflineRefundService` and key-value store).  
@@ -320,6 +328,8 @@ Recommendation:
 ## Discounts
 
 ### DIS-01 - P1 - Cents/major-unit mismatch lets a 5.00 code zero a basket
+
+Status: **fixed** in `b913539`
 
 Validation: reproduced on real SQLite (`LocalDiscountService`).  
 Evidence: `features/discounts/services/BaseDiscountService.ts:32-38,72`;
