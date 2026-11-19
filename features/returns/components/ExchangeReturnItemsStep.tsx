@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, FlatList, TouchableOpacity } from 'react-native';
-import { formatMoney, multiplyMoney, sumMoney } from '../../../shared/utils/money';
+import { formatMoney, sumMoney, toCents, toDollars } from '../../../shared/utils/money';
 import { Button } from '../../../shared/components/Button';
 import { exchangeStyles as styles } from './exchangeStyles';
 
@@ -10,6 +10,8 @@ export interface ReturnableItem {
   variantId: string | null;
   name: string;
   price: number;
+  /** Amount actually paid for the full returnableQuantity (discount/tax allocated) */
+  refundableAmount: number;
   originalQuantity: number;
   returnedQuantity: number;
   returnableQuantity: number;
@@ -80,7 +82,13 @@ export const ExchangeReturnItemsStep: React.FC<ExchangeReturnItemsStepProps> = (
     )}
     <View style={styles.footer}>
       <Text style={styles.creditSummary}>
-        Return credit: {formatMoney(sumMoney(items.map(i => multiplyMoney(i.price, quantities[i.orderItemId] ?? 0))), currencyCode)}
+        Return credit:{' '}
+        {formatMoney(
+          sumMoney(
+            items.map(i => toDollars(Math.round((toCents(i.refundableAmount) * (quantities[i.orderItemId] ?? 0)) / i.returnableQuantity)))
+          ),
+          currencyCode
+        )}
       </Text>
       <Button
         title="Next: Add New Items"

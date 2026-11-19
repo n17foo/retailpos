@@ -3,9 +3,11 @@ import { BasketItem } from '../../../basket/services/basket';
 import { PaymentLine } from '../../../orders-sync/services/order/order';
 import { ReturnService } from '../refunds/RefundService';
 import { CheckoutServiceInterface } from '../../../checkout/services/CheckoutServiceInterface';
+import { permissionService } from '../../../authentication/services/permissions/PermissionService';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
 import { auditLogService } from '../../../../shared/services/audit/AuditLogService';
 import { getReturnRepository } from '../../repositories/ReturnRepository';
+import { roundMoney, sumMoney, toCents, toDollars } from '../../../../shared/utils/money';
 
 export interface ReturnLineInput {
   orderItemId: string;
@@ -14,13 +16,15 @@ export interface ReturnLineInput {
   productName: string;
   quantity: number;
   price: number;
+  /** Amount actually paid for this returned quantity — discount/tax allocated. Never exceeds the paid line share (RET-03). */
+  refundAmount: number;
 }
 
 export interface ExchangeSession {
   id: string;
   originalOrderId: string;
   returnItems: ReturnLineInput[];
-  returnCredit: number; // sum of returnItems price * qty
+  returnCredit: number; // sum of returnItems refundAmount
   newItems: BasketItem[];
   newItemsTotal: number; // sum of newItems price * qty
   netDue: number; // newItemsTotal - returnCredit (negative = store owes customer)
@@ -32,13 +36,25 @@ export interface ExchangeConfirmResult {
   success: boolean;
   newOrderId?: string;
   returnIds?: string[];
+  /** Store credit still owed to the customer when the return exceeds the new order (netDue < 0) */
+  creditOwed?: number;
   error?: string;
 }
 
+/**
+ * Authorization evidence for the exchange. A cashier without the
+ * 'exchange:process' permission must supply the id of an approving user who
+ * does hold it — the service re-verifies the approver's permission rather
+ * than trusting a boolean from the UI (RET-02).
+ */
+export interface ExchangeAuthorization {
+  approvedByUserId?: string;
+}
+
 function calcTotals(session: Omit<ExchangeSession, 'netDue' | 'remainingDue'>): Pick<ExchangeSession, 'netDue' | 'remainingDue'> {
-  const netDue = Math.round((session.newItemsTotal - session.returnCredit) * 100) / 100;
-  const collected = session.payments.filter(p => p.amount > 0).reduce((s, p) => s + p.amount, 0);
-  const remainingDue = Math.round((netDue - collected) * 100) / 100;
+  const netDue = roundMoney(session.newItemsTotal - session.returnCredit);
+  const collected = sumMoney(session.payments.filter(p => p.amount > 0).map(p => p.amount));
+  const remainingDue = roundMoney(netDue - collected);
   return { netDue, remainingDue };
 }
 
@@ -59,7 +75,7 @@ export class ExchangeService {
   }
 
   createSession(originalOrderId: string, returnItems: ReturnLineInput[]): ExchangeSession {
-    const returnCredit = Math.round(returnItems.reduce((s, i) => s + i.price * i.quantity, 0) * 100) / 100;
+    const returnCredit = roundMoney(sumMoney(returnItems.map(i => i.refundAmount)));
     const base = {
       id: generateUUID(),
       originalOrderId,
@@ -74,14 +90,14 @@ export class ExchangeService {
 
   addItem(session: ExchangeSession, item: BasketItem): ExchangeSession {
     const newItems = [...session.newItems, item];
-    const newItemsTotal = Math.round(newItems.reduce((s, i) => s + i.price * i.quantity, 0) * 100) / 100;
+    const newItemsTotal = roundMoney(sumMoney(newItems.map(i => i.price * i.quantity)));
     const updated = { ...session, newItems, newItemsTotal };
     return { ...updated, ...calcTotals(updated) };
   }
 
   removeItem(session: ExchangeSession, itemId: string): ExchangeSession {
     const newItems = session.newItems.filter(i => i.id !== itemId);
-    const newItemsTotal = Math.round(newItems.reduce((s, i) => s + i.price * i.quantity, 0) * 100) / 100;
+    const newItemsTotal = roundMoney(sumMoney(newItems.map(i => i.price * i.quantity)));
     const updated = { ...session, newItems, newItemsTotal };
     return { ...updated, ...calcTotals(updated) };
   }
@@ -99,10 +115,33 @@ export class ExchangeService {
     return { ...updated, ...calcTotals(updated) };
   }
 
-  async confirm(session: ExchangeSession, cashierId?: string, cashierName?: string): Promise<ExchangeConfirmResult> {
-    // Validate settlement
-    if (Math.abs(session.remainingDue) > 0.01) {
+  /**
+   * The caller must hold 'exchange:process' or present the id of an approver
+   * who does. Verified against the user database at the service boundary —
+   * navigation/menu hiding is not an authorization control (RET-02).
+   */
+  private async authorize(cashierId: string | undefined, authorization?: ExchangeAuthorization): Promise<boolean> {
+    if (cashierId && (await permissionService.can(cashierId, 'exchange:process'))) {
+      return true;
+    }
+    const approver = authorization?.approvedByUserId;
+    return !!approver && approver !== cashierId && (await permissionService.can(approver, 'exchange:process'));
+  }
+
+  async confirm(
+    session: ExchangeSession,
+    cashierId?: string,
+    cashierName?: string,
+    authorization?: ExchangeAuthorization
+  ): Promise<ExchangeConfirmResult> {
+    // Validate settlement — a positive remaining due means the customer
+    // still owes; a negative remainder is store credit owed to them.
+    if (session.remainingDue > 0.01) {
       return { success: false, error: 'Exchange not fully settled' };
+    }
+
+    if (!(await this.authorize(cashierId, authorization))) {
+      return { success: false, error: 'Exchange requires a user with exchange permission or manager approval' };
     }
 
     // Compensation log — populated as writes succeed so a later failure can
@@ -138,7 +177,7 @@ export class ExchangeService {
           variantId: i.variantId,
           productName: i.productName,
           quantity: i.quantity,
-          refundAmount: i.price * i.quantity,
+          refundAmount: i.refundAmount,
           restock: true,
           issueRefund: false,
         })),
@@ -151,17 +190,40 @@ export class ExchangeService {
       }
       createdReturnIds.push(...returnResult.returnIds);
 
-      // 2. If new items exist, create a new order — on failure, undo the
-      // return leg so the original order isn't left half-exchanged
+      // 2. If new items exist, create a new order FROM THE SESSION ITEMS —
+      // never from the live sale basket (RET-01). The order is settled by
+      // the recorded top-up payments plus an explicit 'store_credit' tender
+      // line for the return credit actually consumed — so a zero-tender
+      // exchange can never mark an order paid without coverage (RET-02).
       let newOrderId: string | undefined;
       if (session.newItems.length > 0) {
         try {
-          const newOrder = await this.checkoutService.startCheckout(undefined, cashierId, cashierName);
+          const newOrder = await this.checkoutService.createOrderFromItems(session.newItems, cashierId, cashierName);
           newOrderId = newOrder.id;
 
-          const primaryMethod = session.payments.find(p => p.amount > 0)?.method ?? 'other';
-          const primaryTxId = session.payments.find(p => p.amount > 0)?.transactionId;
-          const paymentResult = await this.checkoutService.completePayment(newOrderId, primaryMethod, primaryTxId, session.payments);
+          const collected = sumMoney(session.payments.filter(p => p.amount > 0).map(p => p.amount));
+          const creditApplied = toDollars(Math.max(0, toCents(newOrder.total) - toCents(collected)));
+
+          const tenderLines: PaymentLine[] = [
+            ...session.payments.filter(p => p.amount > 0),
+            ...(toCents(creditApplied) > 0
+              ? [
+                  {
+                    id: generateUUID(),
+                    method: 'store_credit' as const,
+                    amount: creditApplied,
+                    transactionId: session.originalOrderId,
+                    processedAt: Date.now(),
+                  },
+                ]
+              : []),
+          ];
+
+          const primaryMethod = session.payments.find(p => p.amount > 0)?.method ?? 'store_credit';
+          const primaryTxId = session.payments.find(p => p.amount > 0)?.transactionId ?? session.originalOrderId;
+          const paymentResult = await this.checkoutService.completePayment(newOrderId, primaryMethod, primaryTxId, tenderLines, {
+            preserveBasket: true,
+          });
           if (!paymentResult.success) {
             throw new Error(paymentResult.error ?? 'Payment completion failed');
           }
@@ -187,6 +249,8 @@ export class ExchangeService {
         }
       }
 
+      const creditOwed = session.netDue < -0.005 ? roundMoney(-session.netDue) : 0;
+
       await auditLogService.log('exchange:completed', {
         userId: cashierId,
         userName: cashierName,
@@ -198,10 +262,12 @@ export class ExchangeService {
           returnCredit: session.returnCredit,
           newItemsTotal: session.newItemsTotal,
           netDue: session.netDue,
+          creditOwed,
+          approvedByUserId: authorization?.approvedByUserId,
         },
       });
 
-      return { success: true, newOrderId, returnIds: returnResult.returnIds };
+      return { success: true, newOrderId, returnIds: returnResult.returnIds, creditOwed };
     } catch (err) {
       this.logger.error({ message: 'Exchange confirmation failed' }, err instanceof Error ? err : new Error(String(err)));
       return { success: false, error: err instanceof Error ? err.message : 'Exchange failed' };

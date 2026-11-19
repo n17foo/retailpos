@@ -9,6 +9,7 @@ const item: ReturnableItem = {
   variantId: null,
   name: 'Iced Latte',
   price: 2.99,
+  refundableAmount: 8.97,
   originalQuantity: 3,
   returnedQuantity: 0,
   returnableQuantity: 3,

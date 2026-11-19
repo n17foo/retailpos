@@ -13,7 +13,7 @@
  */
 
 import { useState, useCallback } from 'react';
-import { managerApprovalService } from '../services/permissions/ManagerApprovalService';
+import { managerApprovalService, ApprovalResult } from '../services/permissions/ManagerApprovalService';
 import { permissionService } from '../services/permissions/PermissionService';
 import { useAuthContext } from '../contexts/AuthProvider';
 
@@ -22,25 +22,25 @@ export function useManagerApproval() {
   const [isApproving, setIsApproving] = useState(false);
 
   /**
-   * Request manager approval for an action.
-   * First checks if the current user has permission — if yes, returns true immediately.
-   * If no, triggers the manager approval modal.
+   * Request manager approval for an action, returning the full result
+   * including the approving manager's user id. Callers that re-verify
+   * authorization downstream (e.g. exchange confirmation) need the approver
+   * identity, not just the boolean.
    */
-  const requestApproval = useCallback(
-    async (actionKey: string): Promise<boolean> => {
-      if (!user?.id) return false;
+  const requestApprovalDetailed = useCallback(
+    async (actionKey: string): Promise<ApprovalResult> => {
+      if (!user?.id) return { approved: false };
 
       setIsApproving(true);
       try {
         // Check if the current user already has permission
         const hasPermission = await permissionService.can(user.id, actionKey);
         if (hasPermission) {
-          return true;
+          return { approved: true };
         }
 
         // User doesn't have permission — request manager approval
-        const result = await managerApprovalService.requestApproval(actionKey, user.id);
-        return result.approved;
+        return await managerApprovalService.requestApproval(actionKey, user.id);
       } finally {
         setIsApproving(false);
       }
@@ -48,5 +48,18 @@ export function useManagerApproval() {
     [user?.id]
   );
 
-  return { requestApproval, isApproving };
+  /**
+   * Request manager approval for an action.
+   * First checks if the current user has permission — if yes, returns true immediately.
+   * If no, triggers the manager approval modal.
+   */
+  const requestApproval = useCallback(
+    async (actionKey: string): Promise<boolean> => {
+      const result = await requestApprovalDetailed(actionKey);
+      return result.approved;
+    },
+    [requestApprovalDetailed]
+  );
+
+  return { requestApproval, requestApprovalDetailed, isApproving };
 }

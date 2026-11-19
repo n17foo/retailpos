@@ -130,6 +130,34 @@ export const exchangeStyles = StyleSheet.create({
   addItemButton: {
     marginBottom: spacing.sm,
   },
+  searchInput: {
+    borderWidth: 1,
+    borderColor: lightColors.border,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    fontSize: typography.fontSize.md,
+    color: lightColors.textPrimary,
+    backgroundColor: lightColors.inputBackground,
+    marginBottom: spacing.sm,
+  },
+  productLoader: {
+    marginVertical: spacing.md,
+  },
+  productRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: lightColors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    marginBottom: spacing.xs,
+    ...elevation.low,
+  },
+  productPrice: {
+    fontSize: typography.fontSize.md,
+    fontWeight: '700',
+    color: lightColors.textPrimary,
+  },
   settleSummary: {
     backgroundColor: lightColors.surface,
     borderRadius: borderRadius.md,

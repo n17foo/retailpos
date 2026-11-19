@@ -1,11 +1,14 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useIsFocused } from '@react-navigation/native';
 import { lightColors, spacing, typography, borderRadius } from '../../../shared/utils/theme';
-import { formatMoney } from '../../../shared/utils/money';
+import { formatMoney, toCents, toDollars } from '../../../shared/utils/money';
 import { useCurrency } from '../../platform-clients/hooks/useCurrency';
 import { useAuthContext } from '../../authentication/contexts/AuthProvider';
+import { useManagerApproval } from '../../authentication/hooks/useManagerApproval';
+import { useActivePlatform } from '../../platform-clients/hooks/useActivePlatform';
+import { useProductsForDisplay } from '../../catalogue/hooks/useProducts';
 import { ReturnService } from '../services/refunds/RefundService';
 import { ExchangeService, ExchangeSession, ReturnLineInput } from '../services/exchange/ExchangeService';
 import { PaymentMethod } from '../../orders-sync/services/order/order';
@@ -28,6 +31,27 @@ const ExchangeScreen: React.FC = () => {
   const { user } = useAuthContext();
 
   const orderId = route.params?.orderId ?? '';
+  const { requestApprovalDetailed } = useManagerApproval();
+
+  // Catalogue products for the exchange add-items step — the same display
+  // products the sale grid uses, resolved for the active platform.
+  const isFocused = useIsFocused();
+  const { platform: activePlatform, isResolved: isPlatformResolved } = useActivePlatform(undefined, isFocused);
+  const { products: catalogueProducts, isLoading: isLoadingProducts } = useProductsForDisplay(
+    isPlatformResolved ? (activePlatform ?? null) : null,
+    null
+  );
+  const exchangeProducts = useMemo(
+    () =>
+      catalogueProducts.map(p => ({
+        id: p.id,
+        name: p.name,
+        price: p.price,
+        variantId: p.variantId,
+        sku: p.sku,
+      })),
+    [catalogueProducts]
+  );
 
   const [step, setStep] = useState<ExchangeStep>('select_returns');
   const [returnableItems, setReturnableItems] = useState<ReturnableItem[]>([]);
@@ -91,14 +115,20 @@ const ExchangeScreen: React.FC = () => {
   const handleNextFromReturns = useCallback(async () => {
     const selectedItems: ReturnLineInput[] = returnableItems
       .filter(i => (returnQtys[i.orderItemId] ?? 0) > 0)
-      .map(i => ({
-        orderItemId: i.orderItemId,
-        productId: i.productId,
-        variantId: i.variantId ?? undefined,
-        productName: i.name,
-        quantity: returnQtys[i.orderItemId],
-        price: i.price,
-      }));
+      .map(i => {
+        const quantity = returnQtys[i.orderItemId];
+        return {
+          orderItemId: i.orderItemId,
+          productId: i.productId,
+          variantId: i.variantId ?? undefined,
+          productName: i.name,
+          quantity,
+          price: i.price,
+          // The exchange credit is what was actually paid for the returned
+          // share of the line — discount and tax allocated (RET-03).
+          refundAmount: toDollars(Math.round((toCents(i.refundableAmount) * quantity) / i.returnableQuantity)),
+        };
+      });
 
     if (selectedItems.length === 0) {
       setError('Select at least one item to return');
@@ -185,12 +215,21 @@ const ExchangeScreen: React.FC = () => {
     setIsProcessing(true);
     setError(null);
     try {
+      // 'exchange:process' defaults to manager — cashiers get the approval
+      // modal; the approver's id is passed on so the service can re-verify
+      // it at the boundary (RET-02).
+      const approval = await requestApprovalDetailed('exchange:process');
+      if (!approval.approved) {
+        setError('Exchange requires manager approval');
+        return;
+      }
+
       const svc = await getExchangeService();
-      const result = await svc.confirm(session, user?.id, user?.username);
+      const result = await svc.confirm(session, user?.id, user?.username, { approvedByUserId: approval.approvingUserId });
       if (result.success) {
         Alert.alert(
           'Exchange Complete',
-          `Exchange completed successfully.${result.newOrderId ? `\nNew order: #${result.newOrderId.slice(-8)}` : ''}`,
+          `Exchange completed successfully.${result.newOrderId ? `\nNew order: #${result.newOrderId.slice(-8)}` : ''}${result.creditOwed ? `\nStore credit owed: ${formatMoney(result.creditOwed, currency.code)}` : ''}`,
           [{ text: 'OK', onPress: () => navigation.goBack() }]
         );
       } else {
@@ -201,7 +240,7 @@ const ExchangeScreen: React.FC = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, [session, user, getExchangeService, navigation]);
+  }, [session, user, getExchangeService, navigation, requestApprovalDetailed, currency.code]);
 
   // ── Render ───────────────────────────────────────────────────────────
 
@@ -250,6 +289,8 @@ const ExchangeScreen: React.FC = () => {
         <ExchangeAddItemsStep
           session={session}
           currencyCode={currency.code}
+          products={exchangeProducts}
+          isLoadingProducts={isLoadingProducts}
           onAddProduct={handleAddProduct}
           onRemoveItem={handleRemoveNewItem}
           onNext={handleNextFromItems}

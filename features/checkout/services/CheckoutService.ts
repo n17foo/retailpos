@@ -11,6 +11,7 @@ import { OrderItemRepository } from '../../orders-sync/repositories/OrderItemRep
 import { LoggerInterface } from '../../../shared/services/logger/LoggerInterface';
 import { posConfig } from '../../platform-clients/services/config/POSConfigService';
 import { generateUUID } from '../../../shared/utils/uuid';
+import { multiplyMoney, roundMoney, sumMoney } from '../../../shared/utils/money';
 import { auditLogService } from '../../../shared/services/audit/AuditLogService';
 import { OrderServiceFactory } from '../../orders-sync/services/order/OrderServiceFactory';
 import { getPlatformCapabilities, getBasketMode } from '../../../shared/utils/platformCapabilities';
@@ -40,9 +41,6 @@ export class CheckoutService implements CheckoutServiceInterface {
     if (basket.items.length === 0) {
       throw new Error('Cannot checkout with empty basket');
     }
-
-    const now = Date.now();
-    const orderId = generateUUID();
 
     // ── Tax comes from the platform ────────────────────────────────────
     // Online platforms own tax. The platform calculates it for the whole basket and the POS never assumes a rate:
@@ -127,10 +125,9 @@ export class CheckoutService implements CheckoutServiceInterface {
       }
     }
 
-    const localOrder: LocalOrder = {
-      id: orderId,
-      platformOrderId,
+    return this.persistOrderRecord({
       platform,
+      platformOrderId,
       items: basket.items,
       subtotal,
       tax,
@@ -141,37 +138,119 @@ export class CheckoutService implements CheckoutServiceInterface {
       customerName: basket.customerName,
       note: basket.note,
       saleMode: basket.saleMode,
-      cashierId,
-      cashierName,
       registerId: basket.registerId,
       status,
+      taxEstimated,
+      taxRates: platformTaxRates,
+      cashierId,
+      cashierName,
+    });
+  }
+
+  /**
+   * Create an order from an explicit item snapshot — no basket read.
+   * Used by exchanges: the exchanged goods live in the exchange session,
+   * so the new order must be built from those items, not whatever happens
+   * to be in the live sale basket (RET-01).
+   */
+  async createOrderFromItems(items: BasketItem[], cashierId?: string, cashierName?: string): Promise<LocalOrder> {
+    if (!items || items.length === 0) {
+      throw new Error('Cannot create an order with no items');
+    }
+
+    // Totals from the snapshot — same per-item-rate rule as the basket's own
+    // calculateTotals, applied to the exchange session items.
+    const lineTotals = items.map(item => multiplyMoney(item.price, item.quantity));
+    const subtotal = sumMoney(lineTotals);
+    const tax = sumMoney(
+      items.map(item =>
+        item.taxable === false || item.taxRate === undefined ? 0 : multiplyMoney(multiplyMoney(item.price, item.quantity), item.taxRate)
+      )
+    );
+    const total = Math.max(0, roundMoney(subtotal + tax));
+
+    return this.persistOrderRecord({
+      items,
+      subtotal,
+      tax,
+      total,
+      status: 'pending',
+      cashierId,
+      cashierName,
+    });
+  }
+
+  /** Shared order-record creation: builds the local order + order_items rows. */
+  private async persistOrderRecord(params: {
+    items: BasketItem[];
+    platform?: ECommercePlatform;
+    platformOrderId?: string;
+    subtotal: number;
+    tax: number;
+    total: number;
+    discountAmount?: number;
+    discountCode?: string;
+    customerEmail?: string;
+    customerName?: string;
+    note?: string;
+    saleMode?: string;
+    registerId?: string;
+    status: LocalOrderStatus;
+    taxEstimated?: boolean;
+    taxRates?: (number | undefined)[];
+    cashierId?: string;
+    cashierName?: string;
+  }): Promise<LocalOrder> {
+    const { items, subtotal, tax, total, status, cashierId, cashierName } = params;
+    const now = Date.now();
+    const orderId = generateUUID();
+    const taxRates = params.taxRates ?? items.map(() => undefined);
+
+    const localOrder: LocalOrder = {
+      id: orderId,
+      platformOrderId: params.platformOrderId,
+      platform: params.platform,
+      items,
+      subtotal,
+      tax,
+      total,
+      discountAmount: params.discountAmount,
+      discountCode: params.discountCode,
+      customerEmail: params.customerEmail,
+      customerName: params.customerName,
+      note: params.note,
+      saleMode: params.saleMode,
+      cashierId,
+      cashierName,
+      registerId: params.registerId,
+      status,
       syncStatus: 'pending',
-      taxEstimated: taxEstimated || undefined,
+      taxEstimated: params.taxEstimated || undefined,
       createdAt: new Date(now),
       updatedAt: new Date(now),
     };
 
     const orderInput = {
       id: orderId,
-      platform: platform ?? null,
+      platform: params.platform ?? null,
       subtotal,
       tax,
       total,
-      discountAmount: basket.discountAmount ?? null,
-      discountCode: basket.discountCode ?? null,
-      customerEmail: basket.customerEmail ?? null,
-      customerName: basket.customerName ?? null,
-      note: basket.note ?? null,
-      saleMode: basket.saleMode ?? null,
+      discountAmount: params.discountAmount ?? null,
+      discountCode: params.discountCode ?? null,
+      customerEmail: params.customerEmail ?? null,
+      customerName: params.customerName ?? null,
+      note: params.note ?? null,
+      saleMode: params.saleMode ?? null,
       cashierId: cashierId ?? null,
       cashierName: cashierName ?? null,
-      registerId: basket.registerId ?? null,
-      platformOrderId: platformOrderId ?? null,
+      registerId: params.registerId ?? null,
+      platformOrderId: params.platformOrderId ?? null,
       status,
-      taxEstimated,
+      taxEstimated: params.taxEstimated ?? false,
     };
 
-    const itemInputs = basket.items.map((item, i) => ({
+    const itemInputs = items.map((item, i) => ({
       orderId,
       productId: item.productId,
       variantId: item.variantId,
@@ -181,7 +260,7 @@ export class CheckoutService implements CheckoutServiceInterface {
       quantity: item.quantity,
       image: item.image,
       taxable: item.taxable ?? false,
-      taxRate: platformTaxRates[i] ?? item.taxRate ?? null,
+      taxRate: taxRates[i] ?? item.taxRate ?? null,
       isEcommerceProduct: item.isEcommerceProduct,
       originalId: item.originalId,
       properties: item.properties,
@@ -197,8 +276,8 @@ export class CheckoutService implements CheckoutServiceInterface {
     auditLogService.log('order:created', {
       userId: cashierId,
       userName: cashierName,
-      details: `Order ${orderId} created — ${basket.items.length} item(s), total ${total.toFixed(2)}`,
-      metadata: { orderId, itemCount: basket.items.length, total },
+      details: `Order ${orderId} created — ${items.length} item(s), total ${total.toFixed(2)}`,
+      metadata: { orderId, itemCount: items.length, total },
     });
 
     return localOrder;
@@ -256,20 +335,32 @@ export class CheckoutService implements CheckoutServiceInterface {
     return order;
   }
 
-  async completePayment(orderId: string, paymentMethod: string, transactionId?: string, payments?: PaymentLine[]): Promise<CheckoutResult> {
+  async completePayment(
+    orderId: string,
+    paymentMethod: string,
+    transactionId?: string,
+    payments?: PaymentLine[],
+    options?: { preserveBasket?: boolean }
+  ): Promise<CheckoutResult> {
     // Phase 1 — durable payment record. This is the point of no return: the
     // card may already be charged, so a failure here must leave the order
     // in 'processing' (recoverable via interruption recovery), NEVER flip a
     // possibly-paid order to 'failed' (audit bug 4).
     try {
-      // Validate split tender total matches order total (spec §6.1)
-      if (payments && payments.length > 0) {
+      // Validate split tender total matches order total (spec §6.1).
+      // An explicitly-empty tender list is also validated: passing [] must
+      // never mark a positive-total order as paid (RET-02).
+      if (payments !== undefined) {
         const orderRow = await this.orderRepo.findById(orderId);
         if (orderRow) {
           const paymentSum = Math.round(payments.reduce((s, p) => s + p.amount, 0) * 100);
           const orderTotal = Math.round(orderRow.total * 100);
           if (Math.abs(paymentSum - orderTotal) > 1) {
-            throw new Error('Payment total mismatch');
+            return {
+              success: false,
+              orderId,
+              error: 'Recorded tender does not cover the order total — the order was not marked paid.',
+            };
           }
         }
         await this.orderRepo.updatePaymentLines(orderId, paymentMethod, transactionId ?? null, JSON.stringify(payments));
@@ -340,8 +431,13 @@ export class CheckoutService implements CheckoutServiceInterface {
           .catch(nonFatal('fiscal finalization'));
       }
 
-      // Only clear basket after the order is successfully recorded
-      await this.basketService.clearBasket().catch(nonFatal('basket clear'));
+      // Only clear basket after the order is successfully recorded.
+      // preserveBasket is set by flows (e.g. exchanges) whose order was not
+      // built from the live basket — clearing it would destroy an unrelated
+      // in-progress sale.
+      if (!options?.preserveBasket) {
+        await this.basketService.clearBasket().catch(nonFatal('basket clear'));
+      }
 
       // Post-payment hooks — non-blocking, must not affect checkout result
       // orderRow was already fetched above; reuse it

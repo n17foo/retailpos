@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { lightColors, spacing, typography, borderRadius, elevation } from '../../../shared/utils/theme';
-import { formatMoney, multiplyMoney } from '../../../shared/utils/money';
+import { formatMoney, multiplyMoney, toCents, toDollars } from '../../../shared/utils/money';
 import { useRefund } from '../hooks/useRefund';
 import { RefundRecord } from '../services/refunds/RefundService';
 import { Button } from '../../../shared/components/Button';
@@ -190,6 +190,11 @@ const RefundScreen: React.FC<ReturnsScreenProps> = ({ onGoBack }) => {
     }
   };
 
+  // The refundable amount for a partial quantity is the prorated share of
+  // what was actually paid for the line — discount and tax allocated (RET-03).
+  const refundableForQuantity = (item: ReturnableItem, quantity: number): number =>
+    toDollars(Math.round((toCents(item.refundableAmount) * quantity) / item.returnableQuantity));
+
   const addReturnItem = (item: ReturnableItem) => {
     setReturnItems([
       ...returnItems,
@@ -199,7 +204,7 @@ const RefundScreen: React.FC<ReturnsScreenProps> = ({ onGoBack }) => {
         variantId: item.variantId || undefined,
         productName: item.name,
         quantity: 1,
-        refundAmount: item.price,
+        refundAmount: refundableForQuantity(item, 1),
         reason: reason || undefined,
         restock: true,
       },
@@ -216,12 +221,13 @@ const RefundScreen: React.FC<ReturnsScreenProps> = ({ onGoBack }) => {
     const returnableItem = returnableItems.find(ri => ri.orderItemId === item.orderItemId);
     const maxQuantity = returnableItem?.returnableQuantity || 1;
     const clampedQty = Math.min(Math.max(1, quantity), maxQuantity);
-    const unitPrice = returnableItem?.price ?? item.refundAmount / item.quantity;
 
     newItems[index] = {
       ...item,
       quantity: clampedQty,
-      refundAmount: multiplyMoney(unitPrice, clampedQty),
+      refundAmount: returnableItem
+        ? refundableForQuantity(returnableItem, clampedQty)
+        : multiplyMoney(item.refundAmount / item.quantity, clampedQty),
     };
     setReturnItems(newItems);
   };

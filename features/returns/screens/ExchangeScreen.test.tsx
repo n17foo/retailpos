@@ -11,6 +11,24 @@ jest.mock('../../authentication/contexts/AuthProvider', () => ({
   useAuthContext: () => ({ user: { id: 'u1', username: 'Admin', role: 'admin' } }),
 }));
 
+jest.mock('../../authentication/hooks/useManagerApproval', () => ({
+  useManagerApproval: () => ({
+    requestApprovalDetailed: jest.fn().mockResolvedValue({ approved: true }),
+    isApproving: false,
+  }),
+}));
+
+jest.mock('../../platform-clients/hooks/useActivePlatform', () => ({
+  useActivePlatform: () => ({ platform: null, isResolved: true }),
+}));
+
+jest.mock('../../catalogue/hooks/useProducts', () => ({
+  useProductsForDisplay: () => ({
+    products: [{ id: 'prod-1', name: 'Green Tea', price: 5, sku: 'GT-1', variantId: 'v1' }],
+    isLoading: false,
+  }),
+}));
+
 const mockGetReturnableItems = jest.fn().mockResolvedValue([
   {
     orderItemId: 'oi-1',
@@ -18,6 +36,7 @@ const mockGetReturnableItems = jest.fn().mockResolvedValue([
     variantId: null,
     name: 'Ceramic Mug',
     price: 10,
+    refundableAmount: 20,
     originalQuantity: 2,
     returnedQuantity: 0,
     returnableQuantity: 2,
