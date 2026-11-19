@@ -1,4 +1,5 @@
 import { KeyValueRepository } from '../../../shared/repositories/KeyValueRepository';
+import { withKeyedLock } from '../../../shared/utils/keyedLock';
 import { InventoryUpdate } from './InventoryServiceInterface';
 
 const STORAGE_KEY = 'inventory:pendingUpdates';
@@ -38,23 +39,29 @@ export class PendingInventoryStore {
    * Queue failed updates. Absolute (`adjustment:false`) writes coalesce per
    * item — the latest target quantity wins. Deltas append (each represents a
    * distinct intended change).
+   *
+   * The queue is one JSON value, so the read-modify-write must be
+   * serialized — parallel adds used to overwrite each other and lose
+   * updates permanently (INV-02).
    */
   async add(platform: string, updates: InventoryUpdate[]): Promise<void> {
     if (updates.length === 0) return;
-    const all = await this.readAll();
-    for (const update of updates) {
-      if (update.adjustment === false) {
-        // Latest absolute value wins for the same item
-        const key = this.updateKey(update);
-        for (let i = all.length - 1; i >= 0; i--) {
-          if (all[i].platform === platform && all[i].update.adjustment === false && this.updateKey(all[i].update) === key) {
-            all.splice(i, 1);
+    await withKeyedLock('pending-inventory', async () => {
+      const all = await this.readAll();
+      for (const update of updates) {
+        if (update.adjustment === false) {
+          // Latest absolute value wins for the same item
+          const key = this.updateKey(update);
+          for (let i = all.length - 1; i >= 0; i--) {
+            if (all[i].platform === platform && all[i].update.adjustment === false && this.updateKey(all[i].update) === key) {
+              all.splice(i, 1);
+            }
           }
         }
+        all.push({ platform, update, queuedAt: Date.now() });
       }
-      all.push({ platform, update, queuedAt: Date.now() });
-    }
-    await this.writeAll(all);
+      await this.writeAll(all);
+    });
   }
 
   async list(platform: string): Promise<PendingInventoryUpdate[]> {
@@ -62,11 +69,13 @@ export class PendingInventoryStore {
   }
 
   async remove(platform: string, entries: PendingInventoryUpdate[]): Promise<void> {
-    const drop = new Set(entries.map(e => `${e.platform}::${e.queuedAt}::${this.updateKey(e.update)}::${e.update.quantity}`));
-    const remaining = (await this.readAll()).filter(
-      e => !drop.has(`${e.platform}::${e.queuedAt}::${this.updateKey(e.update)}::${e.update.quantity}`)
-    );
-    await this.writeAll(remaining);
+    await withKeyedLock('pending-inventory', async () => {
+      const drop = new Set(entries.map(e => `${e.platform}::${e.queuedAt}::${this.updateKey(e.update)}::${e.update.quantity}`));
+      const remaining = (await this.readAll()).filter(
+        e => !drop.has(`${e.platform}::${e.queuedAt}::${this.updateKey(e.update)}::${e.update.quantity}`)
+      );
+      await this.writeAll(remaining);
+    });
   }
 
   async count(platform: string): Promise<number> {
