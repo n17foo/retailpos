@@ -1,6 +1,7 @@
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
 import { AbstractPrinterService } from './BasePrinterService';
 import { PrinterStatus, ReceiptData } from './PrinterTypes';
+import { getCommandSet } from './PrinterCommandSets';
 import { receiptConfigService } from './ReceiptConfigService';
 
 /**
@@ -233,8 +234,9 @@ export class UnifiedPrinterService extends AbstractPrinterService {
         await printer.addTextAlign(ALIGN_LEFT);
         await print(`${divider}\n`);
 
-        // Order info
-        await print(`Order #: ${data.orderId}\n`);
+        // Order info — the fiscal number is the legal document reference
+        // when the fiscal module produced one (docs/features/fiscal).
+        await print(`Order #: ${data.fiscalNumber ?? data.orderId}\n`);
         await print(`Date: ${data.date.toLocaleString()}\n`);
         await print(`Cashier: ${data.cashierName}\n`);
 
@@ -301,6 +303,17 @@ export class UnifiedPrinterService extends AbstractPrinterService {
         } else {
           // Single payment method
           await print(`Payment Method: ${data.paymentMethod}\n\n`);
+        }
+
+        // Fiscal QR — legally required on e.g. ES record-mode receipts
+        // (ValidarQR). Emitted as raw ESC/POS so any model with the
+        // standard QR function prints it.
+        if (data.fiscalQr) {
+          const qr = getCommandSet('epson').QR_CODE;
+          if (qr) {
+            await printer.addTextAlign(ALIGN_CENTER);
+            await printer.addCommand(new Uint8Array(qr(data.fiscalQr)));
+          }
         }
 
         // Footer — driven by ReceiptConfigService

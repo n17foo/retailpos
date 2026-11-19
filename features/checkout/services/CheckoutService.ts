@@ -20,6 +20,7 @@ import { DiscountServiceFactory } from '../../discounts/services/DiscountService
 import { procurementService } from '../../procurement/services/ProcurementService';
 import { InventoryServiceFactory } from '../../inventory/services/InventoryServiceFactory';
 import { isRetryableTransportError } from '../../../shared/utils/apiErrors';
+import { getFiscalService } from '../../fiscal/services/FiscalServiceFactory';
 
 /**
  * Handles checkout flow and order queries.
@@ -221,6 +222,13 @@ export class CheckoutService implements CheckoutServiceInterface {
       }
     }
 
+    // Fiscalized orders are immutable — a fiscal record already exists,
+    // so this is a void/return correction, not a draft delete (fiscal R4).
+    const row = await this.orderRepo.findById(orderId);
+    if (row?.fiscal_status && row.fiscal_status !== 'unfinalized') {
+      throw new Error(`Order ${orderId} is fiscalized — it cannot be deleted; issue a void or return instead`);
+    }
+
     // Always remove the local draft row
     await this.orderRepo.delete(orderId);
   }
@@ -281,6 +289,8 @@ export class CheckoutService implements CheckoutServiceInterface {
     // payment is durably recorded as 'paid', so failures are logged and
     // reported as warnings, never a status flip (audit bug 4).
     const warnings: string[] = [];
+    let fiscalNumber: string | undefined;
+    let fiscalQr: string | undefined;
     const nonFatal = (label: string) => (error: unknown) => {
       warnings.push(label);
       this.logger.warn(
@@ -310,6 +320,24 @@ export class CheckoutService implements CheckoutServiceInterface {
             warnings.push('platform order completion');
           }
         }
+      }
+
+      // Fiscal finalization — part of the durable post-payment phase. On
+      // failure the order stays 'unfinalized' and retryable: strict mode
+      // means we never pretend the record exists, never that we roll the
+      // charge back (docs/features/fiscal R2/R5).
+      if (posConfig.values.fiscalEnabled) {
+        await getFiscalService()
+          .finalizeSale(orderId)
+          .then(record => {
+            fiscalNumber = record.number;
+            fiscalQr = record.authorityQr;
+            auditLogService.log('fiscal:finalized', {
+              details: `Order ${orderId} fiscalized as ${record.number}`,
+              metadata: { orderId, fiscalRecordId: record.id, number: record.number, seq: record.seq },
+            });
+          })
+          .catch(nonFatal('fiscal finalization'));
       }
 
       // Only clear basket after the order is successfully recorded
@@ -347,6 +375,8 @@ export class CheckoutService implements CheckoutServiceInterface {
         success: true,
         orderId,
         openDrawer,
+        fiscalNumber,
+        fiscalQr,
         warning: warnings.length > 0 ? `Payment recorded; deferred step(s) failed: ${warnings.join(', ')}` : undefined,
       };
     } catch (error) {
@@ -356,12 +386,34 @@ export class CheckoutService implements CheckoutServiceInterface {
       return {
         success: true,
         orderId,
+        fiscalNumber,
+        fiscalQr,
         warning: `Payment recorded; a post-payment step failed: ${(error as Error).message}`,
       };
     }
   }
 
   async cancelOrder(orderId: string): Promise<void> {
+    // A fiscalized sale is cancelled through a chained 'void' record —
+    // the ledger never erases (fiscal R4). Best-effort: the cancel still
+    // happens if the record can't be chained right now.
+    const row = await this.orderRepo.findById(orderId);
+    if (posConfig.values.fiscalEnabled && row?.fiscal_status === 'fiscalized') {
+      await getFiscalService()
+        .voidOrder(orderId, 'cancelled')
+        .then(record => {
+          auditLogService.log('fiscal:voided', {
+            details: `Order ${orderId} voided as fiscal record ${record.number}`,
+            metadata: { orderId, fiscalRecordId: record.id, number: record.number },
+          });
+        })
+        .catch(err => {
+          this.logger.warn(
+            { message: `Fiscal void record failed for order ${orderId} — reissue required` },
+            err instanceof Error ? err : new Error(String(err))
+          );
+        });
+    }
     await this.orderRepo.updateStatus(orderId, 'cancelled');
     auditLogService.log('order:cancelled', {
       details: `Order ${orderId} cancelled`,
@@ -430,6 +482,8 @@ export class CheckoutService implements CheckoutServiceInterface {
       status: row.status as LocalOrderStatus,
       syncStatus: row.sync_status as 'pending' | 'synced' | 'failed',
       taxEstimated: row.tax_estimated === 1 ? true : undefined,
+      fiscalNumber: row.fiscal_number ?? undefined,
+      fiscalStatus: row.fiscal_status ?? undefined,
       syncError: row.sync_error ?? undefined,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),

@@ -58,6 +58,10 @@ export interface LocalOrder {
   syncError?: string;
   /** Tax computed from last-known local rates — the platform could not be reached. */
   taxEstimated?: boolean;
+  /** Legal invoice number allocated at fiscalization, e.g. N17-A-000123. */
+  fiscalNumber?: string;
+  /** 'unfinalized' | 'fiscalized' | 'voided' — absent when the module is off or the sale predates it. */
+  fiscalStatus?: string;
   registerId?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -77,6 +81,9 @@ export interface CheckoutResult {
   warning?: string;
   /** Signals the UI to open the cash drawer (true when payment method is cash) */
   openDrawer?: boolean;
+  /** Legal invoice number allocated during this checkout, when the fiscal module is on. */
+  fiscalNumber?: string;
+  fiscalQr?: string;
   payments?: PaymentLine[];
 }
 

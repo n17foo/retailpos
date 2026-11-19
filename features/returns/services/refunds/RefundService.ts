@@ -18,6 +18,8 @@ import { OfflineRefundService } from './platforms/OfflineRefundService';
 import { COUNTED_RETURN_STATUSES, validateReturnRequest } from './returnValidation';
 import { addMoney } from '../../../../shared/utils/money';
 import { withKeyedLock } from '../../../../shared/utils/keyedLock';
+import { posConfig } from '../../../platform-clients/services/config/POSConfigService';
+import { getFiscalService } from '../../../fiscal/services/FiscalServiceFactory';
 
 export interface ReturnItem {
   id: string;
@@ -211,6 +213,27 @@ export class ReturnService {
       const { order, returnIds, totalRefund } = settled;
 
       this.logger.info(`Processed return for order ${input.orderId}: ${returnIds.length} item(s), refund ${totalRefund.toFixed(2)}`);
+
+      // Fiscal correction — one chained 'return' record per return row.
+      // Best-effort like the platform refund: the return already happened,
+      // a missing record is logged + audited for reissue (fiscal R6).
+      if (posConfig.values.fiscalEnabled) {
+        for (const returnId of returnIds) {
+          try {
+            const record = await getFiscalService().registerReturn(returnId, input.orderId);
+            auditLogService.log('fiscal:return', {
+              userId: input.processedBy,
+              details: `Return ${returnId} chained as fiscal record ${record.number} for order ${input.orderId}`,
+              metadata: { orderId: input.orderId, returnId, fiscalRecordId: record.id, number: record.number },
+            });
+          } catch (err) {
+            this.logger.warn(
+              { message: `Fiscal return record failed for ${returnId} — reissue required` },
+              err instanceof Error ? err : new Error(String(err))
+            );
+          }
+        }
+      }
 
       // Optionally trigger a monetary refund via the platform refund service
       let refundId: string | undefined;

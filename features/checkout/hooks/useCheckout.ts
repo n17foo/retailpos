@@ -320,6 +320,8 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
               printerFactory
                 .printReceipt({
                   orderId: order.id.slice(-8),
+                  fiscalNumber: result.fiscalNumber,
+                  fiscalQr: result.fiscalQr,
                   items: order.items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
                   subtotal,
                   tax,
@@ -456,6 +458,8 @@ export function useCheckout({ platform, onSuccess }: UseCheckoutOptions = {}) {
                 printerFactory
                   .printReceipt({
                     orderId: order.id.slice(-8),
+                    fiscalNumber: result.fiscalNumber,
+                    fiscalQr: result.fiscalQr,
                     items: order.items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
                     subtotal,
                     tax,

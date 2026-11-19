@@ -141,6 +141,12 @@ export class OfflineOrderRepository implements OrderRepository {
   // ── Delete ────────────────────────────────────────────────────────────
 
   async delete(orderId: string): Promise<void> {
+    // Fiscalized rows are immutable — void/return records correct them,
+    // they can never be deleted (docs/features/fiscal R4).
+    const row = await db.getFirstAsync<{ fiscal_status: string | null }>('SELECT fiscal_status FROM orders WHERE id = ?', [orderId]);
+    if (row?.fiscal_status && row.fiscal_status !== 'unfinalized') {
+      throw new Error(`Order ${orderId} has a fiscal record (${row.fiscal_status}) — use a void/return correction, not delete`);
+    }
     await db.runAsync('DELETE FROM orders WHERE id = ?', [orderId]);
   }
 }

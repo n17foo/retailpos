@@ -88,6 +88,7 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = () => {
     try {
       const receiptData = {
         orderId: selectedOrder.id.slice(-8),
+        fiscalNumber: selectedOrder.fiscalNumber,
         items: selectedOrder.items.map(item => ({ name: item.name, quantity: item.quantity, price: item.price })),
         subtotal: selectedOrder.subtotal,
         tax: selectedOrder.tax,

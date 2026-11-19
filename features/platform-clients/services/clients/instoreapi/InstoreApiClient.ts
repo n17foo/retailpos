@@ -9,6 +9,47 @@ import { TaxProfileRow } from '../../../repositories/TaxProfileRepository';
 import { ReturnRow, CreateReturnInput } from '../../../../returns/repositories/ReturnRepository';
 import { Category } from '../../../../catalogue/services/category/CategoryServiceInterface';
 import { ApiError, RequestTimeoutError } from '../../../../../shared/utils/apiErrors';
+import type {
+  FiscalRecord,
+  FiscalRecordType,
+  ChainVerification,
+  ShiftFiscalSummary,
+} from '../../../../fiscal/services/FiscalServiceInterface';
+
+/** Server row shape — /api/fiscal/* responses (snake_case, like orders). */
+export interface InstoreApiFiscalRecordRow {
+  id: string;
+  chain_id: string;
+  seq: number;
+  number: string;
+  type: FiscalRecordType;
+  order_id: string | null;
+  return_id: string | null;
+  shift_id: string | null;
+  register_id: string | null;
+  payload_json: string;
+  prev_hash: string;
+  hash: string;
+  created_at: number;
+}
+
+function mapFiscalRecord(row: InstoreApiFiscalRecordRow): FiscalRecord {
+  return {
+    id: row.id,
+    chainId: row.chain_id,
+    seq: row.seq,
+    number: row.number,
+    type: row.type,
+    orderId: row.order_id,
+    returnId: row.return_id,
+    shiftId: row.shift_id,
+    registerId: row.register_id,
+    payloadJson: row.payload_json,
+    prevHash: row.prev_hash,
+    hash: row.hash,
+    createdAt: row.created_at,
+  };
+}
 
 export interface InstoreApiHealthResponse {
   ok: boolean;
@@ -553,6 +594,45 @@ export class InstoreApiClient {
       closingCash: closingCash ?? 0,
     });
     return result.shift;
+  }
+
+  // ── Fiscal chain (docs/features/fiscal) ───────────────────────────
+  //
+  // The Store API owns the fiscal chain in client mode — it allocates
+  // numbers atomically so concurrent registers can't collide.
+
+  async fiscalFinalize(orderId: string): Promise<FiscalRecord> {
+    const result = await this.post<{ record: InstoreApiFiscalRecordRow }>('/api/fiscal/finalize', { orderId });
+    return mapFiscalRecord(result.record);
+  }
+
+  async fiscalVoid(orderId: string, reason: string): Promise<FiscalRecord> {
+    const result = await this.post<{ record: InstoreApiFiscalRecordRow }>(`/api/fiscal/orders/${orderId}/void`, { reason });
+    return mapFiscalRecord(result.record);
+  }
+
+  async fiscalReturn(returnId: string, orderId: string): Promise<FiscalRecord> {
+    const result = await this.post<{ record: InstoreApiFiscalRecordRow }>('/api/fiscal/returns', { returnId, orderId });
+    return mapFiscalRecord(result.record);
+  }
+
+  async fiscalCloseShift(summary: ShiftFiscalSummary): Promise<FiscalRecord> {
+    const result = await this.post<{ record: InstoreApiFiscalRecordRow }>('/api/fiscal/shifts/close', summary);
+    return mapFiscalRecord(result.record);
+  }
+
+  async getFiscalRecord(orderId: string): Promise<FiscalRecord | null> {
+    try {
+      const result = await this.get<{ record: InstoreApiFiscalRecordRow }>(`/api/fiscal/orders/${orderId}`);
+      return mapFiscalRecord(result.record);
+    } catch {
+      return null;
+    }
+  }
+
+  async verifyFiscalChain(fromSeq?: number): Promise<ChainVerification> {
+    const params = fromSeq !== undefined ? { fromSeq: String(fromSeq) } : undefined;
+    return this.get<ChainVerification>('/api/fiscal/verify', params);
   }
 
   // ── Generic HTTP helpers ──────────────────────────────────────────
