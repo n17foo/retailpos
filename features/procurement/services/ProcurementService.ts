@@ -22,6 +22,8 @@ import { notificationService } from '../../../shared/services/notifications/Noti
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
 import { ECommercePlatform } from '../../../shared/utils/platforms';
 import { getPlatformCapabilities } from '../../../shared/utils/platformCapabilities';
+import { db } from '../../../shared/utils/db';
+import { withKeyedLock } from '../../../shared/utils/keyedLock';
 
 export interface ReceiveLineInput {
   itemId: string;
@@ -102,65 +104,101 @@ export class ProcurementService {
 
   /**
    * Receive goods against a purchase order.
-   * Increments received quantities and pushes stock adjustments to the platform.
+   * Validates PO state, line membership and quantities BEFORE writing, then
+   * commits all increments and the status transition atomically (PRO-01).
+   * Over-receiving is rejected — a retried/duplicated receive therefore
+   * fails closed instead of crediting stock twice.
    */
   async receivePO(poId: string, lines: ReceiveLineInput[], platform: ECommercePlatform, receivedBy?: string): Promise<ReceiveResult> {
     try {
-      const items = await procurementRepository.findPOItems(poId);
+      // Serialize per PO — concurrent receives must not double-credit.
+      return await withKeyedLock(`po:${poId}`, async () => {
+        const po = await procurementRepository.findPOById(poId);
+        if (!po) throw new Error(`Purchase order ${poId} not found`);
+        // Lifecycle check — only a submitted PO may receive.
+        if (po.status !== 'ordered' && po.status !== 'partially_received') {
+          throw new Error(`Purchase order ${poId} is '${po.status}' — it cannot receive goods`);
+        }
 
-      // Increment received quantities
-      for (const line of lines) {
-        if (line.receiveNow <= 0) continue;
-        await procurementRepository.incrementReceivedQty(line.itemId, line.receiveNow);
-      }
+        const items = await procurementRepository.findPOItems(poId);
+        const itemsById = new Map(items.map(i => [i.id, i]));
 
-      // Push stock adjustments to platform (gated on inventory capability).
-      // Local receipt stays committed on failure — the physical goods are
-      // received regardless — and RetryingInventoryService has already
-      // persisted the batch to the pending queue for replay, so the failure
-      // is surfaced as platformSyncPending rather than aborting the receive.
-      let platformSyncPending = false;
-      const capabilities = getPlatformCapabilities(platform);
-      if (capabilities.inventory !== 'not_recommended') {
-        const inventoryService = InventoryServiceFactory.getInstance().getService(platform);
-        const updates = lines
-          .filter(l => l.receiveNow > 0)
-          .map(line => {
-            const item = items.find(i => i.id === line.itemId);
-            return item
-              ? { productId: item.product_id, variantId: item.variant_id ?? undefined, quantity: line.receiveNow, adjustment: true }
-              : null;
-          })
-          .filter((u): u is NonNullable<typeof u> => u !== null);
+        // Validate every line BEFORE any write: the line must belong to this
+        // PO, the quantity must be a finite positive number, and receiving
+        // must not exceed what is still outstanding (explicit no-over-receive
+        // policy — PRO-01).
+        const validated: { item: PurchaseOrderItemRow; qty: number }[] = [];
+        for (const line of lines) {
+          if (line.receiveNow <= 0) continue;
+          if (!Number.isFinite(line.receiveNow)) {
+            throw new Error(`Invalid receive quantity ${line.receiveNow} for line ${line.itemId}`);
+          }
+          const item = itemsById.get(line.itemId);
+          if (!item) {
+            throw new Error(`Line ${line.itemId} does not belong to purchase order ${poId}`);
+          }
+          const remaining = item.ordered_qty - item.received_qty;
+          if (line.receiveNow > remaining) {
+            throw new Error(`Receiving ${line.receiveNow} of '${item.product_name}' exceeds the ${remaining} remaining on PO ${poId}`);
+          }
+          validated.push({ item, qty: line.receiveNow });
+        }
+        if (validated.length === 0) {
+          throw new Error('Nothing to receive — no valid lines supplied');
+        }
 
-        if (updates.length > 0) {
-          try {
-            const result = await inventoryService.updateInventory(updates);
-            platformSyncPending = result.failed > 0;
-          } catch (err) {
-            platformSyncPending = true;
-            this.logger.warn({ message: `Inventory push failed for PO ${poId}: ${err instanceof Error ? err.message : String(err)}` });
+        // Commit the local receipt atomically — increments and the status
+        // transition succeed or roll back together.
+        const outcome: { newStatus: 'partially_received' | 'received' } = { newStatus: 'partially_received' };
+        await db.withTransactionAsync(async () => {
+          for (const { item, qty } of validated) {
+            await procurementRepository.incrementReceivedQty(item.id, qty);
+          }
+          const updatedItems = await procurementRepository.findPOItems(poId);
+          outcome.newStatus = updatedItems.every(i => i.received_qty >= i.ordered_qty) ? 'received' : 'partially_received';
+          await procurementRepository.updatePOStatus(poId, outcome.newStatus);
+        });
+        const newStatus = outcome.newStatus;
+
+        // Push stock adjustments to platform (gated on inventory capability).
+        // Local receipt stays committed on failure — the physical goods are
+        // received regardless — and RetryingInventoryService has already
+        // persisted the batch to the pending queue for replay, so the failure
+        // is surfaced as platformSyncPending rather than aborting the receive.
+        let platformSyncPending = false;
+        const capabilities = getPlatformCapabilities(platform);
+        if (capabilities.inventory !== 'not_recommended') {
+          const inventoryService = InventoryServiceFactory.getInstance().getService(platform);
+          const updates = validated.map(({ item, qty }) => ({
+            productId: item.product_id,
+            variantId: item.variant_id ?? undefined,
+            quantity: qty,
+            adjustment: true,
+          }));
+
+          if (updates.length > 0) {
+            try {
+              const result = await inventoryService.updateInventory(updates);
+              platformSyncPending = result.failed > 0;
+            } catch (err) {
+              platformSyncPending = true;
+              this.logger.warn({ message: `Inventory push failed for PO ${poId}: ${err instanceof Error ? err.message : String(err)}` });
+            }
           }
         }
-      }
 
-      // Determine new PO status
-      const updatedItems = await procurementRepository.findPOItems(poId);
-      const allReceived = updatedItems.every(i => i.received_qty >= i.ordered_qty);
-      const newStatus = allReceived ? 'received' : 'partially_received';
-      await procurementRepository.updatePOStatus(poId, newStatus);
+        await auditLogService.log('purchase_order:received', {
+          userId: receivedBy,
+          details: `Purchase order ${poId} receiving: ${validated.length} line(s) — status: ${newStatus}`,
+          metadata: { poId, newStatus, lines, platformSyncPending },
+        });
 
-      await auditLogService.log('purchase_order:received', {
-        userId: receivedBy,
-        details: `Purchase order ${poId} receiving: ${lines.length} line(s) — status: ${newStatus}`,
-        metadata: { poId, newStatus, lines, platformSyncPending },
+        if (newStatus === 'received') {
+          notificationService.notify('Purchase Order Received', `PO ${poId.slice(-8)} fully received`, 'info');
+        }
+
+        return { success: true, newStatus, platformSyncPending };
       });
-
-      if (newStatus === 'received') {
-        notificationService.notify('Purchase Order Received', `PO ${poId.slice(-8)} fully received`, 'info');
-      }
-
-      return { success: true, newStatus, platformSyncPending };
     } catch (err) {
       this.logger.error({ message: `Failed to receive PO ${poId}` }, err instanceof Error ? err : new Error(String(err)));
       return { success: false, newStatus: 'partially_received', error: err instanceof Error ? err.message : 'Receiving failed' };
