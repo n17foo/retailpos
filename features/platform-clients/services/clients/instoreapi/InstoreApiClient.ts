@@ -302,6 +302,7 @@ export class InstoreApiClient {
     order_id?: string | null;
     reason?: string | null;
     created_by?: string | null;
+    reverses_id?: string | null;
   }): Promise<{ transaction: unknown; account: unknown }> {
     return this.post('/api/loyalty/transactions', input);
   }
@@ -347,6 +348,7 @@ export class InstoreApiClient {
     order_id?: string | null;
     reason?: string | null;
     created_by?: string | null;
+    reverses_id?: string | null;
   }): Promise<unknown> {
     const result = await this.post<{ entry: unknown }>('/api/store-credit', input);
     return result.entry;

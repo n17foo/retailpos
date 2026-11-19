@@ -23,6 +23,7 @@ import { auditLogService } from '../../../../shared/services/audit/AuditLogServi
 import { notificationService } from '../../../../shared/services/notifications/NotificationService';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
 import { toCents, toDollars } from '../../../../shared/utils/money';
+import { withKeyedLock } from '../../../../shared/utils/keyedLock';
 
 export interface LoyaltyConfig {
   enabled: boolean;
@@ -163,28 +164,36 @@ export class LoyaltyService {
    */
   async redeemPoints(email: string, orderId: string, pointsToRedeem: number): Promise<{ transactionId: string; discountDollars: number }> {
     const config = await this.getConfig();
-    const account = await getLoyaltyRepository().getOrCreateAccount(email);
 
-    const clamped = Math.min(pointsToRedeem, account.balance);
-    if (clamped <= 0) throw new Error('Insufficient loyalty points balance');
+    return withKeyedLock(`loyalty:${email.toLowerCase()}`, async () => {
+      const account = await getLoyaltyRepository().getOrCreateAccount(email);
 
-    let txId: string;
-    try {
-      txId = await getLoyaltyRepository().applyTransaction(email, 'redeem', -clamped, orderId, 'Points redemption');
-    } catch (err) {
-      // A parallel register may have spent the points between read and write.
-      throw new Error('Insufficient loyalty points balance', { cause: err });
-    }
+      const clamped = Math.min(pointsToRedeem, account.balance);
+      if (clamped <= 0) throw new Error('Insufficient loyalty points balance');
 
-    const discountCents = clamped * config.redeemRate;
-    const discountDollars = toDollars(discountCents);
+      let txId: string;
+      try {
+        // The balance debit is guarded inside the transaction — a
+        // concurrent redemption can no longer overdraw the account (CUS-02/04).
+        txId = await getLoyaltyRepository().applyTransaction(email, 'redeem', -clamped, orderId, 'Points redemption');
+      } catch (err) {
+        // A parallel register may have spent the points between read and write.
+        throw new Error('Insufficient loyalty points balance', { cause: err });
+      }
 
-    this.logger.info(`Redeemed ${clamped} points for ${email} — discount ${discountDollars}`);
-    return { transactionId: txId, discountDollars };
+      const discountCents = clamped * config.redeemRate;
+      const discountDollars = toDollars(discountCents);
+
+      this.logger.info(`Redeemed ${clamped} points for ${email} — discount ${discountDollars}`);
+      return { transactionId: txId, discountDollars };
+    });
   }
 
   /**
    * Reverse a redemption (e.g. basket cleared after redeeming).
+   * Idempotent — the reversal carries reverses_id and the ledger enforces at
+   * most one reversal per redemption, so a repeated call restores nothing
+   * extra (CUS-01).
    */
   async reverseRedemption(transactionId: string): Promise<void> {
     try {
@@ -197,10 +206,18 @@ export class LoyaltyService {
         'reversal',
         restoredPoints,
         tx.order_id,
-        `Reversal of ${transactionId}`
+        `Reversal of ${transactionId}`,
+        'system',
+        transactionId
       );
       this.logger.info(`Reversed redemption ${transactionId} — restored ${restoredPoints} points`);
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('UNIQUE constraint failed')) {
+        // Already reversed — duplicate callback/retry; nothing to restore.
+        this.logger.info(`Loyalty redemption ${transactionId} already reversed — no-op`);
+        return;
+      }
       this.logger.error({ message: `Failed to reverse redemption ${transactionId}` }, err instanceof Error ? err : new Error(String(err)));
       notificationService.notify('Loyalty Warning', `Failed to reverse points redemption — manual review required`, 'warning');
     }
@@ -262,40 +279,27 @@ export class LoyaltyService {
 
       for (const customerEmail of customers) {
         try {
-          // Get expired transactions for this customer
-          const expiredTransactions = await getLoyaltyRepository().findExpiredEarnTransactions(customerEmail, expiryThreshold);
-
-          if (expiredTransactions.length === 0) continue;
-
-          // Calculate total points to expire
-          const pointsToExpire = expiredTransactions.reduce((sum, tx) => sum + tx.points, 0);
-
-          if (pointsToExpire <= 0) continue;
-
-          // Get current balance to ensure we don't expire more than available
-          const account = await getLoyaltyRepository().getOrCreateAccount(customerEmail);
-          const actualPointsToExpire = Math.min(pointsToExpire, account.balance);
-
-          if (actualPointsToExpire <= 0) continue;
-
-          // Create expiry transaction
-          await getLoyaltyRepository().applyTransaction(
-            customerEmail,
-            'expire',
-            -actualPointsToExpire,
-            null,
-            `Points expired after ${config.expiryDays} days`,
-            'system'
+          // Lot-aware expiry — only the unexpired remainder of old earn lots
+          // is consumed; a repeated pass finds nothing (CUS-05).
+          const expireLots = getLoyaltyRepository().expireLots;
+          if (!expireLots) {
+            this.logger.warn({ message: 'Points expiry is not supported by the active loyalty ledger' });
+            break;
+          }
+          const expired = await withKeyedLock(`loyalty:${customerEmail}`, () =>
+            expireLots.call(getLoyaltyRepository(), customerEmail, expiryThreshold, `Points expired after ${config.expiryDays} days`)
           );
+          const actualPointsToExpire = expired.pointsExpired;
+          if (actualPointsToExpire <= 0) continue;
 
           // Log the expiry
           await auditLogService.log('loyalty:expired', {
             userId: 'system',
-            details: `Expired ${actualPointsToExpire} points for ${customerEmail} (${expiredTransactions.length} transactions older than ${config.expiryDays} days)`,
+            details: `Expired ${actualPointsToExpire} points for ${customerEmail} (${expired.lotsProcessed} lots older than ${config.expiryDays} days)`,
             metadata: {
               email: customerEmail,
               pointsExpired: actualPointsToExpire,
-              transactionCount: expiredTransactions.length,
+              transactionCount: expired.lotsProcessed,
               expiryDays: config.expiryDays,
             },
           });
@@ -303,7 +307,7 @@ export class LoyaltyService {
           customersProcessed++;
           totalPointsExpired += actualPointsToExpire;
 
-          this.logger.info(`Expired ${actualPointsToExpire} points for ${customerEmail} (${expiredTransactions.length} transactions)`);
+          this.logger.info(`Expired ${actualPointsToExpire} points for ${customerEmail} (${expired.lotsProcessed} lots)`);
         } catch (err) {
           this.logger.error(
             { message: `Failed to expire points for ${customerEmail}` },

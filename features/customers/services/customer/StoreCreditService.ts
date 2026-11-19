@@ -15,6 +15,7 @@ import { keyValueRepository } from '../../../../shared/repositories/KeyValueRepo
 import { auditLogService } from '../../../../shared/services/audit/AuditLogService';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
 import { toDollars } from '../../../../shared/utils/money';
+import { withKeyedLock } from '../../../../shared/utils/keyedLock';
 
 const CONFIG_KEY = 'storeCredit.enabled';
 
@@ -53,7 +54,7 @@ export class StoreCreditService {
   // ── Issue ─────────────────────────────────────────────────────────────
 
   async issue(email: string, amountCents: number, reason: string, issuedBy?: string): Promise<string> {
-    if (amountCents <= 0) throw new Error('Issue amount must be positive');
+    if (!Number.isFinite(amountCents) || amountCents <= 0) throw new Error('Issue amount must be a finite positive number');
 
     const entryId = await getStoreCreditRepository().appendEntry(email, 'issue', amountCents, null, reason, issuedBy);
 
@@ -72,37 +73,39 @@ export class StoreCreditService {
   /**
    * Redeem store credit. Clamps to available balance.
    * Returns the actual amount redeemed in cents.
+   *
+   * The balance check and the debit are one serialized transaction — two
+   * concurrent redemptions can never both pass the check (CUS-02).
    */
   async redeem(
     email: string,
     orderId: string,
     requestedCents: number
   ): Promise<{ entryId: string; redeemedCents: number; discountDollars: number }> {
-    const balance = await this.getBalanceCents(email);
-    const redeemedCents = Math.min(requestedCents, balance);
-
-    if (redeemedCents <= 0) throw new Error('Insufficient store credit balance');
-
-    let entryId: string;
     try {
-      entryId = await getStoreCreditRepository().appendEntry(email, 'redeem', -redeemedCents, orderId, 'Store credit redemption');
+      const { entryId, redeemedCents } = await withKeyedLock(`store_credit:${email.toLowerCase()}`, () =>
+        getStoreCreditRepository().redeemIfSufficient(email, requestedCents, orderId)
+      );
+
+      await auditLogService.log('store_credit:redeemed', {
+        details: `Store credit redeemed by ${email}: ${toDollars(redeemedCents).toFixed(2)} on order ${orderId}`,
+        metadata: { email, redeemedCents, orderId, entryId },
+      });
+
+      return { entryId, redeemedCents, discountDollars: toDollars(redeemedCents) };
     } catch (err) {
-      // Another register may have consumed the balance between the read and
-      // the write — the server rejects the overdraw; surface it as the same
-      // insufficient-balance failure the local path raises.
+      // Balance rechecked inside the transaction — a concurrent debit means
+      // the request now overdraws; surface the same failure the pre-check
+      // used to raise.
       throw new Error('Insufficient store credit balance', { cause: err });
     }
-
-    await auditLogService.log('store_credit:redeemed', {
-      details: `Store credit redeemed by ${email}: ${toDollars(redeemedCents).toFixed(2)} on order ${orderId}`,
-      metadata: { email, redeemedCents, orderId, entryId },
-    });
-
-    return { entryId, redeemedCents, discountDollars: toDollars(redeemedCents) };
   }
 
   /**
    * Reverse a redemption (e.g. basket cleared after redeeming).
+   * Idempotent — the reversal row carries reverses_id and the ledger enforces
+   * at most one reversal per redemption, so a repeated call cannot restore
+   * the credit twice (CUS-01).
    */
   async reverseRedemption(entryId: string): Promise<void> {
     try {
@@ -115,10 +118,18 @@ export class StoreCreditService {
         'reversal',
         restoredCents,
         entry.order_id,
-        `Reversal of ${entryId}`
+        `Reversal of ${entryId}`,
+        null,
+        entryId
       );
       this.logger.info(`Reversed store credit redemption ${entryId} — restored ${restoredCents}¢`);
     } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (message.includes('UNIQUE constraint failed')) {
+        // Already reversed — duplicate callback/retry; nothing to restore.
+        this.logger.info(`Store credit redemption ${entryId} already reversed — no-op`);
+        return;
+      }
       this.logger.error(
         { message: `Failed to reverse store credit redemption ${entryId}` },
         err instanceof Error ? err : new Error(String(err))

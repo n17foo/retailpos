@@ -40,7 +40,8 @@ export class InstoreApiLoyaltyRepository implements LoyaltyLedger {
     points: number,
     orderId?: string | null,
     reason?: string | null,
-    createdBy?: string | null
+    createdBy?: string | null,
+    reversesId?: string | null
   ): Promise<string> {
     const result = await instoreApiClient.appendLoyaltyTransaction({
       customer_email: email,
@@ -49,6 +50,7 @@ export class InstoreApiLoyaltyRepository implements LoyaltyLedger {
       order_id: orderId ?? null,
       reason: reason ?? null,
       created_by: createdBy ?? null,
+      reverses_id: reversesId ?? null,
     });
     return (result.transaction as LoyaltyTransactionRow).id;
   }
@@ -60,9 +62,10 @@ export class InstoreApiLoyaltyRepository implements LoyaltyLedger {
     points: number,
     orderId?: string | null,
     reason?: string | null,
-    createdBy?: string | null
+    createdBy?: string | null,
+    reversesId?: string | null
   ): Promise<string> {
-    return this.applyTransaction(email, type, points, orderId, reason, createdBy);
+    return this.applyTransaction(email, type, points, orderId, reason, createdBy, reversesId);
   }
 
   async findTransactionsByEmail(email: string, limit = 50): Promise<LoyaltyTransactionRow[]> {

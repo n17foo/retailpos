@@ -7,7 +7,7 @@ const logger = LoggerFactory.getInstance().createLogger('dbSchema');
  * Current database schema version.
  * Bump this number and add a migration block whenever the schema changes.
  */
-export const LATEST_DB_VERSION = 15;
+export const LATEST_DB_VERSION = 16;
 
 /**
  * Initialise (or migrate) the database schema.
@@ -908,6 +908,40 @@ async function migrateDatabase(db: SQLiteDatabase, fromVersion: number, toVersio
       }
 
       logger.info('v15 applied.');
+    }
+
+    // ── v16 – Ledger integrity: one reversal per entry, earn-lot expiry ──
+    if (fromVersion < 16) {
+      logger.info('Applying v16: reversal identity + loyalty earn-lot expiry tracking…');
+
+      // reverses_id links a reversal to the entry it undoes; the unique
+      // partial index enforces at most one reversal per entry, so a retried
+      // or duplicated reversal cannot mint credit twice (CUS-01).
+      for (const table of ['store_credit_ledger', 'loyalty_transactions'] as const) {
+        const hasReversesId = await db.getFirstAsync<{ cid: number }>(
+          `SELECT cid FROM pragma_table_info('${table}') WHERE name = 'reverses_id'`
+        );
+        if (!hasReversesId) {
+          await db.runAsync(`ALTER TABLE ${table} ADD COLUMN reverses_id TEXT`);
+        }
+      }
+      await db.runAsync(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_sc_ledger_reverses ON store_credit_ledger(reverses_id) WHERE reverses_id IS NOT NULL`
+      );
+      await db.runAsync(
+        `CREATE UNIQUE INDEX IF NOT EXISTS idx_loyalty_tx_reverses ON loyalty_transactions(reverses_id) WHERE reverses_id IS NOT NULL`
+      );
+
+      // expired_points tracks how much of each earn lot has already been
+      // consumed by expiry — a repeated expiry pass finds nothing left (CUS-05).
+      const hasExpiredPoints = await db.getFirstAsync<{ cid: number }>(
+        `SELECT cid FROM pragma_table_info('loyalty_transactions') WHERE name = 'expired_points'`
+      );
+      if (!hasExpiredPoints) {
+        await db.runAsync(`ALTER TABLE loyalty_transactions ADD COLUMN expired_points INTEGER NOT NULL DEFAULT 0`);
+      }
+
+      logger.info('v16 applied.');
     }
 
     // Stamp the version

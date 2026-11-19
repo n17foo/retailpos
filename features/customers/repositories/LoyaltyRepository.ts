@@ -33,6 +33,10 @@ export interface LoyaltyTransactionRow {
   reason: string | null;
   created_by: string | null;
   created_at: number;
+  /** Set on 'reversal' rows — the transaction they undo. Unique per redemption (CUS-01). */
+  reverses_id: string | null;
+  /** Points of this earn lot already consumed by expiry passes (CUS-05). */
+  expired_points: number;
 }
 
 /** Structural contract shared by local and Store API loyalty ledgers. */
@@ -47,7 +51,8 @@ export interface LoyaltyLedger {
     points: number,
     orderId?: string | null,
     reason?: string | null,
-    createdBy?: string | null
+    createdBy?: string | null,
+    reversesId?: string | null
   ): Promise<string>;
   appendTransaction(
     email: string,
@@ -55,13 +60,20 @@ export interface LoyaltyLedger {
     points: number,
     orderId?: string | null,
     reason?: string | null,
-    createdBy?: string | null
+    createdBy?: string | null,
+    reversesId?: string | null
   ): Promise<string>;
   findTransactionsByEmail(email: string, limit?: number): Promise<LoyaltyTransactionRow[]>;
   findTransactionById(id: string): Promise<LoyaltyTransactionRow | null>;
   findCustomersWithExpiredTransactions(expiryThreshold: number): Promise<string[]>;
   findExpiredEarnTransactions(email: string, expiryThreshold: number): Promise<LoyaltyTransactionRow[]>;
   findEarnTransactionsBetween(email: string, expiryThreshold: number, warningThreshold: number): Promise<LoyaltyTransactionRow[]>;
+  /**
+   * Lot-aware points expiry (CUS-05): expires the remaining points of earn
+   * lots older than `expiryThreshold` in one transaction — idempotent, so a
+   * repeated pass cannot consume newly earned points. Local ledger only.
+   */
+  expireLots?(email: string, expiryThreshold: number, reason: string): Promise<{ lotsProcessed: number; pointsExpired: number }>;
 }
 
 export class LoyaltyRepository {
@@ -112,7 +124,9 @@ export class LoyaltyRepository {
 
   /**
    * Append a transaction AND apply its balance delta atomically. In client
-   * mode this is one server call — splitting it would race across registers.
+   * mode this is one server call — locally the insert and the guarded
+   * balance update commit or roll back together (CUS-04), and the update
+   * is conditioned on not overdrawing the account (CUS-02).
    */
   async applyTransaction(
     email: string,
@@ -120,10 +134,30 @@ export class LoyaltyRepository {
     points: number,
     orderId?: string | null,
     reason?: string | null,
-    createdBy?: string | null
+    createdBy?: string | null,
+    reversesId?: string | null
   ): Promise<string> {
-    const id = await this.appendTransaction(email, type, points, orderId, reason, createdBy);
-    await this.updateBalance(email, points);
+    const id = generateUUID();
+    const now = Date.now();
+    await db.withTransactionAsync(async () => {
+      await db.runAsync(
+        `INSERT INTO loyalty_transactions
+           (id, customer_email, type, points, order_id, reason, created_by, created_at, reverses_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [id, email.toLowerCase(), type, points, orderId ?? null, reason ?? null, createdBy ?? null, now, reversesId ?? null]
+      );
+      const res = await db.runAsync(
+        `UPDATE loyalty_accounts
+         SET balance = balance + ?,
+             lifetime_earned = CASE WHEN ? > 0 THEN lifetime_earned + ? ELSE lifetime_earned END,
+             updated_at = ?
+         WHERE customer_email = ? AND balance + ? >= 0`,
+        [points, points, points, now, email.toLowerCase(), points]
+      );
+      if (res.changes === 0) {
+        throw new Error('Insufficient loyalty points balance');
+      }
+    });
     return id;
   }
 
@@ -133,15 +167,16 @@ export class LoyaltyRepository {
     points: number,
     orderId?: string | null,
     reason?: string | null,
-    createdBy?: string | null
+    createdBy?: string | null,
+    reversesId?: string | null
   ): Promise<string> {
     const id = generateUUID();
     const now = Date.now();
     await db.runAsync(
       `INSERT INTO loyalty_transactions
-         (id, customer_email, type, points, order_id, reason, created_by, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, email.toLowerCase(), type, points, orderId ?? null, reason ?? null, createdBy ?? null, now]
+         (id, customer_email, type, points, order_id, reason, created_by, created_at, reverses_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, email.toLowerCase(), type, points, orderId ?? null, reason ?? null, createdBy ?? null, now, reversesId ?? null]
     );
     return id;
   }
@@ -157,6 +192,121 @@ export class LoyaltyRepository {
     return db.getFirstAsync<LoyaltyTransactionRow>('SELECT * FROM loyalty_transactions WHERE id = ?', [id]);
   }
 
+  /**
+   * Expire remaining points on earn lots older than expiryThreshold.
+   *
+   * Lot accounting replays the whole ledger in one transaction: each 'earn'
+   * row is a lot; 'redeem' rows consume lots oldest-first (FIFO); 'reversal'
+   * rows restore the lots their linked redemption consumed (legacy unlinked
+   * reversals restore newest-first); each lot's `expired_points` column
+   * records what earlier expiry passes already consumed. The pass therefore
+   * expires only what is genuinely left — re-running it cannot consume
+   * newly earned points (CUS-05).
+   */
+  async expireLots(email: string, expiryThreshold: number, reason: string): Promise<{ lotsProcessed: number; pointsExpired: number }> {
+    const outcome = { lotsProcessed: 0, pointsExpired: 0 };
+    await db.withTransactionAsync(async () => {
+      const txns = await db.getAllAsync<LoyaltyTransactionRow>(
+        `SELECT * FROM loyalty_transactions WHERE customer_email = ? ORDER BY created_at ASC, rowid ASC`,
+        [email.toLowerCase()]
+      );
+
+      interface EarnLot {
+        id: string;
+        created_at: number;
+        /** points - expired_points — the most the lot can still hold */
+        cap: number;
+        remaining: number;
+      }
+      const lotsById = new Map<string, EarnLot>();
+      const orderedLots: EarnLot[] = [];
+      // redeem tx id → the lots it consumed, so a reversal can restore them
+      const redeemAllocations = new Map<string, { lotId: string; amount: number }[]>();
+
+      for (const tx of txns) {
+        if (tx.type === 'earn') {
+          const cap = tx.points - (tx.expired_points ?? 0);
+          const lot: EarnLot = { id: tx.id, created_at: tx.created_at, cap, remaining: cap };
+          lotsById.set(tx.id, lot);
+          orderedLots.push(lot);
+        } else if (tx.type === 'redeem') {
+          let toConsume = -tx.points;
+          const allocation: { lotId: string; amount: number }[] = [];
+          for (const lot of orderedLots) {
+            if (toConsume <= 0) break;
+            const take = Math.min(lot.remaining, toConsume);
+            if (take > 0) {
+              lot.remaining -= take;
+              allocation.push({ lotId: lot.id, amount: take });
+              toConsume -= take;
+            }
+          }
+          redeemAllocations.set(tx.id, allocation);
+        } else if (tx.type === 'reversal') {
+          let restore = tx.points;
+          const linked = tx.reverses_id ? redeemAllocations.get(tx.reverses_id) : undefined;
+          if (linked) {
+            for (const { lotId, amount } of linked) {
+              if (restore <= 0) break;
+              const lot = lotsById.get(lotId);
+              if (!lot) continue;
+              const give = Math.min(amount, lot.cap - lot.remaining);
+              lot.remaining += give;
+              restore -= give;
+            }
+          }
+          // Unlinked legacy reversal or leftover: restore newest-first, capped
+          for (let i = orderedLots.length - 1; i >= 0 && restore > 0; i--) {
+            const lot = orderedLots[i];
+            const give = Math.min(restore, lot.cap - lot.remaining);
+            lot.remaining += give;
+            restore -= give;
+          }
+        }
+      }
+
+      const expiredLots = orderedLots.filter(l => l.created_at < expiryThreshold && l.remaining > 0);
+      const expirable = expiredLots.reduce((s, l) => s + l.remaining, 0);
+      if (expirable <= 0) return;
+
+      const account = await db.getFirstAsync<{ balance: number }>('SELECT balance FROM loyalty_accounts WHERE customer_email = ?', [
+        email.toLowerCase(),
+      ]);
+      let toExpire = Math.min(expirable, Math.max(0, account?.balance ?? 0));
+      if (toExpire <= 0) return;
+
+      const expireId = generateUUID();
+      await db.runAsync(
+        `INSERT INTO loyalty_transactions
+           (id, customer_email, type, points, order_id, reason, created_by, created_at, reverses_id)
+         VALUES (?, ?, 'expire', ?, NULL, ?, 'system', ?, NULL)`,
+        [expireId, email.toLowerCase(), -toExpire, reason, Date.now()]
+      );
+
+      // Mark each expired lot — oldest first — so the pass is idempotent.
+      for (const lot of expiredLots) {
+        if (toExpire <= 0) break;
+        const take = Math.min(lot.remaining, toExpire);
+        await db.runAsync('UPDATE loyalty_transactions SET expired_points = expired_points + ? WHERE id = ?', [take, lot.id]);
+        toExpire -= take;
+        outcome.lotsProcessed++;
+        outcome.pointsExpired += take;
+      }
+
+      // Guarded balance debit in the same transaction (CUS-04).
+      const res = await db.runAsync(
+        `UPDATE loyalty_accounts
+         SET balance = balance - ?, updated_at = ?
+         WHERE customer_email = ? AND balance - ? >= 0`,
+        [outcome.pointsExpired, Date.now(), email.toLowerCase(), outcome.pointsExpired]
+      );
+      if (res.changes === 0) {
+        throw new Error('Insufficient loyalty points balance');
+      }
+    });
+    return outcome;
+  }
+
   // ── Expiry Support ────────────────────────────────────────────────────
 
   /**
@@ -165,9 +315,9 @@ export class LoyaltyRepository {
    */
   async findCustomersWithExpiredTransactions(expiryThreshold: number): Promise<string[]> {
     const rows = await db.getAllAsync<{ customer_email: string }>(
-      `SELECT DISTINCT customer_email 
-       FROM loyalty_transactions 
-       WHERE type = 'earn' AND created_at < ?`,
+      `SELECT DISTINCT customer_email
+       FROM loyalty_transactions
+       WHERE type = 'earn' AND created_at < ? AND points > COALESCE(expired_points, 0)`,
       [expiryThreshold]
     );
     return rows.map(row => row.customer_email);

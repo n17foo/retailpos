@@ -10,8 +10,14 @@ export interface StoreCreditLedger {
     amountCents: number,
     orderId?: string | null,
     reason?: string | null,
-    createdBy?: string | null
+    createdBy?: string | null,
+    reversesId?: string | null
   ): Promise<string>;
+  /**
+   * Balance check + debit as one serialized operation — the clamped
+   * redemption is only written while sufficient balance remains (CUS-02).
+   */
+  redeemIfSufficient(email: string, requestedCents: number, orderId?: string | null): Promise<{ entryId: string; redeemedCents: number }>;
   findEntriesByEmail(email: string, limit?: number): Promise<StoreCreditEntryRow[]>;
   findEntryById(id: string): Promise<StoreCreditEntryRow | null>;
 }
@@ -33,7 +39,8 @@ export class InstoreApiStoreCreditRepository implements StoreCreditLedger {
     amountCents: number,
     orderId?: string | null,
     reason?: string | null,
-    createdBy?: string | null
+    createdBy?: string | null,
+    reversesId?: string | null
   ): Promise<string> {
     const entry = (await instoreApiClient.appendStoreCreditEntry({
       customer_email: email,
@@ -42,8 +49,23 @@ export class InstoreApiStoreCreditRepository implements StoreCreditLedger {
       order_id: orderId ?? null,
       reason: reason ?? null,
       created_by: createdBy ?? null,
+      reverses_id: reversesId ?? null,
     })) as StoreCreditEntryRow;
     return entry.id;
+  }
+
+  async redeemIfSufficient(
+    email: string,
+    requestedCents: number,
+    orderId?: string | null
+  ): Promise<{ entryId: string; redeemedCents: number }> {
+    // The server conditions the debit on the current balance (HTTP 409 on
+    // overdraw); the clamp keeps the request at or below the known balance.
+    const balance = await this.getBalanceCents(email);
+    const redeemedCents = Math.min(requestedCents, balance);
+    if (redeemedCents <= 0) throw new Error('Insufficient store credit balance');
+    const entryId = await this.appendEntry(email, 'redeem', -redeemedCents, orderId ?? null, 'Store credit redemption');
+    return { entryId, redeemedCents };
   }
 
   async findEntriesByEmail(email: string, limit = 50): Promise<StoreCreditEntryRow[]> {
