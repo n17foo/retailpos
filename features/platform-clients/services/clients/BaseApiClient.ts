@@ -189,13 +189,45 @@ export abstract class BaseApiClient<TConfig extends BaseApiClientConfig = BaseAp
     return headers;
   }
 
+  /**
+   * Normalise a configured store URL.
+   *
+   * Remote platform endpoints always use TLS — an explicit `http://` URL is
+   * upgraded to `https://` so credentials can never cross the network in
+   * plaintext. The only `http://` targets kept as-is are loopback and
+   * private-LAN hosts, which exist for local development and in-store LAN
+   * services that have no CA-signed certificate.
+   */
   protected normalizeUrl(url: string): string {
     if (!url) return '';
     url = url.replace(/\/+$/, '');
+    if (/^http:\/\//i.test(url)) {
+      if (this.isLocalDevUrl(url)) return url;
+      return `https://${url.slice('http://'.length)}`;
+    }
     if (!url.startsWith('http')) {
       url = `https://${url}`;
     }
     return url;
+  }
+
+  /**
+   * True for loopback and RFC-1918/private-LAN hosts — the only targets
+   * allowed to keep a plaintext `http://` scheme.
+   */
+  private isLocalDevUrl(url: string): boolean {
+    let host: string;
+    try {
+      host = new URL(url).hostname.toLowerCase();
+    } catch {
+      return false;
+    }
+    if (host === 'localhost' || host.endsWith('.localhost') || host === '[::1]' || host.endsWith('.local')) return true;
+    const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!m) return false;
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    return a === 127 || a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
   }
 
   private appendQueryParams(url: string, params?: Record<string, string>): string {

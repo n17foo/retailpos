@@ -571,7 +571,11 @@ app.whenReady().then(() => {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: http: https:",
     "font-src 'self' data:",
-    `connect-src 'self' http: https: ws:${isDev ? ' http://localhost:19006 ws://localhost:19006' : ''}`,
+    // PLT-01: production renderers may only open TLS connections. Plaintext
+    // http:/ws: is confined to loopback and mDNS LAN names so a compromised
+    // renderer cannot exfiltrate data to an arbitrary plaintext endpoint; dev
+    // additionally permits the Metro bundler ports.
+    `connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:* http://[::1]:* ws://localhost:* ws://127.0.0.1:* ws://[::1]:* http://*.local ws://*.local${isDev ? ' http://localhost:19006 ws://localhost:19006' : ''}`,
     "worker-src 'self' blob:",
     "object-src 'none'",
     "base-uri 'self'",
