@@ -54,11 +54,12 @@ providers.
 can restart the device bypasses it. Deliberate (avoids persistent lockout DoS).
 🟠 **E3.4** — malformed PIN (non-6-digit) counts toward the limiter.
 
-## R4 — PINs are salted-SHA256; legacy plaintext migrates on first login
+## R4 — PINs are PBKDF2-hashed; legacy formats migrate on first login
 
 **Rule**
 `UserRepository.findByPin` scans **all active users**, `verifyPin` each —
-matching a legacy plaintext row transparently re-hashes it (`v1$` format).
+matching a legacy plaintext or `v1$` salted-SHA256 row transparently re-hashes
+it to `v2$` PBKDF2-HMAC-SHA256 (10k iterations).
 
 **Evidence** — `features/authentication/repositories/UserRepository.ts:90-103`, `shared/utils/crypto.ts`.
 

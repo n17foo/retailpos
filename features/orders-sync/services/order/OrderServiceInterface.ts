@@ -21,6 +21,12 @@ export interface Order {
   fulfillmentStatus?: 'unfulfilled' | 'partially_fulfilled' | 'fulfilled';
   note?: string;
   tags?: string[];
+  /**
+   * Stable POS-side identifier (the local order id) sent to the platform so
+   * a retry after a lost response or crash can detect that the order was
+   * already created — see findOrderByReference / platform idempotency keys.
+   */
+  reference?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -137,6 +143,15 @@ export interface OrderServiceInterface {
    * Get an existing order by ID
    */
   getOrder(orderId: string): Promise<Order | null>;
+
+  /**
+   * Look up an order by the POS reference embedded at create time. Used
+   * before createOrder so a retry after a lost response or app crash does
+   * not push a duplicate order to the platform. Platforms without a viable
+   * lookup leave it unimplemented (dedupe then relies on native mechanisms
+   * like Shopify's idempotency_key).
+   */
+  findOrderByReference?(reference: string): Promise<Order | null>;
 
   /**
    * Update an existing order

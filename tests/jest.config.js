@@ -46,6 +46,7 @@ module.exports = {
     '^expo-file-system$': '<rootDir>/__mocks__/uiMocks.ts',
     '^expo-sharing$': '<rootDir>/__mocks__/uiMocks.ts',
     '^expo-localization$': '<rootDir>/__mocks__/uiMocks.ts',
+    '^@react-native-community/netinfo$': '<rootDir>/__mocks__/netinfo.ts',
     '\\.(png|jpg|jpeg|gif|webp|svg)$': '<rootDir>/__mocks__/fileMock.ts',
   },
   // Transform node_modules that use ES modules

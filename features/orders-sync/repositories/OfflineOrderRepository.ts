@@ -1,5 +1,5 @@
 import { db } from '../../../shared/utils/db';
-import { CreateOrderItemInput, OrderItemRepository } from './OrderItemRepository';
+import { CreateOrderItemInput, orderItemRepository } from './OrderItemRepository';
 import { CreateOrderInput, OrderRepository, OrderRow } from './OrderRepository';
 
 /**
@@ -15,8 +15,8 @@ export class OfflineOrderRepository implements OrderRepository {
         id, platform, platform_order_id, subtotal, tax, total,
         discount_amount, discount_code, customer_email, customer_name, note, sale_mode,
         cashier_id, cashier_name, register_id,
-        status, sync_status, payments_json, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        status, sync_status, payments_json, tax_estimated, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.id,
         input.platform,
@@ -36,6 +36,7 @@ export class OfflineOrderRepository implements OrderRepository {
         input.status ?? 'pending',
         'pending',
         input.paymentsJson ?? null,
+        input.taxEstimated ? 1 : 0,
         now,
         now,
       ]
@@ -43,8 +44,10 @@ export class OfflineOrderRepository implements OrderRepository {
   }
 
   async createWithItems(input: CreateOrderInput, items: CreateOrderItemInput[]): Promise<void> {
-    await this.create(input);
-    await new OrderItemRepository().createMany(items);
+    await db.withTransactionAsync(async () => {
+      await this.create(input);
+      await orderItemRepository.createMany(items);
+    });
   }
 
   // ── Read ──────────────────────────────────────────────────────────────
@@ -61,10 +64,10 @@ export class OfflineOrderRepository implements OrderRepository {
   }
 
   async findUnsynced(): Promise<OrderRow[]> {
-    return db.getAllAsync<OrderRow>(`SELECT * FROM orders WHERE status = ? AND sync_status != ? ORDER BY created_at ASC`, [
-      'paid',
-      'synced',
-    ]);
+    return db.getAllAsync<OrderRow>(
+      `SELECT * FROM orders WHERE status = ? AND sync_status NOT IN ('synced', 'quarantined') ORDER BY created_at ASC`,
+      ['paid']
+    );
   }
 
   async findByDateRange(fromTimestamp: number, toTimestamp: number, cashierId?: string): Promise<OrderRow[]> {

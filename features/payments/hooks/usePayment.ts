@@ -5,6 +5,7 @@ import paymentService from '../services/PaymentService';
 import { isElectron, isMobile } from '../../../shared/utils/electron';
 import { instoreApiConfig } from '../../multi-register/services/InstoreApiConfig';
 import { useStoreApiHealth } from '../../multi-register/hooks/useStoreApiHealth';
+import { useOffline } from '../../../shared/hooks/useConnectivity';
 
 /** The payment modes the checkout UI needs to know about. */
 export type PaymentMode =
@@ -31,6 +32,9 @@ const TAP_TO_PAY_PROVIDERS = new Set<PaymentProvider>([
 export const usePayment = () => {
   // Re-renders consumers when LAN health flips — PED tender hides while degraded.
   const { isDegraded } = useStoreApiHealth();
+  // And when the device loses all connectivity — tap-to-pay SDKs cannot
+  // authorise a charge without any network, so card tender hides entirely.
+  const isOffline = useOffline();
 
   const connectToTerminal = useCallback((deviceId: string): Promise<boolean> => paymentService.connectToTerminal(deviceId), []);
 
@@ -68,10 +72,12 @@ export const usePayment = () => {
     if (isElectron()) return 'cash_only';
     // Web (non-Electron) also has no SDK support.
     if (!isMobile()) return 'cash_only';
+    // No connectivity at all — a tap-to-pay SDK could only fail the charge.
+    if (isOffline) return 'cash_only';
     // Mobile/tablet: check whether the active provider is a tap-to-pay SDK.
     const provider = paymentService.getCurrentProvider();
     return TAP_TO_PAY_PROVIDERS.has(provider) ? 'tap_to_pay' : 'cash_only';
-  }, [isDegraded]);
+  }, [isDegraded, isOffline]);
 
   return useMemo(
     () => ({

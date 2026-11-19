@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- raw platform API response mapping */
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
+import { ApiError, RequestTimeoutError } from '../../../../shared/utils/apiErrors';
 
 /**
  * Authentication strategy for platform API clients.
@@ -141,7 +142,7 @@ export abstract class BaseApiClient<TConfig extends BaseApiClientConfig = BaseAp
 
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(`API error ${response.status}: ${text}`);
+        throw new ApiError(response.status, `API error ${response.status}: ${text}`);
       }
 
       // Some DELETE endpoints return 204 with no body
@@ -155,7 +156,7 @@ export abstract class BaseApiClient<TConfig extends BaseApiClientConfig = BaseAp
     } catch (error: any) {
       clearTimeout(timeout);
       if (error.name === 'AbortError') {
-        throw new Error(`Request timeout: ${method} ${url}`, { cause: error });
+        throw new RequestTimeoutError(`Request timeout: ${method} ${url}`, { cause: error });
       }
       throw error;
     }

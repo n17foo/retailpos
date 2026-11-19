@@ -1,6 +1,7 @@
 import { PrinterConfig, PrinterStatus, ReceiptData } from './PrinterTypes';
 import { BasePrinterService } from './BasePrinterService';
 import { USE_MOCK_PRINTERS } from '@env';
+import { isMockFlagEnabled } from '../../../../shared/utils/mockFlags';
 import { UnifiedPrinterServiceMock } from './UnifiedPrinterServiceMock';
 import { ElectronPrinterService } from './ElectronPrinterService';
 import { LoggerFactory } from '../../../../shared/services/logger/LoggerFactory';
@@ -46,7 +47,7 @@ export class PrinterServiceFactory {
       const instance = new PrinterServiceFactory();
 
       try {
-        if (USE_MOCK_PRINTERS === 'true') {
+        if (isMockFlagEnabled(USE_MOCK_PRINTERS)) {
           factoryLogger.info('Using mock printer service');
           instance.unifiedPrinterService = new UnifiedPrinterServiceMock();
         } else if (isElectron()) {

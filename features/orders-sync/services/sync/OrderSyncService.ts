@@ -8,6 +8,9 @@ import { OrderRepository } from '../../repositories/OrderRepository';
 import { KeyValueRepository } from '../../../../shared/repositories/KeyValueRepository';
 import { LoggerInterface } from '../../../../shared/services/logger/LoggerInterface';
 import { MAX_SYNC_RETRIES } from '../../../platform-clients/services/config/POSConfigService';
+import { isRetryableTransportError } from '../../../../shared/utils/apiErrors';
+import { noteWithReference } from '../order/orderReference';
+import { auditLogService } from '../../../../shared/services/audit/AuditLogService';
 import { ECommercePlatform, isOnlinePlatform } from '../../../../shared/utils/platforms';
 import { toPlatformProductId, toPlatformVariantId } from '../../../../shared/utils/platformIds';
 import { kdsServiceFactory } from '../../../hardware/services/kds/KdsServiceFactory';
@@ -93,6 +96,20 @@ export class OrderSyncService implements OrderSyncServiceInterface {
         return { success: true, orderId, platformOrderId };
       }
 
+      // Idempotent create: look for an order carrying this POS reference
+      // first — a previous attempt may have created it while the response
+      // or the crash prevented us from recording the platform id.
+      if (orderService.findOrderByReference) {
+        const existing = await orderService.findOrderByReference(orderId).catch(() => null);
+        if (existing) {
+          const existingId = existing.id ?? existing.platformOrderId ?? '';
+          this.logger.info(`Order ${orderId} already exists on platform as ${existingId} — marking synced`);
+          await this.orderRepo.updateSyncSuccess(orderId, existingId);
+          await this.clearRetries(orderId);
+          return { success: true, orderId, platformOrderId: existingId };
+        }
+      }
+
       const platformOrder: Order = {
         customerEmail: localOrder.customerEmail,
         customerName: localOrder.customerName,
@@ -104,7 +121,8 @@ export class OrderSyncService implements OrderSyncServiceInterface {
           ? [{ code: localOrder.discountCode, amount: localOrder.discountAmount ?? 0, type: 'fixed_amount' }]
           : undefined,
         paymentStatus: 'paid',
-        note:
+        reference: orderId,
+        note: noteWithReference(
           [
             localOrder.note,
             localOrder.payments && localOrder.payments.length > 1
@@ -113,6 +131,8 @@ export class OrderSyncService implements OrderSyncServiceInterface {
           ]
             .filter(Boolean)
             .join(' | ') || undefined,
+          orderId
+        ),
         createdAt: localOrder.createdAt,
       };
 
@@ -162,10 +182,20 @@ export class OrderSyncService implements OrderSyncServiceInterface {
         return false;
       }
 
-      await this.orderRepo.updateStatus(orderId, 'cancelled');
-      await this.orderRepo.updateSyncError(orderId, 'failed', 'Manually discarded by user');
+      // Quarantine, don't cancel — the sale already happened and may even
+      // exist on the platform; silently marking it 'cancelled' loses both
+      // the sale record and any audit trail (audit bug 7).
+      await this.orderRepo.updateSyncError(
+        orderId,
+        'quarantined',
+        `Discarded by user — requires manual platform reconciliation (was: ${order.sync_error ?? 'no error recorded'})`
+      );
       await this.clearRetries(orderId);
-      this.logger.info(`Discarded failed order: ${orderId}`);
+      auditLogService.log('order:discarded', {
+        details: `Failed sync discarded for order ${orderId}`,
+        metadata: { orderId, platform: order.platform, previousSyncError: order.sync_error ?? null },
+      });
+      this.logger.info(`Quarantined failed sync for order ${orderId}`);
       return true;
     } catch (error) {
       this.logger.error({ message: `Failed to discard order ${orderId}` }, error instanceof Error ? error : new Error(String(error)));
@@ -193,21 +223,9 @@ export class OrderSyncService implements OrderSyncServiceInterface {
   }
 
   private isRetryable(error: unknown): boolean {
-    if (error instanceof Error) {
-      // Network errors are retryable
-      if (error.name === 'TypeError' && error.message.includes('fetch')) return true;
-
-      // Check HTTP status code
-      const statusMatch = error.message.match(/status (\d+)/);
-      if (statusMatch) {
-        const status = parseInt(statusMatch[1], 10);
-        // 5xx errors are retryable, 4xx are not
-        return status >= 500;
-      }
-    }
-
-    // Default to non-retryable for unknown errors (spec requirement: sync.md §1.7)
-    return false;
+    // Classify by error type/status, not message text — see
+    // shared/utils/apiErrors.ts (audit bug 2).
+    return isRetryableTransportError(error);
   }
 
   private dispatchKdsTicket(order: { id: string; items: BasketItem[] }): void {

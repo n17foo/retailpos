@@ -2,7 +2,7 @@ import { getUserRepository } from '../../../repositories/UserRepository';
 import { keyValueRepository } from '../../../../../shared/repositories/KeyValueRepository';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
 import { cardReaderDetection } from '../CardReaderDetection';
-import { hashCredential, verifyCredential, isHashedCredential } from '../../../../../shared/utils/crypto';
+import { hashCredential, verifyCredential, isCurrentCredentialHash } from '../../../../../shared/utils/crypto';
 import { AuthAttemptLimiter } from '../AuthAttemptLimiter';
 
 const MAGSTRIPE_KEY_PREFIX = 'auth.magstripe.';
@@ -78,7 +78,7 @@ export class MagstripeAuthProvider implements AuthMethodProvider {
       for (const user of users) {
         const storedCardId = await keyValueRepository.getObject<string>(MAGSTRIPE_KEY_PREFIX + user.id);
         if (storedCardId && verifyCredential(employeeId, storedCardId)) {
-          if (!isHashedCredential(storedCardId)) {
+          if (!isCurrentCredentialHash(storedCardId)) {
             // Transparent migration: re-hash legacy plaintext card ID on match
             await keyValueRepository.setObject(MAGSTRIPE_KEY_PREFIX + user.id, hashCredential(employeeId)).catch(() => undefined);
           }

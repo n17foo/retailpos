@@ -3,6 +3,7 @@ import { Order, TaxQuote } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { WooCommerceApiClient } from '../../../../platform-clients/services/clients/woocommerce/WooCommerceApiClient';
+import { noteHasReference } from '../orderReference';
 
 /**
  * WooCommerce-specific implementation of the order service
@@ -291,6 +292,21 @@ export class WooCommerceOrderService extends BaseOrderService {
       payment_method: order.paymentStatus === 'paid' ? 'cod' : 'bacs', // Default to Cash on Delivery or Bank Transfer
       set_paid: order.paymentStatus === 'paid',
     };
+  }
+
+  /**
+   * Scan recent orders for the POS reference marker in customer_note —
+   * prevents a duplicate create when a response was lost (audit bug 3).
+   */
+  async findOrderByReference(reference: string): Promise<Order | null> {
+    if (!this.isInitialized()) return null;
+    try {
+      const data = await this.apiClient.get<any[]>('orders?per_page=50&orderby=date&order=desc');
+      const hit = (data ?? []).find(o => noteHasReference(o.customer_note, reference));
+      return hit ? this.getOrder(String(hit.id)) : null;
+    } catch {
+      return null;
+    }
   }
 
   /**

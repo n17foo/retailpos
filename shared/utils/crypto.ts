@@ -127,10 +127,10 @@ export function sha256Hex(message: string): string {
   return toHex(sha256(utf8Bytes(message)));
 }
 
-/** HMAC-SHA256 hex digest. Key and message are UTF-8 strings. */
-export function hmacSha256Hex(key: string, message: string): string {
+/** Byte-level HMAC-SHA256 — the base of both the hex API and PBKDF2. */
+function hmacSha256(key: number[], message: number[]): number[] {
   const BLOCK = 64;
-  let keyBytes = utf8Bytes(key);
+  let keyBytes = key;
   if (keyBytes.length > BLOCK) {
     const hashed = sha256(keyBytes);
     keyBytes = [];
@@ -144,12 +144,23 @@ export function hmacSha256Hex(key: string, message: string): string {
     ipad[i] ^= keyBytes[i];
     opad[i] ^= keyBytes[i];
   }
-  const inner = sha256(ipad.concat(utf8Bytes(message)));
+  const inner = sha256(ipad.concat(message));
   const innerBytes: number[] = [];
   for (const word of inner) {
     innerBytes.push((word >>> 24) & 0xff, (word >>> 16) & 0xff, (word >>> 8) & 0xff, word & 0xff);
   }
-  return toHex(sha256(opad.concat(innerBytes)));
+  const outer = sha256(opad.concat(innerBytes));
+  const out: number[] = [];
+  for (const word of outer) {
+    out.push((word >>> 24) & 0xff, (word >>> 16) & 0xff, (word >>> 8) & 0xff, word & 0xff);
+  }
+  return out;
+}
+
+/** HMAC-SHA256 hex digest. Key and message are UTF-8 strings. */
+export function hmacSha256Hex(key: string, message: string): string {
+  const digest = hmacSha256(utf8Bytes(key), utf8Bytes(message));
+  return digest.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 // ── Comparisons ─────────────────────────────────────────────────────────────
@@ -184,36 +195,83 @@ export function randomHex(byteCount: number): string {
 
 // ── PIN hashing ─────────────────────────────────────────────────────────────
 
-const PIN_HASH_PREFIX = 'v1';
 const PIN_SALT_BYTES = 16;
+/**
+ * PBKDF2 iterations for the v2 format. ~10k HMAC-SHA256 rounds cost well
+ * under a second at login but turn a leaked 6-digit-PIN brute force from
+ * a single hash scan into days of work.
+ */
+const PBKDF2_ITERATIONS = 10_000;
+const PBKDF2_KEY_BYTES = 32;
+
+function hexToBytes(hex: string): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < hex.length; i += 2) out.push(parseInt(hex.slice(i, i + 2), 16));
+  return out;
+}
+
+function bytesToHex(bytes: number[]): string {
+  return bytes.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 /**
- * Hash a PIN for storage. Format: `v1$<saltHex>$<sha256(salt + pin)Hex>`.
- * Salted so identical PINs across users don't share a hash and a leaked
- * database row can't be checked against a rainbow table of the 10^6 PIN space.
+ * PBKDF2-HMAC-SHA256 (RFC 2898), single 32-byte block — enough for a
+ * credential hash and keeps the implementation auditable.
+ */
+function pbkdf2Sha256(password: string, saltHex: string, iterations: number): number[] {
+  const salt = hexToBytes(saltHex);
+  const key = utf8Bytes(password);
+  // U1 = PRF(P, S || INT32_BE(1))
+  let u = hmacSha256(key, salt.concat([0, 0, 0, 1]));
+  const derived = u.slice();
+  for (let i = 1; i < iterations; i++) {
+    u = hmacSha256(key, u);
+    for (let j = 0; j < PBKDF2_KEY_BYTES; j++) derived[j] ^= u[j];
+  }
+  return derived;
+}
+
+/**
+ * Hash a credential for storage. Current format:
+ *   `v2$<saltHex>$<iterations>$<pbkdf2-sha256 Hex>`
+ * The iteration count travels in the string so it can be raised later
+ * without a format change.
  */
 export function hashPin(pin: string): string {
   const salt = randomHex(PIN_SALT_BYTES);
-  return `${PIN_HASH_PREFIX}$${salt}$${sha256Hex(salt + pin)}`;
+  return `v2$${salt}$${PBKDF2_ITERATIONS}$${bytesToHex(pbkdf2Sha256(pin, salt, PBKDF2_ITERATIONS))}`;
 }
 
+/** Any recognised hashed format (v1 fast-hash or v2 PBKDF2). */
 export function isHashedPin(stored: string): boolean {
-  return /^v1\$[0-9a-f]{32}\$[0-9a-f]{64}$/.test(stored);
+  return /^v[12]\$/.test(stored);
+}
+
+/** True only for the strongest current format — gates the upgrade-on-verify path. */
+export function isCurrentPinHash(stored: string): boolean {
+  return /^v2\$[0-9a-f]{32}\$\d+\$[0-9a-f]{64}$/.test(stored);
 }
 
 /**
- * Verify a candidate PIN against a stored value.
- * Legacy rows store the raw PIN — those are compared directly (constant-time)
- * so callers can transparently re-hash on successful verify.
+ * Verify a candidate PIN against a stored value. Handles every format the
+ * column has ever held so callers can transparently re-hash on success:
+ *   v2 → PBKDF2-SHA256, v1 → sha256(salt + pin), anything else → raw PIN
  */
 export function verifyPin(pin: string, stored: string): boolean {
   if (!stored) return false;
-  if (!isHashedPin(stored)) {
-    return stored.startsWith(`${PIN_HASH_PREFIX}$`) ? false : timingSafeEqual(pin, stored);
+  const parts = stored.split('$');
+  if (parts[0] === 'v2') {
+    const [, salt, iterStr, expected] = parts;
+    const iterations = parseInt(iterStr ?? '', 10);
+    if (!salt || !expected || !Number.isFinite(iterations)) return false;
+    return timingSafeEqual(bytesToHex(pbkdf2Sha256(pin, salt, iterations)), expected);
   }
-  const [, salt, expected] = stored.split('$');
-  if (!salt || !expected) return false;
-  return timingSafeEqual(sha256Hex(salt + pin), expected);
+  if (parts[0] === 'v1') {
+    const [, salt, expected] = parts;
+    if (!salt || !expected) return false;
+    return timingSafeEqual(sha256Hex(salt + pin), expected);
+  }
+  return timingSafeEqual(pin, stored);
 }
 
 // The same salted-hash format protects other credential types (passwords,
@@ -221,3 +279,4 @@ export function verifyPin(pin: string, stored: string): boolean {
 export const hashCredential = hashPin;
 export const verifyCredential = verifyPin;
 export const isHashedCredential = isHashedPin;
+export const isCurrentCredentialHash = isCurrentPinHash;

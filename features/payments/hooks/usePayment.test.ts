@@ -4,6 +4,7 @@ import { usePayment } from './usePayment';
 import paymentService from '../services/PaymentService';
 import { PaymentProvider } from '../services/PaymentServiceFactory';
 import { isElectron, isMobile } from '../../../shared/utils/electron';
+import NetInfo from '@react-native-community/netinfo';
 
 jest.mock('expo-constants', () => ({
   __esModule: true,
@@ -61,6 +62,25 @@ describe('usePayment', () => {
     (paymentService.getCurrentProvider as jest.Mock).mockReturnValue(PaymentProvider.STRIPE_NFC);
 
     const { get } = mountHook();
+    expect(get().getPaymentMode()).toBe('tap_to_pay');
+  });
+
+  it('returns cash_only on mobile when the device has no connectivity', () => {
+    (isElectron as jest.Mock).mockReturnValue(false);
+    (isMobile as jest.Mock).mockReturnValue(true);
+    (paymentService.getCurrentProvider as jest.Mock).mockReturnValue(PaymentProvider.STRIPE_NFC);
+
+    const { get } = mountHook();
+    expect(get().getPaymentMode()).toBe('tap_to_pay');
+
+    act(() => {
+      (NetInfo as unknown as { __emit: (s: { isConnected: boolean | null }) => void }).__emit({ isConnected: false });
+    });
+    expect(get().getPaymentMode()).toBe('cash_only');
+
+    act(() => {
+      (NetInfo as unknown as { __emit: (s: { isConnected: boolean | null }) => void }).__emit({ isConnected: true });
+    });
     expect(get().getPaymentMode()).toBe('tap_to_pay');
   });
 

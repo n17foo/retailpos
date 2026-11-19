@@ -8,6 +8,7 @@ import { Product } from '../../../../catalogue/repositories/ProductRepository';
 import { TaxProfileRow } from '../../../repositories/TaxProfileRepository';
 import { ReturnRow, CreateReturnInput } from '../../../../returns/repositories/ReturnRepository';
 import { Category } from '../../../../catalogue/services/category/CategoryServiceInterface';
+import { ApiError, RequestTimeoutError } from '../../../../../shared/utils/apiErrors';
 
 export interface InstoreApiHealthResponse {
   ok: boolean;
@@ -72,6 +73,9 @@ export interface InstoreApiShift {
  * Used by registers in "client" mode to read/write shared data
  * from the server register instead of local SQLite.
  */
+/** Bounded wait for any signed Store API request — a frozen server must not hang checkout. */
+const REQUEST_TIMEOUT_MS = 10_000;
+
 export class InstoreApiClient {
   private static instance: InstoreApiClient;
   private logger = LoggerFactory.getInstance().createLogger('InstoreApiClient');
@@ -360,10 +364,7 @@ export class InstoreApiClient {
     const path = `/api/orders/${orderId}/sync/claim`;
     let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}${path}`, {
-        method: 'PUT',
-        headers: this.buildSignedHeaders('PUT', path, ''),
-      });
+      response = await this.signedFetch('PUT', path, '');
       this.reportSuccess();
     } catch (error) {
       this.reportFailure(error);
@@ -371,8 +372,7 @@ export class InstoreApiClient {
     }
     if (response.status === 409) return false;
     if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
-      throw new Error(errorBody.error || `PUT ${path} failed: ${response.status}`);
+      throw await this.errorFromResponse('PUT', path, response);
     }
     return true;
   }
@@ -386,6 +386,15 @@ export class InstoreApiClient {
 
   async updateProduct(id: string, data: Partial<Product>): Promise<Product> {
     const result = await this.put<{ product: Product }>(`/api/products/${id}`, data);
+    return result.product;
+  }
+
+  /**
+   * Atomic signed stock delta — the only safe way for concurrent registers
+   * to change shared stock (a get-then-put read-modify-write loses updates).
+   */
+  async adjustProductStock(id: string, delta: number): Promise<Product> {
+    const result = await this.post<{ product: Product }>(`/api/products/${id}/stock-adjust`, { delta });
     return result.product;
   }
 
@@ -578,6 +587,36 @@ export class InstoreApiClient {
     storeApiHealthService.noteRequestFailure(error);
   }
 
+  /**
+   * Signed request with a bounded timeout. Transport-level failures surface
+   * as TypeError, client-side timeouts as RequestTimeoutError and non-2xx
+   * responses as ApiError — callers classify via isStoreApiUnavailable.
+   */
+  private async signedFetch(method: 'GET' | 'POST' | 'PUT' | 'DELETE', path: string, rawBody: string): Promise<Response> {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      return await fetch(`${this.baseUrl}${path}`, {
+        method,
+        headers: this.buildSignedHeaders(method, path, rawBody),
+        body: method === 'GET' || method === 'DELETE' ? undefined : rawBody,
+        signal: controller.signal,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new RequestTimeoutError(`${method} ${path} timed out after ${REQUEST_TIMEOUT_MS}ms`, { cause: error });
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  private async errorFromResponse(method: string, path: string, response: Response): Promise<ApiError> {
+    const errorBody = (await response.json().catch(() => ({}))) as { error?: string };
+    return new ApiError(response.status, errorBody.error || `${method} ${path} failed: ${response.status}`);
+  }
+
   private async get<T>(path: string, queryParams?: Record<string, string>): Promise<T> {
     let pathWithQuery = path;
     if (queryParams) {
@@ -587,10 +626,7 @@ export class InstoreApiClient {
 
     let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}${pathWithQuery}`, {
-        method: 'GET',
-        headers: this.buildSignedHeaders('GET', pathWithQuery, ''),
-      });
+      response = await this.signedFetch('GET', pathWithQuery, '');
       this.reportSuccess();
     } catch (error) {
       this.reportFailure(error);
@@ -598,8 +634,7 @@ export class InstoreApiClient {
     }
 
     if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
-      throw new Error(errorBody.error || `GET ${path} failed: ${response.status}`);
+      throw await this.errorFromResponse('GET', path, response);
     }
 
     return response.json();
@@ -615,10 +650,7 @@ export class InstoreApiClient {
 
     let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}${pathWithQuery}`, {
-        method: 'GET',
-        headers: this.buildSignedHeaders('GET', pathWithQuery, ''),
-      });
+      response = await this.signedFetch('GET', pathWithQuery, '');
       this.reportSuccess();
     } catch (error) {
       this.reportFailure(error);
@@ -626,8 +658,7 @@ export class InstoreApiClient {
     }
 
     if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
-      throw new Error(errorBody.error || `GET ${path} failed: ${response.status}`);
+      throw await this.errorFromResponse('GET', path, response);
     }
 
     return response.text();
@@ -667,11 +698,7 @@ export class InstoreApiClient {
     const rawBody = JSON.stringify(body);
     let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}${path}`, {
-        method: 'POST',
-        headers: this.buildSignedHeaders('POST', path, rawBody),
-        body: rawBody,
-      });
+      response = await this.signedFetch('POST', path, rawBody);
       this.reportSuccess();
     } catch (error) {
       this.reportFailure(error);
@@ -679,8 +706,7 @@ export class InstoreApiClient {
     }
 
     if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
-      throw new Error(errorBody.error || `POST ${path} failed: ${response.status}`);
+      throw await this.errorFromResponse('POST', path, response);
     }
 
     return response.json();
@@ -690,11 +716,7 @@ export class InstoreApiClient {
     const rawBody = JSON.stringify(body);
     let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}${path}`, {
-        method: 'PUT',
-        headers: this.buildSignedHeaders('PUT', path, rawBody),
-        body: rawBody,
-      });
+      response = await this.signedFetch('PUT', path, rawBody);
       this.reportSuccess();
     } catch (error) {
       this.reportFailure(error);
@@ -702,8 +724,7 @@ export class InstoreApiClient {
     }
 
     if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
-      throw new Error(errorBody.error || `PUT ${path} failed: ${response.status}`);
+      throw await this.errorFromResponse('PUT', path, response);
     }
 
     return response.json();
@@ -712,10 +733,7 @@ export class InstoreApiClient {
   private async delete(path: string): Promise<void> {
     let response: Response;
     try {
-      response = await fetch(`${this.baseUrl}${path}`, {
-        method: 'DELETE',
-        headers: this.buildSignedHeaders('DELETE', path, ''),
-      });
+      response = await this.signedFetch('DELETE', path, '');
       this.reportSuccess();
     } catch (error) {
       this.reportFailure(error);
@@ -723,8 +741,7 @@ export class InstoreApiClient {
     }
 
     if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
-      throw new Error(errorBody.error || `DELETE ${path} failed: ${response.status}`);
+      throw await this.errorFromResponse('DELETE', path, response);
     }
   }
 }

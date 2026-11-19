@@ -3,6 +3,7 @@ import { Order, TaxQuote } from '../OrderServiceInterface';
 import { PlatformOrderConfig, PlatformConfigRequirements } from './PlatformOrderServiceInterface';
 import { BaseOrderService } from './BaseOrderService';
 import { MagentoApiClient } from '../../../../platform-clients/services/clients/magento/MagentoApiClient';
+import { noteHasReference } from '../orderReference';
 
 /**
  * Magento-specific implementation of the order service
@@ -88,6 +89,18 @@ export class MagentoOrderService extends BaseOrderService {
         paymentMethod: { method: 'checkmo' },
       });
 
+      // Cart-based create can't carry the note — stamp the POS reference
+      // as a status comment so findOrderByReference can detect a retry.
+      if (order.reference) {
+        try {
+          await this.apiClient.post(`orders/${orderId}/comments`, {
+            statusHistory: { comment: order.note, is_customer_notified: 0, is_visible_on_front: 0 },
+          });
+        } catch {
+          // Non-fatal: the order exists; dedupe falls back to other platforms' hooks.
+        }
+      }
+
       // Fetch the created order
       return (await this.getOrder(String(orderId))) as Order;
     } catch (error) {
@@ -147,6 +160,24 @@ export class MagentoOrderService extends BaseOrderService {
     await this.apiClient.post(`carts/${cartId}/items`, {
       cartItem: { sku: item.sku, qty: item.quantity, quote_id: cartId },
     });
+  }
+
+  /**
+   * Scan recent orders' status comments for the POS reference marker
+   * (audit bug 3).
+   */
+  async findOrderByReference(reference: string): Promise<Order | null> {
+    if (!this.isInitialized()) return null;
+    try {
+      const data = await this.apiClient.get<any>(
+        'orders?searchCriteria[sortOrders][0][field]=created_at&searchCriteria[sortOrders][0][direction]=DESC&searchCriteria[pageSize]=50'
+      );
+      const items: any[] = data?.items ?? [];
+      const hit = items.find(o => (o.status_histories ?? []).some((c: { comment?: string }) => noteHasReference(c.comment, reference)));
+      return hit ? this.getOrder(String(hit.entity_id)) : null;
+    } catch {
+      return null;
+    }
   }
 
   /**

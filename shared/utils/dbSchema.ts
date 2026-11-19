@@ -7,7 +7,7 @@ const logger = LoggerFactory.getInstance().createLogger('dbSchema');
  * Current database schema version.
  * Bump this number and add a migration block whenever the schema changes.
  */
-export const LATEST_DB_VERSION = 12;
+export const LATEST_DB_VERSION = 14;
 
 /**
  * Initialise (or migrate) the database schema.
@@ -747,6 +747,87 @@ async function migrateDatabase(db: SQLiteDatabase, fromVersion: number, toVersio
       await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_pending_ops_created ON pending_ops(created_at);`);
 
       logger.info('v12 pending_ops created.');
+    }
+
+    // ── v13 – widen orders.sync_status CHECK + pending_ops retry state ──
+    //
+    // The LAN-outage queue (v12) marks orders 'pending_upload' and the
+    // sync-claim protocol uses 'syncing'/'quarantined', but the original
+    // CHECK only allows 'pending','synced','failed' — any write threw
+    // CHECK-constraint errors. SQLite can't ALTER a CHECK, so rebuild the
+    // table preserving all columns added by v1–v11.
+    if (fromVersion < 13) {
+      logger.info('Applying v13: widening orders.sync_status CHECK, adding pending_ops retry state…');
+
+      const ORDER_COLUMNS =
+        'id, platform_order_id, platform, subtotal, tax, total, discount_amount, discount_code, ' +
+        'customer_email, customer_name, note, payment_method, payment_transaction_id, cashier_id, cashier_name, ' +
+        'status, sync_status, sync_error, created_at, updated_at, paid_at, synced_at, customer_id, payments_json, register_id, sale_mode';
+
+      await db.runAsync(`
+        CREATE TABLE IF NOT EXISTS orders_v13 (
+          id                      TEXT PRIMARY KEY NOT NULL,
+          platform_order_id       TEXT,
+          platform                TEXT,
+          subtotal                REAL NOT NULL,
+          tax                     REAL NOT NULL,
+          total                   REAL NOT NULL,
+          discount_amount         REAL,
+          discount_code           TEXT,
+          customer_email          TEXT,
+          customer_name           TEXT,
+          note                    TEXT,
+          payment_method          TEXT,
+          payment_transaction_id  TEXT,
+          cashier_id              TEXT,
+          cashier_name            TEXT,
+          status                  TEXT NOT NULL DEFAULT 'pending'
+                                    CHECK(status IN ('pending','processing','paid','synced','failed','cancelled')),
+          sync_status             TEXT NOT NULL DEFAULT 'pending'
+                                    CHECK(sync_status IN ('pending','synced','failed','pending_upload','syncing','quarantined')),
+          sync_error              TEXT,
+          created_at              INTEGER NOT NULL,
+          updated_at              INTEGER NOT NULL,
+          paid_at                 INTEGER,
+          synced_at               INTEGER,
+          customer_id             TEXT,
+          payments_json           TEXT,
+          register_id             TEXT,
+          sale_mode               TEXT
+        );
+      `);
+      await db.runAsync(`INSERT INTO orders_v13 (${ORDER_COLUMNS}) SELECT ${ORDER_COLUMNS} FROM orders;`);
+      await db.runAsync(`DROP TABLE orders;`);
+      await db.runAsync(`ALTER TABLE orders_v13 RENAME TO orders;`);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_orders_status      ON orders(status);`);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_orders_sync_status ON orders(sync_status);`);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_orders_cashier     ON orders(cashier_id);`);
+      await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_orders_created_at  ON orders(created_at);`);
+
+      // Retry bookkeeping on the pending-ops queue — a failed op must be
+      // kept and retried, not deleted (audit bug 6).
+      for (const [colName, ddl] of [
+        ['attempts', `ALTER TABLE pending_ops ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0`],
+        ['last_error', `ALTER TABLE pending_ops ADD COLUMN last_error TEXT`],
+        ['quarantined', `ALTER TABLE pending_ops ADD COLUMN quarantined INTEGER NOT NULL DEFAULT 0`],
+      ] as const) {
+        const col = await db.getFirstAsync<{ cid: number }>(`SELECT cid FROM pragma_table_info('pending_ops') WHERE name = '${colName}'`);
+        if (!col) {
+          await db.runAsync(ddl);
+        }
+      }
+
+      logger.info('v13 applied.');
+    }
+
+    // ── v14 – tax_estimated flag on orders ─────────────────────────────
+    if (fromVersion < 14) {
+      logger.info('Applying v14: adding tax_estimated to orders…');
+      const colExists = await db.getFirstAsync<{ cid: number }>(`SELECT cid FROM pragma_table_info('orders') WHERE name = 'tax_estimated'`);
+      if (!colExists) {
+        await db.runAsync(`ALTER TABLE orders ADD COLUMN tax_estimated INTEGER NOT NULL DEFAULT 0`);
+      }
+      logger.info('v14 applied.');
     }
 
     // Stamp the version

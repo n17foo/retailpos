@@ -2,7 +2,7 @@ import { getUserRepository } from '../../../repositories/UserRepository';
 import { keyValueRepository } from '../../../../../shared/repositories/KeyValueRepository';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
 import { AuthAttemptLimiter } from '../AuthAttemptLimiter';
-import { hashCredential, verifyCredential, isHashedCredential } from '../../../../../shared/utils/crypto';
+import { hashCredential, verifyCredential, isCurrentCredentialHash } from '../../../../../shared/utils/crypto';
 
 const PASSWORD_KEY_PREFIX = 'auth.password.';
 const MAX_PASSWORD_LENGTH = 1024;
@@ -46,7 +46,7 @@ export class PasswordAuthProvider implements AuthMethodProvider {
       for (const user of users) {
         const storedPassword = await keyValueRepository.getObject<string>(PASSWORD_KEY_PREFIX + user.id);
         if (storedPassword && verifyCredential(credential, storedPassword)) {
-          if (!isHashedCredential(storedPassword)) {
+          if (!isCurrentCredentialHash(storedPassword)) {
             // Transparent migration: re-hash legacy plaintext password on match
             await keyValueRepository.setObject(PASSWORD_KEY_PREFIX + user.id, hashCredential(credential)).catch(() => undefined);
           }

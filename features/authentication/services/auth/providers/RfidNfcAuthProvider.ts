@@ -1,7 +1,7 @@
 import { getUserRepository } from '../../../repositories/UserRepository';
 import { keyValueRepository } from '../../../../../shared/repositories/KeyValueRepository';
 import { AuthMethodProvider, AuthMethodInfo, AuthResult, AUTH_METHOD_INFO } from '../AuthMethodInterface';
-import { hashCredential, verifyCredential, isHashedCredential } from '../../../../../shared/utils/crypto';
+import { hashCredential, verifyCredential, isCurrentCredentialHash } from '../../../../../shared/utils/crypto';
 import { AuthAttemptLimiter } from '../AuthAttemptLimiter';
 
 const RFID_KEY_PREFIX = 'auth.rfid.';
@@ -51,7 +51,7 @@ export class RfidNfcAuthProvider implements AuthMethodProvider {
       for (const user of users) {
         const storedBadgeId = await keyValueRepository.getObject<string>(RFID_KEY_PREFIX + user.id);
         if (storedBadgeId && verifyCredential(badgeId, storedBadgeId)) {
-          if (!isHashedCredential(storedBadgeId)) {
+          if (!isCurrentCredentialHash(storedBadgeId)) {
             // Transparent migration: re-hash legacy plaintext badge ID on match
             await keyValueRepository.setObject(RFID_KEY_PREFIX + user.id, hashCredential(badgeId)).catch(() => undefined);
           }

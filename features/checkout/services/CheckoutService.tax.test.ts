@@ -21,6 +21,7 @@ jest.mock('../../orders-sync/services/order/OrderServiceFactory', () => ({
 
 import { CheckoutService } from './CheckoutService';
 import { ECommercePlatform } from '../../../shared/utils/platforms';
+import { ApiError } from '../../../shared/utils/apiErrors';
 import type { Basket } from '../../basket/services/basket';
 
 const basket = (overrides: Partial<Basket> = {}): Basket => ({
@@ -112,8 +113,18 @@ describe('startCheckout tax', () => {
     expect(orderRepo.createWithItems).not.toHaveBeenCalled();
   });
 
-  it('stops checkout when a draft platform fails to create the draft', async () => {
-    mockOrderService.createDraftOrder.mockRejectedValue(new Error('500'));
+  it('continues checkout with last-known local rates when the platform is unreachable', async () => {
+    mockOrderService.createDraftOrder.mockRejectedValue(new ApiError(503, 'draft create failed'));
+    const { service, orderRepo } = setup(basket({ tax: 8, total: 108 }));
+
+    const order = await service.startCheckout(ECommercePlatform.WIX);
+
+    expect(order).toMatchObject({ tax: 8, total: 108, taxEstimated: true, status: 'pending' });
+    expect(orderRepo.createWithItems).toHaveBeenCalledWith(expect.objectContaining({ taxEstimated: true }), expect.anything());
+  });
+
+  it('stops checkout when the platform actively rejects the basket (4xx)', async () => {
+    mockOrderService.createDraftOrder.mockRejectedValue(new ApiError(422, 'invalid product'));
     const { service, orderRepo } = setup(basket());
 
     await expect(service.startCheckout(ECommercePlatform.WIX)).rejects.toThrow(/cannot be completed/);

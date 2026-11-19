@@ -1,4 +1,4 @@
-import { sha256Hex, hmacSha256Hex, timingSafeEqual, randomHex, hashPin, verifyPin, isHashedPin } from './crypto';
+import { sha256Hex, hmacSha256Hex, timingSafeEqual, randomHex, hashPin, verifyPin, isHashedPin, isCurrentPinHash } from './crypto';
 
 describe('sha256Hex', () => {
   it('should produce the known SHA-256 digest for a known input', () => {
@@ -64,10 +64,11 @@ describe('randomHex', () => {
 });
 
 describe('pin hashing', () => {
-  it('should produce a salted v1 hash', () => {
+  it('should produce a salted v2 PBKDF2 hash', () => {
     const hashed = hashPin('123456');
-    expect(hashed).toMatch(/^v1\$[0-9a-f]{32}\$[0-9a-f]{64}$/);
+    expect(hashed).toMatch(/^v2\$[0-9a-f]{32}\$\d+\$[0-9a-f]{64}$/);
     expect(isHashedPin(hashed)).toBe(true);
+    expect(isCurrentPinHash(hashed)).toBe(true);
   });
 
   it('should produce different hashes for the same PIN (salted)', () => {
@@ -80,6 +81,14 @@ describe('pin hashing', () => {
     expect(verifyPin('000000', hashed)).toBe(false);
   });
 
+  it('should verify a v1 fast-hash PIN for migration', () => {
+    const v1 = 'v1$0123456789abcdef0123456789abcdef$' + sha256Hex('0123456789abcdef0123456789abcdef' + '246810');
+    expect(isHashedPin(v1)).toBe(true);
+    expect(isCurrentPinHash(v1)).toBe(false);
+    expect(verifyPin('246810', v1)).toBe(true);
+    expect(verifyPin('000000', v1)).toBe(false);
+  });
+
   it('should verify legacy plaintext PINs for migration', () => {
     expect(verifyPin('123456', '123456')).toBe(true);
     expect(verifyPin('999999', '123456')).toBe(false);
@@ -87,6 +96,8 @@ describe('pin hashing', () => {
 
   it('should reject malformed stored hashes', () => {
     expect(verifyPin('123456', 'v1$nope')).toBe(false);
+    expect(verifyPin('123456', 'v2$bad')).toBe(false);
+    expect(verifyPin('123456', 'v2$0123456789abcdef0123456789abcdef$abc$' + '0'.repeat(64))).toBe(false);
     expect(verifyPin('123456', '')).toBe(false);
   });
 });
