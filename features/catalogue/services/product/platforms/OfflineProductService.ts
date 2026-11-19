@@ -90,9 +90,13 @@ export class OfflineProductService implements PlatformProductServiceInterface {
       filteredProducts = filteredProducts.filter(p => options.ids!.includes(p.id));
     }
 
-    // Apply out of stock filter
+    // Apply out of stock filter — the canonical availability policy:
+    // tracked variants need stock; untracked ones use the platform-
+    // reported availability flag (CAT-01).
     if (!options.includeOutOfStock) {
-      filteredProducts = filteredProducts.filter(p => p.variants.some(v => v.inventoryQuantity > 0));
+      filteredProducts = filteredProducts.filter(p =>
+        p.variants.some(v => ((v.trackInventory ?? true) ? v.inventoryQuantity > 0 : (v.isAvailable ?? true)))
+      );
     }
 
     // Apply pagination
