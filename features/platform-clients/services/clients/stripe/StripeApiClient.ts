@@ -1,4 +1,5 @@
 import { BaseApiClient, AuthStrategy, BaseApiClientConfig } from '../BaseApiClient';
+import { isDevelopmentRuntime } from '../../../../../shared/utils/mockFlags';
 
 export interface StripeConfig extends BaseApiClientConfig {
   apiKey?: string;
@@ -43,25 +44,33 @@ export class StripeApiClient extends BaseApiClient<StripeConfig> {
   }
 
   /**
-   * POST to the optional backend proxy URL.
-   * Falls back to direct Stripe API if backendUrl is not set.
+   * POST to the configured backend proxy URL.
+   * In production the backend is mandatory (it holds the Stripe secret key —
+   * PAY-03). The direct Stripe API fallback exists for development only.
    */
   public async postToBackend<T>(backendPath: string, stripeFallbackPath: string, body: unknown): Promise<T> {
     if (this.config.backendUrl) {
       const url = `${this.config.backendUrl.replace(/\/$/, '')}/${backendPath.replace(/^\//, '')}`;
       return this.request<T>('POST', url, body);
     }
+    if (!isDevelopmentRuntime()) {
+      throw new Error('Stripe backend URL is not configured');
+    }
     return this.post<T>(stripeFallbackPath, body);
   }
 
   /**
-   * GET from the optional backend proxy URL.
-   * Falls back to direct Stripe API if backendUrl is not set.
+   * GET from the configured backend proxy URL.
+   * In production the backend is mandatory (it holds the Stripe secret key —
+   * PAY-03). The direct Stripe API fallback exists for development only.
    */
   public async getFromBackend<T>(backendPath: string, stripeFallbackPath: string): Promise<T> {
     if (this.config.backendUrl) {
       const url = `${this.config.backendUrl.replace(/\/$/, '')}/${backendPath.replace(/^\//, '')}`;
       return this.request<T>('GET', url);
+    }
+    if (!isDevelopmentRuntime()) {
+      throw new Error('Stripe backend URL is not configured');
     }
     return this.get<T>(stripeFallbackPath);
   }

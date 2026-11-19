@@ -32,6 +32,8 @@ export interface SquareSettings {
   applicationId: string;
   locationId: string;
   accessToken: string;
+  /** Merchant backend endpoint that charges card nonces via the Square Payments API. */
+  backendUrl?: string;
 }
 
 export interface AdyenSettings {
@@ -88,6 +90,7 @@ const DEFAULT_PAYMENT_SETTINGS: PaymentSettings = {
     applicationId: '',
     locationId: '',
     accessToken: '',
+    backendUrl: '',
   },
   adyen: {
     apiKey: '',

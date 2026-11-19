@@ -48,6 +48,17 @@ export const SquareSettingsForm: React.FC<SquareSettingsFormProps> = ({ paymentS
           editable={!isLoading}
         />
       </View>
+      <View style={styles.inputGroup}>
+        <TextInput
+          style={styles.input}
+          value={s.backendUrl ?? ''}
+          onChangeText={v => onSettingChange('backendUrl', v)}
+          placeholder={t('settings.payment.backendUrl')}
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={!isLoading}
+        />
+      </View>
     </View>
   );
 };

@@ -1,5 +1,7 @@
 import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from './PaymentServiceInterface';
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
+import { PaymentSettingsStorage } from '../../platform-clients/services/config/PaymentSettingsStorage';
+import { toCents } from '../../../shared/utils/money';
 
 /**
  * Square In-Person Payments service.
@@ -119,17 +121,71 @@ export class SquareService implements PaymentServiceInterface {
         );
       });
 
-      // In production the nonce (cardDetails.nonce) is sent to your backend,
-      // which calls the Square Payments API to charge the card.
-      const transactionId = `sq_${Date.now()}`;
       const nonce = cardDetails.nonce as string | undefined;
-
       this.logger.info(`Square card nonce obtained: ${nonce ? '***' : 'none'}`);
+
+      if (!nonce) {
+        return {
+          success: false,
+          errorMessage: 'Square card entry did not return a card nonce',
+          timestamp: new Date(),
+        };
+      }
+
+      // A nonce is not a charge (PAY-02). The card must be charged through the
+      // merchant's backend via the Square Payments API; success is reported
+      // only after the backend confirms the payment and returns its real ID.
+      const settings = await PaymentSettingsStorage.load<{ square?: { backendUrl?: string; locationId?: string } }>();
+      const backendUrl = settings?.square?.backendUrl?.replace(/\/+$/, '');
+      if (!backendUrl) {
+        return {
+          success: false,
+          errorMessage: 'Square backend URL is not configured — the card cannot be charged',
+          timestamp: new Date(),
+        };
+      }
+
+      const response = await fetch(`${backendUrl}/square/charge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          nonce,
+          amountCents: toCents(request.amount),
+          currency: request.currency,
+          locationId: settings?.square?.locationId,
+          reference: request.reference,
+          orderId: request.orderId,
+          idempotencyKey: request.orderId || request.reference,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          success: false,
+          errorMessage: `Square charge failed: ${response.status} ${errorText}`,
+          timestamp: new Date(),
+        };
+      }
+
+      const data = (await response.json()) as {
+        paymentId?: string;
+        id?: string;
+        payment?: { id?: string };
+      };
+      const paymentId = data.paymentId ?? data.id ?? data.payment?.id;
+      if (!paymentId) {
+        return {
+          success: false,
+          errorMessage: 'Square backend did not confirm a payment',
+          timestamp: new Date(),
+        };
+      }
 
       return {
         success: true,
-        transactionId,
-        receiptNumber: `SQ-${transactionId.slice(-8).toUpperCase()}`,
+        transactionId: paymentId,
+        receiptNumber: `SQ-${paymentId.slice(-8).toUpperCase()}`,
         timestamp: new Date(),
         amount: request.amount,
         paymentMethod: 'card',

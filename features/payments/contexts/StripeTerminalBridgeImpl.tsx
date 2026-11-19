@@ -11,7 +11,9 @@ import React, { useState, useEffect, ReactNode, useMemo } from 'react';
 import { StripeTerminalProvider, useStripeTerminal } from '@stripe/stripe-terminal-react-native';
 import { keyValueRepository } from '../../../shared/repositories/KeyValueRepository';
 import { useLogger } from '../../../shared/hooks/useLogger';
+import { isDevelopmentRuntime } from '../../../shared/utils/mockFlags';
 import { PaymentSettingsStorage } from '../../platform-clients/services/config/PaymentSettingsStorage';
+import { cancelStripePayment, createStripePaymentIntent, createStripeRefund, fetchStripeConnectionToken } from '../services/stripeBackend';
 import { StripeTerminalBridgeContext, StripeTerminalBridgeManager } from './StripeTerminalBridge';
 import type { Reader, CommonError, StripeTerminalBridgeState, StripeTerminalBridgeActions } from './StripeTerminalBridge';
 
@@ -29,38 +31,23 @@ export const StripeTerminalBridgeProvider: React.FC<{ children: ReactNode }> = (
   // Token provider function
   const fetchTokenProvider = async () => {
     try {
-      const apiKey = (await PaymentSettingsStorage.getStripeNfcApiKey()) || '';
       const locationId = (await keyValueRepository.getItem('stripe_nfc_merchantId')) || '';
-      const useDirectApi = (await keyValueRepository.getItem('stripe_nfc_useDirectApi')) === 'true';
 
-      if (!apiKey) {
-        throw new Error('Stripe API key not configured');
-      }
-
-      // If using direct API, return the API key directly
+      // Direct-API mode (secret key on the register as the connection token)
+      // is a development convenience only — production must go through the
+      // merchant's backend, which holds the secret key (PAY-03).
+      const useDirectApi = isDevelopmentRuntime() && (await keyValueRepository.getItem('stripe_nfc_useDirectApi')) === 'true';
       if (useDirectApi) {
-        logger.info('Using direct API for Stripe Terminal token');
+        const apiKey = (await PaymentSettingsStorage.getStripeNfcApiKey()) || '';
+        if (!apiKey) {
+          throw new Error('Stripe API key not configured');
+        }
+        logger.info('Using direct API for Stripe Terminal token (development only)');
         return apiKey;
       }
 
-      // Otherwise, use backend to fetch token
-      const backendUrl = (await keyValueRepository.getItem('stripe_nfc_backendUrl')) || 'https://your-backend-url.com';
-      logger.info(`Fetching Stripe Terminal token from ${backendUrl}/stripe/connection_token`);
-
-      const response = await fetch(`${backendUrl}/stripe/connection_token`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, locationId }),
-      });
-
-      // Handle potential errors
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Token fetch failed: ${response.status} - ${errorText}`);
-      }
-
-      const { secret } = await response.json();
-      return secret;
+      logger.info('Fetching Stripe Terminal connection token from backend');
+      return await fetchStripeConnectionToken(locationId);
     } catch (error) {
       logger.error('Failed to fetch Stripe connection token:', error instanceof Error ? error : new Error(String(error)));
       throw error;
@@ -311,12 +298,13 @@ export const StripeTerminalBridgeProvider: React.FC<{ children: ReactNode }> = (
             setState(prev => ({ ...prev, isProcessingPayment: true }));
             logger.info(`Processing payment: $${amount} ${currency} - ${description}`);
 
-            // Check if we should use the direct API or backend
-            const useDirectApi = (await keyValueRepository.getItem('stripe_nfc_useDirectApi')) === 'true';
+            // PaymentIntents are created by the merchant's backend, which
+            // holds the secret key. The legacy direct-API path (secret key on
+            // the register) is kept for development builds only (PAY-03).
+            const useDirectApi = isDevelopmentRuntime() && (await keyValueRepository.getItem('stripe_nfc_useDirectApi')) === 'true';
             let paymentIntent;
 
             if (useDirectApi) {
-              // Direct API - use API key
               const apiKey = (await PaymentSettingsStorage.getStripeNfcApiKey()) || '';
               if (!apiKey) {
                 throw new Error('Stripe API key not configured');
@@ -347,28 +335,7 @@ export const StripeTerminalBridgeProvider: React.FC<{ children: ReactNode }> = (
 
               paymentIntent = await stripeResponse.json();
             } else {
-              // Use backend endpoint
-              const backendUrl = await keyValueRepository.getItem('stripe_nfc_backendUrl');
-              if (!backendUrl) {
-                throw new Error('Stripe backend URL not configured');
-              }
-
-              const response = await fetch(`${backendUrl}/stripe/create_payment_intent`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  amount: Math.round(amount * 100), // Convert dollars to cents
-                  currency,
-                  description,
-                  metadata,
-                }),
-              });
-
-              if (!response.ok) {
-                throw new Error(`Backend error: ${response.status}`);
-              }
-
-              paymentIntent = await response.json();
+              paymentIntent = await createStripePaymentIntent({ amount, currency, description, metadata });
             }
 
             if (!paymentIntent || !paymentIntent.id) {
@@ -483,29 +450,9 @@ export const StripeTerminalBridgeProvider: React.FC<{ children: ReactNode }> = (
             }
 
             // The Stripe Terminal SDK requires a backend call to first retrieve the payment intent
-            // before cancelling, as the terminal itself may not have the full intent details
-            const apiKey = (await PaymentSettingsStorage.getStripeNfcApiKey()) || '';
-            if (!apiKey) {
-              throw new Error('Stripe API key not configured');
-            }
-
-            // Get backend URL from storage
-            const backendUrl = (await keyValueRepository.getItem('stripe_nfc_backendUrl')) || 'https://your-backend-url.com';
-            const response = await fetch(`${backendUrl}/stripe/cancel_payment`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                apiKey,
-                paymentIntentId: transactionId,
-              }),
-            });
-
-            const result = await response.json();
-
-            if (!result.success) {
-              throw new Error(result.error || 'Cancel payment failed');
-            }
-
+            // before cancelling, as the terminal itself may not have the full intent details.
+            // The backend holds the secret key — it is never sent from the register (PAY-03).
+            await cancelStripePayment(transactionId);
             return true;
           } catch (e) {
             const error = e as Error;
@@ -515,31 +462,10 @@ export const StripeTerminalBridgeProvider: React.FC<{ children: ReactNode }> = (
         },
 
         refundPayment: async (transactionId, amount) => {
-          // Note: Refunds are typically handled through the Stripe API, not the Terminal SDK
-          // This would be implemented by calling your backend which calls the Stripe Refunds API
+          // Refunds go through the merchant's backend, which calls the Stripe
+          // Refunds API with the secret key it holds (PAY-03).
           try {
-            const apiKey = (await PaymentSettingsStorage.getStripeNfcApiKey()) || '';
-            if (!apiKey) {
-              throw new Error('Stripe API key not configured');
-            }
-
-            // Get backend URL from storage
-            const backendUrl = (await keyValueRepository.getItem('stripe_nfc_backendUrl')) || 'https://your-backend-url.com';
-            const response = await fetch(`${backendUrl}/stripe/refund`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                apiKey,
-                paymentIntentId: transactionId,
-                amount: Math.round(amount * 100), // Convert to cents
-              }),
-            });
-
-            const result = await response.json();
-
-            if (!result.success) {
-              throw new Error(result.error || 'Refund failed');
-            }
+            await createStripeRefund(transactionId, amount);
 
             setState(prev => ({
               ...prev,

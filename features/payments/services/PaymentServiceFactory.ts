@@ -1,7 +1,7 @@
 import { PaymentServiceInterface } from './PaymentServiceInterface';
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
 import { USE_MOCK_PAYMENT } from '@env';
-import { isMockFlagEnabled } from '../../../shared/utils/mockFlags';
+import { isDevelopmentRuntime, isMockFlagEnabled } from '../../../shared/utils/mockFlags';
 import Constants from 'expo-constants';
 import { MockPaymentService } from './mock/MockPaymentService';
 import { InstoreApiPaymentService } from '../../multi-register/services/payment/InstoreApiPaymentService';
@@ -124,13 +124,23 @@ export class PaymentServiceFactory {
 
   /**
    * Attempts to load a real SDK service via the provided factory function.
-   * Falls back to MockPaymentService and logs a warning if the load fails
-   * (e.g. native module not available on the current platform).
+   *
+   * In development builds it falls back to MockPaymentService with a warning
+   * if the load fails (e.g. native module not available on the current
+   * platform). In production it rethrows — a register must never silently
+   * simulate payments when the real provider cannot initialise (PAY-01).
    */
   private loadWithMockFallback(factory: () => PaymentServiceInterface, providerName: string): PaymentServiceInterface {
     try {
       return factory();
     } catch (error) {
+      if (!isDevelopmentRuntime()) {
+        this.logger.error(
+          { message: `${providerName} SDK not available — refusing to simulate payments in production` },
+          error instanceof Error ? error : new Error(String(error))
+        );
+        throw error;
+      }
       this.logger.warn(
         { message: `${providerName} SDK not available — falling back to MockPaymentService` },
         error instanceof Error ? error : new Error(String(error))

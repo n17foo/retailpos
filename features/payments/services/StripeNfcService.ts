@@ -5,6 +5,7 @@ import { StripeTerminalBridgeManager } from '../contexts/StripeTerminalBridge';
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
 import { StripeApiClient } from '../../platform-clients/services/clients/stripe/StripeApiClient';
 import { PaymentSettingsStorage } from '../../platform-clients/services/config/PaymentSettingsStorage';
+import { isDevelopmentRuntime } from '../../../shared/utils/mockFlags';
 
 /**
  * Implementation of Stripe NFC Tap to Pay service
@@ -425,37 +426,42 @@ export class StripeNfcService implements PaymentServiceInterface {
 
   /**
    * Configure the Stripe API client with current settings.
+   *
+   * The merchant backend holds the Stripe secret key (PAY-03), so the key on
+   * the register is optional: when a backend URL is configured it is not sent
+   * to the client at all. Without a backend URL only development builds may
+   * use the direct Stripe API.
    */
   private async configureStripeClient(): Promise<StripeApiClient> {
-    const apiKey = await PaymentSettingsStorage.getStripeNfcApiKey();
-    if (!apiKey) {
-      throw new Error('Stripe API key not configured');
-    }
     const backendUrl = (await keyValueRepository.getItem('stripe_nfc_backendUrl')) || undefined;
+    const apiKey = backendUrl ? undefined : ((await PaymentSettingsStorage.getStripeNfcApiKey()) ?? undefined);
+    if (!backendUrl && !apiKey && !isDevelopmentRuntime()) {
+      throw new Error('Stripe backend URL is not configured');
+    }
     const client = StripeApiClient.getInstance();
     client.configure({ apiKey, backendUrl, storeUrl: 'https://api.stripe.com' });
     return client;
   }
 
   /**
-   * Get raw transaction data from Stripe API (internal use)
+   * Get raw transaction data via the merchant backend (internal use).
+   * Falls back to the direct Stripe API in development builds only.
    */
   private async getRawTransactionStatus(transactionId: string): Promise<Record<string, unknown>> {
     const client = await this.configureStripeClient();
 
-    const bridgeManager = StripeTerminalBridgeManager.getInstance();
-    if (bridgeManager.bridge && bridgeManager.isTerminalInitialized()) {
-      try {
-        return await client.getFromBackend<Record<string, unknown>>(
-          `stripe/payment_intent/${transactionId}`,
-          `v1/payment_intents/${transactionId}`
-        );
-      } catch (bridgeError) {
-        this.logger.warn('Bridge transaction status check failed, falling back to Stripe API', bridgeError);
+    try {
+      return await client.getFromBackend<Record<string, unknown>>(
+        `stripe/payment_intent/${transactionId}`,
+        `v1/payment_intents/${transactionId}`
+      );
+    } catch (backendError) {
+      if (!isDevelopmentRuntime()) {
+        throw backendError;
       }
+      this.logger.warn('Backend transaction status check failed, falling back to Stripe API (development only)', backendError);
+      return client.get<Record<string, unknown>>(`v1/payment_intents/${transactionId}`);
     }
-
-    return client.get<Record<string, unknown>>(`v1/payment_intents/${transactionId}`);
   }
 
   /**
