@@ -1,6 +1,7 @@
 import { getStoreCurrencyCode } from '../../platform-clients/services/config/StoreCurrency';
 import { PaymentRequest, PaymentResponse, PaymentServiceInterface } from './PaymentServiceInterface';
 import { LoggerFactory } from '../../../shared/services/logger/LoggerFactory';
+import { toCents } from '../../../shared/utils/money';
 
 /**
  * Adyen In-Person Payments service.
@@ -42,6 +43,14 @@ export class AdyenService implements PaymentServiceInterface {
   private loadSdk(): void {
     try {
       this.sdk = require('@adyen/react-native');
+      // PAY-04: the installed @adyen/react-native package exposes components/
+      // checkout modules only — the AdyenTerminal object this service needs is
+      // not part of it (Adyen Terminal API via Cloud is routed through
+      // INSTORE_API instead, see PaymentServiceFactory/ADR-015). Fail at load
+      // time rather than surfacing a cryptic TypeError on first connect.
+      if (!this.sdk?.AdyenTerminal) {
+        throw new Error('@adyen/react-native does not expose AdyenTerminal — in-person Adyen payments must use the INSTORE_API provider');
+      }
       this.logger.info('Adyen React Native SDK loaded');
     } catch (error) {
       this.logger.error('Failed to load Adyen SDK', error instanceof Error ? error : new Error(String(error)));
@@ -119,7 +128,8 @@ export class AdyenService implements PaymentServiceInterface {
       this.logger.info(`Processing Adyen payment of ${request.amount} (ref: ${request.reference})`);
 
       const result = await this.sdk.AdyenTerminal.startPayment({
-        amount: { value: request.amount, currency: request.currency?.toUpperCase() },
+        // Adyen amounts are in minor units (cents); PaymentRequest.amount is major.
+        amount: { value: toCents(request.amount), currency: request.currency?.toUpperCase() },
         reference: request.reference,
         merchantAccount: process.env.ADYEN_MERCHANT_ACCOUNT ?? '',
         metadata: {
@@ -187,7 +197,7 @@ export class AdyenService implements PaymentServiceInterface {
       this.logger.info(`Refunding Adyen transaction: ${transactionId} for ${amount}`);
       const result = await this.sdk.AdyenTerminal.refundPayment({
         pspReference: transactionId,
-        amount: { value: amount, currency: (await getStoreCurrencyCode()).toUpperCase() },
+        amount: { value: toCents(amount), currency: (await getStoreCurrencyCode()).toUpperCase() },
       });
       return {
         success: result.status === 'received',

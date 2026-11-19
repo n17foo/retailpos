@@ -41,6 +41,13 @@ export class TapPaymentsService implements PaymentServiceInterface {
   private loadSdk(): void {
     try {
       this.sdk = require('card-react-native');
+      // PAY-04: card-react-native only ships a card-tokenization UI component
+      // (CardSdkReactNativeView) — the TapPayments terminal object this service
+      // needs is not part of the package. Fail at load time rather than
+      // surfacing a cryptic TypeError on first connect.
+      if (!this.sdk?.TapPayments) {
+        throw new Error('card-react-native does not expose TapPayments — this provider cannot process in-person payments');
+      }
       this.logger.info('Tap Payments (card-react-native) SDK loaded');
     } catch (error) {
       this.logger.error('Failed to load Tap Payments SDK', error instanceof Error ? error : new Error(String(error)));
