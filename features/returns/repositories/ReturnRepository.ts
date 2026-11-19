@@ -14,6 +14,10 @@ export interface ReturnRow {
   reason: string | null;
   restock: number;
   status: string;
+  /** Monetary leg lifecycle (RET-05): none → pending → refunded | failed */
+  refund_status?: 'none' | 'pending' | 'refunded' | 'failed';
+  /** Platform refund reference once the monetary leg confirmed */
+  refund_id?: string | null;
   processed_by: string | null;
   processed_at: number | null;
   created_at: number;
@@ -21,6 +25,8 @@ export interface ReturnRow {
   /** Links a return line to the exchange order that replaced it */
   exchange_order_id?: string | null;
 }
+
+export type RefundStatus = 'none' | 'pending' | 'refunded' | 'failed';
 
 export interface CreateReturnInput {
   orderId: string;
@@ -49,6 +55,13 @@ export interface ReturnRepository {
   delete(id: string): Promise<void>;
   /** Link a return line to the exchange order that replaced it (ExchangeService uses when present) */
   linkToExchange?(returnId: string, exchangeOrderId: string): Promise<void>;
+  /**
+   * Update the monetary-leg lifecycle of a return (RET-05). Required for the
+   * durable refund-retry path; repositories without refund tracking may omit it.
+   */
+  updateRefundStatus?(id: string, status: RefundStatus, refundId?: string | null): Promise<void>;
+  /** Returns whose monetary leg is still owed: 'pending' or 'failed' (RET-05). */
+  findUnrefunded?(): Promise<ReturnRow[]>;
 }
 
 /** Singleton offline instance for direct use in standalone/server mode */

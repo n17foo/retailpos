@@ -87,6 +87,8 @@ export interface ProcessReturnResult {
   totalRefund: number;
   /** Platform refund ID if a monetary refund was issued */
   refundId?: string;
+  /** Monetary-leg lifecycle (RET-05): 'pending'/'failed' = still owed, retryable */
+  refundStatus?: 'none' | 'pending' | 'refunded' | 'failed';
   error?: string;
 }
 
@@ -240,9 +242,18 @@ export class ReturnService {
         }
       }
 
-      // Optionally trigger a monetary refund via the platform refund service
+      // Optionally trigger a monetary refund via the platform refund service.
+      // The refund intent is persisted on each return row BEFORE the attempt
+      // (RET-05): a 'pending' row that crashes mid-call and a 'failed' row are
+      // both retryable via retryRefund()/retryUnrefundedReturns().
       let refundId: string | undefined;
+      let refundStatus: 'none' | 'pending' | 'refunded' | 'failed' = 'none';
+      let refundError: string | undefined;
       if (input.issueRefund) {
+        refundStatus = 'pending';
+        for (const id of returnIds) {
+          await this.returnRepo.updateRefundStatus?.(id, 'pending');
+        }
         const platform = input.platform ?? (order.platform as ECommercePlatform | undefined);
         try {
           const refundResult = await this.processRefund(
@@ -262,13 +273,27 @@ export class ReturnService {
           );
           if (refundResult.success) {
             refundId = refundResult.refundId;
+            refundStatus = 'refunded';
+            for (const id of returnIds) {
+              await this.returnRepo.updateRefundStatus?.(id, 'refunded', refundId ?? null);
+            }
             this.logger.info(`Platform refund issued: ${refundId}`);
           } else {
+            refundStatus = 'failed';
+            refundError = refundResult.error ?? 'Platform refund failed';
+            for (const id of returnIds) {
+              await this.returnRepo.updateRefundStatus?.(id, 'failed');
+            }
             this.logger.warn(`Platform refund failed: ${refundResult.error}`);
             notificationService.notify('Refund Warning', `Return recorded but platform refund failed: ${refundResult.error}`, 'warning');
           }
-        } catch (refundError) {
-          this.logger.warn(`Platform refund error: ${refundError instanceof Error ? refundError.message : String(refundError)}`);
+        } catch (refundErr) {
+          refundStatus = 'failed';
+          refundError = refundErr instanceof Error ? refundErr.message : String(refundErr);
+          for (const id of returnIds) {
+            await this.returnRepo.updateRefundStatus?.(id, 'failed');
+          }
+          this.logger.warn(`Platform refund error: ${refundError}`);
         }
       }
 
@@ -280,11 +305,19 @@ export class ReturnService {
 
       notificationService.notify('Return Processed', `${returnIds.length} item(s) returned for order ${input.orderId.slice(-8)}`, 'info');
 
+      // A requested refund that did not complete is NOT overall success —
+      // the return rows are recorded (returnIds/totalRefund stay populated)
+      // and refundStatus tells the caller the money leg is still owed (RET-05).
+      const refundOwed = input.issueRefund === true && refundStatus !== 'refunded';
       return {
-        success: true,
+        success: !refundOwed,
         returnIds,
         totalRefund: Math.round(totalRefund * 100) / 100,
         refundId,
+        refundStatus,
+        error: refundOwed
+          ? `Return recorded, but the refund could not be completed (${refundError ?? 'pending'}) — it can be retried`
+          : undefined,
       };
     } catch (error) {
       this.logger.error(
@@ -293,6 +326,82 @@ export class ReturnService {
       );
       return { success: false, returnIds: [], totalRefund: 0, error: 'Failed to process return' };
     }
+  }
+
+  /**
+   * Retry the monetary leg of a previously recorded return whose refund is
+   * 'pending' or 'failed' (RET-05). Idempotent: a 'refunded' row returns its
+   * existing refund id, a 'none' row was never meant to refund.
+   */
+  async retryRefund(returnId: string): Promise<RefundResult> {
+    try {
+      const row = await this.returnRepo.findById(returnId);
+      if (!row) {
+        return { success: false, error: 'Return not found', timestamp: new Date() };
+      }
+      if (row.refund_status === 'refunded') {
+        return { success: true, refundId: row.refund_id ?? undefined, timestamp: new Date() };
+      }
+      if (!row.refund_status || row.refund_status === 'none') {
+        return { success: false, error: 'This return has no refund outstanding', timestamp: new Date() };
+      }
+
+      const order = await getOrderRepository().findById(row.order_id);
+      if (!order) {
+        return { success: false, error: 'Order not found — cannot refund an unknown order', timestamp: new Date() };
+      }
+
+      const result = await this.processRefund(
+        order.platform_order_id || row.order_id,
+        {
+          amount: row.refund_amount,
+          reason: row.reason ?? 'POS return (retry)',
+          items: [
+            {
+              lineItemId: row.order_item_id || row.product_id,
+              quantity: row.quantity,
+              amount: row.refund_amount,
+              restockInventory: row.restock === 1,
+            },
+          ],
+        },
+        (order.platform as ECommercePlatform | null) ?? undefined,
+        { forReturn: true }
+      );
+
+      await this.returnRepo.updateRefundStatus?.(returnId, result.success ? 'refunded' : 'failed', result.refundId ?? null);
+      return result;
+    } catch (error) {
+      this.logger.error(
+        { message: `Error retrying refund for return ${returnId}` },
+        error instanceof Error ? error : new Error(String(error))
+      );
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: new Date(),
+      };
+    }
+  }
+
+  /**
+   * Returns whose monetary leg is still owed (RET-05) — the work queue a
+   * reconciliation screen or drainer drains via retryRefund().
+   */
+  async getUnrefundedReturns(): Promise<ReturnRow[]> {
+    if (!this.returnRepo.findUnrefunded) return [];
+    return this.returnRepo.findUnrefunded();
+  }
+
+  /** Drain all outstanding refund work; returns the count still owed. */
+  async retryUnrefundedReturns(): Promise<{ attempted: number; refunded: number; outstanding: number }> {
+    const rows = await this.getUnrefundedReturns();
+    let refunded = 0;
+    for (const row of rows) {
+      const result = await this.retryRefund(row.id);
+      if (result.success) refunded++;
+    }
+    return { attempted: rows.length, refunded, outstanding: rows.length - refunded };
   }
 
   /** Get all returns for a specific order */

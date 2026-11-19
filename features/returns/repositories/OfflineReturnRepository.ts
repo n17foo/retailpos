@@ -70,4 +70,18 @@ export class OfflineReturnRepository implements ReturnRepository {
     const now = Date.now();
     await db.runAsync('UPDATE returns SET exchange_order_id = ?, updated_at = ? WHERE id = ?', [exchangeOrderId, now, returnId]);
   }
+
+  async updateRefundStatus(id: string, status: 'none' | 'pending' | 'refunded' | 'failed', refundId?: string | null): Promise<void> {
+    const now = Date.now();
+    await db.runAsync('UPDATE returns SET refund_status = ?, refund_id = ?, updated_at = ? WHERE id = ?', [
+      status,
+      refundId ?? null,
+      now,
+      id,
+    ]);
+  }
+
+  async findUnrefunded(): Promise<ReturnRow[]> {
+    return db.getAllAsync<ReturnRow>(`SELECT * FROM returns WHERE refund_status IN ('pending','failed') ORDER BY created_at ASC`);
+  }
 }

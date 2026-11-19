@@ -7,7 +7,7 @@ const logger = LoggerFactory.getInstance().createLogger('dbSchema');
  * Current database schema version.
  * Bump this number and add a migration block whenever the schema changes.
  */
-export const LATEST_DB_VERSION = 16;
+export const LATEST_DB_VERSION = 17;
 
 /**
  * Initialise (or migrate) the database schema.
@@ -261,6 +261,9 @@ async function migrateDatabase(db: SQLiteDatabase, fromVersion: number, toVersio
           restock           INTEGER NOT NULL DEFAULT 1,
           status            TEXT NOT NULL DEFAULT 'pending'
                               CHECK(status IN ('pending','approved','rejected','completed')),
+          refund_status     TEXT NOT NULL DEFAULT 'none'
+                              CHECK(refund_status IN ('none','pending','refunded','failed')),
+          refund_id         TEXT,
           processed_by      TEXT,
           processed_at      INTEGER,
           exchange_order_id TEXT,
@@ -942,6 +945,27 @@ async function migrateDatabase(db: SQLiteDatabase, fromVersion: number, toVersio
       }
 
       logger.info('v16 applied.');
+    }
+
+    // ── v17 – Refund lifecycle on returns (RET-05) ────────────────────────
+    if (fromVersion < 17) {
+      logger.info('Applying v17: refund_status/refund_id on returns…');
+
+      // refund_status tracks the monetary leg separately from the return's
+      // stock lifecycle: none (no refund requested) → pending (intent
+      // persisted) → refunded | failed. A 'pending'/'failed' row is durable
+      // refund work that retryRefund() can pick up after a crash.
+      for (const [colName, ddl] of [
+        ['refund_status', `ALTER TABLE returns ADD COLUMN refund_status TEXT NOT NULL DEFAULT 'none'`],
+        ['refund_id', `ALTER TABLE returns ADD COLUMN refund_id TEXT`],
+      ] as const) {
+        const col = await db.getFirstAsync<{ cid: number }>(`SELECT cid FROM pragma_table_info('returns') WHERE name = '${colName}'`);
+        if (!col) {
+          await db.runAsync(ddl);
+        }
+      }
+
+      logger.info('v17 applied.');
     }
 
     // Stamp the version
