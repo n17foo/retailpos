@@ -41,6 +41,11 @@ export class OfflineFiscalService implements FiscalService {
   }
 
   async finalizeSale(orderId: string): Promise<FiscalRecord> {
+    // Resolve the authority adapter BEFORE allocating — an unsupported
+    // jurisdiction (IT without a certified partner) must leave the order
+    // 'unfinalized', not stamp a record that can never be legal.
+    const adapter = getFiscalAuthorityAdapter(this.jurisdiction);
+
     const order = await orderRepository.findById(orderId);
     if (!order) {
       throw new Error(`Cannot fiscalize unknown order ${orderId}`);
@@ -66,11 +71,11 @@ export class OfflineFiscalService implements FiscalService {
       },
       registerId: order.register_id ?? null,
     });
-    await this.notifyAuthority(record);
-    return record;
+    return this.notifyAuthority(record, adapter);
   }
 
   async voidOrder(orderId: string, reason: string): Promise<FiscalRecord> {
+    const adapter = getFiscalAuthorityAdapter(this.jurisdiction);
     const order = await orderRepository.findById(orderId);
     if (!order) {
       throw new Error(`Cannot void unknown order ${orderId}`);
@@ -85,11 +90,11 @@ export class OfflineFiscalService implements FiscalService {
       registerId: order.register_id ?? null,
       markOrder: 'voided',
     });
-    await this.notifyAuthority(record);
-    return record;
+    return this.notifyAuthority(record, adapter);
   }
 
   async registerReturn(returnId: string, orderId: string): Promise<FiscalRecord> {
+    const adapter = getFiscalAuthorityAdapter(this.jurisdiction);
     const order = await orderRepository.findById(orderId);
     if (!order) {
       throw new Error(`Cannot register return against unknown order ${orderId}`);
@@ -98,14 +103,13 @@ export class OfflineFiscalService implements FiscalService {
       throw new Error(`Return ${returnId} references order ${orderId} which has no fiscal record`);
     }
     const record = await this.allocateRecord('return', { orderId, returnId });
-    await this.notifyAuthority(record);
-    return record;
+    return this.notifyAuthority(record, adapter);
   }
 
   async closeShift(summary: ShiftFiscalSummary): Promise<FiscalRecord> {
+    const adapter = getFiscalAuthorityAdapter(this.jurisdiction);
     const record = await this.allocateRecord('z_report', { shiftId: summary.shiftId, shift: summary });
-    await this.notifyAuthority(record);
-    return record;
+    return this.notifyAuthority(record, adapter);
   }
 
   async getRecord(orderId: string): Promise<FiscalRecord | null> {
@@ -238,17 +242,20 @@ export class OfflineFiscalService implements FiscalService {
     return record;
   }
 
-  private async notifyAuthority(record: FiscalRecord): Promise<void> {
+  private async notifyAuthority(record: FiscalRecord, adapter: ReturnType<typeof getFiscalAuthorityAdapter>): Promise<FiscalRecord> {
     // Adapter failure must not touch the committed chain record — the
     // authority outbox picks it up on retry.
-    await getFiscalAuthorityAdapter(this.jurisdiction)
-      .onRecord(record)
-      .catch((error: unknown) => {
-        this.logger.warn(
-          { message: `Authority adapter failed for record ${record.number}` },
-          error instanceof Error ? error : new Error(String(error))
-        );
-      });
+    const outcome = await adapter.onRecord(record).catch((error: unknown) => {
+      this.logger.warn(
+        { message: `Authority adapter failed for record ${record.number}` },
+        error instanceof Error ? error : new Error(String(error))
+      );
+      return undefined;
+    });
+    if (outcome?.receiptQrUrl) {
+      record.authorityQr = outcome.receiptQrUrl;
+    }
+    return record;
   }
 
   private mapRow(row: FiscalRecordRow): FiscalRecord {

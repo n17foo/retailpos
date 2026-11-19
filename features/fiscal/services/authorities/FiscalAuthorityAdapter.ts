@@ -9,10 +9,21 @@ import type { FiscalJurisdiction, FiscalRecord } from '../FiscalServiceInterface
  *
  * docs/features/fiscal/README.md §Jurisdiction matrix.
  */
+/** Artifacts an adapter can hand back to the caller (receipt extras). */
+export interface FiscalAuthorityOutcome {
+  /** Receipt QR payload — e.g. the Veri*factu ValidarQR URL. */
+  receiptQrUrl?: string;
+}
+
 export interface FiscalAuthorityAdapter {
   readonly jurisdiction: FiscalJurisdiction;
   /** Post-commit authority work for a new fiscal record. */
-  onRecord(record: FiscalRecord): Promise<void>;
+  onRecord(record: FiscalRecord): Promise<FiscalAuthorityOutcome | undefined>;
+  /**
+   * Side-effect-free receipt artifacts for an existing record — safe to
+   * call in client mode where authority submission is server-owned.
+   */
+  receiptOutcome?(record: FiscalRecord): FiscalAuthorityOutcome | undefined;
 }
 
 export class UnsupportedAuthorityError extends Error {

@@ -64,6 +64,8 @@ export interface ReceiptData {
   currencySymbol?: string;
   /** Fiscal invoice number (e.g. N17-A-000123) — printed in place of the raw order id when set. */
   fiscalNumber?: string;
+  /** Fiscal QR payload (e.g. ES record-mode ValidarQR URL) — printed as a QR image when set. */
+  fiscalQr?: string;
 }
 
 /**

@@ -8,5 +8,7 @@ import type { FiscalJurisdiction, FiscalRecord } from '../FiscalServiceInterface
  */
 export class NullAuthorityAdapter implements FiscalAuthorityAdapter {
   readonly jurisdiction: FiscalJurisdiction = 'generic';
-  async onRecord(_record: FiscalRecord): Promise<void> {}
+  async onRecord(_record: FiscalRecord): Promise<undefined> {
+    return undefined;
+  }
 }

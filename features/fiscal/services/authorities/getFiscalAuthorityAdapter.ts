@@ -1,13 +1,16 @@
 import { FiscalAuthorityAdapter, UnsupportedAuthorityError } from './FiscalAuthorityAdapter';
 import { NullAuthorityAdapter } from './NullAuthorityAdapter';
 import { RecordOnlyAuthorityAdapter } from './RecordOnlyAuthorityAdapter';
+import { EsVerifactuAdapter } from './EsVerifactuAdapter';
+import { DeTseAdapter } from './DeTseAdapter';
+import { FrNf525Adapter } from './FrNf525Adapter';
 import type { FiscalJurisdiction } from '../FiscalServiceInterface';
 
 /**
  * Select the authority adapter for the configured jurisdiction.
- * Record-only markets share one adapter; the certified tier (ES/IT/DE/FR)
- * throws until its vendor adapters land — fail-closed on purpose: a
- * merchant must not sell under an unimplemented fiscal regime.
+ * Record-only markets share one adapter; Italy alone stays unsupported —
+ * it needs an AdE-approved software solution or RT-device partner, so
+ * configuring 'it' fails closed rather than produce illegal receipts.
  */
 export function getFiscalAuthorityAdapter(jurisdiction: FiscalJurisdiction): FiscalAuthorityAdapter {
   switch (jurisdiction) {
@@ -19,9 +22,12 @@ export function getFiscalAuthorityAdapter(jurisdiction: FiscalJurisdiction): Fis
     case 'be':
       return new RecordOnlyAuthorityAdapter(jurisdiction);
     case 'es':
-    case 'it':
+      return new EsVerifactuAdapter();
     case 'de':
+      return new DeTseAdapter();
     case 'fr':
+      return new FrNf525Adapter();
+    case 'it':
       throw new UnsupportedAuthorityError(jurisdiction);
   }
 }

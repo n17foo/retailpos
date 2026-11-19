@@ -875,6 +875,7 @@ async function migrateDatabase(db: SQLiteDatabase, fromVersion: number, toVersio
           record_id  TEXT NOT NULL,
           authority  TEXT NOT NULL,
           status     TEXT NOT NULL CHECK(status IN ('pending','sent','failed','dead')),
+          request    TEXT,
           response   TEXT,
           attempts   INTEGER NOT NULL DEFAULT 0,
           created_at INTEGER NOT NULL,
@@ -883,6 +884,15 @@ async function migrateDatabase(db: SQLiteDatabase, fromVersion: number, toVersio
         );
       `);
       await db.runAsync(`CREATE INDEX IF NOT EXISTS idx_fiscal_tx_status ON fiscal_transmissions(status);`);
+
+      // request column added after the v15 CREATE shipped on the dev branch —
+      // guarded ALTER so databases migrated before the column existed get it.
+      const txHasRequest = await db.getFirstAsync<{ cid: number }>(
+        `SELECT cid FROM pragma_table_info('fiscal_transmissions') WHERE name = 'request'`
+      );
+      if (!txHasRequest) {
+        await db.runAsync(`ALTER TABLE fiscal_transmissions ADD COLUMN request TEXT`);
+      }
 
       // Appended columns — order scans elsewhere are positional, so these
       // must go last (same rule as the server-side ORDER_COLUMNS contract).

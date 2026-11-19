@@ -9,5 +9,7 @@ import type { FiscalJurisdiction, FiscalRecord } from '../FiscalServiceInterface
  */
 export class RecordOnlyAuthorityAdapter implements FiscalAuthorityAdapter {
   constructor(readonly jurisdiction: FiscalJurisdiction) {}
-  async onRecord(_record: FiscalRecord): Promise<void> {}
+  async onRecord(_record: FiscalRecord): Promise<undefined> {
+    return undefined;
+  }
 }

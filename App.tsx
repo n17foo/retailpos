@@ -18,6 +18,7 @@ import { useLogger } from './shared/hooks/useLogger';
 import { useTranslate } from './shared/hooks/useTranslate';
 import { lightColors } from './shared/utils/theme';
 import { queueManager } from './shared/services/queue/QueueManager';
+import { fiscalTransmissionDrainer } from './features/fiscal/services/FiscalTransmissionDrainer';
 import { backgroundSyncService } from './features/orders-sync/services/sync/BackgroundSyncService';
 import { loyaltyExpiryJob } from './features/customers/services/loyalty/LoyaltyExpiryJob';
 import { posConfig } from './features/platform-clients/services/config/POSConfigService';
@@ -159,6 +160,10 @@ const AppContent = () => {
         loggerRef.current.error({ message: 'Failed to load local API config' }, err instanceof Error ? err : new Error(String(err)));
       });
 
+    // Fiscal authority outbox — drains pending transmissions (AEAT/TSE)
+    // in standalone mode; the Store API drains its own in client mode.
+    fiscalTransmissionDrainer.start();
+
     // Initialize sync queue manager
     queueManager.initialize();
 
@@ -174,6 +179,7 @@ const AppContent = () => {
       backgroundSyncService.stop();
       loyaltyExpiryJob.stop();
       queueManager.dispose();
+      fiscalTransmissionDrainer.stop();
       syncPoller.stop();
       storeApiHealthService.stop();
       pendingOrderStore.stop();

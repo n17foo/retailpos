@@ -83,6 +83,7 @@ export interface CheckoutResult {
   openDrawer?: boolean;
   /** Legal invoice number allocated during this checkout, when the fiscal module is on. */
   fiscalNumber?: string;
+  fiscalQr?: string;
   payments?: PaymentLine[];
 }
 

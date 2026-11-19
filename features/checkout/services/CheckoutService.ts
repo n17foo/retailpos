@@ -290,6 +290,7 @@ export class CheckoutService implements CheckoutServiceInterface {
     // reported as warnings, never a status flip (audit bug 4).
     const warnings: string[] = [];
     let fiscalNumber: string | undefined;
+    let fiscalQr: string | undefined;
     const nonFatal = (label: string) => (error: unknown) => {
       warnings.push(label);
       this.logger.warn(
@@ -330,6 +331,7 @@ export class CheckoutService implements CheckoutServiceInterface {
           .finalizeSale(orderId)
           .then(record => {
             fiscalNumber = record.number;
+            fiscalQr = record.authorityQr;
             auditLogService.log('fiscal:finalized', {
               details: `Order ${orderId} fiscalized as ${record.number}`,
               metadata: { orderId, fiscalRecordId: record.id, number: record.number, seq: record.seq },
@@ -374,6 +376,7 @@ export class CheckoutService implements CheckoutServiceInterface {
         orderId,
         openDrawer,
         fiscalNumber,
+        fiscalQr,
         warning: warnings.length > 0 ? `Payment recorded; deferred step(s) failed: ${warnings.join(', ')}` : undefined,
       };
     } catch (error) {
@@ -384,6 +387,7 @@ export class CheckoutService implements CheckoutServiceInterface {
         success: true,
         orderId,
         fiscalNumber,
+        fiscalQr,
         warning: `Payment recorded; a post-payment step failed: ${(error as Error).message}`,
       };
     }

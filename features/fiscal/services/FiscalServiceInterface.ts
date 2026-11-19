@@ -31,6 +31,12 @@ export interface FiscalRecord {
   prevHash: string;
   hash: string;
   createdAt: number;
+  /**
+   * Transient receipt artifact from the authority adapter (e.g. ES
+   * record-mode ValidarQR URL). Never persisted or hashed — populated
+   * only on records returned by finalize/void/return calls.
+   */
+  authorityQr?: string;
 }
 
 export interface ChainVerification {

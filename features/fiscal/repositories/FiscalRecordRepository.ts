@@ -29,6 +29,8 @@ export interface FiscalTransmissionRow {
   record_id: string;
   authority: string;
   status: 'pending' | 'sent' | 'failed' | 'dead';
+  /** Authority-specific request body built at enqueue time (e.g. AEAT XML + huella). */
+  request: string | null;
   response: string | null;
   attempts: number;
   created_at: number;
@@ -98,13 +100,53 @@ export class FiscalRecordRepository {
   }
 
   /** Enqueue an authority submission for a record (jurisdiction adapters). */
-  async enqueueTransmission(id: string, recordId: string, authority: string): Promise<void> {
-    await db.runAsync(`INSERT INTO fiscal_transmissions (id, record_id, authority, status, created_at) VALUES (?, ?, ?, 'pending', ?)`, [
-      id,
-      recordId,
-      authority,
+  async enqueueTransmission(id: string, recordId: string, authority: string, request?: string): Promise<void> {
+    await db.runAsync(
+      `INSERT INTO fiscal_transmissions (id, record_id, authority, status, request, created_at) VALUES (?, ?, ?, 'pending', ?, ?)`,
+      [id, recordId, authority, request ?? null, Date.now()]
+    );
+  }
+
+  /** Outbox feed — pending rows plus failed rows still under the retry cap. */
+  async listPendingTransmissions(maxAttempts: number, limit = 25): Promise<FiscalTransmissionRow[]> {
+    return db.getAllAsync<FiscalTransmissionRow>(
+      `SELECT * FROM fiscal_transmissions
+       WHERE status = 'pending' OR (status = 'failed' AND attempts < ?)
+       ORDER BY created_at ASC LIMIT ?`,
+      [maxAttempts, limit]
+    );
+  }
+
+  async markTransmissionSent(id: string, response: string | null): Promise<void> {
+    await db.runAsync(`UPDATE fiscal_transmissions SET status = 'sent', response = ?, attempts = attempts + 1, sent_at = ? WHERE id = ?`, [
+      response,
       Date.now(),
+      id,
     ]);
+  }
+
+  async markTransmissionFailed(id: string, error: string, maxAttempts: number): Promise<void> {
+    // attempts is bumped in the same statement; the status flips to 'dead'
+    // once the cap is reached — no read-modify-write race.
+    await db.runAsync(
+      `UPDATE fiscal_transmissions
+       SET attempts = attempts + 1,
+           response = ?,
+           status = CASE WHEN attempts + 1 >= ? THEN 'dead' ELSE 'failed' END
+       WHERE id = ?`,
+      [error, maxAttempts, id]
+    );
+  }
+
+  /** The most recent authority request payload for a chain — carries the previous huella for ES encadenamiento. */
+  async latestChainTransmission(chainId: string, authority: string): Promise<FiscalTransmissionRow | null> {
+    return db.getFirstAsync<FiscalTransmissionRow>(
+      `SELECT t.* FROM fiscal_transmissions t
+       JOIN fiscal_records r ON r.id = t.record_id
+       WHERE r.chain_id = ? AND t.authority = ?
+       ORDER BY r.seq DESC LIMIT 1`,
+      [chainId, authority]
+    );
   }
 }
 
