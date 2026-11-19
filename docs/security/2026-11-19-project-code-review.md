@@ -2,7 +2,7 @@
 
 Date: 2026-11-19  
 Revision: `909c2ee` (`main`)  
-Status: all P1 findings fixed — commits `3ad321f`, `b913539`, `632ed86`, `4f54bbb`, `157e7fb`, `b055ee0`, `9343a50`, `4f90d42`; P2 findings remain open
+Status: all findings fixed — P1 commits `3ad321f`, `b913539`, `632ed86`, `4f54bbb`, `157e7fb`, `b055ee0`, `9343a50`, `4f90d42`; P2 commits `9579b1e`, `ca2654b`, `d10c85e`, `d82e255`, `e995039`, `bf0b760`, `53ae296`
 
 ## Findings And Priorities
 
@@ -110,6 +110,8 @@ and optimistic version checks. Test concurrent add/add and add/remove.
 
 ### BAS-02 - P2 - Basket clear retains the previous customer's identity and note
 
+Status: **fixed** in `9579b1e`
+
 Evidence: `features/basket/repositories/BasketRepository.ts:81-88`;
 `features/basket/services/BasketService.ts:64-67,161-167`.
 
@@ -126,6 +128,8 @@ customer/sale-scoped fields; preserve state only for a separately named action.
 ## Catalogue
 
 ### CAT-01 - P2 - Available untracked products are filtered out as out of stock
+
+Status: **fixed** in `ca2654b`
 
 Evidence:
 `features/catalogue/services/product/platforms/OfflineProductService.ts:65-96`.
@@ -207,6 +211,8 @@ This reproduces standalone behavior; server rejection is not validated here.
 
 ### CUS-03 - P2 - Retried checkout can award the same order's loyalty twice
 
+Status: **fixed** in `d10c85e`
+
 Evidence: `features/customers/services/loyalty/LoyaltyService.ts:135-146`;
 `features/customers/repositories/LoyaltyRepository.ts:117-146`.
 
@@ -277,6 +283,8 @@ under the consuming features.
 
 ### HARD-01 - P2 - Electron receipts ignore supplied fiscal identity and QR
 
+Status: **fixed** in `d82e255`
+
 Evidence: `features/hardware/services/printer/ElectronPrinterService.ts:100-119`;
 `features/hardware/services/printer/BasePrinterService.ts:144-208`.
 
@@ -292,6 +300,8 @@ and QR command bytes. No physical printer behavior was tested.
 ## Inventory
 
 ### INV-01 - P2 - Offline inventory merges distinct product variants
+
+Status: **fixed** in `e995039`
 
 Evidence:
 `features/inventory/services/platforms/OfflineInventoryService.ts:61-75,82-125`.
@@ -474,6 +484,8 @@ writes, partial saves, and effective credential/provider rotation.
 
 ### SHR-01 - P2 - Concurrent generic queue drains send the same request twice
 
+Status: **fixed** in `bf0b760`
+
 Evidence: `shared/hooks/useSyncStore.ts:71-98`;
 `shared/services/queue/QueueManager.ts:19-56`.
 
@@ -490,6 +502,8 @@ This review did not establish a real monetary endpoint using this generic
 queue, so it does not claim an observed duplicate charge from SHR-01.
 
 ### SYS-01 - P2 - SQLite is exposed before migration/readiness completes
+
+Status: **fixed** in `53ae296`
 
 Validation: static asynchronous control-flow trace.  
 Evidence: `shared/utils/db.ts:66-85,105-117`.

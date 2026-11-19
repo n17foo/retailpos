@@ -2,7 +2,7 @@
 
 Date: 2026-11-19  
 Revision: `909c2ee` (`main`)  
-Status: all P1 findings fixed — PAY-03 in `3ad321f`, RET-02/03/04 in `632ed86`, DIS-01 in `b913539`; P2 findings and notes remain open
+Status: all findings fixed — P1 commits `3ad321f`, `632ed86`, `b913539`; P2 commits `0d406ae`, `f3ae662`, `d96dba0`, `9a9d32e`. Lower-priority observations (non-findings) remain as documented
 
 ## Summary
 
@@ -118,6 +118,8 @@ Recommendation:
   backend URL.
 
 ### PAY-04 - P2 - Adyen and Tap services call SDK APIs that do not exist; Adyen amount units
+
+Status: **fixed** in `0d406ae`
 
 Validation: static, plus inspection of the installed packages.  
 Evidence: `features/payments/services/AdyenService.ts:44,60,97,121-124,168,188-190`;
@@ -304,6 +306,8 @@ Recommendation:
 
 ### RET-05 - P2 - Return is committed before the refund; a failed refund cannot be retried
 
+Status: **fixed** in `f3ae662`
+
 Validation: static trace.  
 Evidence: `features/returns/services/refunds/RefundService.ts:201-202,240-262`.
 
@@ -370,6 +374,8 @@ Recommendation:
 
 ### AUTH-01 - P2 - Client-mode PIN login has no LAN-outage fallback
 
+Status: **fixed** in `d96dba0`
+
 Validation: reproduced on real SQLite with the signed transport rejected.  
 Evidence: `features/platform-clients/services/clients/instoreapi/InstoreApiClient.ts:527-535`;
 `features/authentication/services/auth/providers/PinAuthProvider.ts:45,86-95`;
@@ -409,6 +415,8 @@ Recommendation:
 - Test outage login with a cached and an uncached user.
 
 ### AUTH-02 - P2 - Most registered permission keys are never enforced
+
+Status: **fixed** in `d96dba0`
 
 Validation: static (repository-wide search for each key outside the registry).  
 Evidence: `shared/utils/actionRegistry.ts:24-47`;
@@ -452,6 +460,8 @@ Recommendation:
 ## Platform Clients
 
 ### PLT-01 - P2 - Plaintext `http://` platform URLs accepted with credentials
+
+Status: **fixed** in `9a9d32e`
 
 Validation: static.  
 Evidence: `features/platform-clients/services/clients/BaseApiClient.ts:192-199`;

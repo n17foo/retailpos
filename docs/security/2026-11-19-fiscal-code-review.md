@@ -2,7 +2,7 @@
 
 Date: 2026-11-19  
 Reviewed revision: `909c2ee` (`main`)  
-Status: F01–F08 (all P1) fixed in `f699375` with real-SQLite regression coverage; F09–F12 (P2) remain open
+Status: all findings fixed — F01–F08 (P1) in `f699375`, F09–F12 (P2) in `ee711fc`, with real-SQLite regression coverage
 
 ## Scope And Method
 
@@ -246,6 +246,8 @@ this integration for merchants.
 
 ### F09 - P2 - Retrying finalization can resurrect a voided sale
 
+Status: **fixed** in `ee711fc`
+
 Category: financial correctness / idempotency  
 Evidence: `features/fiscal/services/OfflineFiscalService.ts:53-64,77-93,224-231`
 
@@ -264,6 +266,8 @@ of voided orders, and enforce one original sale record per order at the
 transaction/database boundary rather than relying solely on a pre-read.
 
 ### F10 - P2 - SOAP header interpolation permits XML corruption/injection
+
+Status: **fixed** in `ee711fc`
 
 Category: security / input handling (CWE-91)  
 Evidence: `features/fiscal/services/transports/AeatVerifactuTransport.ts:31-46`
@@ -285,6 +289,8 @@ all interpolated text consistently, validate tax-ID input, and test both
 special-character merchant names and closing-tag payloads.
 
 ### F11 - P2 - ES receipt QR artifacts use preproduction and disappear on replay/reprint
+
+Status: **fixed** in `ee711fc`
 
 Category: receipt correctness  
 Evidence: `features/fiscal/services/authorities/verifactu.ts:120-133`;
@@ -309,6 +315,8 @@ and derive receipt artifacts from immutable fiscal data on every relevant
 read/reprint, not only on the first checkout callback.
 
 ### F12 - P2 - Z reports do not freeze totals or lock the standalone period
+
+Status: **fixed** in `ee711fc`
 
 Category: financial integrity / incomplete close semantics  
 Evidence: `features/hardware/services/printer/DailyReportService.ts:90-104,174-235`;
